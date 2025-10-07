@@ -1,0 +1,21 @@
+{
+  "name": "senars-v2",
+  "version": "2.0.0",
+  "description": "SeNARS - Semantic Non-axiomatic Reasoning System - v2 Implementation",
+  "type": "module",
+  "scripts": {
+    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest"
+  },
+  "keywords": [
+    "senars",
+    "agi",
+    "nars",
+    "cognitive-architecture",
+    "neuro-symbolic"
+  ],
+  "author": "SeNARS Community",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "jest": "^30.2.0"
+  }
+}
