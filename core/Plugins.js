@@ -13,21 +13,25 @@ class Plugins extends Component {
   }
 
   async loadPlugin(plugin) {
-    Validation.requireProps(plugin, ['id']);
-    Validation.validateFunction(plugin.install, 'plugin.install');
+    Validation.validatePlugin(plugin);
 
     if (this.plugins.has(plugin.id)) {
       console.warn(`Plugin "${plugin.id}" already loaded`);
       return;
     }
 
-    await plugin.install(this.core);
-    this.plugins.set(plugin.id, plugin);
-    this.emit('plugin.loaded', { id: plugin.id });
+    try {
+      await plugin.install(this.core);
+      this.plugins.set(plugin.id, plugin);
+      this.emit('plugin.loaded', { id: plugin.id });
+    } catch (error) {
+      console.error(`Failed to load plugin "${plugin.id}":`, error);
+      throw error;
+    }
   }
 
   async unloadPlugin(pluginId) {
-    const plugin = this.plugins.has(pluginId) ? this.plugins.get(pluginId) : (() => { throw new Error(`Plugin "${pluginId}" not loaded`); })();
+    const plugin = this.plugins.has(pluginId) ? this.plugins.get(pluginId) : (() => { throw new Error(`Plugin "${pluginId}" is not loaded.`); })();
 
     if (typeof plugin.uninstall === 'function') {
       try {

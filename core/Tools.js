@@ -13,8 +13,7 @@ class Tools extends Component {
   }
 
   registerTool(tool) {
-    Validation.requireProps(tool, ['id']);
-    Validation.validateFunction(tool.execute, 'tool.execute');
+    Validation.validateTool(tool);
 
     if (this.tools.has(tool.id)) {
       console.warn(`Tool "${tool.id}" already registered. Overwriting.`);
@@ -23,15 +22,20 @@ class Tools extends Component {
   }
 
   async execute(toolId, params = {}) {
-    const tool = this.tools.has(toolId) ? this.tools.get(toolId) : (() => { throw new Error(`Tool "${toolId}" not found`); })();
+    const tool = this.tools.has(toolId) ? this.tools.get(toolId) : (() => { throw new Error(`Tool with ID "${toolId}" not found.`); })();
 
     tool.parameters?.forEach(param => {
       if (param.required && !(param.name in params)) {
-        throw new Error(`Missing required parameter "${param.name}" for tool "${toolId}"`);
+        throw new Error(`Missing required parameter "${param.name}" for tool "${toolId}".`);
       }
     });
 
-    return tool.execute(params);
+    try {
+      return await tool.execute(params);
+    } catch (error) {
+      console.error(`Error executing tool "${toolId}":`, error);
+      throw error;
+    }
   }
 
   getAvailableTools() {

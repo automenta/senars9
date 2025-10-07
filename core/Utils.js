@@ -174,6 +174,18 @@ class Validation {
       throw new Error(`${name} must be a function`);
     }
   }
+
+  static validateTool(tool) {
+    if (!tool?.id || typeof tool.execute !== 'function') {
+      throw new Error('Tool must have an id and an execute method.');
+    }
+  }
+
+  static validatePlugin(plugin) {
+    if (!plugin?.id || typeof plugin.install !== 'function') {
+      throw new Error('Plugin must have an id and an install method.');
+    }
+  }
 }
 
 export { Cache, Index, Storage, Retry, Validation };

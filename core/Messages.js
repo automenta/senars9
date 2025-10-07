@@ -61,11 +61,26 @@ class Messages extends Component {
   }
 
   execute(command, data) {
-    const handler = this.commands.has(command) ? this.commands.get(command) : (() => { throw new Error(`Command "${command}" not found`); })();
+    const handler = this.commands.has(command) ? this.commands.get(command) : (() => { throw new Error(`Command "${command}" not found.`); })();
     const context = { type: 'command', name: command, data, cancelled: false };
 
-    return this._executeMiddleware(context, (ctx) =>
-      Retry.execute(() => handler(ctx.data), this.retryPolicies.get(command) || this.retryPolicies.get('default')));
+    const executeWithRetry = (ctx) => {
+      const policy = this.retryPolicies.get(command) || this.retryPolicies.get('default');
+      if (policy.maxRetries === 0) {
+        return handler(ctx.data);
+      }
+      return Retry.execute(() => handler(ctx.data), policy);
+    };
+
+    const result = this._executeMiddleware(context, executeWithRetry);
+
+    // For backward compatibility, if no middleware and no retries, return result directly
+    const policy = this.retryPolicies.get(command) || this.retryPolicies.get('default');
+    if (this.middleware.length === 0 && policy.maxRetries === 0) {
+      return result;
+    }
+
+    return result;
   }
 
   // === UNIFIED COMMAND/EVENT PROCESSING ===
@@ -159,26 +174,30 @@ class Messages extends Component {
   }
 
   _executeMiddleware(context, final) {
-    const dispatch = (i = 0) => {
-      if (i <= this._dispatchIndex) throw new Error('next() called multiple times');
-      if (context.cancelled) return;
-      if (i >= this.middleware.length) return final ? final(context) : undefined;
+    let index = -1;
+    const dispatch = (i) => {
+      if (i <= index) {
+        throw new Error('next() called multiple times');
+      }
+      index = i;
 
-      this._dispatchIndex = i;
-      const fn = this.middleware[i];
+      if (context.cancelled) return;
+
+      let fn = this.middleware[i];
+      if (i === this.middleware.length) {
+        fn = final;
+      }
+
+      if (!fn) return;
 
       try {
-        const result = fn(context, () => dispatch(i + 1));
-        return result?.then ? result.catch(err => this._handleError(err, context, () => dispatch(i + 1))) : result;
+        return fn(context, () => dispatch(i + 1));
       } catch (err) {
         return this._handleError(err, context, () => dispatch(i + 1));
       }
     };
 
-    this._dispatchIndex = -1;
-    const result = dispatch();
-
-    return result?.then ? result.catch(err => this._handleError(err, context)) : result;
+    return dispatch(0);
   }
 
   _executeWithRetry(fn, data, type, name) {

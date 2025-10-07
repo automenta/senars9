@@ -22,7 +22,7 @@ class LM extends Component {
   _getProvider(providerId = null) {
     const id = providerId || this.defaultProviderId;
     if (!id || !this.providers.has(id)) {
-      throw new Error(`LM provider "${id}" not found or no default provider set`);
+      throw new Error(`LM provider "${id}" not found or no default provider is set.`);
     }
     return this.providers.get(id);
   }
@@ -38,7 +38,7 @@ class LM extends Component {
   async generateHypothesis(observations, options = {}, providerId = null) {
     const provider = this._getProvider(providerId);
     if (typeof provider.generateHypothesis !== 'function') {
-      throw new Error(`Provider "${providerId || this.defaultProviderId}" does not support hypothesis generation`);
+      throw new Error(`Provider "${providerId || this.defaultProviderId}" does not support hypothesis generation.`);
     }
     return provider.generateHypothesis(observations, options);
   }

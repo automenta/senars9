@@ -40,17 +40,17 @@ class Component {
   }
 
   on(event, handler) {
-    if (!this.core?.messages) throw new Error('Messages component not available on core');
+    if (!this.core?.messages) throw new Error('Messages component not available on core.');
     this.core.messages.on(event, handler);
   }
 
   off(event, handler) {
-    if (!this.core?.messages) throw new Error('Messages component not available on core');
+    if (!this.core?.messages) throw new Error('Messages component not available on core.');
     this.core.messages.off(event, handler);
   }
 
   emit(event, data) {
-    if (!this.core?.messages) throw new Error('Messages component not available on core');
+    if (!this.core?.messages) throw new Error('Messages component not available on core.');
     this.core.messages.emit(event, data);
   }
 }
