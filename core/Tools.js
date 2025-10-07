@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Storage, Validation } from './Utils.js';
+import { Storage, Validation, ErrorHandler } from './Utils.js';
 
 class Tools extends Component {
   constructor() {
@@ -7,17 +7,14 @@ class Tools extends Component {
     this.tools = new Storage();
   }
 
-  async initialize(config = {}) {
-    await super.initialize(config);
+  async _doInitialize() {
     this.tools.clear();
   }
 
   registerTool(tool) {
     Validation.validateTool(tool);
 
-    if (this.tools.has(tool.id)) {
-      console.warn(`Tool "${tool.id}" already registered. Overwriting.`);
-    }
+    this.tools.has(tool.id) && console.warn(`Tool "${tool.id}" already registered. Overwriting.`);
     this.tools.set(tool.id, tool);
   }
 
@@ -25,9 +22,8 @@ class Tools extends Component {
     const tool = Validation.ensureExists(this.tools.get(toolId), toolId, 'Tool');
 
     tool.parameters?.forEach(param => {
-      if (param.required && !(param.name in params)) {
-        throw new Error(`Missing required parameter "${param.name}" for tool "${toolId}".`);
-      }
+      param.required && !(param.name in params) &&
+        (() => { throw new Error(`Missing required parameter "${param.name}" for tool "${toolId}".`); })();
     });
 
     try {

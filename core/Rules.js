@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Index, Storage, Validation } from './Utils.js';
+import { Index, Storage, Validation, ErrorHandler } from './Utils.js';
 
 const COMPLEXITY_LEVELS = { simple: 1, medium: 2, complex: 3 };
 const MAX_PRIORITY = 10;
@@ -12,8 +12,7 @@ class Rules extends Component {
     this.preFilters = new Set();
   }
 
-  async initialize(config = {}) {
-    await super.initialize(config);
+  async _doInitialize() {
     this.rules = [];
     this.indexes.clear();
     this.preFilters.clear();
@@ -36,11 +35,11 @@ class Rules extends Component {
 
   remove(name) {
     const index = this.rules.findIndex(rule => rule.name === name);
-    if (index !== -1) {
+    index !== -1 && (() => {
       const rule = this.rules[index];
       this.rules.splice(index, 1);
       this._removeFromIndexes(rule);
-    }
+    })();
   }
 
   _updateIndexes(rule) {
@@ -50,9 +49,7 @@ class Rules extends Component {
 
   _removeFromIndexes(rule) {
     this.indexes.remove(rule.type, rule.name);
-    if (rule.preFilterTags?.length > 0) {
-      this._cleanupPreFilters();
-    }
+    rule.preFilterTags?.length > 0 && this._cleanupPreFilters();
   }
 
   _cleanupPreFilters() {
@@ -94,8 +91,8 @@ class Rules extends Component {
     let candidates = [...this.rules];
 
     candidates = this._preFilterRules(candidates, context);
-    if (options.ruleType) candidates = this._filterByType(candidates, options.ruleType);
-    if (options.maxComplexity) candidates = this._filterByComplexity(candidates, options.maxComplexity);
+    options.ruleType && (candidates = this._filterByType(candidates, options.ruleType));
+    options.maxComplexity && (candidates = this._filterByComplexity(candidates, options.maxComplexity));
 
     const applicableRules = candidates.filter(rule => {
       try {

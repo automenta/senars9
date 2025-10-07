@@ -5,9 +5,8 @@ class Cache {
   }
 
   get(key) {
-    if (!this.cache.has(key)) return undefined;
     const value = this.cache.get(key);
-    this._touch(key, value);
+    value !== undefined && this._touch(key, value);
     return value;
   }
 
@@ -38,9 +37,7 @@ class Cache {
   }
 
   _evict() {
-    if (this.cache.size > this.maxSize) {
-      this.cache.delete(this.cache.keys().next().value);
-    }
+    this.cache.size > this.maxSize && this.cache.delete(this.cache.keys().next().value);
   }
 }
 
@@ -193,6 +190,26 @@ class Validation {
   static ensureCondition(condition, message) {
     if (!condition) throw new Error(message);
   }
+
+  static ensure(condition, message = 'Validation failed') {
+    return this.ensureCondition(condition, message);
+  }
 }
 
-export { Cache, Index, Storage, Retry, Validation };
+class ErrorHandler {
+  static handle(error, context = '') {
+    const errorInfo = { error: error.message, stack: error.stack, context };
+    console.error('Handled error:', errorInfo);
+    return errorInfo;
+  }
+
+  static async withErrorHandling(fn, context = '') {
+    try {
+      return await fn();
+    } catch (error) {
+      return this.handle(error, context);
+    }
+  }
+}
+
+export { Cache, Index, Storage, Retry, Validation, ErrorHandler };

@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Cache, Index, Storage, Validation } from './Utils.js';
+import { Cache, Index, Storage, Validation, ErrorHandler } from './Utils.js';
 
 class Memory extends Component {
   constructor() {
@@ -7,16 +7,13 @@ class Memory extends Component {
     this.storage = new Storage();
     this.cache = new Cache();
     this._cacheSize = 1000;
-
     this.focusSets = new Map();
     this.currentFocus = null;
     this.focusSize = 50;
-
     this.indexes = new Index();
   }
 
-  async initialize(config = {}) {
-    await super.initialize(config);
+  async _doInitialize(config = {}) {
     this.storage.clear();
     this.cache = new Cache(config.cacheSize || this._cacheSize);
     this.focusSize = config.focusSize || this.focusSize;
@@ -91,16 +88,17 @@ class Memory extends Component {
 
     return Array.from(focusSet.items.entries())
       .sort((a, b) => (b[1].priority || 0) - (a[1].priority || 0) || b[1].timestamp - a[1].timestamp)
-      .slice(0, count);
+      .slice(0, count)
+      .map(([key, value]) => [key, value]);
   }
 
   query(criteria = {}) {
     const { type, tags, minPriority, limit = 100 } = criteria;
     let candidates = new Set(this.storage.keys());
 
-    if (type) candidates = this._intersectKeys(candidates, this.indexes.get(type));
-    if (tags?.length) candidates = this._intersectTags(candidates, tags);
-    if (minPriority !== undefined) candidates = this._intersectPriority(candidates, minPriority);
+    type && (candidates = this._intersectKeys(candidates, this.indexes.get(type)));
+    tags?.length && (candidates = this._intersectTags(candidates, tags));
+    minPriority !== undefined && (candidates = this._intersectPriority(candidates, minPriority));
 
     return Array.from(candidates)
       .slice(0, limit)

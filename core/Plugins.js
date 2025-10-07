@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Validation } from './Utils.js';
+import { Validation, ErrorHandler } from './Utils.js';
 
 class Plugins extends Component {
   constructor() {
@@ -7,18 +7,14 @@ class Plugins extends Component {
     this.plugins = new Map();
   }
 
-  async initialize(config = {}) {
-    await super.initialize(config);
+  async _doInitialize() {
     this.plugins.clear();
   }
 
   async loadPlugin(plugin) {
     Validation.validatePlugin(plugin);
 
-    if (this.plugins.has(plugin.id)) {
-      console.warn(`Plugin "${plugin.id}" already loaded`);
-      return;
-    }
+    this.plugins.has(plugin.id) && console.warn(`Plugin "${plugin.id}" already loaded`);
 
     try {
       await plugin.install(this.core);
@@ -33,13 +29,8 @@ class Plugins extends Component {
   async unloadPlugin(pluginId) {
     const plugin = Validation.ensureExists(this.plugins.get(pluginId), pluginId, 'Plugin');
 
-    if (typeof plugin.uninstall === 'function') {
-      try {
-        await plugin.uninstall(this.core);
-      } catch (error) {
-        console.error(`Error uninstalling plugin "${pluginId}":`, error);
-      }
-    }
+    typeof plugin.uninstall === 'function' && await plugin.uninstall(this.core).catch(error =>
+      console.error(`Error uninstalling plugin "${pluginId}":`, error));
 
     this.plugins.delete(pluginId);
     this.emit('plugin.unloaded', { id: pluginId });

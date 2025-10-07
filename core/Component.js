@@ -4,24 +4,38 @@ class Component {
   constructor() {
     this.status = STATES.UNINITIALIZED;
     this.flags = { initialized: false, started: false };
+    this._eventHandlers = new Map();
   }
 
   async initialize(config = {}) {
     this.config = config;
+    await this._doInitialize(config);
     this._setState(STATES.INITIALIZED, { initialized: true });
   }
 
+  async _doInitialize() {}
+
   async start() {
+    await this._doStart();
     this._setState(STATES.RUNNING, { started: true });
   }
 
+  async _doStart() {}
+
   async stop() {
+    await this._doStop();
     this._setState(STATES.STOPPED, { started: false });
   }
 
+  async _doStop() {}
+
   async destroy() {
+    await this._doDestroy();
     this._setState(STATES.DESTROYED, { initialized: false, started: false });
+    this._eventHandlers.clear();
   }
+
+  async _doDestroy() {}
 
   _setState(status, flags) {
     this.status = status;
