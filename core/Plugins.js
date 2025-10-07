@@ -31,7 +31,7 @@ class Plugins extends Component {
   }
 
   async unloadPlugin(pluginId) {
-    const plugin = this.plugins.has(pluginId) ? this.plugins.get(pluginId) : (() => { throw new Error(`Plugin "${pluginId}" is not loaded.`); })();
+    const plugin = Validation.ensureExists(this.plugins.get(pluginId), pluginId, 'Plugin');
 
     if (typeof plugin.uninstall === 'function') {
       try {

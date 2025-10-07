@@ -125,14 +125,7 @@ class Retry {
     const { maxRetries = 3, retryDelay = 1000, backoffMultiplier = 2 } = options;
     let lastError;
 
-    // If no retries needed, execute synchronously
-    if (maxRetries === 0) {
-      try {
-        return fn();
-      } catch (error) {
-        throw error;
-      }
-    }
+    if (maxRetries === 0) return fn();
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -179,21 +172,26 @@ class Validation {
   }
 
   static validateFunction(fn, name) {
-    if (typeof fn !== 'function') {
-      throw new Error(`${name} must be a function`);
-    }
+    this.validateType(fn, 'function', name);
   }
 
   static validateTool(tool) {
-    if (!tool?.id || typeof tool.execute !== 'function') {
-      throw new Error('Tool must have an id and an execute method.');
-    }
+    this.requireProps(tool, ['id']);
+    this.validateFunction(tool.execute, 'tool.execute');
   }
 
   static validatePlugin(plugin) {
-    if (!plugin?.id || typeof plugin.install !== 'function') {
-      throw new Error('Plugin must have an id and an install method.');
-    }
+    this.requireProps(plugin, ['id']);
+    this.validateFunction(plugin.install, 'plugin.install');
+  }
+
+  static ensureExists(item, name, type = 'Item') {
+    if (!item) throw new Error(`${type} "${name}" not found.`);
+    return item;
+  }
+
+  static ensureCondition(condition, message) {
+    if (!condition) throw new Error(message);
   }
 }
 

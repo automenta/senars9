@@ -1,30 +1,31 @@
+const STATES = { UNINITIALIZED: 'uninitialized', INITIALIZED: 'initialized', RUNNING: 'running', STOPPED: 'stopped', DESTROYED: 'destroyed' };
+
 class Component {
   constructor() {
-    this.status = 'uninitialized';
-    this.initialized = false;
-    this.started = false;
+    this.status = STATES.UNINITIALIZED;
+    this.flags = { initialized: false, started: false };
   }
 
   async initialize(config = {}) {
     this.config = config;
-    this.status = 'initialized';
-    this.initialized = true;
+    this._setState(STATES.INITIALIZED, { initialized: true });
   }
 
   async start() {
-    this.status = 'running';
-    this.started = true;
+    this._setState(STATES.RUNNING, { started: true });
   }
 
   async stop() {
-    this.status = 'stopped';
-    this.started = false;
+    this._setState(STATES.STOPPED, { started: false });
   }
 
   async destroy() {
-    this.status = 'destroyed';
-    this.initialized = false;
-    this.started = false;
+    this._setState(STATES.DESTROYED, { initialized: false, started: false });
+  }
+
+  _setState(status, flags) {
+    this.status = status;
+    Object.assign(this.flags, flags);
   }
 
   getHealth() {
@@ -40,18 +41,20 @@ class Component {
   }
 
   on(event, handler) {
-    if (!this.core?.messages) throw new Error('Messages component not available on core.');
-    this.core.messages.on(event, handler);
+    this._requireMessages().on(event, handler);
   }
 
   off(event, handler) {
-    if (!this.core?.messages) throw new Error('Messages component not available on core.');
-    this.core.messages.off(event, handler);
+    this._requireMessages().off(event, handler);
   }
 
   emit(event, data) {
+    this._requireMessages().emit(event, data);
+  }
+
+  _requireMessages() {
     if (!this.core?.messages) throw new Error('Messages component not available on core.');
-    this.core.messages.emit(event, data);
+    return this.core.messages;
   }
 }
 

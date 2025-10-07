@@ -45,11 +45,11 @@ describe('Plugins Component', () => {
   });
 
   test('should throw an error if plugin is invalid', async () => {
-    await expect(plugins.loadPlugin({ id: 'invalid' })).rejects.toThrow('Plugin must have an id and an install method.');
+    await expect(plugins.loadPlugin({ id: 'invalid' })).rejects.toThrow('plugin.install must be function, got undefined');
   });
 
   test('should throw an error when unloading a non-existent plugin', async () => {
-    await expect(plugins.unloadPlugin('non-existent')).rejects.toThrow('Plugin "non-existent" is not loaded.');
+    await expect(plugins.unloadPlugin('non-existent')).rejects.toThrow('Plugin "non-existent" not found.');
   });
 
   test('should list loaded plugins', async () => {

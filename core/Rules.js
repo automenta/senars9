@@ -1,5 +1,8 @@
 import Component from './Component.js';
-import { Index, Storage } from './Utils.js';
+import { Index, Storage, Validation } from './Utils.js';
+
+const COMPLEXITY_LEVELS = { simple: 1, medium: 2, complex: 3 };
+const MAX_PRIORITY = 10;
 
 class Rules extends Component {
   constructor() {
@@ -17,9 +20,7 @@ class Rules extends Component {
   }
 
   add(rule) {
-    if (!rule?.name || !rule?.condition || !rule?.action) {
-      throw new Error('Rule must have a name, condition, and action.');
-    }
+    Validation.requireProps(rule, ['name', 'condition', 'action']);
 
     const enhancedRule = {
       priority: 0,
@@ -118,6 +119,14 @@ class Rules extends Component {
     }
   }
 
+  _applyFilters(rules, context, filters) {
+    let filtered = rules;
+    if (filters.preFilter) filtered = this._preFilterRules(filtered, context);
+    if (filters.ruleType) filtered = this._filterByType(filtered, filters.ruleType);
+    if (filters.maxComplexity) filtered = this._filterByComplexity(filtered, filters.maxComplexity);
+    return filtered;
+  }
+
   _preFilterRules(rules, context) {
     const contextKeys = Object.keys(context);
     if (contextKeys.length === 0) return rules;
@@ -134,18 +143,14 @@ class Rules extends Component {
   }
 
   _filterByComplexity(rules, maxComplexity) {
-    const levels = { 'simple': 1, 'medium': 2, 'complex': 3 };
-    const maxLevel = levels[maxComplexity] || 3;
-
-    return rules.filter(rule => (levels[rule.complexity] || 1) <= maxLevel);
+    const maxLevel = COMPLEXITY_LEVELS[maxComplexity] || COMPLEXITY_LEVELS.complex;
+    return rules.filter(rule => (COMPLEXITY_LEVELS[rule.complexity] || 1) <= maxLevel);
   }
 
   _sortByPriority(rules) {
-    const levels = { 'simple': 1, 'medium': 2, 'complex': 3 };
-
     rules.sort((a, b) => {
       if (a.priority !== b.priority) return b.priority - a.priority;
-      return (levels[a.complexity] || 1) - (levels[b.complexity] || 1);
+      return COMPLEXITY_LEVELS[a.complexity] - COMPLEXITY_LEVELS[b.complexity];
     });
   }
 }

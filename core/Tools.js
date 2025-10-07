@@ -22,7 +22,7 @@ class Tools extends Component {
   }
 
   async execute(toolId, params = {}) {
-    const tool = this.tools.has(toolId) ? this.tools.get(toolId) : (() => { throw new Error(`Tool with ID "${toolId}" not found.`); })();
+    const tool = Validation.ensureExists(this.tools.get(toolId), toolId, 'Tool');
 
     tool.parameters?.forEach(param => {
       if (param.required && !(param.name in params)) {

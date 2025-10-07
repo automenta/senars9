@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Cache, Index, Storage } from './Utils.js';
+import { Cache, Index, Storage, Validation } from './Utils.js';
 
 class Memory extends Component {
   constructor() {
@@ -64,7 +64,7 @@ class Memory extends Component {
   }
 
   createFocusSet(name, maxSize = this.focusSize) {
-    if (this.focusSets.has(name)) throw new Error(`Focus set '${name}' already exists`);
+    Validation.ensureCondition(!this.focusSets.has(name), `Focus set '${name}' already exists`);
     this.focusSets.set(name, {
       items: new Map(),
       maxSize,
@@ -74,7 +74,7 @@ class Memory extends Component {
   }
 
   setFocus(name) {
-    if (!this.focusSets.has(name)) throw new Error(`Focus set '${name}' does not exist`);
+    Validation.ensureCondition(this.focusSets.has(name), `Focus set '${name}' does not exist`);
     this.currentFocus = name;
   }
 
@@ -98,31 +98,34 @@ class Memory extends Component {
     const { type, tags, minPriority, limit = 100 } = criteria;
     let candidates = new Set(this.storage.keys());
 
-    if (type) {
-      const typeKeys = this.indexes.get(type);
-      candidates = new Set([...candidates].filter(key => typeKeys.includes(key)));
-    }
-
-    if (tags?.length) {
-      const tagCandidates = new Set();
-      tags.forEach(tag => {
-        this.indexes.get(tag).forEach(key => tagCandidates.add(key));
-      });
-      candidates = new Set([...candidates].filter(key => tagCandidates.has(key)));
-    }
-
-    if (minPriority !== undefined) {
-      const priorityCandidates = new Set();
-      for (let priority = minPriority; priority <= 10; priority++) {
-        this.indexes.get(`priority_${priority}`).forEach(key => priorityCandidates.add(key));
-      }
-      candidates = new Set([...candidates].filter(key => priorityCandidates.has(key)));
-    }
+    if (type) candidates = this._intersectKeys(candidates, this.indexes.get(type));
+    if (tags?.length) candidates = this._intersectTags(candidates, tags);
+    if (minPriority !== undefined) candidates = this._intersectPriority(candidates, minPriority);
 
     return Array.from(candidates)
       .slice(0, limit)
       .map(key => [key, this.get(key)])
       .filter(([, value]) => value !== undefined);
+  }
+
+  _intersectKeys(candidates, keys) {
+    return new Set([...candidates].filter(key => keys.includes(key)));
+  }
+
+  _intersectTags(candidates, tags) {
+    const tagCandidates = new Set();
+    tags.forEach(tag => {
+      this.indexes.get(tag).forEach(key => tagCandidates.add(key));
+    });
+    return new Set([...candidates].filter(key => tagCandidates.has(key)));
+  }
+
+  _intersectPriority(candidates, minPriority) {
+    const priorityCandidates = new Set();
+    for (let priority = minPriority; priority <= 10; priority++) {
+      this.indexes.get(`priority_${priority}`).forEach(key => priorityCandidates.add(key));
+    }
+    return new Set([...candidates].filter(key => priorityCandidates.has(key)));
   }
 
   getStats() {
@@ -149,20 +152,13 @@ class Memory extends Component {
     const { type, tags, priority } = options;
 
     if (type) this.indexes.add(type, key);
-    if (tags?.forEach) tags.forEach(tag => this.indexes.add(tag, key));
+    tags?.forEach(tag => this.indexes.add(tag, key));
     if (priority !== undefined) this.indexes.add(`priority_${priority}`, key);
   }
 
   _removeFromIndexes(key) {
-    // This would need to be enhanced in the Index class to support removal by key across all types
-    // For now, we'll implement a simple version
     for (const [type, keys] of this.indexes.indexes.entries()) {
-      if (keys.has(key)) {
-        keys.delete(key);
-        if (keys.size === 0) {
-          this.indexes.indexes.delete(type);
-        }
-      }
+      keys.delete(key) && keys.size === 0 && this.indexes.indexes.delete(type);
     }
   }
 
@@ -174,12 +170,15 @@ class Memory extends Component {
     if (focusData.items.has(key)) return;
 
     focusData.items.set(key, { priority, timestamp: Date.now() });
+    this._evictFocusSet(focusData);
+  }
 
-    if (focusData.items.size > focusData.maxSize) {
-      const items = Array.from(focusData.items.entries())
-        .sort((a, b) => a[1].priority - b[1].priority);
-      focusData.items.delete(items[0][0]);
-    }
+  _evictFocusSet(focusData) {
+    if (focusData.items.size <= focusData.maxSize) return;
+
+    const items = Array.from(focusData.items.entries())
+      .sort((a, b) => a[1].priority - b[1].priority);
+    focusData.items.delete(items[0][0]);
   }
 
   _removeFromFocusSets(key) {

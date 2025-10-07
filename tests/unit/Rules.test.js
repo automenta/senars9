@@ -31,9 +31,9 @@ describe('Rules Component', () => {
   });
 
   test('should throw an error if a rule is missing required properties', () => {
-    expect(() => rules.add({})).toThrow('Rule must have a name, condition, and action.');
-    expect(() => rules.add({ name: 'test' })).toThrow('Rule must have a name, condition, and action.');
-    expect(() => rules.add({ name: 'test', condition: () => true })).toThrow('Rule must have a name, condition, and action.');
+    expect(() => rules.add({})).toThrow('name is required');
+    expect(() => rules.add({ name: 'test' })).toThrow('condition is required');
+    expect(() => rules.add({ name: 'test', condition: () => true })).toThrow('action is required');
   });
 
   describe('evaluate', () => {

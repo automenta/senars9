@@ -41,11 +41,11 @@ describe('Tools Component', () => {
   });
 
   test('should throw an error if tool is not found', async () => {
-    await expect(tools.execute('nonexistent-tool')).rejects.toThrow('Tool with ID "nonexistent-tool" not found.');
+    await expect(tools.execute('nonexistent-tool')).rejects.toThrow('Tool "nonexistent-tool" not found.');
   });
 
   test('should throw an error if tool registration is invalid', () => {
-    expect(() => tools.registerTool({ id: 'invalid' })).toThrow('Tool must have an id and an execute method.');
+    expect(() => tools.registerTool({ id: 'invalid' })).toThrow('tool.execute must be function, got undefined');
   });
 
   test('should handle tool execution errors', async () => {
