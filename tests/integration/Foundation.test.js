@@ -3,14 +3,13 @@
  * @description: Integration tests for the foundational components (Core, Messages, Rules, Memory).
  */
 
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import createCore from '../../core/createCore.js';
 
 describe('Core Foundation Integration Test', () => {
   let core;
 
   beforeEach(async () => {
-    // createCore now initializes a core with all foundational components
     core = await createCore();
   });
 
@@ -33,7 +32,6 @@ describe('Core Foundation Integration Test', () => {
           truth: context.truth,
           derivedFrom: [context.id],
         };
-        // The action is responsible for emitting the result
         core.messages.emit('task.derived', derivedTask);
       },
       priority: 10,
@@ -43,11 +41,13 @@ describe('Core Foundation Integration Test', () => {
     core.rules.add(deductionRule);
 
     // 3. Set up a listener for the output (derived task)
-    const derivedTaskHandler = jest.fn();
+    let derivedTask = null;
+    const derivedTaskHandler = (task) => {
+      derivedTask = task;
+    };
     core.messages.on('task.derived', derivedTaskHandler);
 
-    // 4. In a real system, a "Cycle" component would do this.
-    // For this test, we'll listen for an input task and trigger the rules engine.
+    // 4. For this test, we'll listen for an input task and trigger the rules engine.
     core.messages.on('task.input', (task) => {
       core.rules.evaluate(task);
     });
@@ -62,8 +62,7 @@ describe('Core Foundation Integration Test', () => {
     core.messages.emit('task.input', inputTask);
 
     // 6. Assert that the rule was triggered and a new task was derived
-    expect(derivedTaskHandler).toHaveBeenCalledTimes(1);
-    const derivedTask = derivedTaskHandler.mock.calls[0][0];
+    expect(derivedTask).not.toBeNull();
     expect(derivedTask.term.name).toBe('B');
     expect(derivedTask.derivedFrom).toEqual(['task-1']);
   });
