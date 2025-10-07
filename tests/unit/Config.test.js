@@ -1,6 +1,6 @@
 import Config from '../../core/Config.js';
 
-describe('Config Component', () => {
+describe('Config', () => {
   let config;
 
   beforeEach(async () => {
@@ -8,10 +8,13 @@ describe('Config Component', () => {
     await config.initialize({
       core: {
         cycleIntervalMs: 50,
+        focusSetSize: 10,
       },
-      components: {
-        memory: {
-          maxShortTermTasks: 1000,
+      nested: {
+        a: {
+          b: {
+            c: 123,
+          },
         },
       },
     });
@@ -21,48 +24,73 @@ describe('Config Component', () => {
     expect(config.get('core.cycleIntervalMs')).toBe(50);
   });
 
-  test('should retrieve a nested configuration value', () => {
-    const maxTasks = config.get('components.memory.maxShortTermTasks');
-    expect(maxTasks).toBe(1000);
-  });
-
-  test('should return a default value for a non-existent key', () => {
-    const nonExistent = config.get('core.nonExistent', 'default');
-    expect(nonExistent).toBe('default');
-  });
-
-  test('should set a new configuration value', () => {
-    config.set('components.reasoning.maxRuleApplications', 100);
-    const maxRules = config.get('components.reasoning.maxRuleApplications');
-    expect(maxRules).toBe(100);
-  });
-
-  test('should deep merge a new configuration object', () => {
-    config.merge({
-      core: {
-        focusSetSize: 10,
-      },
-      components: {
-        memory: {
-          consolidationThreshold: 0.8,
-        },
-      },
-    });
-
+  test('get should retrieve a value using dot notation', () => {
     expect(config.get('core.cycleIntervalMs')).toBe(50);
-    expect(config.get('core.focusSetSize')).toBe(10);
-    expect(config.get('components.memory.maxShortTermTasks')).toBe(1000);
-    expect(config.get('components.memory.consolidationThreshold')).toBe(0.8);
+    expect(config.get('nested.a.b.c')).toBe(123);
   });
 
-  test('should invalidate cache after setting a value', () => {
-    // Populate cache
-    expect(config.get('core.cycleIntervalMs')).toBe(50);
-    expect(config.cache.has('core.cycleIntervalMs')).toBe(true);
+  test('get should return a default value if key is not found', () => {
+    expect(config.get('nonexistent.key', 'default')).toBe('default');
+    expect(config.get('core.nonexistent', null)).toBeNull();
+  });
 
-    // Set a new value
+  test('get should return undefined if key is not found and no default is provided', () => {
+    expect(config.get('nonexistent.key')).toBeUndefined();
+  });
+
+  test('set should add a new value using dot notation', () => {
+    config.set('new.key.value', 'hello');
+    expect(config.get('new.key.value')).toBe('hello');
+  });
+
+  test('set should update an existing value', () => {
     config.set('core.cycleIntervalMs', 100);
-    expect(config.cache.size).toBe(0);
     expect(config.get('core.cycleIntervalMs')).toBe(100);
+  });
+
+  test('set should create nested objects if they do not exist', () => {
+    config.set('a.b.c.d', 999);
+    expect(config.get('a.b.c.d')).toBe(999);
+  });
+
+  test('merge should deeply merge a new configuration object', () => {
+    const newConfig = {
+      core: {
+        focusSetSize: 20,
+        newParam: true,
+      },
+      other: {
+        setting: 'enabled',
+      },
+    };
+    config.merge(newConfig);
+    expect(config.get('core.cycleIntervalMs')).toBe(50); // Unchanged
+    expect(config.get('core.focusSetSize')).toBe(20); // Updated
+    expect(config.get('core.newParam')).toBe(true); // Added
+    expect(config.get('other.setting')).toBe('enabled'); // Added
+  });
+
+  test('cache should be invalidated after set', () => {
+    config.get('core.cycleIntervalMs'); // Cache the value
+    expect(config.cache.has('core.cycleIntervalMs')).toBe(true);
+    config.set('core.cycleIntervalMs', 200);
+    expect(config.cache.size).toBe(0);
+  });
+
+  test('cache should be invalidated after merge', () => {
+    config.get('core.cycleIntervalMs'); // Cache the value
+    expect(config.cache.has('core.cycleIntervalMs')).toBe(true);
+    config.merge({ core: { anotherParam: 1 } });
+    expect(config.cache.size).toBe(0);
+  });
+
+  test('get should use cache for subsequent reads', () => {
+    const key = 'nested.a.b.c';
+    const value = config.get(key);
+    expect(config.cache.get(key)).toBe(value);
+
+    // To be sure it's from the cache, we can tamper with the underlying config
+    config.config.nested.a.b.c = 999;
+    expect(config.get(key)).toBe(value); // Should still be the cached value
   });
 });

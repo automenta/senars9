@@ -1,0 +1,87 @@
+/**
+ * @file: core/System.js
+ * @description: High-level API wrapper for the SeNARS system, providing a simplified interface for interaction.
+ * @module System
+ */
+
+import createCore from './createCore.js';
+
+class System {
+  /**
+   * @param {object} [config={}] - The initial configuration for the system.
+   */
+  constructor(config = {}) {
+    this.config = config;
+    this.core = null;
+  }
+
+  /**
+   * Initializes and starts the SeNARS system.
+   * This must be called before any other methods are used.
+   * @returns {Promise<void>}
+   */
+  async start() {
+    if (this.core) {
+      console.warn('System is already running.');
+      return;
+    }
+    this.core = await createCore(this.config);
+    await this.core.start();
+  }
+
+  /**
+   * Stops the SeNARS system and cleans up all resources.
+   * @returns {Promise<void>}
+   */
+  async stop() {
+    if (!this.core) {
+      return;
+    }
+    await this.core.stop();
+    await this.core.destroy();
+    this.core = null;
+  }
+
+  /**
+   * Inputs a task (e.g., a belief, goal, or question) into the system.
+   * This is the primary method for providing the system with new information.
+   * @param {object} task - The task object to input.
+   * @returns {void}
+   */
+  input(task) {
+    if (!this.core) {
+      throw new Error('System is not running. Call start() before inputting tasks.');
+    }
+    // Emitting an event is a decoupled way to introduce tasks.
+    // A dedicated component like Memory will listen for this event.
+    this.core.messages.emit('task.input', task);
+  }
+
+  /**
+   * Registers an event handler to listen for system events.
+   * @param {string} event - The name of the event (e.g., 'task.derived').
+   * @param {Function} handler - The callback function to execute.
+   */
+  on(event, handler) {
+    if (!this.core) {
+      // Allow registering handlers before start, but they will be on a non-existent core.
+      // Let's enforce that the system must be started.
+      throw new Error('System is not running. Call start() before registering event handlers.');
+    }
+    this.core.messages.on(event, handler);
+  }
+
+  /**
+   * Unregisters an event handler.
+   * @param {string} event - The name of the event.
+   * @param {Function} handler - The callback function to remove.
+   */
+  off(event, handler) {
+    if (!this.core) {
+      return; // Fail silently if trying to unregister from a stopped system
+    }
+    this.core.messages.off(event, handler);
+  }
+}
+
+export default System;
