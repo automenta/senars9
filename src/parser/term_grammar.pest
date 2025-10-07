@@ -1,0 +1,48 @@
+// SeNARS Term Grammar for pest
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+
+// Atoms are the basic building blocks
+atom = @{ (ASCII_ALPHANUMERIC | "_")+ }
+
+// Core Relationship Operators
+negation = { "(--," ~ term ~ ")" }
+product = { "(" ~ term ~ "," ~ term ~ ")" }
+inheritance = { "(" ~ term ~ "-->" ~ term ~ ")" }
+similarity = { "(" ~ term ~ "<->" ~ term ~ ")" }
+implication = { "(" ~ term ~ "==>" ~ term ~ ")" }
+equivalence = { "(" ~ term ~ "<=>" ~ term ~ ")" }
+conjunction = { "(&," ~ (term ~ ",")* ~ term ~ ")" }
+disjunction = { "(|," ~ (term ~ ",")* ~ term ~ ")" }
+sequential_conjunction = { "(&/," ~ term ~ "," ~ term ~ ")" }
+operation = { "(" ~ term ~ "^" ~ term ~ ")" }
+
+// Set and Property Operators
+instance = { "(" ~ term ~ "{--" ~ term ~ ")" }
+property = { "(" ~ term ~ "--}" ~ term ~ ")" }
+extensional_set = { "{" ~ (term ~ ",")* ~ term ~ "}" }
+intensional_set = { "[" ~ (atom ~ ",")* ~ atom ~ "]" }
+
+
+// A term is either an atom or a compound term
+compound_term = {
+    negation |
+    product |
+    inheritance |
+    similarity |
+    implication |
+    equivalence |
+    conjunction |
+    disjunction |
+    sequential_conjunction |
+    operation |
+    instance |
+    property |
+    extensional_set |
+    intensional_set
+}
+
+term = { atom | compound_term }
+
+// The top-level rule for a single term
+term_entry = { SOI ~ term ~ EOI }
