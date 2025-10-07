@@ -1,80 +1,73 @@
 use super::*;
-use crate::data_structures::{
-    punctuation::Punctuation,
-    task::Task,
-    term::Term,
-    term_type::TermType,
-    truth_value::TruthValue,
-};
-use crate::memory::Memory;
-use crate::reasoning::Reasoner;
-
-fn create_dummy_task(name: &str) -> Task {
-    Task {
-        term: Term {
-            name: name.to_string(),
-            term_type: TermType::Atom,
-            complexity: 1,
-            subject: None,
-            predicate: None,
-            components: None,
-            embedding: None,
-            created_at: 0,
-            hash: name.to_string(),
-        },
-        punctuation: Punctuation::Belief,
-        truth: Some(TruthValue {
-            frequency: 1.0,
-            confidence: 0.9,
-        }),
-        priority: 0.5,
-        accessed_at: 0,
-        created_at: 0,
-        occurrence_time: None,
-        expiration_time: None,
-        is_in_focus_set: false,
-        derivation_path: None,
-    }
-}
+use crate::{memory::Memory, parser, reasoning::Reasoner};
 
 #[test]
-fn test_new_cycle() {
-    let memory = Memory::new();
-    let reasoner = Reasoner::new();
-    let cycle = Cycle::new(&memory, &reasoner);
-    assert_eq!(cycle.select_focus_set().len(), 0);
-}
-
-#[test]
-fn test_select_focus_set_less_than_max() {
+fn test_select_focus_set_priority() {
     let mut memory = Memory::new();
     let reasoner = Reasoner::new();
-    memory.add_task(create_dummy_task("task1"));
-    memory.add_task(create_dummy_task("task2"));
 
-    let cycle = Cycle::new(&memory, &reasoner);
+    // Create tasks with different priorities
+    let mut task1 = parser::parse("task1.").unwrap();
+    task1.priority = 0.2;
+    let mut task2 = parser::parse("task2.").unwrap();
+    task2.priority = 0.8;
+    let mut task3 = parser::parse("task3.").unwrap();
+    task3.priority = 0.5;
+
+    memory.add_task(task1);
+    memory.add_task(task2);
+    memory.add_task(task3);
+
+    let cycle = Cycle::new(&mut memory, &reasoner);
     let focus_set = cycle.select_focus_set();
-    assert_eq!(focus_set.len(), 2);
+
+    // Verify that the highest priority task is selected first
+    assert_eq!(focus_set.len(), 3);
+    assert_eq!(focus_set[0].term.name, "task2");
+    assert_eq!(focus_set[1].term.name, "task3");
+    assert_eq!(focus_set[2].term.name, "task1");
 }
 
 #[test]
-fn test_select_focus_set_more_than_max() {
+fn test_select_focus_set_limited_by_size() {
     let mut memory = Memory::new();
     let reasoner = Reasoner::new();
-    for i in 0..10 {
-        memory.add_task(create_dummy_task(&format!("task{}", i)));
+
+    // Create more tasks than the FOCUS_SET_SIZE
+    for i in 0..FOCUS_SET_SIZE + 5 {
+        let mut task = parser::parse(&format!("task{}.", i)).unwrap();
+        task.priority = (i as f64) / 10.0;
+        memory.add_task(task);
     }
 
-    let cycle = Cycle::new(&memory, &reasoner);
+    let cycle = Cycle::new(&mut memory, &reasoner);
     let focus_set = cycle.select_focus_set();
+
+    // Verify that the focus set is capped at FOCUS_SET_SIZE
     assert_eq!(focus_set.len(), FOCUS_SET_SIZE);
+    // The highest priority task should be task9
+    assert_eq!(focus_set[0].term.name, format!("task{}", FOCUS_SET_SIZE + 4));
 }
 
 #[test]
-fn test_run_cycle_does_not_panic() {
+fn test_cycle_adds_derived_task_to_memory() {
     let mut memory = Memory::new();
     let reasoner = Reasoner::new();
-    memory.add_task(create_dummy_task("task1"));
-    let cycle = Cycle::new(&memory, &reasoner);
-    cycle.run_cycle(); // This should just run without panicking
+
+    // Setup premises for a syllogism
+    memory.add_task(parser::parse("(cat --> mammal).").unwrap());
+    memory.add_task(parser::parse("(mammal --> animal).").unwrap());
+
+    // Run the cycle
+    let mut cycle = Cycle::new(&mut memory, &reasoner);
+    cycle.run_cycle();
+
+    // Verify that the conclusion was added to memory
+    let conclusion_term = parser::parse("(cat --> animal).").unwrap().term;
+    let conclusion_from_mem = memory.get_task(&conclusion_term.hash);
+    assert!(
+        conclusion_from_mem.is_some(),
+        "The derived conclusion should be in memory after the cycle."
+    );
+    assert_eq!(conclusion_from_mem.unwrap().term.hash, conclusion_term.hash);
 }

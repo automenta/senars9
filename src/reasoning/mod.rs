@@ -1,81 +1,122 @@
 use crate::data_structures::{
+    punctuation::Punctuation,
     task::Task,
     term::Term,
     term_type::TermType,
-    punctuation::Punctuation,
     truth_value::TruthValue,
 };
+use crate::memory::Memory;
 use std::sync::Arc;
 
 /// Represents the reasoning component of the SeNARS system.
+///
+/// The `Reasoner` is responsible for applying inference rules to a given set of tasks
+/// (the "focus set") to derive new knowledge. It interacts with the `Memory` component
+/// to fetch related knowledge needed for inference.
 #[derive(Debug, Default)]
 pub struct Reasoner;
 
 impl Reasoner {
-    /// Creates a new Reasoner.
+    /// Creates a new `Reasoner`.
     pub fn new() -> Self {
         Reasoner
     }
 
-    /// Applies inference rules to a set of tasks to derive new knowledge.
+    /// The main reasoning function.
     ///
-    /// This implementation performs a simple deductive inference on inheritance chains.
-    /// If it finds two tasks `(A --> B)` and `(B --> C)`, it derives `(A --> C)`.
-    pub fn reason(&self, focus_set: &[&Task]) -> Vec<Task> {
+    /// It iterates through a "focus set" of tasks and attempts to apply relevant
+    /// inference rules to each task, potentially deriving new tasks.
+    ///
+    /// # Arguments
+    /// * `focus_set` - A slice of `Arc<Task>` representing the tasks to reason about.
+    /// * `memory` - A reference to the system's `Memory` to look up related knowledge.
+    ///
+    /// # Returns
+    /// A `Vec<Task>` containing all newly derived tasks.
+    pub fn reason(&self, focus_set: &[Arc<Task>], memory: &Memory) -> Vec<Task> {
         let mut derived_tasks = Vec::new();
-        let inheritance_tasks: Vec<&Task> = focus_set
-            .iter()
-            .filter(|t| t.term.term_type == TermType::Inheritance)
-            .cloned()
-            .collect();
 
-        for &task1 in &inheritance_tasks {
-            for &task2 in &inheritance_tasks {
-                if let (Some(subject1), Some(predicate1), Some(subject2), Some(predicate2)) =
-                    (&task1.term.subject, &task1.term.predicate, &task2.term.subject, &task2.term.predicate)
-                {
-                    // Look for a chain: (A --> B) and (B --> C)
-                    if predicate1.name == subject2.name {
-                        // Found a chain. Derive (A --> C).
-                        let new_term_name = format!("({} --> {})", subject1.name, predicate2.name);
-                        println!("Derived new term: {}", new_term_name);
+        for task in focus_set {
+            // Attempt to apply different inference rules based on the task's term type.
+            match task.term.term_type {
+                TermType::Inheritance => {
+                    derived_tasks.extend(self.deductive_syllogism(task, memory));
+                }
+                TermType::Implication => {
+                    derived_tasks.extend(self.modus_ponens(task, memory));
+                }
+                _ => {
+                    // This is where other inference rule applications would go.
+                }
+            }
+        }
 
-                        // TODO: Calculate new truth value based on premises.
+        derived_tasks
+    }
+
+    /// Applies the deductive syllogism rule.
+    ///
+    /// Given a premise `(S --> M).`, it looks for a second premise `(M --> P).`
+    /// in memory to derive the conclusion `(S --> P).`.
+    fn deductive_syllogism(&self, premise1: &Arc<Task>, memory: &Memory) -> Vec<Task> {
+        let mut derived = Vec::new();
+        if let (Some(subject1), Some(predicate1)) = (&premise1.term.subject, &premise1.term.predicate) {
+            // `premise1` is (S --> M). We need to find tasks of the form (M --> P).
+            // The `inheritance_index` in memory stores tasks by their subject.
+            // So, we look for tasks where the subject is `predicate1` (M).
+            if let Some(premises2) = memory.get_inheritance_by_subject(predicate1) {
+                for premise2 in premises2 {
+                    if let Some(predicate2) = &premise2.term.predicate {
+                        // Found (M --> P). Now derive (S --> P).
+                        let new_term = Term::new_compound(
+                            TermType::Inheritance,
+                            vec![Arc::clone(subject1), Arc::clone(predicate2)],
+                        );
+
+                        // TODO: Implement proper truth value calculation.
                         let new_truth = TruthValue {
                             frequency: 1.0,
-                            confidence: 0.81, // 0.9 * 0.9
+                            confidence: 0.81, // Simplified for now.
                         };
 
-                        let new_term = Term {
-                            name: new_term_name,
-                            term_type: TermType::Inheritance,
-                            complexity: subject1.complexity + predicate2.complexity + 1,
-                            subject: Some(Arc::clone(subject1)),
-                            predicate: Some(Arc::clone(predicate2)),
-                            components: None,
-                            embedding: None,
-                            created_at: 0, // TODO: Set current time
-                            hash: "".to_string(), // TODO: Calculate hash
-                        };
-
-                        let new_task = Task {
-                            term: new_term,
-                            punctuation: Punctuation::Belief,
-                            truth: Some(new_truth),
-                            priority: 0.8, // TODO: Calculate priority
-                            accessed_at: 0,
-                            created_at: 0,
-                            occurrence_time: None,
-                            expiration_time: None,
-                            is_in_focus_set: false,
-                            derivation_path: Some(vec![task1.term.name.clone(), task2.term.name.clone()]),
-                        };
-                        derived_tasks.push(new_task);
+                        let new_task =
+                            Task::new(Arc::new(new_term), Punctuation::Belief, Some(new_truth));
+                        derived.push(new_task);
                     }
                 }
             }
         }
-        derived_tasks
+        derived
+    }
+
+    /// Applies the modus ponens rule.
+    ///
+    /// Given a premise `(A ==> B).` (an implication), it looks for a second premise `A.`
+    /// (the antecedent as a belief) in memory to derive the conclusion `B.`.
+    fn modus_ponens(&self, implication_task: &Arc<Task>, memory: &Memory) -> Vec<Task> {
+        let mut derived = Vec::new();
+        if let Some(antecedent) = &implication_task.term.subject {
+            // We have `(A ==> B)`. We need to check if `A.` exists in memory.
+            if let Some(antecedent_task) = memory.get_task(&antecedent.hash) {
+                if antecedent_task.is_belief() {
+                    // `A.` exists. Derive `B.`.
+                    if let Some(consequent) = &implication_task.term.predicate {
+                        // TODO: Implement proper truth value calculation.
+                        let new_truth = TruthValue {
+                            frequency: 1.0,
+                            confidence: 0.81, // Simplified for now.
+                        };
+                        let new_task = Task::new(
+                            Arc::clone(consequent),
+                            Punctuation::Belief,
+                            Some(new_truth),
+                        );
+                        derived.push(new_task);
+                    }
+                }
+            }
+        }
+        derived
     }
 }
 

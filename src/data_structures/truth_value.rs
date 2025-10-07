@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// Represents the truth value of a belief, consisting of frequency and confidence.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TruthValue {
@@ -5,4 +7,10 @@ pub struct TruthValue {
     pub frequency: f64,
     /// The confidence in the belief (0.0 to 1.0).
     pub confidence: f64,
+}
+
+impl fmt::Display for TruthValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "%{};{}%", self.frequency, self.confidence)
+    }
 }

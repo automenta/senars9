@@ -1,68 +1,73 @@
 use super::*;
-use crate::data_structures::{
-    punctuation::Punctuation,
-    task::Task,
-    term::Term,
-    term_type::TermType,
-    truth_value::TruthValue,
-};
+use crate::{memory::Memory, parser};
 use std::sync::Arc;
 
-fn create_inheritance_task(subject_name: &str, predicate_name: &str) -> Task {
-    let subject = Arc::new(Term {
-        name: subject_name.to_string(),
-        term_type: TermType::Atom,
-        complexity: 1,
-        subject: None, predicate: None, components: None, embedding: None, created_at: 0, hash: subject_name.to_string(),
-    });
-    let predicate = Arc::new(Term {
-        name: predicate_name.to_string(),
-        term_type: TermType::Atom,
-        complexity: 1,
-        subject: None, predicate: None, components: None, embedding: None, created_at: 0, hash: predicate_name.to_string(),
-    });
-
-    let term = Term {
-        name: format!("({} --> {})", subject_name, predicate_name),
-        term_type: TermType::Inheritance,
-        complexity: 3,
-        subject: Some(subject),
-        predicate: Some(predicate),
-        components: None, embedding: None, created_at: 0, hash: "".to_string(),
-    };
-
-    Task {
-        term,
-        punctuation: Punctuation::Belief,
-        truth: Some(TruthValue { frequency: 1.0, confidence: 0.9 }),
-        priority: 1.0, accessed_at: 0, created_at: 0, occurrence_time: None, expiration_time: None, is_in_focus_set: false, derivation_path: None,
-    }
-}
-
 #[test]
-fn test_deductive_inference() {
+fn test_deductive_syllogism_inference() {
+    // Setup: Memory with (mammal --> animal).
+    let mut memory = Memory::new();
     let reasoner = Reasoner::new();
-    let task1 = create_inheritance_task("cat", "mammal");
-    let task2 = create_inheritance_task("mammal", "animal");
-    let task3 = create_inheritance_task("bird", "animal"); // Unrelated task
+    let premise2 = parser::parse("(mammal --> animal).").unwrap();
+    memory.add_task(premise2);
 
-    let focus_set = vec![&task1, &task2, &task3];
-    let derived_tasks = reasoner.reason(&focus_set);
+    // Focus set with (cat --> mammal).
+    let premise1 = Arc::new(parser::parse("(cat --> mammal).").unwrap());
+    let focus_set = vec![premise1];
 
-    assert_eq!(derived_tasks.len(), 1);
+    // Run reasoning
+    let derived_tasks = reasoner.reason(&focus_set, &memory);
+
+    // Verification
+    assert_eq!(derived_tasks.len(), 1, "Expected exactly one derived task.");
     let derived_task = &derived_tasks[0];
-    assert_eq!(derived_task.term.name, "(cat --> animal)");
-    assert_eq!(derived_task.term.term_type, TermType::Inheritance);
-    assert_eq!(derived_task.truth.unwrap().confidence, 0.81);
+    let expected_term = parser::parse("(cat --> animal).").unwrap().term;
+    assert_eq!(
+        derived_task.term.hash, expected_term.hash,
+        "Derived term is not the expected (cat --> animal)."
+    );
 }
 
 #[test]
-fn test_no_inference() {
+fn test_modus_ponens_inference() {
+    // Setup: Memory with `raining.`
+    let mut memory = Memory::new();
     let reasoner = Reasoner::new();
-    let task1 = create_inheritance_task("cat", "mammal");
-    let task2 = create_inheritance_task("dog", "mammal");
+    let premise2 = parser::parse("raining.").unwrap();
+    memory.add_task(premise2);
 
-    let focus_set = vec![&task1, &task2];
-    let derived_tasks = reasoner.reason(&focus_set);
-    assert!(derived_tasks.is_empty());
+    // Focus set with `(raining ==> wet_streets).`
+    let premise1 = Arc::new(parser::parse("(raining ==> wet_streets).").unwrap());
+    let focus_set = vec![premise1];
+
+    // Run reasoning
+    let derived_tasks = reasoner.reason(&focus_set, &memory);
+
+    // Verification
+    assert_eq!(derived_tasks.len(), 1, "Expected exactly one derived task.");
+    let derived_task = &derived_tasks[0];
+    let expected_term = parser::parse("wet_streets.").unwrap().term;
+    assert_eq!(
+        derived_task.term.hash, expected_term.hash,
+        "Derived term is not the expected wet_streets."
+    );
+}
+
+#[test]
+fn test_no_inference_when_premise_is_missing() {
+    // Setup: Empty memory
+    let memory = Memory::new();
+    let reasoner = Reasoner::new();
+
+    // Focus set with (cat --> mammal).
+    let premise1 = Arc::new(parser::parse("(cat --> mammal).").unwrap());
+    let focus_set = vec![premise1];
+
+    // Run reasoning
+    let derived_tasks = reasoner.reason(&focus_set, &memory);
+
+    // Verification
+    assert!(
+        derived_tasks.is_empty(),
+        "No tasks should be derived when the second premise is missing."
+    );
 }

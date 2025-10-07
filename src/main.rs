@@ -1,65 +1,48 @@
-pub mod data_structures;
-pub mod parser;
-pub mod memory;
-pub mod cycle;
-pub mod reasoning;
-
-use data_structures::{
-    punctuation::Punctuation,
-    task::Task,
-    term::Term,
-    term_type::TermType,
-    truth_value::TruthValue,
+use app::{
+    cycle::Cycle,
+    memory::Memory,
+    parser,
+    reasoning::Reasoner,
 };
-use memory::Memory;
-use cycle::Cycle;
-use reasoning::Reasoner;
-use std::sync::Arc;
 
-fn create_inheritance_task(subject_name: &str, predicate_name: &str) -> Task {
-    let subject = Arc::new(Term {
-        name: subject_name.to_string(),
-        term_type: TermType::Atom,
-        complexity: 1,
-        subject: None, predicate: None, components: None, embedding: None, created_at: 0, hash: subject_name.to_string(),
-    });
-    let predicate = Arc::new(Term {
-        name: predicate_name.to_string(),
-        term_type: TermType::Atom,
-        complexity: 1,
-        subject: None, predicate: None, components: None, embedding: None, created_at: 0, hash: predicate_name.to_string(),
-    });
-
-    let term = Term {
-        name: format!("({} --> {})", subject_name, predicate_name),
-        term_type: TermType::Inheritance,
-        complexity: 3,
-        subject: Some(subject),
-        predicate: Some(predicate),
-        components: None, embedding: None, created_at: 0, hash: "".to_string(),
-    };
-
-    Task {
-        term,
-        punctuation: Punctuation::Belief,
-        truth: Some(TruthValue { frequency: 1.0, confidence: 0.9 }),
-        priority: 1.0, accessed_at: 0, created_at: 0, occurrence_time: None, expiration_time: None, is_in_focus_set: false, derivation_path: None,
-    }
-}
-
+/// The main entry point for the SeNARS application.
+///
+/// This example demonstrates the core functionality of the system:
+/// 1. Initializes the Memory, Reasoner, and Cycle components.
+/// 2. Populates the memory with initial knowledge using the Narsese parser.
+/// 3. Runs a cognitive cycle, which triggers the reasoner to derive new knowledge.
+/// 4. The new knowledge is then learned by being added back into memory.
 fn main() {
+    println!("--- Initializing SeNARS System ---");
+
     // 1. Initialize components
     let mut memory = Memory::new();
     let reasoner = Reasoner::new();
 
-    // 2. Populate memory with knowledge
-    println!("--- Populating Memory ---");
-    memory.add_task(create_inheritance_task("cat", "mammal"));
-    memory.add_task(create_inheritance_task("mammal", "animal"));
-    memory.add_task(create_inheritance_task("dog", "mammal"));
-    println!("Memory populated with 3 tasks.");
+    // 2. Populate memory with initial knowledge
+    println!("--- Populating Memory with Initial Knowledge ---");
+    // Premise 1: bird is a type of animal.
+    let task1 = parser::parse("(bird --> animal).").expect("Failed to parse task 1");
+    println!("Adding task: {}", task1);
+    memory.add_task(task1);
 
-    // 3. Run the cognitive cycle
-    let cycle = Cycle::new(&memory, &reasoner);
+    // Premise 2: animal is a type of living_thing.
+    let task2 = parser::parse("(animal --> living_thing).").expect("Failed to parse task 2");
+    println!("Adding task: {}", task2);
+    memory.add_task(task2);
+
+    // 3. Run the cognitive cycle to reason and learn
+    let mut cycle = Cycle::new(&mut memory, &reasoner);
     cycle.run_cycle();
+
+    // After the cycle, the memory should contain the derived conclusion (bird --> living_thing).
+    let conclusion_term = parser::parse("(bird --> living_thing).")
+        .expect("Failed to parse conclusion term")
+        .term;
+    match memory.get_task(&conclusion_term.hash) {
+        Some(task) => {
+            println!("\nSUCCESS: System derived and learned the conclusion: {}", task)
+        }
+        None => println!("\nFAILURE: System did not derive the expected conclusion."),
+    }
 }

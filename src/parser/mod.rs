@@ -1,30 +1,72 @@
+use crate::data_structures::{
+    punctuation::Punctuation,
+    task::Task,
+    term::Term,
+    term_type::TermType,
+    truth_value::TruthValue,
+};
 use pest::Parser;
 use pest_derive::Parser;
-use crate::data_structures::term::Term;
-use crate::data_structures::term_type::TermType;
 use std::sync::Arc;
 
 #[derive(Parser)]
-#[grammar = "parser/term_grammar.pest"]
-pub struct TermParser;
+#[grammar = "parser/narsese_grammar.pest"]
+pub struct NarseseParser;
 
-pub fn parse_term(input: &str) -> Result<Term, pest::error::Error<Rule>> {
-    let pairs = TermParser::parse(Rule::term_entry, input)?;
-    let pair = pairs.into_iter().next().unwrap().into_inner().next().unwrap();
-    build_term_from_pair(pair)
+/// Parses a Narsese string into a `Task`.
+///
+/// This is the main entry point for the parser. It handles a complete Narsese statement,
+/// including the term, punctuation, and an optional truth value.
+///
+/// # Arguments
+/// * `input` - A string slice representing the Narsese statement.
+///
+/// # Returns
+/// A `Result` containing either the parsed `Task` or a `pest` error.
+pub fn parse(input: &str) -> Result<Task, pest::error::Error<Rule>> {
+    let pairs = NarseseParser::parse(Rule::narsese_entry, input)?;
+    let statement_pair = pairs.into_iter().next().unwrap().into_inner().next().unwrap();
+    build_task_from_pair(statement_pair)
 }
 
+/// Constructs a `Task` from a `statement` grammar rule pair.
+fn build_task_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Task, pest::error::Error<Rule>> {
+    let inner_pair = pair.into_inner().next().unwrap();
+    match inner_pair.as_rule() {
+        Rule::belief => {
+            let mut inner = inner_pair.into_inner();
+            let term = Arc::new(build_term_from_pair(inner.next().unwrap())?);
+            // The next item is belief_punct, which we can ignore as we already know the type.
+            inner.next();
+            // The next item *might* be the truth value.
+            let truth = inner.next().map(build_truth_from_pair).transpose()?.flatten();
+            Ok(Task::new(term, Punctuation::Belief, truth))
+        }
+        Rule::goal => {
+            let mut inner = inner_pair.into_inner();
+            let term = Arc::new(build_term_from_pair(inner.next().unwrap())?);
+            Ok(Task::new(term, Punctuation::Goal, None))
+        }
+        Rule::question => {
+            let mut inner = inner_pair.into_inner();
+            let term = Arc::new(build_term_from_pair(inner.next().unwrap())?);
+            Ok(Task::new(term, Punctuation::Question, None))
+        }
+        _ => unreachable!("Parser encountered unexpected statement rule: {:?}", inner_pair.as_rule()),
+    }
+}
+
+/// Recursively constructs a `Term` from a `term` grammar rule pair.
 fn build_term_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Term, pest::error::Error<Rule>> {
     match pair.as_rule() {
         Rule::term | Rule::compound_term => {
-            // These are wrapper rules, so we descend into the single inner pair.
+            // These are wrapper rules, so descend into the actual content.
             build_term_from_pair(pair.into_inner().next().unwrap())
         }
+        Rule::atom => Ok(Term::new_atom(pair.as_str())),
         rule => {
-            // This is a concrete rule, so we build the term.
-            let name = pair.as_str().to_string();
+            // This is a compound term rule.
             let term_type = match rule {
-                Rule::atom => TermType::Atom,
                 Rule::negation => TermType::Negation,
                 Rule::product => TermType::Product,
                 Rule::inheritance => TermType::Inheritance,
@@ -39,52 +81,32 @@ fn build_term_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Term, pest:
                 Rule::property => TermType::Property,
                 Rule::extensional_set => TermType::ExtensionalSet,
                 Rule::intensional_set => TermType::IntensionalSet,
-                _ => unreachable!("Parser encountered unexpected rule: {:?}", rule),
+                _ => unreachable!("Parser encountered unexpected term rule: {:?}", rule),
             };
 
-            let mut inner_pairs = pair.into_inner();
-            let (subject, predicate, components) = match term_type {
-                TermType::Atom => (None, None, None),
-                TermType::Negation => {
-                    let inner_term = build_term_from_pair(inner_pairs.next().unwrap())?;
-                    (Some(Arc::new(inner_term)), None, None)
-                }
-                TermType::Product
-                | TermType::Inheritance
-                | TermType::Similarity
-                | TermType::Implication
-                | TermType::Equivalence
-                | TermType::SequentialConjunction
-                | TermType::Operation
-                | TermType::Instance
-                | TermType::Property => {
-                    let subject = build_term_from_pair(inner_pairs.next().unwrap())?;
-                    let predicate = build_term_from_pair(inner_pairs.next().unwrap())?;
-                    (Some(Arc::new(subject)), Some(Arc::new(predicate)), None)
-                }
-                TermType::Conjunction | TermType::Disjunction | TermType::ExtensionalSet | TermType::IntensionalSet => {
-                    let components = inner_pairs
-                        .map(|p| build_term_from_pair(p).map(Arc::new))
-                        .collect::<Result<Vec<_>, _>>()?;
-                    (None, None, Some(components))
-                }
-            };
+            let components = pair
+                .into_inner()
+                .map(|p| build_term_from_pair(p).map(Arc::new))
+                .collect::<Result<Vec<_>, _>>()?;
 
-            // TODO: Calculate complexity, created_at, and hash properly
-            Ok(Term {
-                name,
-                term_type,
-                complexity: 1,
-                subject,
-                predicate,
-                components,
-                embedding: None,
-                created_at: 0,
-                hash: "".to_string(),
-            })
+            Ok(Term::new_compound(term_type, components))
         }
     }
 }
+
+/// Constructs a `TruthValue` from a `truth_value` grammar rule pair.
+fn build_truth_from_pair(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Option<TruthValue>, pest::error::Error<Rule>> {
+    let mut inner = pair.into_inner();
+    let frequency: f64 = inner.next().unwrap().as_str().parse().unwrap();
+    let confidence: f64 = inner.next().unwrap().as_str().parse().unwrap();
+    Ok(Some(TruthValue {
+        frequency,
+        confidence,
+    }))
+}
+
 
 #[cfg(test)]
 mod tests;
