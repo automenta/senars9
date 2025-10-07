@@ -31,76 +31,50 @@ class Core {
     });
   }
 
-  /**
-   * Registers a component with the core system.
-   * @param {string} name - The name of the component.
-   * @param {object} component - The component instance.
-   */
-  registerComponent(name, component) {
-    if (this.componentMap.has(name)) {
-      throw new Error(`Component "${name}" is already registered.`);
-    }
-    this.componentMap.set(name, component);
-    this.registrationOrder.push(name);
-    component.core = this; // Provide a reference to the core
-  }
+ registerComponent(name, component) {
+   if (this.componentMap.has(name)) {
+     throw new Error(`Component "${name}" already registered`);
+   }
+   this.componentMap.set(name, component);
+   this.registrationOrder.push(name);
+   component.core = this;
+ }
 
-  /**
-   * Retrieves a component by its name.
-   * @param {string} name - The name of the component.
-   * @returns {object|undefined} The component instance.
-   */
-  getComponent(name) {
-    return this.componentMap.get(name);
-  }
+ getComponent(name) {
+   return this.componentMap.get(name);
+ }
 
-  /**
-   * Initializes all registered components in order of registration.
-   * @param {object} initialConfig - The initial system configuration.
-   * @returns {Promise<void>}
-   */
-  async initialize(initialConfig = {}) {
-    // Initialize config first as other components may depend on it
-    await this.config.initialize(initialConfig);
+ async initialize(config = {}) {
+   await this.config.initialize(config);
 
-    for (const name of this.registrationOrder) {
-      if (name !== 'config') { // Config is already initialized
-        const component = this.componentMap.get(name);
-        const componentConfig = this.config.get(`components.${name}`, {});
-        await component.initialize(componentConfig);
-      }
-    }
-  }
+   const initPromises = this.registrationOrder.map(async (name) => {
+     if (name !== 'config') {
+       const component = this.componentMap.get(name);
+       const componentConfig = this.config.get(`components.${name}`, {});
+       await component.initialize(componentConfig);
+     }
+   });
 
-  /**
-   * Starts all registered components in order of registration.
-   * @returns {Promise<void>}
-   */
-  async start() {
-    for (const name of this.registrationOrder) {
-      await this.componentMap.get(name).start();
-    }
-  }
+   await Promise.all(initPromises);
+ }
 
-  /**
-   * Stops all registered components in reverse order of registration.
-   * @returns {Promise<void>}
-   */
-  async stop() {
-    for (const name of [...this.registrationOrder].reverse()) {
-      await this.componentMap.get(name).stop();
-    }
-  }
+ async start() {
+   const startPromises = this.registrationOrder.map(name =>
+     this.componentMap.get(name).start());
+   await Promise.all(startPromises);
+ }
 
-  /**
-   * Destroys all registered components in reverse order of registration.
-   * @returns {Promise<void>}
-   */
-  async destroy() {
-    for (const name of [...this.registrationOrder].reverse()) {
-      await this.componentMap.get(name).destroy();
-    }
-  }
+ async stop() {
+   const stopPromises = [...this.registrationOrder].reverse().map(name =>
+     this.componentMap.get(name).stop());
+   await Promise.all(stopPromises);
+ }
+
+ async destroy() {
+   const destroyPromises = [...this.registrationOrder].reverse().map(name =>
+     this.componentMap.get(name).destroy());
+   await Promise.all(destroyPromises);
+ }
 }
 
 export default Core;

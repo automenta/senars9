@@ -44,7 +44,6 @@ class Memory extends Component {
 
   delete(key) {
     if (!this.storage.has(key)) return false;
-    const value = this.storage.get(key);
     this.cache.delete(key);
     this.storage.delete(key);
     this._removeFromIndexes(key);

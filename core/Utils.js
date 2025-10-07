@@ -39,8 +39,7 @@ class Cache {
 
   _evict() {
     if (this.cache.size > this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
+      this.cache.delete(this.cache.keys().next().value);
     }
   }
 }
@@ -121,4 +120,60 @@ class Storage {
   }
 }
 
-export { Cache, Index, Storage };
+class Retry {
+  static async execute(fn, options = {}) {
+    const { maxRetries = 3, retryDelay = 1000, backoffMultiplier = 2 } = options;
+    let lastError;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await fn();
+        if (attempt > 0) console.log(`Operation succeeded after ${attempt} retries`);
+        return result;
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxRetries) {
+          const delay = retryDelay * Math.pow(backoffMultiplier, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
+  static withHandler(errorHandler) {
+    return {
+      async execute(fn, options = {}) {
+        try {
+          return await Retry.execute(fn, options);
+        } catch (error) {
+          return errorHandler(error);
+        }
+      }
+    };
+  }
+}
+
+class Validation {
+  static requireProps(obj, props) {
+    if (!obj) throw new Error('Object is required');
+    props.forEach(prop => {
+      if (!obj[prop]) throw new Error(`${prop} is required`);
+    });
+  }
+
+  static validateType(value, type, name) {
+    if (typeof value !== type) {
+      throw new Error(`${name} must be ${type}, got ${typeof value}`);
+    }
+  }
+
+  static validateFunction(fn, name) {
+    if (typeof fn !== 'function') {
+      throw new Error(`${name} must be a function`);
+    }
+  }
+}
+
+export { Cache, Index, Storage, Retry, Validation };

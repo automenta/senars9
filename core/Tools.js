@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Storage } from './Utils.js';
+import { Storage, Validation } from './Utils.js';
 
 class Tools extends Component {
   constructor() {
@@ -13,35 +13,25 @@ class Tools extends Component {
   }
 
   registerTool(tool) {
-    if (!tool?.id || typeof tool.execute !== 'function') {
-      throw new Error('Tool must have an id and an execute method.');
-    }
+    Validation.requireProps(tool, ['id']);
+    Validation.validateFunction(tool.execute, 'tool.execute');
+
     if (this.tools.has(tool.id)) {
-      console.warn(`Tool with ID "${tool.id}" is already registered. Overwriting.`);
+      console.warn(`Tool "${tool.id}" already registered. Overwriting.`);
     }
     this.tools.set(tool.id, tool);
   }
 
   async execute(toolId, params = {}) {
-    if (!this.tools.has(toolId)) {
-      throw new Error(`Tool with ID "${toolId}" not found.`);
-    }
-    const tool = this.tools.get(toolId);
+    const tool = this.tools.has(toolId) ? this.tools.get(toolId) : (() => { throw new Error(`Tool "${toolId}" not found`); })();
 
-    if (tool.parameters) {
-      for (const param of tool.parameters) {
-        if (param.required && !(param.name in params)) {
-          throw new Error(`Missing required parameter "${param.name}" for tool "${toolId}".`);
-        }
+    tool.parameters?.forEach(param => {
+      if (param.required && !(param.name in params)) {
+        throw new Error(`Missing required parameter "${param.name}" for tool "${toolId}"`);
       }
-    }
+    });
 
-    try {
-      return await tool.execute(params);
-    } catch (error) {
-      console.error(`Error executing tool "${toolId}":`, error);
-      throw error;
-    }
+    return tool.execute(params);
   }
 
   getAvailableTools() {

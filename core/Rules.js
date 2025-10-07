@@ -18,7 +18,7 @@ class Rules extends Component {
 
   add(rule) {
     if (!rule?.name || !rule?.condition || !rule?.action) {
-      throw new Error('Rule must have a name, condition, and action.');
+      throw new Error('Rule must have name, condition, and action');
     }
 
     const enhancedRule = {

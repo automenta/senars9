@@ -8,10 +8,10 @@ class Config extends Component {
     this.config = {};
   }
 
-  async initialize(initialConfig = {}) {
-    this.config = initialConfig;
+  async initialize(config = {}) {
+    this.config = config;
     this.cache.clear();
-    await super.initialize(initialConfig);
+    await super.initialize(config);
   }
 
   get(key, defaultValue) {
@@ -21,22 +21,13 @@ class Config extends Component {
     const value = key.split('.').reduce((obj, k) =>
       (obj && typeof obj === 'object' && k in obj) ? obj[k] : undefined, this.config);
 
-    if (value !== undefined) {
-      this.cache.set(key, value);
-      return value;
-    }
-
-    return defaultValue;
+    return value !== undefined ? (this.cache.set(key, value), value) : defaultValue;
   }
 
   set(key, value) {
     const keys = key.split('.');
     const lastKey = keys.pop();
-    const target = keys.reduce((obj, k) => {
-      if (typeof obj[k] !== 'object' || obj[k] === null) obj[k] = {};
-      return obj[k];
-    }, this.config);
-
+    const target = keys.reduce((obj, k) => (typeof obj[k] !== 'object' || obj[k] === null) ? obj[k] = {} : obj[k], this.config);
     target[lastKey] = value;
     this.cache.clear();
   }
@@ -61,7 +52,6 @@ class Config extends Component {
   _isObject(item) {
     return item && typeof item === 'object' && !Array.isArray(item);
   }
-
 }
 
 export default Config;

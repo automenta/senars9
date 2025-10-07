@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Storage } from './Utils.js';
+import { Storage, Retry } from './Utils.js';
 
 class Messages extends Component {
   constructor() {
@@ -61,13 +61,11 @@ class Messages extends Component {
   }
 
   execute(command, data) {
-    if (!this.commands.has(command)) {
-      throw new Error(`Command "${command}" not found.`);
-    }
-
+    const handler = this.commands.has(command) ? this.commands.get(command) : (() => { throw new Error(`Command "${command}" not found`); })();
     const context = { type: 'command', name: command, data, cancelled: false };
+
     return this._executeMiddleware(context, (ctx) =>
-      this._executeWithRetry(this.commands.get(ctx.name), ctx.data, 'command', command));
+      Retry.execute(() => handler(ctx.data), this.retryPolicies.get(command) || this.retryPolicies.get('default')));
   }
 
   // === UNIFIED COMMAND/EVENT PROCESSING ===
@@ -160,166 +158,63 @@ class Messages extends Component {
     };
   }
 
-  /**
-   * Executes the middleware chain with enhanced error handling.
-   * @param {object} context - The context object for the middleware.
-   * @param {Function} final - The final function to call after the chain.
-   * @returns {*} The result of the final function.
-   * @private
-   */
   _executeMiddleware(context, final) {
-    let index = -1;
-    const dispatch = (i) => {
-      if (i <= index) {
-        throw new Error('next() called multiple times');
-      }
-      index = i;
-
+    const dispatch = (i = 0) => {
+      if (i <= this._dispatchIndex) throw new Error('next() called multiple times');
       if (context.cancelled) return;
+      if (i >= this.middleware.length) return final ? final(context) : undefined;
 
-      let fn = this.middleware[i];
-      if (i === this.middleware.length) {
-        fn = final;
-      }
-
-      if (!fn) return;
+      this._dispatchIndex = i;
+      const fn = this.middleware[i];
 
       try {
         const result = fn(context, () => dispatch(i + 1));
-
-        // Handle both sync and async results
-        if (result && typeof result.then === 'function') {
-          return result.catch(err => this._handleError(err, context, () => dispatch(i + 1)));
-        }
-
-        return result;
+        return result?.then ? result.catch(err => this._handleError(err, context, () => dispatch(i + 1))) : result;
       } catch (err) {
         return this._handleError(err, context, () => dispatch(i + 1));
       }
     };
 
-    const result = dispatch(0);
+    this._dispatchIndex = -1;
+    const result = dispatch();
 
-    // Handle both sync and async results at the top level
-    if (result && typeof result.then === 'function') {
-      return result.catch(err => this._handleError(err, context));
-    }
-
-    return result;
+    return result?.then ? result.catch(err => this._handleError(err, context)) : result;
   }
 
-  /**
-   * Executes a function with retry logic and error handling.
-   * @param {Function} fn - The function to execute.
-   * @param {*} data - The data to pass to the function.
-   * @param {string} type - The type of operation ('command' or 'event').
-   * @param {string} name - The name of the operation.
-   * @returns {*} The result of the function.
-   * @private
-   */
   _executeWithRetry(fn, data, type, name) {
     const policy = this.retryPolicies.get(name) || this.retryPolicies.get('default');
-    let lastError;
 
-    // Synchronous retry logic for compatibility
-    for (let attempt = 0; attempt <= policy.maxRetries; attempt++) {
-      try {
-        const result = fn(data);
-        // Handle both sync and async results
-        if (result && typeof result.then === 'function') {
-          // If async, we need to return a promise for the whole chain
-          return result.then(
-            (asyncResult) => {
-              if (attempt > 0) {
-                console.log(`Operation ${name} succeeded after ${attempt} retries`);
-              }
-              return asyncResult;
-            },
-            (error) => {
-              if (attempt < policy.maxRetries) {
-                console.warn(`Operation ${name} failed (attempt ${attempt + 1}), will retry:`, error.message);
-                return new Promise((resolve) => {
-                  setTimeout(() => {
-                    resolve(this._executeWithRetry(fn, data, type, name));
-                  }, policy.retryDelay * Math.pow(policy.backoffMultiplier, attempt));
-                });
-              } else {
-                console.error(`Operation ${name} failed after ${policy.maxRetries + 1} attempts:`, error);
-                return this._handleError(error, { type, name, data });
-              }
-            }
-          );
-        } else {
-          // Synchronous result
-          if (attempt > 0) {
-            console.log(`Operation ${name} succeeded after ${attempt} retries`);
-          }
-          return result;
-        }
-      } catch (error) {
-        lastError = error;
-
-        if (attempt < policy.maxRetries) {
-          console.warn(`Operation ${name} failed (attempt ${attempt + 1}), retrying:`, error.message);
-          // For sync operations, we can't delay, so we continue immediately
-        } else {
-          console.error(`Operation ${name} failed after ${policy.maxRetries + 1} attempts:`, error);
-        }
-      }
-    }
-
-    // Try error handlers before giving up
-    return this._handleError(lastError, { type, name, data });
+    return Retry.execute(() => fn(data), policy).catch(error =>
+      this._handleError(error, { type, name, data }));
   }
 
-  /**
-   * Handles errors with registered error handlers.
-   * @param {Error} error - The error that occurred.
-   * @param {object} context - The operation context.
-   * @param {Function} [retryFn] - Optional retry function.
-   * @returns {*} The error handling result.
-   * @private
-   */
   _handleError(error, context, retryFn) {
     const errorType = error.constructor.name || 'Error';
 
-    // Try specific error handlers
-    if (this.errorHandlers.has(errorType)) {
-      for (const handler of this.errorHandlers.get(errorType)) {
+    const tryHandlers = (handlers) => {
+      for (const handler of handlers) {
         try {
           const result = handler(error, context, retryFn);
-          // Handle both sync and async results
-          if (result && typeof result.then === 'function') {
-            return result;
-          }
-          if (result) {
-            return result; // Handler successfully recovered
-          }
+          if (result?.then) return result;
+          if (result) return result;
         } catch (handlerError) {
-          console.error(`Error handler for ${errorType} failed:`, handlerError);
+          console.error(`Error handler failed:`, handlerError);
         }
       }
+    };
+
+    // Try specific error handlers first
+    if (this.errorHandlers.has(errorType)) {
+      const result = tryHandlers(this.errorHandlers.get(errorType));
+      if (result) return result;
     }
 
     // Try generic error handlers
     if (this.errorHandlers.has('Error')) {
-      for (const handler of this.errorHandlers.get('Error')) {
-        try {
-          const result = handler(error, context, retryFn);
-          // Handle both sync and async results
-          if (result && typeof result.then === 'function') {
-            return result;
-          }
-          if (result) {
-            return result;
-          }
-        } catch (handlerError) {
-          console.error('Generic error handler failed:', handlerError);
-        }
-      }
+      const result = tryHandlers(this.errorHandlers.get('Error'));
+      if (result) return result;
     }
 
-    // If no handlers recovered, throw the original error
     throw error;
   }
 
