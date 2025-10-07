@@ -125,6 +125,15 @@ class Retry {
     const { maxRetries = 3, retryDelay = 1000, backoffMultiplier = 2 } = options;
     let lastError;
 
+    // If no retries needed, execute synchronously
+    if (maxRetries === 0) {
+      try {
+        return fn();
+      } catch (error) {
+        throw error;
+      }
+    }
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const result = await fn();

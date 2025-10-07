@@ -7,6 +7,8 @@ describe('Messages', () => {
   beforeEach(async () => {
     messages = new Messages();
     await messages.initialize({});
+    // Ensure middleware is cleared for each test
+    messages.middleware = [];
   });
 
   describe('Event Handling', () => {
@@ -37,12 +39,12 @@ describe('Messages', () => {
   });
 
   describe('Command Handling', () => {
-    test('should register and execute a command', () => {
+    test('should register and execute a command', async () => {
       const commandHandler = jest.fn(data => `executed ${data}`);
       messages.registerCommand('test-command', commandHandler);
       const result = messages.execute('test-command', 'input');
       expect(commandHandler).toHaveBeenCalledWith('input');
-      expect(result).toBe('executed input');
+      expect(await result).toBe('executed input');
     });
 
     test('should throw an error for an unknown command', () => {
@@ -79,7 +81,7 @@ describe('Messages', () => {
       expect(handler).toHaveBeenCalledWith({ original: true, modified: true });
     });
 
-    test('should process commands through middleware', () => {
+    test('should process commands through middleware', async () => {
       const middlewareFn = jest.fn((context, next) => {
         context.data = `modified ${context.data}`;
         return next();
@@ -92,7 +94,7 @@ describe('Messages', () => {
 
       expect(middlewareFn).toHaveBeenCalled();
       expect(commandHandler).toHaveBeenCalledWith('modified input');
-      expect(result).toBe('final modified input');
+      expect(await result).toBe('final modified input');
     });
 
     test('middleware can cancel an event', () => {

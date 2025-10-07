@@ -74,9 +74,9 @@ class Messages extends Component {
 
     const result = this._executeMiddleware(context, executeWithRetry);
 
-    // For backward compatibility, if no middleware and no retries, return result directly
-    const policy = this.retryPolicies.get(command) || this.retryPolicies.get('default');
-    if (this.middleware.length === 0 && policy.maxRetries === 0) {
+    // For backward compatibility, if no middleware and no command-specific retries, return result directly
+    const commandPolicy = this.retryPolicies.get(command);
+    if (this.middleware.length === 0 && (!commandPolicy || commandPolicy.maxRetries === 0)) {
       return result;
     }
 
@@ -191,7 +191,8 @@ class Messages extends Component {
       if (!fn) return;
 
       try {
-        return fn(context, () => dispatch(i + 1));
+        const result = fn(context, () => dispatch(i + 1));
+        return result;
       } catch (err) {
         return this._handleError(err, context, () => dispatch(i + 1));
       }
