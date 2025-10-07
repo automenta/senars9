@@ -1,6 +1,6 @@
 /**
  * @file: core/LM.js
- * @description: Integrates with external Language Models (LLMs) for advanced cognitive functions.
+ * @description: Abstraction layer for interacting with language model providers for tasks like text generation, embedding, and hypothesis generation.
  * @module LM
  */
 
@@ -10,86 +10,82 @@ class LM extends Component {
   constructor() {
     super();
     this.providers = new Map();
+    this.defaultProviderId = null;
   }
 
   /**
    * Initializes the LM component.
-   * @param {object} config - The configuration object.
+   * @param {object} config - Configuration for the LM component, including providers.
    * @returns {Promise<void>}
    */
   async initialize(config = {}) {
     await super.initialize(config);
-    this.registerDefaultProviders();
+    this.defaultProviderId = config.defaultProvider || null;
+    // In a real implementation, provider instances would be created here based on config.
   }
 
   /**
-   * Registers placeholder providers. A real implementation would connect to actual LLM APIs.
+   * Registers a language model provider.
+   * @param {string} id - A unique identifier for the provider.
+   * @param {object} provider - The provider instance, which should conform to a specific interface.
    */
-  registerDefaultProviders() {
-    this.addProvider({
-      id: 'ollama',
-      name: 'Ollama (Mock)',
-      generate: async (prompt, options) => `Mock response for: "${prompt}"`,
-      generateEmbedding: async (text) => [0.1, 0.2, 0.3], // Fixed-size mock embedding
-    });
-
-    this.addProvider({
-      id: 'xenova',
-      name: 'Xenova (Mock)',
-      generate: async (prompt, options) => `Mock response for: "${prompt}"`,
-      generateEmbedding: async (text) => [0.4, 0.5, 0.6],
-    });
-  }
-
-  /**
-   * Adds a language model provider.
-   * @param {object} provider - The provider object.
-   */
-  addProvider(provider) {
-    if (!provider || !provider.id) {
-      throw new Error('Provider must have an ID.');
+  registerProvider(id, provider) {
+    this.providers.set(id, provider);
+    if (!this.defaultProviderId) {
+      this.defaultProviderId = id;
     }
-    this.providers.set(provider.id, provider);
   }
 
   /**
-   * Generates text using a specified provider.
-   * @param {string} prompt - The prompt to send to the LLM.
-   * @param {object} options - Generation options, including which provider to use.
+   * Gets the active provider, either the default or a specified one.
+   * @param {string|null} providerId - The ID of the provider to use.
+   * @returns {object} The provider instance.
+   * @private
+   */
+  _getProvider(providerId = null) {
+    const id = providerId || this.defaultProviderId;
+    if (!id || !this.providers.has(id)) {
+      throw new Error(`LM provider "${id}" not found or no default provider is set.`);
+    }
+    return this.providers.get(id);
+  }
+
+  /**
+   * Generates text using the configured language model.
+   * @param {string} prompt - The prompt to send to the language model.
+   * @param {object} options - Generation options (e.g., temperature, maxTokens).
+   * @param {string|null} providerId - The specific provider to use.
    * @returns {Promise<string>} The generated text.
    */
-  async generateText(prompt, options = {}) {
-    const providerId = options.provider || this.config.defaultProvider || 'ollama';
-    if (!this.providers.has(providerId)) {
-      throw new Error(`LM provider "${providerId}" not found.`);
-    }
-    const provider = this.providers.get(providerId);
-    return provider.generate(prompt, options);
+  async generateText(prompt, options = {}, providerId = null) {
+    const provider = this._getProvider(providerId);
+    return provider.generateText(prompt, options);
   }
 
   /**
-   * Generates an embedding for a piece of text.
+   * Generates an embedding vector for a given text.
    * @param {string} text - The text to embed.
-   * @param {object} options - Options, including which provider to use.
-   * @returns {Promise<Array<number>>} The generated embedding vector.
+   * @param {string|null} providerId - The specific provider to use.
+   * @returns {Promise<Array<number>>} The embedding vector.
    */
-  async generateEmbedding(text, options = {}) {
-    const providerId = options.provider || this.config.defaultProvider || 'ollama';
-    if (!this.providers.has(providerId)) {
-      throw new Error(`LM provider "${providerId}" not found.`);
-    }
-    const provider = this.providers.get(providerId);
-    return provider.generateEmbedding(text, options);
+  async generateEmbedding(text, providerId = null) {
+    const provider = this._getProvider(providerId);
+    return provider.generateEmbedding(text);
   }
 
   /**
-   * Retrieves LM-related metrics.
-   * @returns {object}
+   * Generates a hypothesis based on observations.
+   * @param {Array<string>} observations - A list of observations.
+   * @param {object} options - Options for hypothesis generation.
+   * @param {string|null} providerId - The specific provider to use.
+   * @returns {Promise<object>} The generated hypothesis.
    */
-  getMetrics() {
-    return {
-      providerCount: this.providers.size,
-    };
+  async generateHypothesis(observations, options = {}, providerId = null) {
+    const provider = this._getProvider(providerId);
+    if (typeof provider.generateHypothesis !== 'function') {
+      throw new Error(`Provider "${providerId || this.defaultProviderId}" does not support hypothesis generation.`);
+    }
+    return provider.generateHypothesis(observations, options);
   }
 }
 

@@ -1,58 +1,62 @@
+/**
+ * @file: tests/unit/LM.test.js
+ * @description: Unit tests for the LM component.
+ */
+
 import { jest } from '@jest/globals';
 import LM from '../../core/LM.js';
 
 describe('LM Component', () => {
   let lm;
+  let mockProvider;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     lm = new LM();
-    await lm.initialize({ defaultProvider: 'ollama' });
+
+    mockProvider = {
+      generateText: jest.fn().mockResolvedValue('generated text'),
+      generateEmbedding: jest.fn().mockResolvedValue([0.1, 0.2, 0.3]),
+      generateHypothesis: jest.fn().mockResolvedValue({ hypothesis: 'a new idea' }),
+    };
+
+    lm.initialize({ defaultProvider: 'mock' });
+    lm.registerProvider('mock', mockProvider);
   });
 
-  test('should initialize with default mock providers', () => {
-    expect(lm.providers.has('ollama')).toBe(true);
-    expect(lm.providers.has('xenova')).toBe(true);
-    expect(lm.getMetrics().providerCount).toBe(2);
-  });
-
-  test('should add a new provider', () => {
-    const newProvider = { id: 'custom', name: 'Custom Provider', generate: async () => {} };
-    lm.addProvider(newProvider);
-    expect(lm.providers.has('custom')).toBe(true);
-    expect(lm.getMetrics().providerCount).toBe(3);
+  test('should register a provider and set it as default', () => {
+    expect(lm.defaultProviderId).toBe('mock');
+    expect(lm.providers.get('mock')).toEqual(mockProvider);
   });
 
   test('should generate text using the default provider', async () => {
-    const result = await lm.generateText('test prompt');
-    expect(result).toBe('Mock response for: "test prompt"');
-  });
-
-  test('should generate text using a specified provider', async () => {
-    const xenovaProvider = lm.providers.get('xenova');
-    const spy = jest.spyOn(xenovaProvider, 'generate');
-    await lm.generateText('test prompt', { provider: 'xenova' });
-    expect(spy).toHaveBeenCalled();
-  });
-
-  test('should generate an embedding using the default provider', async () => {
-    const embedding = await lm.generateEmbedding('test text');
-    expect(embedding).toEqual([0.1, 0.2, 0.3]);
+    const result = await lm.generateText('a prompt');
+    expect(mockProvider.generateText).toHaveBeenCalledWith('a prompt', {});
+    expect(result).toBe('generated text');
   });
 
   test('should generate an embedding using a specified provider', async () => {
-    const embedding = await lm.generateEmbedding('test text', { provider: 'xenova' });
-    expect(embedding).toEqual([0.4, 0.5, 0.6]);
+    const newProvider = { generateEmbedding: jest.fn().mockResolvedValue([0.4, 0.5]) };
+    lm.registerProvider('new', newProvider);
+
+    const result = await lm.generateEmbedding('some text', 'new');
+    expect(newProvider.generateEmbedding).toHaveBeenCalledWith('some text');
+    expect(result).toEqual([0.4, 0.5]);
   });
 
-  test('should throw an error for a non-existent provider', async () => {
-    await expect(lm.generateText('prompt', { provider: 'non-existent' })).rejects.toThrow(
-      'LM provider "non-existent" not found.'
-    );
+  test('should generate a hypothesis', async () => {
+    const observations = ['obs1', 'obs2'];
+    const result = await lm.generateHypothesis(observations);
+    expect(mockProvider.generateHypothesis).toHaveBeenCalledWith(observations, {});
+    expect(result).toEqual({ hypothesis: 'a new idea' });
   });
 
-  test('should throw an error when adding a provider without an ID', () => {
-    expect(() => {
-      lm.addProvider({ name: 'Invalid Provider' });
-    }).toThrow('Provider must have an ID.');
+  test('should throw an error if provider is not found', async () => {
+    await expect(lm.generateText('prompt', {}, 'nonexistent')).rejects.toThrow('LM provider "nonexistent" not found or no default provider is set.');
+  });
+
+  test('should throw an error if hypothesis generation is not supported', async () => {
+    const simpleProvider = { generateText: () => {} };
+    lm.registerProvider('simple', simpleProvider);
+    await expect(lm.generateHypothesis([], {}, 'simple')).rejects.toThrow('Provider "simple" does not support hypothesis generation.');
   });
 });

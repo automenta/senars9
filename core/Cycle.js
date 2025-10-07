@@ -1,6 +1,6 @@
 /**
  * @file: core/Cycle.js
- * @description: Manages the core cognitive cycle, orchestrating the phases of reasoning and system maintenance.
+ * @description: Manages the main cognitive loop, orchestrating the phases of perception, reasoning, and action with adaptive timing.
  * @module Cycle
  */
 
@@ -9,19 +9,19 @@ import Component from './Component.js';
 class Cycle extends Component {
   constructor() {
     super();
+    this.isRunning = false;
     this.cycleTimer = null;
-    this.isCycling = false;
-    this.cycleCount = 0;
+    this.cycleIntervalMs = 100; // Default cycle interval
   }
 
   /**
    * Initializes the Cycle component.
-   * @param {object} config - The configuration object.
+   * @param {object} config - Configuration for the cycle, including 'cycleIntervalMs'.
    * @returns {Promise<void>}
    */
   async initialize(config = {}) {
     await super.initialize(config);
-    this.config.intervalMs = this.config.intervalMs || 1000; // Default to 1 second
+    this.cycleIntervalMs = config.cycleIntervalMs || this.cycleIntervalMs;
   }
 
   /**
@@ -29,11 +29,12 @@ class Cycle extends Component {
    * @returns {Promise<void>}
    */
   async start() {
-    if (this.isCycling) return;
-    this.isCycling = true;
-    this.cycleTimer = setInterval(() => this.run(), this.config.intervalMs);
+    if (this.isRunning) {
+      return;
+    }
+    this.isRunning = true;
+    this.cycleTimer = setInterval(() => this._runCycle(), this.cycleIntervalMs);
     await super.start();
-    this.emit('cycle.started');
   }
 
   /**
@@ -41,74 +42,70 @@ class Cycle extends Component {
    * @returns {Promise<void>}
    */
   async stop() {
-    if (!this.isCycling) return;
-    clearInterval(this.cycleTimer);
-    this.isCycling = false;
-    this.cycleTimer = null;
+    if (!this.isRunning) {
+      return;
+    }
+    this.isRunning = false;
+    if (this.cycleTimer) {
+      clearInterval(this.cycleTimer);
+      this.cycleTimer = null;
+    }
     await super.stop();
-    this.emit('cycle.stopped');
   }
 
   /**
-   * Runs a single cognitive cycle.
+   * The main cognitive cycle loop.
+   * This method orchestrates the different phases of the system's operation.
+   * @private
    */
-  async run() {
-    this.cycleCount++;
-    this.emit('cycle.before', { count: this.cycleCount });
+  async _runCycle() {
+    if (!this.core) return;
 
-    try {
-      // 1. Select focus set from memory (placeholder)
-      const focusSet = await this.selectFocusSet();
+    // 1. Perception: Convert external input to tasks (handled externally, tasks are added to memory)
 
-      // 2. Perform reasoning on the focus set
-      if (focusSet.length > 0) {
-        await this.core.reasoning.reason(focusSet);
+    // 2. Prioritization: Calculate task priorities (handled by a future PriorityManager or within Memory)
+
+    // 3. Focus Selection: Select tasks for the current cycle
+    const focusSet = await this._selectFocusSet();
+
+    // 4. Reasoning: Apply inference rules to the focus set
+    if (this.core.reasoner) {
+      const derivedTasks = await this.core.reasoner.reason(focusSet);
+      if (derivedTasks.length > 0 && this.core.memory) {
+        // await this.core.memory.addTasks(derivedTasks); // Assumes an addTasks method
       }
-
-      // 3. Perform self-monitoring and maintenance (placeholder)
-      await this.performMaintenance();
-    } catch (error) {
-      this.emit('cycle.error', { error });
-      console.error('Error during cognitive cycle:', error);
     }
 
-    this.emit('cycle.after', { count: this.cycleCount });
+    // 5. Meta-Cognition: Detect contradictions and conflicts (future implementation)
+
+    // 6. Neural Enrichment: Use LMs for insights (future implementation)
+
+    // 7. Planning: Create action sequences for goals (future implementation)
+
+    // 8. Action Execution: Execute plans (future implementation)
+
+    // 9. Learning: Consolidate new knowledge into memory
+    if (this.core.memory) {
+      await this.core.memory.consolidateKnowledge();
+    }
+
+    // Adaptive Timing: Adjust cycle interval based on system load (future implementation)
   }
 
   /**
-   * Selects the set of tasks to focus on for the current cycle.
-   * @returns {Promise<Array<object>>}
+   * Selects a set of tasks to focus on for the current cycle.
+   * @returns {Promise<Array<object>>} A list of tasks for the focus set.
    * @private
    */
-  async selectFocusSet() {
-    // Placeholder: In a real implementation, this would involve complex
-    // prioritization logic based on task priority, recency, relevance, etc.
+  async _selectFocusSet() {
     if (!this.core || !this.core.memory) {
-      throw new Error('Memory component not available on core.');
+      return [];
     }
-    // For now, just grab a few recent tasks.
-    const allTasks = await this.core.memory.queryTasks({});
-    return allTasks.slice(0, this.config.focusSetSize || 5);
-  }
-
-  /**
-   * Performs system maintenance tasks.
-   * @private
-   */
-  async performMaintenance() {
-    // Placeholder for self-optimization, memory consolidation, etc.
-  }
-
-  /**
-   * Retrieves cycle-related performance metrics.
-   * @returns {object}
-   */
-  getMetrics() {
-    return {
-      isCycling: this.isCycling,
-      cycleCount: this.cycleCount,
-      intervalMs: this.config.intervalMs,
-    };
+    // Simple strategy: get a few of the most recently added tasks
+    const allTasks = await this.core.memory.queryTasks({}); // A simple query for now
+    allTasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const focusSetSize = this.core.config.get('core.focusSetSize', 10);
+    return allTasks.slice(0, focusSetSize);
   }
 }
 

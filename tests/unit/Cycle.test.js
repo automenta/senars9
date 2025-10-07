@@ -1,112 +1,84 @@
+/**
+ * @file: tests/unit/Cycle.test.js
+ * @description: Unit tests for the Cycle component.
+ */
+
 import { jest } from '@jest/globals';
 import Cycle from '../../core/Cycle.js';
 
 describe('Cycle Component', () => {
   let cycle;
   let mockCore;
-  let mockMemory;
-  let mockReasoning;
-  let mockMessages;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     jest.useFakeTimers();
-
-    mockMemory = {
-      queryTasks: jest.fn(async () => [{ id: 'task1' }]),
-    };
-    mockReasoning = {
-      reason: jest.fn(async () => []),
-    };
-    mockMessages = {
-      on: jest.fn(),
-      off: jest.fn(),
-      emit: jest.fn(),
-    };
-    mockCore = {
-      memory: mockMemory,
-      reasoning: mockReasoning,
-      messages: mockMessages,
-    };
-
     cycle = new Cycle();
-    await cycle.initialize({ intervalMs: 100 });
+
+    mockCore = {
+      config: {
+        get: jest.fn().mockReturnValue(10), // focusSetSize
+      },
+      memory: {
+        queryTasks: jest.fn().mockResolvedValue([]),
+        consolidateKnowledge: jest.fn().mockResolvedValue(),
+      },
+      reasoner: {
+        reason: jest.fn().mockResolvedValue([]),
+      },
+    };
+
     cycle.core = mockCore;
+    cycle.initialize({ cycleIntervalMs: 50 });
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  test('should initialize with a default interval', async () => {
-    const newCycle = new Cycle();
-    await newCycle.initialize();
-    expect(newCycle.config.intervalMs).toBe(1000);
+  test('should initialize with correct interval', () => {
+    expect(cycle.cycleIntervalMs).toBe(50);
   });
 
-  test('start() should begin the cycle and emit an event', async () => {
+  test('should start and run the cycle loop', async () => {
+    const runCycleSpy = jest.spyOn(cycle, '_runCycle');
     await cycle.start();
-    expect(cycle.isCycling).toBe(true);
+    expect(cycle.isRunning).toBe(true);
     expect(cycle.cycleTimer).not.toBeNull();
-    // The second argument is undefined when no data is passed to emit()
-    expect(mockMessages.emit).toHaveBeenCalledWith('cycle.started', undefined);
+
+    jest.advanceTimersByTime(100); // Advance time by 2 cycles
+
+    expect(runCycleSpy).toHaveBeenCalledTimes(2);
+    runCycleSpy.mockRestore();
   });
 
-  test('stop() should end the cycle and emit an event', async () => {
+  test('should stop the cycle loop', async () => {
     await cycle.start();
     await cycle.stop();
-    expect(cycle.isCycling).toBe(false);
+    expect(cycle.isRunning).toBe(false);
     expect(cycle.cycleTimer).toBeNull();
-    // The second argument is undefined when no data is passed to emit()
-    expect(mockMessages.emit).toHaveBeenCalledWith('cycle.stopped', undefined);
   });
 
-  test('should run a cycle periodically', async () => {
-    await cycle.start();
-    expect(cycle.cycleCount).toBe(0);
+  test('_runCycle should call memory, reasoner, and other phases', async () => {
+    const focusSet = [{ id: 'task1' }];
+    mockCore.memory.queryTasks.mockResolvedValue(focusSet);
 
-    jest.advanceTimersByTime(100); // Advance time by one interval
-    expect(cycle.cycleCount).toBe(1);
+    await cycle._runCycle();
 
-    jest.advanceTimersByTime(200); // Advance time by two more intervals
-    expect(cycle.cycleCount).toBe(3);
+    expect(mockCore.memory.queryTasks).toHaveBeenCalled();
+    expect(mockCore.reasoner.reason).toHaveBeenCalledWith(focusSet);
+    expect(mockCore.memory.consolidateKnowledge).toHaveBeenCalled();
   });
 
-  test('run() should select a focus set and perform reasoning', async () => {
-    await cycle.run();
+  test('_selectFocusSet should select tasks from memory', async () => {
+    const tasks = [
+      { term: { hash: 'task1' }, createdAt: 100 },
+      { term: { hash: 'task2' }, createdAt: 200 },
+    ];
+    mockCore.memory.queryTasks.mockResolvedValue(tasks);
 
-    expect(mockMemory.queryTasks).toHaveBeenCalled();
-    expect(mockReasoning.reason).toHaveBeenCalledWith([{ id: 'task1' }]);
-  });
+    const focusSet = await cycle._selectFocusSet();
 
-  test('run() should emit before and after events', async () => {
-    await cycle.run();
-    expect(mockMessages.emit).toHaveBeenCalledWith('cycle.before', { count: 1 });
-    expect(mockMessages.emit).toHaveBeenCalledWith('cycle.after', { count: 1 });
-  });
-
-  test('run() should handle and emit errors', async () => {
-    // Mock console.error to prevent logging during this test
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    const error = new Error('Reasoning failed');
-    mockReasoning.reason.mockRejectedValue(error);
-
-    await cycle.run();
-    expect(mockMessages.emit).toHaveBeenCalledWith('cycle.error', { error });
-
-    // Restore original console.error
-    consoleErrorSpy.mockRestore();
-  });
-
-  test('should return correct metrics', async () => {
-    await cycle.start();
-    jest.advanceTimersByTime(300);
-
-    const metrics = cycle.getMetrics();
-    expect(metrics).toEqual({
-      isCycling: true,
-      cycleCount: 3,
-      intervalMs: 100,
-    });
+    expect(focusSet.length).toBe(2);
+    expect(focusSet[0].term.hash).toBe('task2'); // Should be sorted by createdAt descending
   });
 });

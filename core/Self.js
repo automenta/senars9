@@ -1,6 +1,6 @@
 /**
  * @file: core/Self.js
- * @description: Manages system self-monitoring, optimization, and meta-cognitive functions.
+ * @description: Responsible for system monitoring, performance analysis, and self-optimization.
  * @module Self
  */
 
@@ -9,78 +9,70 @@ import Component from './Component.js';
 class Self extends Component {
   constructor() {
     super();
-    this.performanceRules = new Map();
+    this.performanceRules = [];
   }
 
   /**
    * Initializes the Self component.
-   * @param {object} config - The configuration object.
+   * @param {object} config - The configuration for the component.
    * @returns {Promise<void>}
    */
   async initialize(config = {}) {
     await super.initialize(config);
-    this.registerDefaultListeners();
+    // In the future, this could load performance-tuning rules.
   }
 
   /**
-   * Registers listeners for core system events to enable self-monitoring.
+   * Gathers and aggregates statistics from all registered components.
+   * @returns {object} An object containing system-wide statistics.
    */
-  registerDefaultListeners() {
-    this.on('cycle.after', (data) => this.handleCycleCompletion(data));
-    this.on('cycle.error', (data) => this.handleCycleError(data));
+  getSystemStats() {
+    if (!this.core) {
+      return {};
+    }
+
+    const stats = {};
+    for (const [name, component] of this.core.componentMap.entries()) {
+      if (typeof component.getMetrics === 'function') {
+        const metrics = component.getMetrics();
+        if (Object.keys(metrics).length > 0) {
+          stats[name] = metrics;
+        }
+      }
+    }
+    return stats;
   }
 
   /**
-   * Handles the completion of a cognitive cycle.
-   * @param {object} data - Event data from the cycle.
+   * Analyzes system performance and suggests or applies optimizations.
+   * This is a placeholder for future self-optimization logic.
    */
-  handleCycleCompletion(data) {
-    // Placeholder for performance analysis, e.g., checking cycle time, memory usage, etc.
-    // console.log(`Cycle ${data.count} completed. Analyzing performance...`);
-    this.runPerformanceChecks();
-  }
+  async optimize() {
+    const stats = this.getSystemStats();
 
-  /**
-   * Handles an error that occurred during a cognitive cycle.
-   * @param {object} data - Event data containing the error.
-   */
-  handleCycleError(data) {
-    // Placeholder for logging critical errors or triggering recovery mechanisms.
-    console.error('Self-monitoring detected a cycle error:', data.error);
-  }
+    // Example: Check memory pressure
+    if (stats.memory && stats.memory.usage > 0.9) {
+      this.emit('system.memory.high_pressure', { usage: stats.memory.usage });
+    }
 
-  /**
-   * Runs a series of performance checks and applies optimizations.
-   */
-  runPerformanceChecks() {
-    // In a real implementation, this would iterate through performance rules
-    // and potentially adjust system parameters, e.g., cycle interval.
-    for (const rule of this.performanceRules.values()) {
-      rule.check(this.core);
+    // Example: Check cycle latency
+    if (stats.cycle && stats.cycle.avgLatency > 200) {
+      this.emit('system.cycle.high_latency', { latency: stats.cycle.avgLatency });
+      // Future action: could adjust cycleIntervalMs
+    }
+
+    // Apply performance rules
+    for (const rule of this.performanceRules) {
+      rule(this.core, stats);
     }
   }
 
   /**
    * Adds a performance optimization rule.
-   * @param {object} rule - The performance rule to add.
+   * @param {Function} rule - A function that takes the core instance and stats to apply an optimization.
    */
   addPerformanceRule(rule) {
-    if (!rule || !rule.id) {
-      throw new Error('Performance rule must have an ID.');
-    }
-    this.performanceRules.set(rule.id, rule);
-  }
-
-  /**
-   * Retrieves system-wide metrics for analysis.
-   * @returns {object}
-   */
-  getMetrics() {
-    return {
-      performanceRuleCount: this.performanceRules.size,
-      // In a real system, this would aggregate metrics from all components.
-      aggregatedMetrics: {},
-    };
+    this.performanceRules.push(rule);
   }
 }
 

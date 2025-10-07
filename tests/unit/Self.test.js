@@ -1,74 +1,62 @@
+/**
+ * @file: tests/unit/Self.test.js
+ * @description: Unit tests for the Self component.
+ */
+
 import { jest } from '@jest/globals';
 import Self from '../../core/Self.js';
+import Component from '../../core/Component.js';
 
 describe('Self Component', () => {
   let self;
   let mockCore;
-  let mockMessages;
 
-  beforeEach(async () => {
-    // Mock the core and its components that Self interacts with
-    mockMessages = {
-      on: jest.fn(),
-      off: jest.fn(),
-      emit: jest.fn(),
-    };
-    mockCore = {
-      messages: mockMessages,
-    };
-
+  beforeEach(() => {
     self = new Self();
-    // We need to attach the mock core before initialization to allow event listeners to be set up
-    self.core = mockCore;
-    await self.initialize({});
-  });
 
-  test('should register event listeners on initialization', () => {
-    // It should listen for 'cycle.after' and 'cycle.error'
-    expect(mockMessages.on).toHaveBeenCalledWith('cycle.after', expect.any(Function));
-    expect(mockMessages.on).toHaveBeenCalledWith('cycle.error', expect.any(Function));
-    expect(mockMessages.on).toHaveBeenCalledTimes(2);
-  });
+    const mockMemory = new Component();
+    mockMemory.getMetrics = () => ({ usage: 0.95 });
 
-  test('should add and run a performance rule', () => {
-    const perfRule = {
-      id: 'test-rule',
-      check: jest.fn(),
+    const mockCycle = new Component();
+    mockCycle.getMetrics = () => ({ avgLatency: 250 });
+
+    mockCore = {
+      componentMap: new Map([
+        ['memory', mockMemory],
+        ['cycle', mockCycle],
+      ]),
+      messages: {
+        emit: jest.fn(),
+      },
     };
-    self.addPerformanceRule(perfRule);
-
-    expect(self.getMetrics().performanceRuleCount).toBe(1);
-
-    // This simulates the 'cycle.after' event handler calling runPerformanceChecks
-    self.runPerformanceChecks();
-    expect(perfRule.check).toHaveBeenCalledWith(mockCore);
+    self.core = mockCore;
+    self.initialize();
   });
 
-  test('should handle cycle completion event', () => {
-    // Spy on the method that should be called
-    const runChecksSpy = jest.spyOn(self, 'runPerformanceChecks');
-    const cycleData = { count: 1 };
-
-    self.handleCycleCompletion(cycleData);
-    expect(runChecksSpy).toHaveBeenCalled();
-
-    runChecksSpy.mockRestore();
+  test('getSystemStats should aggregate metrics from all components', () => {
+    const stats = self.getSystemStats();
+    expect(stats).toHaveProperty('memory');
+    expect(stats).toHaveProperty('cycle');
+    expect(stats.memory.usage).toBe(0.95);
+    expect(stats.cycle.avgLatency).toBe(250);
   });
 
-  test('should handle cycle error event', () => {
-    // Spy on console.error to check if it's called
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const errorData = { error: new Error('Test Error') };
-
-    self.handleCycleError(errorData);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Self-monitoring detected a cycle error:', errorData.error);
-
-    consoleErrorSpy.mockRestore();
+  test('optimize should emit events for performance issues', async () => {
+    await self.optimize();
+    expect(mockCore.messages.emit).toHaveBeenCalledWith('system.memory.high_pressure', { usage: 0.95 });
+    expect(mockCore.messages.emit).toHaveBeenCalledWith('system.cycle.high_latency', { latency: 250 });
   });
 
-  test('should throw an error if performance rule has no ID', () => {
-    expect(() => {
-      self.addPerformanceRule({ name: 'invalid rule' });
-    }).toThrow('Performance rule must have an ID.');
+  test('should add and apply a performance rule', async () => {
+    const mockRule = jest.fn();
+    self.addPerformanceRule(mockRule);
+    await self.optimize();
+    expect(mockRule).toHaveBeenCalledWith(mockCore, expect.any(Object));
+  });
+
+  test('getSystemStats should handle components without getMetrics', () => {
+    mockCore.componentMap.set('no-metrics', new Component());
+    const stats = self.getSystemStats();
+    expect(stats).not.toHaveProperty('no-metrics');
   });
 });
