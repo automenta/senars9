@@ -4,45 +4,59 @@ use std::sync::Arc;
 
 /// Represents the memory of the SeNARS system, storing knowledge and active tasks.
 ///
-/// The memory is designed for efficient retrieval of information based on term structure,
-/// which is crucial for the reasoning process. It uses a content-addressable storage
-/// approach where terms are identified by their unique hash.
+/// The memory is designed with a dual storage architecture (short-term and long-term)
+/// and uses indexes for efficient, content-addressable retrieval of information.
 #[derive(Debug, Default)]
 pub struct Memory {
-    /// The main storage for all tasks, keyed by the hash of the task's term.
-    /// Using `Arc<Task>` allows for cheap cloning of tasks for processing.
-    tasks: HashMap<String, Arc<Task>>,
+    /// Short-term memory for recently added or accessed tasks.
+    short_term_tasks: HashMap<String, Arc<Task>>,
+    /// Long-term memory for consolidated, important knowledge.
+    long_term_tasks: HashMap<String, Arc<Task>>,
 
-    /// An index to quickly find implications that can be triggered by a given premise.
-    /// Maps the hash of a premise term to a set of task hashes (implications).
+    /// Index for implication relationships: premise_hash -> {task_hash, ...}
     implication_index: HashMap<String, HashSet<String>>,
-
-    /// An index for efficient lookup of inheritance relationships.
-    /// Maps the hash of a subject term to a set of task hashes (inheritance statements).
+    /// Index for inheritance relationships: subject_hash -> {task_hash, ...}
     inheritance_index: HashMap<String, HashSet<String>>,
-    // Add other indexes (similarity, equivalence, etc.) here as needed.
+    /// Index for similarity relationships: term_hash -> {task_hash, ...}
+    similarity_index: HashMap<String, HashSet<String>>,
+    // TODO: Add temporal_index and other indexes as needed.
+
+    // Statistics
+    /// Total number of tasks currently in memory.
+    total_tasks: u64,
+    /// Number of consolidation cycles performed.
+    consolidation_count: u64,
+    /// Timestamp of the last consolidation cycle.
+    last_consolidation: u64,
 }
 
 impl Memory {
     /// Creates a new, empty `Memory` component.
     pub fn new() -> Self {
         Memory {
-            tasks: HashMap::new(),
+            short_term_tasks: HashMap::new(),
+            long_term_tasks: HashMap::new(),
             implication_index: HashMap::new(),
             inheritance_index: HashMap::new(),
+            similarity_index: HashMap::new(),
+            total_tasks: 0,
+            consolidation_count: 0,
+            last_consolidation: 0,
         }
     }
 
-    /// Adds a task to memory and updates the relevant indexes.
+    /// Adds a task to short-term memory and updates the relevant indexes.
     ///
-    /// If a task with the same term hash already exists, it is overwritten.
-    /// The method analyzes the task's term to determine which indexes to update.
+    /// New tasks are always added to short-term memory first.
+    /// The method also updates indexes for efficient retrieval.
     pub fn add_task(&mut self, task: Task) {
         let task_arc = Arc::new(task);
         let term_hash = task_arc.term.hash.clone();
 
-        // Add to the main task store.
-        self.tasks.insert(term_hash.clone(), task_arc.clone());
+        // Add to short-term memory, overwriting if it exists.
+        if self.short_term_tasks.insert(term_hash.clone(), task_arc.clone()).is_none() {
+            self.total_tasks += 1;
+        }
 
         // Update indexes based on the term type.
         match task_arc.term.term_type {
@@ -62,55 +76,60 @@ impl Memory {
                         .insert(term_hash);
                 }
             }
-            // Add cases for other indexed types here.
+            TermType::Similarity => {
+                if let (Some(subj), Some(pred)) = (&task_arc.term.subject, &task_arc.term.predicate) {
+                    self.similarity_index.entry(subj.hash.clone()).or_default().insert(term_hash.clone());
+                    self.similarity_index.entry(pred.hash.clone()).or_default().insert(term_hash);
+                }
+            }
             _ => {}
         }
     }
 
-    /// Retrieves a task from memory by the hash of its term.
+    /// Retrieves a task from memory by its term hash, checking both short-term and long-term memory.
     pub fn get_task(&self, term_hash: &str) -> Option<&Arc<Task>> {
-        self.tasks.get(term_hash)
+        self.short_term_tasks.get(term_hash).or_else(|| self.long_term_tasks.get(term_hash))
     }
 
     /// Retrieves all implication tasks where the given term is the premise.
-    ///
-    /// # Arguments
-    /// * `premise` - The term to use as the premise for the lookup.
-    ///
-    /// # Returns
-    /// An `Option` containing a vector of `Arc<Task>` if any implications are found.
     pub fn get_implications_by_premise(&self, premise: &Term) -> Option<Vec<&Arc<Task>>> {
         self.implication_index
             .get(&premise.hash)
             .map(|task_hashes| {
                 task_hashes
                     .iter()
-                    .filter_map(|hash| self.tasks.get(hash))
+                    .filter_map(|hash| self.get_task(hash))
                     .collect()
             })
     }
 
     /// Retrieves all inheritance tasks where the given term is the subject.
-    ///
-    /// # Arguments
-    /// * `subject` - The term to use as the subject for the lookup.
-    ///
-    /// # Returns
-    /// An `Option` containing a vector of `Arc<Task>` if any inheritance tasks are found.
     pub fn get_inheritance_by_subject(&self, subject: &Term) -> Option<Vec<&Arc<Task>>> {
         self.inheritance_index
             .get(&subject.hash)
             .map(|task_hashes| {
                 task_hashes
                     .iter()
-                    .filter_map(|hash| self.tasks.get(hash))
+                    .filter_map(|hash| self.get_task(hash))
                     .collect()
             })
     }
 
-    /// Returns an iterator over all tasks currently in memory.
+    /// Retrieves all similarity tasks related to the given term.
+    pub fn get_similarities(&self, term: &Term) -> Option<Vec<&Arc<Task>>> {
+        self.similarity_index
+            .get(&term.hash)
+            .map(|task_hashes| {
+                task_hashes
+                    .iter()
+                    .filter_map(|hash| self.get_task(hash))
+                    .collect()
+            })
+    }
+
+    /// Returns an iterator over all tasks in both short-term and long-term memory.
     pub fn get_all_tasks_iter(&self) -> impl Iterator<Item = &Arc<Task>> {
-        self.tasks.values()
+        self.short_term_tasks.values().chain(self.long_term_tasks.values())
     }
 }
 

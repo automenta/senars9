@@ -71,3 +71,31 @@ fn test_no_inference_when_premise_is_missing() {
         "No tasks should be derived when the second premise is missing."
     );
 }
+
+#[test]
+fn test_analogy_inference() {
+    // Setup: Memory with (dog <-> wolf). and (dog --> has_fur).
+    let mut memory = Memory::new();
+    let reasoner = Reasoner::new();
+    let premise1 = parser::parse("(dog <-> wolf).").unwrap();
+    let premise2 = parser::parse("(dog --> has_fur).").unwrap();
+    memory.add_task(premise2);
+
+    // Focus set with the similarity task
+    let focus_task = Arc::new(premise1);
+    let focus_set = vec![focus_task];
+
+    // Run reasoning
+    let derived_tasks = reasoner.reason(&focus_set, &memory);
+
+    // Verification
+    assert_eq!(derived_tasks.len(), 1, "Expected exactly one derived question.");
+    let derived_question = &derived_tasks[0];
+    let expected_term = parser::parse("(wolf --> has_fur)?").unwrap().term;
+
+    assert_eq!(derived_question.punctuation, Punctuation::Question, "Derived task should be a question.");
+    assert_eq!(
+        derived_question.term.hash, expected_term.hash,
+        "Derived question is not the expected (wolf --> has_fur)?"
+    );
+}

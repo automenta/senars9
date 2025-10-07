@@ -42,40 +42,24 @@ impl<'a> Cycle<'a> {
 
     /// Runs a single, complete cognitive cycle.
     ///
-    /// 1. Selects a focus set.
-    /// 2. Applies reasoning to derive new tasks.
-    /// 3. Adds the new tasks back to memory.
+    /// The process involves:
+    /// 1. Selecting a "focus set" of high-priority tasks from memory.
+    /// 2. Passing the focus set to the reasoner to derive new tasks (conclusions).
+    /// 3. Adding the newly derived tasks back into memory.
     pub fn run_cycle(&mut self) {
-        println!("--- Running Cognitive Cycle ---");
-
         // 1. Select focus set
         let focus_set = self.select_focus_set();
         if focus_set.is_empty() {
-            println!("Memory is empty. Nothing to do.");
-            println!("--- Cycle Complete ---");
-            return;
+            return; // Nothing to do if memory is empty.
         }
 
-        println!("Focus Set ({} tasks):", focus_set.len());
-        for task in &focus_set {
-            println!("  - {}", task);
-        }
-
-        // 2. Reason on the focus set
+        // 2. Reason on the focus set to derive new knowledge
         let derived_tasks = self.reasoner.reason(&focus_set, self.memory);
 
         // 3. Add derived tasks back to memory
-        if !derived_tasks.is_empty() {
-            println!("Derived Tasks ({}):", derived_tasks.len());
-            for task in derived_tasks {
-                println!("  - Derived: {}", task);
-                self.memory.add_task(task);
-            }
-        } else {
-            println!("No new tasks were derived.");
+        for task in derived_tasks {
+            self.memory.add_task(task);
         }
-
-        println!("--- Cycle Complete ---");
     }
 }
 

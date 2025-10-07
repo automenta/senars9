@@ -45,6 +45,9 @@ impl Reasoner {
                 TermType::Implication => {
                     derived_tasks.extend(self.modus_ponens(task, memory));
                 }
+                TermType::Similarity => {
+                    derived_tasks.extend(self.analogy(task, memory));
+                }
                 _ => {
                     // This is where other inference rule applications would go.
                 }
@@ -112,6 +115,39 @@ impl Reasoner {
                             Some(new_truth),
                         );
                         derived.push(new_task);
+                    }
+                }
+            }
+        }
+        derived
+    }
+    /// Applies the analogy rule.
+    ///
+    /// Given a premise `(S <-> M).` and another premise `(S --> P).`, it derives
+    /// a new question `(M --> P)?`. This rule generates questions based on similarity.
+    fn analogy(&self, similarity_task: &Arc<Task>, memory: &Memory) -> Vec<Task> {
+        let mut derived = Vec::new();
+        if let (Some(s), Some(m)) = (&similarity_task.term.subject, &similarity_task.term.predicate) {
+            // Case 1: Find properties of S to ask about M.
+            if let Some(properties_of_s) = memory.get_inheritance_by_subject(s) {
+                for property_task in properties_of_s {
+                    if let Some(p) = &property_task.term.predicate {
+                        // Found (S --> P), derive (M --> P)?
+                        let new_term = Term::new_compound(TermType::Inheritance, vec![Arc::clone(m), Arc::clone(p)]);
+                        let new_question = Task::new(Arc::new(new_term), Punctuation::Question, None);
+                        derived.push(new_question);
+                    }
+                }
+            }
+
+            // Case 2: Find properties of M to ask about S.
+            if let Some(properties_of_m) = memory.get_inheritance_by_subject(m) {
+                for property_task in properties_of_m {
+                    if let Some(p) = &property_task.term.predicate {
+                        // Found (M --> P), derive (S --> P)?
+                        let new_term = Term::new_compound(TermType::Inheritance, vec![Arc::clone(s), Arc::clone(p)]);
+                        let new_question = Task::new(Arc::new(new_term), Punctuation::Question, None);
+                        derived.push(new_question);
                     }
                 }
             }

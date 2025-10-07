@@ -45,19 +45,29 @@ impl Term {
     }
 
     /// Generates a name for a compound term based on its type and components.
-    /// This is the standard Narsese representation.
+    /// This is the standard Narsese representation, as defined in `SPECIFICATION.md`.
     fn generate_name(term_type: &TermType, components: &[Arc<Term>]) -> String {
         let component_names: Vec<String> = components.iter().map(|c| c.name.clone()).collect();
-        // This is a simplified representation. A full parser/formatter will be more robust.
         match term_type {
+            // Core Relationship Operators
+            TermType::Negation => format!("(--, {})", component_names[0]),
             TermType::Inheritance => format!("({} --> {})", component_names[0], component_names[1]),
             TermType::Similarity => format!("({} <-> {})", component_names[0], component_names[1]),
             TermType::Implication => format!("({} ==> {})", component_names[0], component_names[1]),
             TermType::Equivalence => format!("({} <=> {})", component_names[0], component_names[1]),
             TermType::Conjunction => format!("(&, {}, {})", component_names[0], component_names[1]),
             TermType::Disjunction => format!("(|, {}, {})", component_names[0], component_names[1]),
+            TermType::SequentialConjunction => format!("(&/, {}, {})", component_names[0], component_names[1]),
             TermType::Operation => format!("({} ^ {})", component_names[0], component_names[1]),
-            TermType::Product => format!("({}, {})", component_names[0], component_names[1]),
+            TermType::Product => format!("({})", component_names.join(", ")),
+
+            // Set and Property Operators
+            TermType::Instance => format!("({} {{-- {})", component_names[0], component_names[1]),
+            TermType::Property => format!("({} --}} {})", component_names[0], component_names[1]),
+            TermType::ExtensionalSet => format!("{{{}}}", component_names.join(", ")),
+            TermType::IntensionalSet => format!("[{}]", component_names.join(", ")),
+
+            // Fallback for any unimplemented or atomic types
             _ => format!("({:?}, {})", term_type, component_names.join(", ")),
         }
     }
