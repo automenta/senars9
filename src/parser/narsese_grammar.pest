@@ -7,7 +7,7 @@ atom = @{ (ASCII_ALPHANUMERIC | "_")+ }
 
 // Core Relationship Operators
 negation = { "(--," ~ term ~ ")" }
-product = { "(" ~ term ~ "," ~ term ~ ")" }
+product = { "(" ~ (term ~ ",")* ~ term ~ ")" }
 inheritance = { "(" ~ term ~ "-->" ~ term ~ ")" }
 similarity = { "(" ~ term ~ "<->" ~ term ~ ")" }
 implication = { "(" ~ term ~ "==>" ~ term ~ ")" }
