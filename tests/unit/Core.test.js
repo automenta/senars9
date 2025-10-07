@@ -3,7 +3,6 @@ import Core from '../../core/Core.js';
 import Component from '../../core/Component.js';
 import Config from '../../core/Config.js';
 
-// A lightweight, real component for testing lifecycle call order.
 class TestComponent extends Component {
   constructor(name, callOrderArray) {
     super();
@@ -40,8 +39,8 @@ describe('Core', () => {
   test('should instantiate with real config and messages components', () => {
     expect(core.getComponent('config')).toBeDefined();
     expect(core.getComponent('messages')).toBeDefined();
-    expect(core.config).toBe(core.getComponent('config')); // Proxy access
-    expect(core.messages).toBe(core.getComponent('messages')); // Proxy access
+    expect(core.config).toBe(core.getComponent('config'));
+    expect(core.messages).toBe(core.getComponent('messages'));
   });
 
   describe('Lifecycle Management', () => {
@@ -49,14 +48,12 @@ describe('Core', () => {
     let compA, compB;
 
     beforeEach(() => {
-      core = new Core(); // Re-instantiate for a clean slate
+      core = new Core();
       callOrder = [];
 
-      // Use the real Config component but spy on its initialize method to track call order.
       const realConfig = new Config();
       jest.spyOn(realConfig, 'initialize').mockImplementation(async (cfg) => {
         callOrder.push('init:config');
-        // Call the original implementation to maintain functionality
         await Config.prototype.initialize.call(realConfig, cfg);
       });
 
@@ -74,12 +71,10 @@ describe('Core', () => {
       const initialConfig = { components: { compA: { setting: 123 } } };
       await core.initialize(initialConfig);
 
-      // Verify order: config is always first, followed by registration order.
       expect(callOrder).toEqual(['init:config', 'init:messages', 'init:compA', 'init:compB']);
 
-      // Verify that the config was passed correctly to the test component.
       expect(compA.config).toEqual({ setting: 123 });
-      expect(compB.config).toEqual({}); // compB received the default empty config
+      expect(compB.config).toEqual({});
     });
 
     test('start should start all components in registration order', async () => {
@@ -88,14 +83,12 @@ describe('Core', () => {
     });
 
     test('stop should stop all components in reverse registration order', async () => {
-      // Manually set the config spy for this test since it's not part of the TestComponent
       jest.spyOn(core.config, 'stop').mockImplementation(async () => { callOrder.push('stop:config'); });
       await core.stop();
       expect(callOrder).toEqual(['stop:compB', 'stop:compA', 'stop:messages', 'stop:config']);
     });
 
     test('destroy should destroy all components in reverse registration order', async () => {
-      // Manually set the config spy for this test
       jest.spyOn(core.config, 'destroy').mockImplementation(async () => { callOrder.push('destroy:config'); });
       await core.destroy();
       expect(callOrder).toEqual(['destroy:compB', 'destroy:compA', 'destroy:messages', 'destroy:config']);

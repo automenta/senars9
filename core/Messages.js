@@ -83,17 +83,6 @@ class Messages extends Component {
     return result;
   }
 
-  // === UNIFIED COMMAND/EVENT PROCESSING ===
-
-  /**
-   * Registers a unified processor for both commands and events.
-   * @param {string} name - The name of the processor.
-   * @param {Function} processor - The processor function.
-   * @param {object} [options={}] - Processor options.
-   * @param {Array<string>} [options.events=[]] - Events this processor handles.
-   * @param {Array<string>} [options.commands=[]] - Commands this processor handles.
-   * @param {number} [options.priority=0] - Processor priority.
-   */
   registerProcessor(name, processor, options = {}) {
     const { events = [], commands = [], priority = 0 } = options;
 
@@ -106,14 +95,6 @@ class Messages extends Component {
     });
   }
 
-  /**
-   * Processes a message through unified command/event system.
-   * @param {object} message - The message to process.
-   * @param {string} message.type - 'command' or 'event'.
-   * @param {string} message.name - The name of the command/event.
-   * @param {*} message.data - The message data.
-   * @returns {*} The processing result.
-   */
   async process(message) {
     const { type, name, data } = message;
 
@@ -127,13 +108,6 @@ class Messages extends Component {
     }
   }
 
-  // === ERROR HANDLING AND RECOVERY ===
-
-  /**
-   * Registers an error handler for specific error types.
-   * @param {string} errorType - The type of error to handle.
-   * @param {Function} handler - The error handler function.
-   */
   registerErrorHandler(errorType, handler) {
     if (!this.errorHandlers.has(errorType)) {
       this.errorHandlers.set(errorType, []);
@@ -141,14 +115,6 @@ class Messages extends Component {
     this.errorHandlers.get(errorType).push(handler);
   }
 
-  /**
-   * Sets a retry policy for specific operations.
-   * @param {string} operation - The operation name.
-   * @param {object} policy - The retry policy.
-   * @param {number} policy.maxRetries - Maximum retry attempts.
-   * @param {number} policy.retryDelay - Delay between retries.
-   * @param {number} [policy.backoffMultiplier=2] - Backoff multiplier.
-   */
   setRetryPolicy(operation, policy) {
     this.retryPolicies.set(operation, {
       maxRetries: policy.maxRetries || 3,
@@ -157,10 +123,6 @@ class Messages extends Component {
     });
   }
 
-  /**
-   * Gets system health and error statistics.
-   * @returns {object} Health and error statistics.
-   */
   getHealth() {
     return {
       events: this.events.size,
@@ -238,12 +200,6 @@ class Messages extends Component {
     throw error;
   }
 
-  /**
-   * Utility function for delays.
-   * @param {number} ms - Milliseconds to delay.
-   * @returns {Promise} Promise that resolves after the delay.
-   * @private
-   */
   _delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }

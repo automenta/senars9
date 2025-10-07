@@ -22,12 +22,6 @@ class System {
     this.core = null;
   }
 
-  /**
-   * Inputs a task (e.g., a belief, goal, or question) into the system.
-   * This is the primary method for providing the system with new information.
-   * @param {object} task - The task object to input.
-   * @returns {void}
-   */
   input(task) {
     if (!this.core) {
       throw new Error('System is not running. Call start() before inputting tasks.');
@@ -37,11 +31,6 @@ class System {
     this.core.messages.emit('task.input', task);
   }
 
-  /**
-   * Registers an event handler to listen for system events.
-   * @param {string} event - The name of the event (e.g., 'task.derived').
-   * @param {Function} handler - The callback function to execute.
-   */
   on(event, handler) {
     if (!this.core) {
       // Allow registering handlers before start, but they will be on a non-existent core.
@@ -51,11 +40,6 @@ class System {
     this.core.messages.on(event, handler);
   }
 
-  /**
-   * Unregisters an event handler.
-   * @param {string} event - The name of the event.
-   * @param {Function} handler - The callback function to remove.
-   */
   off(event, handler) {
     if (!this.core) {
       return; // Fail silently if trying to unregister from a stopped system

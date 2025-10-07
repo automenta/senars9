@@ -1,9 +1,3 @@
-/**
- * @file: core/Core.js
- * @description: The main orchestrator for the SeNARS system. Manages component lifecycle and provides access via metaprogramming.
- * @module Core
- */
-
 import Config from './Config.js';
 import Messages from './Messages.js';
 import Rules from './Rules.js';
@@ -14,20 +8,13 @@ class Core {
     this.componentMap = new Map();
     this.registrationOrder = [];
 
-    // Register foundational components
     this.registerComponent('config', new Config());
     this.registerComponent('messages', new Messages());
     this.registerComponent('rules', new Rules());
     this.registerComponent('memory', new Memory());
 
-    // Metaprogramming-driven component access
     return new Proxy(this, {
-      get: (target, prop) => {
-        if (target.componentMap.has(prop)) {
-          return target.componentMap.get(prop);
-        }
-        return target[prop];
-      },
+      get: (target, prop) => target.componentMap.has(prop) ? target.componentMap.get(prop) : target[prop],
     });
   }
 

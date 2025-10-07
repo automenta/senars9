@@ -30,11 +30,6 @@ class Cycle extends Component {
     await super.stop();
   }
 
-  /**
-   * The main cognitive cycle loop.
-   * This method orchestrates the different phases of the system's operation.
-   * @private
-   */
   async _runCycle() {
     if (!this.core) return;
 
@@ -69,11 +64,6 @@ class Cycle extends Component {
     // Adaptive Timing: Adjust cycle interval based on system load (future implementation)
   }
 
-  /**
-   * Selects a set of tasks to focus on for the current cycle.
-   * @returns {Promise<Array<object>>} A list of tasks for the focus set.
-   * @private
-   */
   async _selectFocusSet() {
     if (!this.core || !this.core.memory) {
       return [];

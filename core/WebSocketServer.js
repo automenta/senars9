@@ -1,9 +1,3 @@
-/**
- * @file: core/WebSocketServer.js
- * @description: WebSocket server for real-time communication and inter-NARS protocol.
- * @module WebSocketServer
- */
-
 import { WebSocketServer as WSServer } from 'ws';
 import { createServer } from 'http';
 import Component from './Component.js';
@@ -17,20 +11,11 @@ class WebSocketServer extends Component {
     this.heartbeatInterval = null;
     this.isRunning = false;
 
-    // Enhanced inter-NARS protocol
-    this.narsInstances = new Map(); // Track NARS instances
-    this.subscriptions = new Map(); // Event subscription management
-    this.taskStreams = new Map(); // Real-time task streaming
+    this.narsInstances = new Map();
+    this.subscriptions = new Map();
+    this.taskStreams = new Map();
   }
 
-  /**
-   * Initializes the WebSocket server.
-   * @param {object} config - The component's configuration object.
-   * @param {number} [config.port=8080] - The port to listen on.
-   * @param {string} [config.host='localhost'] - The host to bind to.
-   * @param {number} [config.heartbeatInterval=30000] - Heartbeat interval in milliseconds.
-   * @returns {Promise<void>}
-   */
   async initialize(config = {}) {
     await super.initialize(config);
 
@@ -52,10 +37,6 @@ class WebSocketServer extends Component {
     this.heartbeatInterval = heartbeatInterval;
   }
 
-  /**
-   * Starts the WebSocket server.
-   * @returns {Promise<void>}
-   */
   async start() {
     if (this.isRunning) return;
 
@@ -76,10 +57,6 @@ class WebSocketServer extends Component {
     });
   }
 
-  /**
-   * Stops the WebSocket server.
-   * @returns {Promise<void>}
-   */
   async stop() {
     if (!this.isRunning) return;
 
@@ -102,11 +79,6 @@ class WebSocketServer extends Component {
     });
   }
 
-  /**
-   * Sends a message to a specific client.
-   * @param {string} clientId - The ID of the client to send to.
-   * @param {object} message - The message to send.
-   */
   sendToClient(clientId, message) {
     const client = this.clients.get(clientId);
     if (client && client.ws.readyState === 1) { // OPEN
@@ -114,11 +86,6 @@ class WebSocketServer extends Component {
     }
   }
 
-  /**
-   * Broadcasts a message to all connected clients.
-   * @param {object} message - The message to broadcast.
-   * @param {Array<string>} [excludeClients=[]] - Client IDs to exclude from broadcast.
-   */
   broadcast(message, excludeClients = []) {
     const excludeSet = new Set(excludeClients);
 
@@ -129,11 +96,6 @@ class WebSocketServer extends Component {
     }
   }
 
-  /**
-   * Sends a message to all clients of a specific type.
-   * @param {string} clientType - The type of clients to send to.
-   * @param {object} message - The message to send.
-   */
   sendToClientType(clientType, message) {
     for (const [clientId, client] of this.clients) {
       if (client.type === clientType && client.ws.readyState === 1) {
@@ -142,12 +104,6 @@ class WebSocketServer extends Component {
     }
   }
 
-  /**
-   * Handles new WebSocket connections.
-   * @param {WebSocket} ws - The WebSocket connection.
-   * @param {object} request - The HTTP request object.
-   * @private
-   */
   _handleConnection(ws, request) {
     const clientId = this._generateClientId();
     const clientInfo = {
@@ -183,12 +139,6 @@ class WebSocketServer extends Component {
     console.log(`Client connected: ${clientId}`);
   }
 
-  /**
-   * Handles incoming messages from clients with enhanced protocol support.
-   * @param {string} clientId - The ID of the client that sent the message.
-   * @param {Buffer} data - The raw message data.
-   * @private
-   */
   _handleMessage(clientId, data) {
     const client = this.clients.get(clientId);
     if (!client) return;
@@ -228,13 +178,7 @@ class WebSocketServer extends Component {
     }
   }
 
-  /**
-    * Handles client identification messages.
-    * @param {string} clientId - The ID of the client.
-    * @param {object} message - The identification message.
-    * @private
-    */
-   _handleIdentify(clientId, message) {
+  _handleIdentify(clientId, message) {
      const client = this.clients.get(clientId);
      if (!client) return;
 
@@ -254,13 +198,7 @@ class WebSocketServer extends Component {
      console.log(`Client ${clientId} identified as: ${client.type} (v${client.version})`);
    }
 
-  /**
-    * Handles subscription requests for real-time event streaming.
-    * @param {string} clientId - The ID of the client.
-    * @param {object} message - The subscription message.
-    * @private
-    */
-   _handleSubscription(clientId, message) {
+  _handleSubscription(clientId, message) {
      const { eventTypes = [], filters = {} } = message;
 
      if (!this.subscriptions.has(clientId)) {
@@ -283,13 +221,7 @@ class WebSocketServer extends Component {
      });
    }
 
-  /**
-    * Handles unsubscription requests.
-    * @param {string} clientId - The ID of the client.
-    * @param {object} message - The unsubscription message.
-    * @private
-    */
-   _handleUnsubscription(clientId, message) {
+  _handleUnsubscription(clientId, message) {
      const { eventTypes = [] } = message;
 
      if (this.subscriptions.has(clientId)) {
@@ -308,13 +240,7 @@ class WebSocketServer extends Component {
      }
    }
 
-  /**
-    * Handles real-time task streaming messages.
-    * @param {string} clientId - The ID of the client.
-    * @param {object} message - The task stream message.
-    * @private
-    */
-   _handleTaskStream(clientId, message) {
+  _handleTaskStream(clientId, message) {
      const { taskId, action, data } = message;
 
      if (!this.taskStreams.has(taskId)) {
@@ -346,13 +272,7 @@ class WebSocketServer extends Component {
      }, [clientId]);
    }
 
-  /**
-    * Enhanced inter-NARS protocol messages with routing.
-    * @param {string} clientId - The ID of the client that sent the message.
-    * @param {object} message - The NARS protocol message.
-    * @private
-    */
-   _handleNARSMessage(clientId, message) {
+  _handleNARSMessage(clientId, message) {
      const client = this.clients.get(clientId);
      if (!client) return;
 
@@ -381,11 +301,6 @@ class WebSocketServer extends Component {
      }
    }
 
-  /**
-   * Handles client disconnections.
-   * @param {string} clientId - The ID of the disconnected client.
-   * @private
-   */
   _handleDisconnection(clientId) {
     const client = this.clients.get(clientId);
     if (client) {
@@ -394,19 +309,10 @@ class WebSocketServer extends Component {
     }
   }
 
-  /**
-   * Generates a unique client ID.
-   * @returns {string} A unique client identifier.
-   * @private
-   */
   _generateClientId() {
     return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Starts the heartbeat mechanism.
-   * @private
-   */
   _startHeartbeat() {
     this.heartbeatInterval = setInterval(() => {
       const now = new Date();
@@ -429,10 +335,6 @@ class WebSocketServer extends Component {
     }, this.heartbeatInterval);
   }
 
-  /**
-   * Stops the heartbeat mechanism.
-   * @private
-   */
   _stopHeartbeat() {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
@@ -440,12 +342,6 @@ class WebSocketServer extends Component {
     }
   }
 
-  /**
-   * Publishes an event to subscribed clients.
-   * @param {string} eventType - The type of event.
-   * @param {object} data - The event data.
-   * @param {object} [filters={}] - Additional filters for targeted delivery.
-   */
   publishEvent(eventType, data, filters = {}) {
     const eventMessage = {
       type: 'event',
@@ -467,10 +363,6 @@ class WebSocketServer extends Component {
     }
   }
 
-  /**
-   * Checks if event filters match subscription filters.
-   * @private
-   */
   _checkEventFilters(subscriptionFilters, eventFilters) {
     for (const [key, value] of Object.entries(subscriptionFilters)) {
       if (eventFilters[key] !== value) {
@@ -480,10 +372,6 @@ class WebSocketServer extends Component {
     return true;
   }
 
-  /**
-   * Gets NARS instances for inter-NARS communication.
-   * @returns {Array} Array of NARS instance information.
-   */
   getNARSInstances() {
     return Array.from(this.narsInstances.values()).map(instance => ({
       id: instance.id,
@@ -494,11 +382,6 @@ class WebSocketServer extends Component {
     }));
   }
 
-  /**
-   * Sends a task to a specific NARS instance.
-   * @param {string} targetInstanceId - The target NARS instance ID.
-   * @param {object} task - The task to send.
-   */
   sendTaskToNARS(targetInstanceId, task) {
     // Find the client ID for the target instance
     for (const [clientId, instance] of this.narsInstances) {
@@ -514,10 +397,6 @@ class WebSocketServer extends Component {
     return false;
   }
 
-  /**
-   * Gets enhanced server statistics.
-   * @returns {object} Server statistics including subscriptions and NARS instances.
-   */
   getStats() {
     const clientTypes = {};
     for (const client of this.clients.values()) {
