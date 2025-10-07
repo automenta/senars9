@@ -1,6 +1,6 @@
 /**
  * @file: core/Rules.js
- * @description: Optimized rules engine with winnowing for fast, condition-based rule selection and execution.
+ * @description: Manages the registration, evaluation, and execution of rules using a winnowing-based approach.
  * @module Rules
  */
 
@@ -9,153 +9,82 @@ import Component from './Component.js';
 class Rules extends Component {
   constructor() {
     super();
-    this.rules = new Map();
-    this.ruleIndex = new Map(); // For fast lookup by type/category
+    this.rules = [];
   }
 
   /**
-   * Initializes the Rules engine.
-   * @param {object} config - The configuration object.
+   * Initializes the Rules component.
+   * @param {object} config - The component's configuration object.
    * @returns {Promise<void>}
    */
   async initialize(config = {}) {
     await super.initialize(config);
-    this.rules.clear();
-    this.ruleIndex.clear();
+    this.rules = [];
   }
 
   /**
-   * Adds an inference rule to the engine.
+   * Adds a rule to the system.
    * @param {object} rule - The rule object to add.
+   * @param {string} rule.name - The name of the rule.
+   * @param {Function} rule.condition - A function that returns true if the rule should be considered.
+   * @param {Function} rule.action - A function to execute if the rule is selected.
+   * @param {number} [rule.priority=0] - The priority of the rule.
    */
-  addRule(rule) {
-    if (!rule || !rule.id) {
-      throw new Error('Rule must have an ID.');
+  add(rule) {
+    if (!rule || !rule.name || !rule.condition || !rule.action) {
+      throw new Error('Rule must have a name, condition, and action.');
     }
-    if (this.rules.has(rule.id)) {
-      console.warn(`Rule with ID "${rule.id}" already exists. Overwriting.`);
-    }
-    this.rules.set(rule.id, rule);
-    this._indexRule(rule);
+    this.rules.push({ priority: 0, ...rule });
   }
 
   /**
-   * Retrieves a rule by its ID.
-   * @param {string} ruleId - The ID of the rule to retrieve.
-   * @returns {object|undefined} The rule object or undefined if not found.
+   * Removes a rule by its name.
+   * @param {string} name - The name of the rule to remove.
    */
-  getRule(ruleId) {
-    return this.rules.get(ruleId);
+  remove(name) {
+    this.rules = this.rules.filter(rule => rule.name !== name);
   }
 
   /**
-   * Removes a rule from the engine.
-   * @param {string} ruleId - The ID of the rule to remove.
+   * Finds all rules matching a given predicate.
+   * @param {Function} predicate - A function to test each rule.
+   * @returns {Array<object>} A list of matching rules.
    */
-  removeRule(ruleId) {
-    const rule = this.rules.get(ruleId);
-    if (rule) {
-      this._deindexRule(rule);
-      this.rules.delete(ruleId);
-    }
+  find(predicate) {
+    return this.rules.filter(predicate);
   }
 
   /**
-   * Finds all rules that are applicable to a given task based on pre-filtering (winnowing).
-   * @param {object} task - The task to find applicable rules for.
-   * @returns {Array<object>} A list of applicable rules, prioritized.
+   * Evaluates the rules against a given context, executing the highest-priority rule that meets its condition.
+   * @param {object} context - The context object to evaluate rules against.
+   * @returns {Promise<any>} The result of the executed rule's action, or null if no rule was executed.
    */
-  findApplicableRules(task) {
-    // This is a simplified winnowing. A real implementation would be more complex.
-    const applicable = [];
-    for (const rule of this.rules.values()) {
-      // Example condition: rule is applicable if the task term type matches a condition in the rule.
-      if (this._isRuleApplicable(rule, task)) {
-        applicable.push(rule);
+  async evaluate(context) {
+    // 1. Winnowing: Filter rules based on the condition
+    const applicableRules = this.rules.filter(rule => {
+      try {
+        return rule.condition(context);
+      } catch (error) {
+        console.error(`Error in rule '${rule.name}' condition:`, error);
+        return false;
       }
-    }
-    return this._prioritizeRules(applicable);
-  }
-
-  /**
-   * Executes the most applicable rules for a set of tasks.
-   * @param {Array<object>} tasks - The tasks to apply rules to.
-   * @param {object} context - The reasoning context.
-   * @returns {Array<object>} A list of derived tasks.
-   */
-  executeRules(tasks, context = {}) {
-    const derivedTasks = [];
-    for (const task of tasks) {
-      const applicableRules = this.findApplicableRules(task);
-      for (const rule of applicableRules) {
-        if (rule.apply) {
-          const result = rule.apply([task], context);
-          if (result) {
-            derivedTasks.push(...result);
-          }
-        }
-      }
-    }
-    return derivedTasks;
-  }
-
-  /**
-   * Indexes a rule for faster retrieval.
-   * @param {object} rule - The rule to index.
-   * @private
-   */
-  _indexRule(rule) {
-    // Example indexing by category
-    if (rule.categories) {
-      for (const category of rule.categories) {
-        if (!this.ruleIndex.has(category)) {
-          this.ruleIndex.set(category, new Set());
-        }
-        this.ruleIndex.get(category).add(rule.id);
-      }
-    }
-  }
-
-  /**
-   * Removes a rule from the index.
-   * @param {object} rule - The rule to de-index.
-   * @private
-   */
-  _deindexRule(rule) {
-    if (rule.categories) {
-      for (const category of rule.categories) {
-        if (this.ruleIndex.has(category)) {
-          this.ruleIndex.get(category).delete(rule.id);
-        }
-      }
-    }
-  }
-
-  /**
-   * Determines if a rule is applicable to a task.
-   * @param {object} rule - The rule to check.
-   * @param {object} task - The task to check against.
-   * @returns {boolean} True if the rule is applicable.
-   * @private
-   */
-  _isRuleApplicable(rule, task) {
-    // Placeholder for actual applicability logic (e.g., matching term structure)
-    return rule.premises && rule.premises.some(p => p.type === task.term.type);
-  }
-
-  /**
-   * Prioritizes a list of rules.
-   * @param {Array<object>} rules - The rules to prioritize.
-   * @returns {Array<object>} The prioritized list of rules.
-   * @private
-   */
-  _prioritizeRules(rules) {
-    // Sort by priority (higher first), then complexity (lower first)
-    return rules.sort((a, b) => {
-      const priorityDiff = (b.priority || 0) - (a.priority || 0);
-      if (priorityDiff !== 0) return priorityDiff;
-      return (a.complexity || 0) - (b.complexity || 0);
     });
+
+    if (applicableRules.length === 0) {
+      return null; // No rules matched
+    }
+
+    // 2. Prioritization: Sort by priority (descending)
+    applicableRules.sort((a, b) => b.priority - a.priority);
+
+    // 3. Execution: Execute the highest-priority rule
+    const topRule = applicableRules[0];
+    try {
+      return await topRule.action(context);
+    } catch (error) {
+      console.error(`Error in rule '${topRule.name}' action:`, error);
+      return null;
+    }
   }
 }
 

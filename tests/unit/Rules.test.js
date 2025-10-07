@@ -1,126 +1,85 @@
-import { jest } from '@jest/globals';
+/**
+ * @file: tests/unit/Rules.test.js
+ * @description: Unit tests for the Rules component.
+ */
+
+import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import Rules from '../../core/Rules.js';
 
-// Mock Task and Rule structures for testing
-const createMockTask = (type) => ({
-  term: { type },
-});
+describe('Rules Component', () => {
+  let rules;
 
-const createMockRule = (id, priority, complexity, premises, categories = []) => ({
-  id,
-  priority,
-  complexity,
-  premises, // e.g., [{ type: 'inheritance' }]
-  categories,
-  apply: jest.fn(tasks => tasks.map(t => ({ ...t, derived: true, ruleId: id }))),
-});
-
-describe('Rules', () => {
-  let rulesEngine;
-
-  beforeEach(async () => {
-    rulesEngine = new Rules();
-    await rulesEngine.initialize({});
+  beforeEach(() => {
+    rules = new Rules();
+    rules.initialize();
   });
 
-  test('should initialize with empty rules and index', () => {
-    expect(rulesEngine.rules.size).toBe(0);
-    expect(rulesEngine.ruleIndex.size).toBe(0);
+  test('should add and retrieve a rule', () => {
+    const rule = { name: 'test-rule', condition: () => true, action: () => 'fired' };
+    rules.add(rule);
+    const found = rules.find(r => r.name === 'test-rule');
+    expect(found).toHaveLength(1);
+    expect(found[0].name).toBe('test-rule');
   });
 
-  describe('Rule Management', () => {
-    test('should add a rule successfully', () => {
-      const rule = createMockRule('rule1', 0.5, 10, [{ type: 'inheritance' }]);
-      rulesEngine.addRule(rule);
-      expect(rulesEngine.rules.has('rule1')).toBe(true);
-      expect(rulesEngine.getRule('rule1')).toBe(rule);
-    });
-
-    test('should throw an error if rule has no ID', () => {
-      const rule = { name: 'invalid' };
-      expect(() => rulesEngine.addRule(rule)).toThrow('Rule must have an ID.');
-    });
-
-    test('should warn when overwriting an existing rule', () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      const rule1 = createMockRule('rule1', 0.5, 10, []);
-      const rule2 = createMockRule('rule1', 0.6, 12, []);
-      rulesEngine.addRule(rule1);
-      rulesEngine.addRule(rule2);
-      expect(warnSpy).toHaveBeenCalledWith('Rule with ID "rule1" already exists. Overwriting.');
-      expect(rulesEngine.getRule('rule1')).toBe(rule2);
-      warnSpy.mockRestore();
-    });
-
-    test('should remove a rule and de-index it', () => {
-      const rule = createMockRule('rule1', 0.5, 10, [], ['cat1']);
-      rulesEngine.addRule(rule);
-      expect(rulesEngine.ruleIndex.get('cat1').has('rule1')).toBe(true);
-
-      rulesEngine.removeRule('rule1');
-      expect(rulesEngine.rules.has('rule1')).toBe(false);
-      expect(rulesEngine.ruleIndex.get('cat1').size).toBe(0);
-    });
+  test('should remove a rule by name', () => {
+    const rule = { name: 'test-rule', condition: () => true, action: () => {} };
+    rules.add(rule);
+    rules.remove('test-rule');
+    const found = rules.find(r => r.name === 'test-rule');
+    expect(found).toHaveLength(0);
   });
 
-  describe('Rule Applicability and Execution', () => {
-    let rule1, rule2, rule3;
-
-    beforeEach(() => {
-      rule1 = createMockRule('rule1', 0.8, 10, [{ type: 'typeA' }]);
-      rule2 = createMockRule('rule2', 0.5, 15, [{ type: 'typeB' }]);
-      rule3 = createMockRule('rule3', 0.8, 5, [{ type: 'typeA' }]); // Same priority as rule1, lower complexity
-
-      rulesEngine.addRule(rule1);
-      rulesEngine.addRule(rule2);
-      rulesEngine.addRule(rule3);
-    });
-
-    test('findApplicableRules should find rules matching task type', () => {
-      const task = createMockTask('typeA');
-      const applicable = rulesEngine.findApplicableRules(task);
-      expect(applicable.map(r => r.id)).toEqual(['rule3', 'rule1']); // Prioritized
-    });
-
-    test('findApplicableRules should return an empty array if no rules match', () => {
-      const task = createMockTask('typeC');
-      const applicable = rulesEngine.findApplicableRules(task);
-      expect(applicable).toEqual([]);
-    });
-
-    test('_prioritizeRules should sort by priority (desc) then complexity (asc)', () => {
-      const rules = [rule1, rule2, rule3];
-      const prioritized = rulesEngine._prioritizeRules(rules);
-      expect(prioritized.map(r => r.id)).toEqual(['rule3', 'rule1', 'rule2']);
-    });
-
-    test('executeRules should apply all applicable rules to a task', () => {
-      const taskA = createMockTask('typeA');
-      const taskB = createMockTask('typeB');
-      const derived = rulesEngine.executeRules([taskA, taskB]);
-
-      expect(rule1.apply).toHaveBeenCalled();
-      expect(rule2.apply).toHaveBeenCalled();
-      expect(rule3.apply).toHaveBeenCalled();
-
-      expect(derived.length).toBe(3);
-      expect(derived.map(d => d.ruleId).sort()).toEqual(['rule1', 'rule2', 'rule3']);
-    });
+  test('should throw an error if a rule is missing required properties', () => {
+    expect(() => rules.add({})).toThrow('Rule must have a name, condition, and action.');
+    expect(() => rules.add({ name: 'test' })).toThrow('Rule must have a name, condition, and action.');
+    expect(() => rules.add({ name: 'test', condition: () => true })).toThrow('Rule must have a name, condition, and action.');
   });
 
-  describe('Indexing', () => {
-    test('_indexRule should add rule to index by category', () => {
-      const rule = createMockRule('indexedRule', 0.5, 10, [], ['catA', 'catB']);
-      rulesEngine.addRule(rule);
-      expect(rulesEngine.ruleIndex.get('catA').has('indexedRule')).toBe(true);
-      expect(rulesEngine.ruleIndex.get('catB').has('indexedRule')).toBe(true);
+  describe('evaluate', () => {
+    test('should execute the action of a matching rule', async () => {
+      const action = jest.fn();
+      rules.add({ name: 'test-rule', condition: () => true, action });
+      await rules.evaluate({});
+      expect(action).toHaveBeenCalledTimes(1);
     });
 
-    test('_deindexRule should remove rule from index', () => {
-      const rule = createMockRule('indexedRule', 0.5, 10, [], ['catA']);
-      rulesEngine.addRule(rule);
-      rulesEngine.removeRule('indexedRule');
-      expect(rulesEngine.ruleIndex.get('catA').size).toBe(0);
+    test('should not execute the action of a non-matching rule', async () => {
+      const action = jest.fn();
+      rules.add({ name: 'test-rule', condition: () => false, action });
+      await rules.evaluate({});
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    test('should execute the highest priority rule', async () => {
+      const lowPriorityAction = jest.fn();
+      const highPriorityAction = jest.fn();
+      rules.add({ name: 'low-priority', condition: () => true, action: lowPriorityAction, priority: 1 });
+      rules.add({ name: 'high-priority', condition: () => true, action: highPriorityAction, priority: 10 });
+      await rules.evaluate({});
+      expect(highPriorityAction).toHaveBeenCalledTimes(1);
+      expect(lowPriorityAction).not.toHaveBeenCalled();
+    });
+
+    test('should pass the context to the condition and action', async () => {
+      const context = { value: 42 };
+      const condition = jest.fn(ctx => ctx.value === 42);
+      const action = jest.fn();
+      rules.add({ name: 'context-rule', condition, action });
+      await rules.evaluate(context);
+      expect(condition).toHaveBeenCalledWith(context);
+      expect(action).toHaveBeenCalledWith(context);
+    });
+
+    test('should return the result of the action', async () => {
+      rules.add({ name: 'return-rule', condition: () => true, action: () => 'result' });
+      const result = await rules.evaluate({});
+      expect(result).toBe('result');
+    });
+
+    test('should return null if no rules match', async () => {
+      const result = await rules.evaluate({});
+      expect(result).toBeNull();
     });
   });
 });

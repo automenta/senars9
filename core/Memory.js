@@ -1,6 +1,6 @@
 /**
  * @file: core/Memory.js
- * @description: Manages the storage, retrieval, and indexing of tasks and terms, supporting both short-term and long-term memory.
+ * @description: Provides a high-performance, caching-enabled data store for the SeNARS system.
  * @module Memory
  */
 
@@ -9,132 +9,98 @@ import Component from './Component.js';
 class Memory extends Component {
   constructor() {
     super();
-    this.shortTermTasks = new Map();
-    this.longTermTasks = new Map();
-
-    // Indexes for efficient retrieval
-    this.implicationIndex = new Map();
-    this.inheritanceIndex = new Map();
-    this.temporalIndex = new Map();
-    this.similarityIndex = new Map();
+    this.storage = new Map();
+    this.cache = new Map();
+    this.cacheSize = 1000; // Default cache size
   }
 
   /**
    * Initializes the Memory component.
-   * @param {object} config - The configuration object for the Memory component.
+   * @param {object} config - The component's configuration object.
+   * @param {number} [config.cacheSize=1000] - The maximum size of the cache.
    * @returns {Promise<void>}
    */
   async initialize(config = {}) {
     await super.initialize(config);
-    this.shortTermTasks.clear();
-    this.longTermTasks.clear();
-    this.implicationIndex.clear();
-    this.inheritanceIndex.clear();
-    this.temporalIndex.clear();
-    this.similarityIndex.clear();
+    this.storage.clear();
+    this.cache.clear();
+    this.cacheSize = config.cacheSize || this.cacheSize;
   }
 
   /**
-   * Stores a task in short-term memory.
-   * @param {object} task - The task object to store.
-   * @returns {Promise<void>}
+   * Retrieves an item from memory, utilizing the cache.
+   * @param {string} key - The key of the item to retrieve.
+   * @returns {*} The item, or undefined if not found.
    */
-  async storeTask(task) {
-    if (!task || !task.term || !task.term.hash) {
-      throw new Error('Task must have a valid term with a hash.');
+  get(key) {
+    if (this.cache.has(key)) {
+      const value = this.cache.get(key);
+      this._updateCache(key, value); // Mark as recently used
+      return value;
     }
-    this.shortTermTasks.set(task.term.hash, task);
-    this._updateIndexes(task);
-  }
 
-  /**
-   * Retrieves a task from memory.
-   * @param {string} taskId - The hash of the task's term.
-   * @returns {Promise<object|undefined>} The task object or undefined if not found.
-   */
-  async retrieveTask(taskId) {
-    return this.shortTermTasks.get(taskId) || this.longTermTasks.get(taskId);
-  }
-
-  /**
-   * Updates a task in memory.
-   * @param {string} taskId - The hash of the task's term.
-   * @param {object} updates - The properties to update on the task.
-   * @returns {Promise<void>}
-   */
-  async updateTask(taskId, updates) {
-    const task = await this.retrieveTask(taskId);
-    if (task) {
-      Object.assign(task, updates);
-      this._updateIndexes(task);
+    const value = this.storage.get(key);
+    if (value !== undefined) {
+      this._updateCache(key, value);
     }
+    return value;
   }
 
   /**
-   * Deletes a task from memory.
-   * @param {string} taskId - The hash of the task's term.
-   * @returns {Promise<void>}
+   * Stores an item in memory.
+   * @param {string} key - The key of the item to store.
+   * @param {*} value - The value to store.
    */
-  async deleteTask(taskId) {
-    if (this.shortTermTasks.has(taskId)) {
-      const task = this.shortTermTasks.get(taskId);
-      this._deindexTask(task);
-      this.shortTermTasks.delete(taskId);
-    }
-    if (this.longTermTasks.has(taskId)) {
-      const task = this.longTermTasks.get(taskId);
-      this._deindexTask(task);
-      this.longTermTasks.delete(taskId);
-    }
+  set(key, value) {
+    this.storage.set(key, value);
+    this._updateCache(key, value);
   }
 
   /**
-   * Queries tasks based on a given query object.
-   * @param {object} query - The query object to filter tasks.
-   * @returns {Promise<Array<object>>} A list of tasks matching the query.
+   * Deletes an item from memory and the cache.
+   * @param {string} key - The key of the item to delete.
+   * @returns {boolean} True if an item was deleted, false otherwise.
    */
-  async queryTasks(query) {
-    // This is a placeholder for a more sophisticated query system.
-    const allTasks = [...this.shortTermTasks.values(), ...this.longTermTasks.values()];
-    return allTasks.filter(task => {
-      return Object.entries(query).every(([key, value]) => {
-        return task[key] === value || (task.term && task.term[key] === value);
-      });
-    });
+  delete(key) {
+    this.cache.delete(key);
+    return this.storage.delete(key);
   }
 
   /**
-   * Updates the indexes for a given task.
-   * @param {object} task - The task to index.
+   * Clears all items from memory and the cache.
+   */
+  clear() {
+    this.storage.clear();
+    this.cache.clear();
+  }
+
+  /**
+   * Checks if an item exists in memory.
+   * @param {string} key - The key to check.
+   * @returns {boolean} True if the item exists, false otherwise.
+   */
+  has(key) {
+    return this.cache.has(key) || this.storage.has(key);
+  }
+
+  /**
+   * Private helper to update the cache and handle eviction (FIFO).
+   * @param {string} key - The key of the item to cache.
+   * @param {*} value - The value to cache.
    * @private
    */
-  _updateIndexes(task) {
-    // Placeholder for actual indexing logic
-  }
+  _updateCache(key, value) {
+    // To re-insert a key and mark it as recently used, delete it first.
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+    this.cache.set(key, value);
 
-  /**
-   * Removes a task from the indexes.
-   * @param {object} task - The task to de-index.
-   * @private
-   */
-  _deindexTask(task) {
-    // Placeholder for actual de-indexing logic
-  }
-
-  /**
-   * Moves tasks from short-term to long-term memory.
-   * @returns {Promise<void>}
-   */
-  async consolidateKnowledge() {
-    // Placeholder for consolidation logic
-  }
-
-  /**
-   * Removes old or low-priority tasks from memory.
-   * @returns {Promise<void>}
-   */
-  async forgetOldTasks() {
-    // Placeholder for forgetting logic
+    // Evict the oldest item if the cache is over size
+    if (this.cache.size > this.cacheSize) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+    }
   }
 }
 

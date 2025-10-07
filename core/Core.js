@@ -6,6 +6,8 @@
 
 import Config from './Config.js';
 import Messages from './Messages.js';
+import Rules from './Rules.js';
+import Memory from './Memory.js';
 
 class Core {
   constructor() {
@@ -15,6 +17,8 @@ class Core {
     // Register foundational components
     this.registerComponent('config', new Config());
     this.registerComponent('messages', new Messages());
+    this.registerComponent('rules', new Rules());
+    this.registerComponent('memory', new Memory());
 
     // Metaprogramming-driven component access
     return new Proxy(this, {
