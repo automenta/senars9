@@ -1,25 +1,11 @@
-/**
- * @file: core/System.js
- * @description: High-level API wrapper for the SeNARS system, providing a simplified interface for interaction.
- * @module System
- */
-
 import createCore from './createCore.js';
 
 class System {
-  /**
-   * @param {object} [config={}] - The initial configuration for the system.
-   */
   constructor(config = {}) {
     this.config = config;
     this.core = null;
   }
 
-  /**
-   * Initializes and starts the SeNARS system.
-   * This must be called before any other methods are used.
-   * @returns {Promise<void>}
-   */
   async start() {
     if (this.core) {
       console.warn('System is already running.');
@@ -29,14 +15,8 @@ class System {
     await this.core.start();
   }
 
-  /**
-   * Stops the SeNARS system and cleans up all resources.
-   * @returns {Promise<void>}
-   */
   async stop() {
-    if (!this.core) {
-      return;
-    }
+    if (!this.core) return;
     await this.core.stop();
     await this.core.destroy();
     this.core = null;

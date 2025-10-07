@@ -1,31 +1,17 @@
-/**
- * @file: core/Messages.js
- * @description: Unified system for event publishing/subscription and command execution, with middleware support.
- * @module Messages
- */
-
 import Component from './Component.js';
+import { Storage } from './Utils.js';
 
 class Messages extends Component {
   constructor() {
     super();
-    this.events = new Map();
-    this.commands = new Map();
+    this.events = new Storage();
+    this.commands = new Storage();
     this.middleware = [];
-
-    // Enhanced unified processing
-    this.processors = new Map(); // Unified event/command processors
-    this.errorHandlers = new Map(); // Error recovery handlers
-    this.retryPolicies = new Map(); // Retry policies for failed operations
+    this.processors = new Storage();
+    this.errorHandlers = new Storage();
+    this.retryPolicies = new Storage();
   }
 
-  /**
-   * Initializes the Messages system with enhanced configuration.
-   * @param {object} config - The configuration object.
-   * @param {number} [config.maxRetries=3] - Maximum retry attempts for failed operations.
-   * @param {number} [config.retryDelay=1000] - Delay between retries in milliseconds.
-   * @returns {Promise<void>}
-   */
   async initialize(config = {}) {
     await super.initialize(config);
     this.events.clear();
@@ -35,7 +21,6 @@ class Messages extends Component {
     this.errorHandlers.clear();
     this.retryPolicies.clear();
 
-    // Set default retry policy
     this.retryPolicies.set('default', {
       maxRetries: config.maxRetries || 3,
       retryDelay: config.retryDelay || 1000,
@@ -43,64 +28,31 @@ class Messages extends Component {
     });
   }
 
-  /**
-   * Adds a middleware function to the pipeline.
-   * @param {Function} middlewareFn - The middleware function to add.
-   */
   use(middlewareFn) {
     this.middleware.push(middlewareFn);
   }
 
-  /**
-   * Registers a handler for a specific event.
-   * @param {string} event - The name of the event.
-   * @param {Function} handler - The callback function.
-   */
   on(event, handler) {
-    if (!this.events.has(event)) {
-      this.events.set(event, []);
-    }
-    this.events.get(event).push(handler);
+    const handlers = this.events.get(event) || [];
+    handlers.push(handler);
+    this.events.set(event, handlers);
   }
 
-  /**
-   * Unregisters a handler for a specific event.
-   * @param {string} event - The name of the event.
-   * @param {Function} handler - The handler function to remove.
-   */
   off(event, handler) {
-    if (!this.events.has(event)) {
-      return;
-    }
-    const handlers = this.events.get(event).filter(h => h !== handler);
-    if (handlers.length === 0) {
-      this.events.delete(event);
-    } else {
-      this.events.set(event, handlers);
-    }
+    const handlers = this.events.get(event);
+    if (!handlers) return;
+
+    const filtered = handlers.filter(h => h !== handler);
+    filtered.length ? this.events.set(event, filtered) : this.events.delete(event);
   }
 
-  /**
-   * Emits an event, processing it through the middleware pipeline.
-   * @param {string} event - The name of the event.
-   * @param {*} data - The data to pass to the event handlers.
-   */
   emit(event, data) {
     const context = { type: 'event', name: event, data, cancelled: false };
-    const finalEmit = (ctx) => {
-      if (this.events.has(ctx.name)) {
-        this.events.get(ctx.name).forEach(handler => handler(ctx.data));
-      }
-    };
-
-    this._executeMiddleware(context, finalEmit);
+    this._executeMiddleware(context, (ctx) => {
+      this.events.get(ctx.name)?.forEach(handler => handler(ctx.data));
+    });
   }
 
-  /**
-   * Registers a handler for a command.
-   * @param {string} command - The name of the command.
-   * @param {Function} handler - The function to execute for the command.
-   */
   registerCommand(command, handler) {
     if (this.commands.has(command)) {
       console.warn(`Command "${command}" is already registered. Overwriting.`);
@@ -108,25 +60,15 @@ class Messages extends Component {
     this.commands.set(command, handler);
   }
 
-  /**
-    * Executes a command, processing it through the middleware pipeline.
-    * @param {string} command - The name of the command to execute.
-    * @param {*} data - The data or arguments for the command.
-    * @returns {*} The result of the command execution.
-    */
-   execute(command, data) {
-     if (!this.commands.has(command)) {
-       throw new Error(`Command "${command}" not found.`);
-     }
+  execute(command, data) {
+    if (!this.commands.has(command)) {
+      throw new Error(`Command "${command}" not found.`);
+    }
 
-     const context = { type: 'command', name: command, data, cancelled: false };
-     const finalExecute = (ctx) => {
-       const handler = this.commands.get(ctx.name);
-       return this._executeWithRetry(handler, ctx.data, 'command', command);
-     };
-
-     return this._executeMiddleware(context, finalExecute);
-   }
+    const context = { type: 'command', name: command, data, cancelled: false };
+    return this._executeMiddleware(context, (ctx) =>
+      this._executeWithRetry(this.commands.get(ctx.name), ctx.data, 'command', command));
+  }
 
   // === UNIFIED COMMAND/EVENT PROCESSING ===
 

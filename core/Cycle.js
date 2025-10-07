@@ -1,9 +1,3 @@
-/**
- * @file: core/Cycle.js
- * @description: Manages the main cognitive loop, orchestrating the phases of perception, reasoning, and action with adaptive timing.
- * @module Cycle
- */
-
 import Component from './Component.js';
 
 class Cycle extends Component {
@@ -11,40 +5,23 @@ class Cycle extends Component {
     super();
     this.isRunning = false;
     this.cycleTimer = null;
-    this.cycleIntervalMs = 100; // Default cycle interval
+    this.cycleIntervalMs = 100;
   }
 
-  /**
-   * Initializes the Cycle component.
-   * @param {object} config - Configuration for the cycle, including 'cycleIntervalMs'.
-   * @returns {Promise<void>}
-   */
   async initialize(config = {}) {
     await super.initialize(config);
     this.cycleIntervalMs = config.cycleIntervalMs || this.cycleIntervalMs;
   }
 
-  /**
-   * Starts the cognitive cycle.
-   * @returns {Promise<void>}
-   */
   async start() {
-    if (this.isRunning) {
-      return;
-    }
+    if (this.isRunning) return;
     this.isRunning = true;
     this.cycleTimer = setInterval(() => this._runCycle(), this.cycleIntervalMs);
     await super.start();
   }
 
-  /**
-   * Stops the cognitive cycle.
-   * @returns {Promise<void>}
-   */
   async stop() {
-    if (!this.isRunning) {
-      return;
-    }
+    if (!this.isRunning) return;
     this.isRunning = false;
     if (this.cycleTimer) {
       clearInterval(this.cycleTimer);
