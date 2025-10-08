@@ -71,7 +71,7 @@ impl Reasoner {
                 for premise2 in premises2 {
                     if let Some(predicate2) = &premise2.term.predicate {
                         // Found (M --> P). Now derive (S --> P).
-                        let new_term = Term::new_compound(
+                        let new_term = Term::create_compound(
                             TermType::Inheritance,
                             vec![Arc::clone(subject1), Arc::clone(predicate2)],
                         );
@@ -83,7 +83,7 @@ impl Reasoner {
                         };
 
                         let new_task =
-                            Task::new(Arc::new(new_term), Punctuation::Belief, Some(new_truth));
+                            Task::new(new_term, Punctuation::Belief, Some(new_truth));
                         derived.push(new_task);
                     }
                 }
@@ -133,8 +133,8 @@ impl Reasoner {
                 for property_task in properties_of_s {
                     if let Some(p) = &property_task.term.predicate {
                         // Found (S --> P), derive (M --> P)?
-                        let new_term = Term::new_compound(TermType::Inheritance, vec![Arc::clone(m), Arc::clone(p)]);
-                        let new_question = Task::new(Arc::new(new_term), Punctuation::Question, None);
+                        let new_term = Term::create_compound(TermType::Inheritance, vec![Arc::clone(m), Arc::clone(p)]);
+                        let new_question = Task::new(new_term, Punctuation::Question, None);
                         derived.push(new_question);
                     }
                 }
@@ -145,8 +145,8 @@ impl Reasoner {
                 for property_task in properties_of_m {
                     if let Some(p) = &property_task.term.predicate {
                         // Found (M --> P), derive (S --> P)?
-                        let new_term = Term::new_compound(TermType::Inheritance, vec![Arc::clone(s), Arc::clone(p)]);
-                        let new_question = Task::new(Arc::new(new_term), Punctuation::Question, None);
+                        let new_term = Term::create_compound(TermType::Inheritance, vec![Arc::clone(s), Arc::clone(p)]);
+                        let new_question = Task::new(new_term, Punctuation::Question, None);
                         derived.push(new_question);
                     }
                 }

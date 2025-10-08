@@ -35,7 +35,7 @@ fn build_task_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Task, pest:
     match inner_pair.as_rule() {
         Rule::belief => {
             let mut inner = inner_pair.into_inner();
-            let term = Arc::new(build_term_from_pair(inner.next().unwrap())?);
+            let term = build_term_from_pair(inner.next().unwrap())?;
             // The next item is belief_punct, which we can ignore as we already know the type.
             inner.next();
             // The next item *might* be the truth value.
@@ -44,12 +44,12 @@ fn build_task_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Task, pest:
         }
         Rule::goal => {
             let mut inner = inner_pair.into_inner();
-            let term = Arc::new(build_term_from_pair(inner.next().unwrap())?);
+            let term = build_term_from_pair(inner.next().unwrap())?;
             Ok(Task::new(term, Punctuation::Goal, None))
         }
         Rule::question => {
             let mut inner = inner_pair.into_inner();
-            let term = Arc::new(build_term_from_pair(inner.next().unwrap())?);
+            let term = build_term_from_pair(inner.next().unwrap())?;
             Ok(Task::new(term, Punctuation::Question, None))
         }
         _ => unreachable!("Parser encountered unexpected statement rule: {:?}", inner_pair.as_rule()),
@@ -57,13 +57,15 @@ fn build_task_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Task, pest:
 }
 
 /// Recursively constructs a `Term` from a `term` grammar rule pair.
-fn build_term_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Term, pest::error::Error<Rule>> {
+fn build_term_from_pair(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Arc<Term>, pest::error::Error<Rule>> {
     match pair.as_rule() {
         Rule::term | Rule::compound_term => {
             // These are wrapper rules, so descend into the actual content.
             build_term_from_pair(pair.into_inner().next().unwrap())
         }
-        Rule::atom => Ok(Term::new_atom(pair.as_str())),
+        Rule::atom => Ok(Arc::new(Term::new_atom(pair.as_str()))),
         rule => {
             // This is a compound term rule.
             let term_type = match rule {
@@ -86,10 +88,10 @@ fn build_term_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Term, pest:
 
             let components = pair
                 .into_inner()
-                .map(|p| build_term_from_pair(p).map(Arc::new))
+                .map(|p| build_term_from_pair(p)) // Recursively build Arc<Term>
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(Term::new_compound(term_type, components))
+            Ok(Term::create_compound(term_type, components))
         }
     }
 }
