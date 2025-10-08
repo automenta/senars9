@@ -41,34 +41,24 @@ class Focus extends Component {
     focusSet.lastAccessed = Date.now();
     focusSet.accessCount++;
 
-    // Convert entries to array for processing
-    const entries = Array.from(focusSet.items.entries());
+    const sortedEntries = Array.from(focusSet.items.entries())
+      .sort(([, dataA], [, dataB]) => {
+        const [priorityA, priorityB] = [(dataA.priority || 0), (dataB.priority || 0)];
+        if (priorityA !== priorityB) return priorityB - priorityA;
+        
+        const [timestampA, timestampB] = [(dataA.timestamp || 0), (dataB.timestamp || 0)];
+        if (timestampA !== timestampB) return timestampB - timestampA;
+        
+        const [accessCountA, accessCountB] = [(dataA.accessCount || 0), (dataB.accessCount || 0)];
+        return accessCountB - accessCountA;
+      })
+      .slice(0, count)
+      .map(([key, value]) => {
+        value.accessCount = (value.accessCount || 0) + 1;
+        return [key, value];
+      });
     
-    // Sort by priority, timestamp, and access count
-    const sortedEntries = entries.sort(([, dataA], [, dataB]) => {
-      const priorityA = dataA.priority || 0;
-      const priorityB = dataB.priority || 0;
-      
-      if (priorityA !== priorityB) return priorityB - priorityA; // Higher priority first
-      
-      const timestampA = dataA.timestamp || 0;
-      const timestampB = dataB.timestamp || 0;
-      
-      if (timestampA !== timestampB) return timestampB - timestampA; // More recent first
-      
-      const accessCountA = dataA.accessCount || 0;
-      const accessCountB = dataB.accessCount || 0;
-      
-      return accessCountB - accessCountA; // More accessed first
-    });
-
-    // Slice and update access counts
-    const result = sortedEntries.slice(0, count).map(([key, value]) => {
-      value.accessCount = (value.accessCount || 0) + 1;
-      return [key, value];
-    });
-    
-    return result;
+    return sortedEntries;
   }
 
   updateFocusAttention(name, delta) {
@@ -210,24 +200,14 @@ class Memory extends Component {
     // Start with all keys from storage
     let candidates = new Set(this.storage.keys());
 
-    // Apply type filter
-    if (type) {
-      const typeKeys = this.indexes.get(type);
-      if (typeKeys.length === 0) return [];
-      candidates = this._intersectKeys(candidates, typeKeys);
-    }
+    // Apply filters - early return if no candidates remain
+    if (type && !(candidates = this._intersectKeys(candidates, this.indexes.get(type))).size) return [];
+    
+    if (tags?.length && candidates.size && 
+        !(candidates = this._intersectTags(candidates, tags)).size) return [];
 
-    // Apply tags filter
-    if (tags?.length) {
-      candidates = this._intersectTags(candidates, tags);
-      if (candidates.size === 0) return [];
-    }
-
-    // Apply minimum priority filter
-    if (minPriority !== undefined) {
-      candidates = this._intersectPriority(candidates, minPriority);
-      if (candidates.size === 0) return [];
-    }
+    if (minPriority !== undefined && candidates.size && 
+        !(candidates = this._intersectPriority(candidates, minPriority)).size) return [];
 
     // Get the actual data for the candidate keys
     let results = Array.from(candidates)
@@ -306,7 +286,7 @@ class Memory extends Component {
   getStats() {
     return {
       storageSize: this.storage.size(),
-      cacheSize: this.cache.size, // Fixed: was accessing cache.cache.size instead of cache.size
+      cacheSize: this.cache.size,
       cacheMaxSize: this.cache.cache.maxSize,
       focusSets: this.focus?.getFocusSetStats() || {},
       indexes: this.indexes.indexes.size

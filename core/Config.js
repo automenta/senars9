@@ -17,15 +17,12 @@ class Config extends Component {
   }
 
   get(key, defaultValue) {
-    // Check cache first
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
 
-    // Extract value from config using dot notation
     const value = ObjectUtils.safeAccess(this.config, key, undefined);
     
     if (value !== undefined) {
-      // Cache the value for future access
       this.cache.set(key, value);
       return value;
     }
@@ -34,18 +31,14 @@ class Config extends Component {
   }
 
   set(key, value) {
-    // Parse the key using dot notation to support nested properties
     const keys = key.split('.');
     const lastKey = keys.pop();
     
-    // Navigate to the correct nested object
     const target = keys.reduce((obj, k) =>
       ObjectUtils.isObject(obj[k]) ? obj[k] : (obj[k] = {}), this.config);
     
-    // Set the value
     target[lastKey] = value;
     
-    // Clear cache since we changed the config
     this.cache.clear();
   }
 
@@ -62,11 +55,9 @@ class Config extends Component {
     const result = { ...target };
     
     for (const key of Object.keys(source)) {
-      if (ObjectUtils.isObject(source[key])) {
-        result[key] = this._deepMerge(result[key] || {}, source[key]);
-      } else {
-        result[key] = source[key];
-      }
+      result[key] = ObjectUtils.isObject(source[key]) 
+        ? this._deepMerge(result[key] || {}, source[key]) 
+        : source[key];
     }
     
     return result;

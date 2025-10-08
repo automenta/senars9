@@ -42,14 +42,13 @@ class Core {
 
     // Initialize all other components with their specific configurations
     for (const name of this.registrationOrder) {
-      if (name !== 'config') {
-        try {
-          const componentConfig = this.config.get(`components.${name}`, {});
-          await this.componentMap.get(name).initialize(componentConfig);
-        } catch (error) {
-          console.error(`Failed to initialize component "${name}":`, error);
-          throw error;
-        }
+      if (name === 'config') continue;
+      try {
+        const componentConfig = this.config.get(`components.${name}`, {});
+        await this.componentMap.get(name).initialize(componentConfig);
+      } catch (error) {
+        console.error(`Failed to initialize component "${name}":`, error);
+        throw error;
       }
     }
   }

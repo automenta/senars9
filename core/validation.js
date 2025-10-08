@@ -16,14 +16,11 @@ class Validation {
 
   static validateType(value, expectedType, name) {
     // Handle special 'any' type and 'null' checking
-    if (expectedType === 'any') return;
+    if (expectedType === 'any' || (value === null && expectedType === 'null')) return;
     
     // For null values, use a different check
     if (value === null) {
-      if (expectedType !== 'null') {
-        throw new Error(`${name} must be ${expectedType}, got null`);
-      }
-      return;
+      throw new Error(`${name} must be ${expectedType}, got null`);
     }
     
     const actualType = typeof value;

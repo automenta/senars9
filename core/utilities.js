@@ -28,7 +28,7 @@ class ObjectUtils {
   static deepClone(obj) {
     if (!obj || typeof obj !== 'object') return obj;
     if (obj instanceof Date) return new Date(obj.getTime());
-    if (obj instanceof Array) return obj.map(item => ObjectUtils.deepClone(item));
+    if (Array.isArray(obj)) return obj.map(item => ObjectUtils.deepClone(item));
     if (obj instanceof Object) {
       const cloned = {};
       for (const key in obj) {
