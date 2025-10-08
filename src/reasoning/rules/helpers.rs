@@ -96,3 +96,44 @@ where
     }
     derived
 }
+
+/// A macro to define a syllogistic inference rule.
+///
+/// This macro generates the necessary struct and `InferenceRule` implementation
+/// for a standard syllogistic rule, reducing boilerplate code.
+///
+/// # Arguments
+/// * `$struct_name`: The name of the struct to be created for the rule.
+/// * `$query_fn`: A lambda expression for querying the second premise.
+/// * `$construct_fn`: A lambda expression for constructing the conclusion's term.
+/// * `$truth_fn`: The truth function to be used (e.g., `TruthValue::deduction`).
+/// * `$exclude_self`: A boolean indicating if premise1 can also be premise2.
+#[macro_export]
+macro_rules! define_syllogistic_rule {
+    ($struct_name:ident, $query_fn:expr, $construct_fn:expr, $truth_fn:expr, $exclude_self:expr) => {
+        pub struct $struct_name;
+
+        impl $crate::reasoning::inference_rule::InferenceRule for $struct_name {
+            fn get_trigger_term_type(&self) -> $crate::data_structures::term_type::TermType {
+                $crate::data_structures::term_type::TermType::Inheritance
+            }
+
+            fn apply(
+                &self,
+                premise1: &std::sync::Arc<$crate::data_structures::task::Task>,
+                memory: &mut $crate::memory::Memory,
+                context: &$crate::cycle::context::CycleContext,
+            ) -> Vec<$crate::data_structures::task::Task> {
+                $crate::reasoning::rules::helpers::apply_syllogistic_rule(
+                    premise1,
+                    memory,
+                    context,
+                    $query_fn,
+                    $construct_fn,
+                    $truth_fn,
+                    $exclude_self,
+                )
+            }
+        }
+    };
+}
