@@ -25,9 +25,9 @@ This document serves as the complete specification for implementing SeNARS in an
 | **Implication** | `(premise ==> conclusion)` | Predictive or causal links | `(raining ==> wet_streets)` | Forward causal and predictive reasoning |
 | **Equivalence** | `(term1 <=> term2)` | Bidirectional relationships | `(cat <=> feline)` | Symmetric relationship representation |
 | **Conjunction** | `(&, term1, term2, ...)` | Logical AND combination | `(&, cat, furry, pet)`, infix form: `(a & b)`==`(&,a,b)` (same for `|`) | Complex condition representation |
-| **Disjunction** | `(|, term1, term2, ...)` | Logical OR alternatives | `(|, cat, dog, bird)` | Alternative possibility representation |
+| **Disjunction** | `(\|, term1, term2, ...)` | Logical OR alternatives | `(\|, cat, dog, bird)` | Alternative possibility representation |
 | **Sequential Conjunction** | `(&/, action, condition)` | Conditional operations | `(&/, clean, dirty_room)` | Action planning with preconditions |
-| **Operation** | `(function ^ arguments)` | Operations, function call | alternate C-like syntax: `f(x,y)`=`(f ^ (x,y))` | Mental/physical actions |
+| **Operation** | `(function ^ arguments)` | Operations, function call, arguments is typically a Product | alternate C-like syntax: `f(x,y)`=`(f ^ (x,y))` | Mental/physical actions |
 
 
 #### Set and Property Operators
