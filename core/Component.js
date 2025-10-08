@@ -1,7 +1,6 @@
 import { Logger } from './utilities.js';
 import { ErrorHandler } from './validation.js';
-
-const STATES = { UNINITIALIZED: 'uninitialized', INITIALIZED: 'initialized', RUNNING: 'running', STOPPED: 'stopped', DESTROYED: 'destroyed' };
+import { STATES } from './constants.js';
 
 class Component {
   constructor() {

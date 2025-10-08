@@ -2,9 +2,7 @@ import Component from './Component.js';
 import { Storage, IndexManager } from './collections.js';
 import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
 import { Validation } from './validation.js';
-
-const COMPLEXITY_LEVELS = { simple: 1, medium: 2, complex: 3 };
-const MAX_PRIORITY = 10;
+import { COMPLEXITY_LEVELS, MAX_PRIORITY } from './constants.js';
 
 class Rules extends Component {
   constructor() {

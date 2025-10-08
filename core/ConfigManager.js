@@ -233,7 +233,7 @@ class ConfigManager {
       });
     }
 
-    Logger.info('Configuration cleared', { keyCount: keys.length });
+    Logger.debug('Configuration cleared', { keyCount: keys.length });
   }
 
   _validateValue(key, value) {

@@ -1,12 +1,24 @@
 class Logger {
   static log(level, message, data = {}) {
-    return (console[level] || console.log)(`[${level.toUpperCase()}]`, message, data);
+    const consoleMethod = level === 'warn' ? 'warn' : level === 'error' ? 'error' : 'log';
+    const upperLevel = level && typeof level === 'string' ? level.toUpperCase() : 'LOG';
+    return console[consoleMethod](`[${upperLevel}]`, message, data);
   }
 
-  static info = (msg, data) => Logger.log('info', msg, data);
+  static info = (msg, data) => {
+    // Only log info in development/debug mode
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
+      Logger.log('info', msg, data);
+    }
+  };
   static warn = (msg, data) => Logger.log('warn', msg, data);
   static error = (msg, data) => Logger.log('error', msg, data);
-  static debug = (msg, data) => Logger.log('debug', msg, data);
+  static debug = (msg, data) => {
+    // Only log debug in development mode
+    if (process.env.NODE_ENV === 'development') {
+      Logger.log('debug', msg, data);
+    }
+  };
 }
 
 class ObjectUtils {

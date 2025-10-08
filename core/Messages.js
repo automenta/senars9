@@ -2,6 +2,7 @@ import Component from './Component.js';
 import { Storage } from './collections.js';
 import { Retry } from './validation.js';
 import { IdGenerator } from './utilities.js';
+import { RETRYABLE_ERRORS, DEFAULTS } from './constants.js';
 
 class Messages extends Component {
   constructor() {
@@ -24,9 +25,9 @@ class Messages extends Component {
     this.retryPolicies.clear();
 
     this.retryPolicies.set('default', {
-      maxRetries: config.maxRetries || 3,
-      retryDelay: config.retryDelay || 1000,
-      backoffMultiplier: 2
+      maxRetries: config.maxRetries || DEFAULTS.MAX_RETRIES,
+      retryDelay: config.retryDelay || DEFAULTS.RETRY_DELAY,
+      backoffMultiplier: DEFAULTS.BACKOFF_MULTIPLIER
     });
   }
 
@@ -36,7 +37,7 @@ class Messages extends Component {
       priority: options.priority || 0,
       name: options.name || `middleware_${this.middleware.length}`,
       enabled: options.enabled !== false,
-      timeout: options.timeout || 5000
+      timeout: options.timeout || DEFAULTS.MIDDLEWARE_TIMEOUT
     };
     this.middleware.push(middleware);
     this.middleware.sort((a, b) => b.priority - a.priority);
@@ -118,7 +119,7 @@ class Messages extends Component {
 
   async process(message, options = {}) {
     const { type, name, data, metadata = {} } = message;
-    const { skipMiddleware = false, timeout = 10000 } = options;
+    const { skipMiddleware = false, timeout = DEFAULTS.MESSAGE_TIMEOUT } = options;
 
     const context = {
       type,
@@ -376,13 +377,7 @@ class Messages extends Component {
 
   // Determine if an error should trigger a retry
   _shouldRetry(error, context) {
-    const retryableErrors = [
-      'TimeoutError',
-      'NetworkError',
-      'ConnectionError',
-      'TemporaryFailure',
-      'RateLimitError'
-    ];
+    const retryableErrors = RETRYABLE_ERRORS;
 
     const errorType = error.constructor.name || 'Error';
     const isRetryableType = retryableErrors.includes(errorType) ||
@@ -456,9 +451,9 @@ class Messages extends Component {
 
     // Reinitialize default retry policy
     this.retryPolicies.set('default', {
-      maxRetries: 3,
-      retryDelay: 1000,
-      backoffMultiplier: 2
+      maxRetries: DEFAULTS.MAX_RETRIES,
+      retryDelay: DEFAULTS.RETRY_DELAY,
+      backoffMultiplier: DEFAULTS.BACKOFF_MULTIPLIER
     });
   }
 

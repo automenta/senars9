@@ -35,7 +35,7 @@ class System {
       // Set up default event handlers
       this._setupDefaultEventHandlers();
 
-      Logger.info('SeNARS system started successfully');
+      Logger.debug('SeNARS system started successfully');
     } catch (error) {
       Logger.error('Failed to start system:', error);
       throw error;
@@ -54,7 +54,7 @@ class System {
       // Clean up event handlers
       this.eventHandlers.clear();
 
-      Logger.info('SeNARS system stopped');
+      Logger.debug('SeNARS system stopped');
     } catch (error) {
       Logger.error('Error stopping system:', error);
       throw error;

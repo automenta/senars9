@@ -238,13 +238,13 @@ class PerformanceMonitor {
       });
     }
 
-    Logger.info('Performance metrics reset');
+    Logger.debug('Performance metrics reset');
   }
 
   // Enable/disable monitoring
   setEnabled(enabled) {
     this.enabled = enabled;
-    Logger.info('Performance monitoring', { enabled });
+    Logger.debug('Performance monitoring', { enabled });
   }
 
   // Create middleware for automatic performance monitoring

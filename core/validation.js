@@ -1,4 +1,5 @@
 import { Logger, IdGenerator } from './utilities.js';
+import { DEFAULTS, RETRYABLE_ERRORS } from './constants.js';
 
 class Validation {
   static requireProps(obj, props) {
@@ -121,13 +122,11 @@ class ErrorHandler {
   }
 }
 
-const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_RETRY_DELAY = 1000;
-const DEFAULT_BACKOFF_MULTIPLIER = 2;
+
 
 class Retry {
   static async execute(fn, options = {}) {
-    const { maxRetries = DEFAULT_MAX_RETRIES, retryDelay = DEFAULT_RETRY_DELAY, backoffMultiplier = DEFAULT_BACKOFF_MULTIPLIER } = options;
+    const { maxRetries = DEFAULTS.MAX_RETRIES, retryDelay = DEFAULTS.RETRY_DELAY, backoffMultiplier = DEFAULTS.BACKOFF_MULTIPLIER } = options;
     let lastError;
 
     if (maxRetries === 0) return fn();
@@ -135,7 +134,7 @@ class Retry {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const result = await fn();
-        attempt > 0 && Logger.info(`Operation succeeded after ${attempt} retries`);
+        attempt > 0 && Logger.debug(`Operation succeeded after ${attempt} retries`);
         return result;
       } catch (error) {
         lastError = error;

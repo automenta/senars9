@@ -1,6 +1,7 @@
 import Component from './Component.js';
 import { Cache } from './collections.js';
 import { ObjectUtils } from './utilities.js';
+import { STATES } from './constants.js';
 
 class Config extends Component {
   constructor() {

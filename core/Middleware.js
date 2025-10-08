@@ -278,7 +278,7 @@ export class CommonMiddleware {
           const result = await next();
 
           if (attempt > 0) {
-            Logger.info(`Operation succeeded after ${attempt} retries`, {
+            Logger.debug(`Operation succeeded after ${attempt} retries`, {
               type: context.type,
               name: context.name,
               attempts: attempt + 1
