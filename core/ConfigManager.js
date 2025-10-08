@@ -1,11 +1,8 @@
-import { Storage } from './data-structures.js';
+import { Storage } from './collections.js';
 import { Logger, ObjectUtils } from './utilities.js';
 import { Validation } from './validation.js';
 import CommonMiddleware from './Middleware.js';
 
-/**
- * Unified configuration management using Messages.js patterns
- */
 class ConfigManager {
   constructor(messagesComponent = null) {
     this.storage = new Storage({
@@ -20,21 +17,17 @@ class ConfigManager {
     this.defaults = new Map();
   }
 
-  // Enhanced configuration setting with validation and events
   set(key, value, options = {}) {
     const { validate = true, silent = false, merge = false } = options;
 
     try {
-      // Get current value for comparison
       const currentValue = this.storage.get(key);
 
-      // Merge with existing value if requested
       let finalValue = value;
       if (merge && currentValue && typeof currentValue === 'object' && typeof value === 'object') {
         finalValue = { ...currentValue, ...value };
       }
 
-      // Validate if required
       if (validate) {
         const validationError = this._validateValue(key, finalValue);
         if (validationError) {
@@ -42,13 +35,9 @@ class ConfigManager {
         }
       }
 
-      // Set the value
       this.storage.set(key, finalValue);
-
-      // Notify watchers
       this._notifyWatchers(key, finalValue, currentValue);
 
-      // Emit configuration change event
       if (this.messages && !silent) {
         this.messages.emit('config:changed', {
           key,
@@ -75,12 +64,10 @@ class ConfigManager {
     }
   }
 
-  // Enhanced configuration getting with defaults
   get(key, defaultValue = null) {
     const value = this.storage.get(key);
 
     if (value === undefined || value === null) {
-      // Return default if available
       if (this.defaults.has(key)) {
         return this.defaults.get(key);
       }
@@ -90,12 +77,10 @@ class ConfigManager {
     return value;
   }
 
-  // Get nested configuration values
   getNested(path, defaultValue = null) {
     return ObjectUtils.safeAccess(this.getAll(), path, defaultValue);
   }
 
-  // Get all configuration as object
   getAll() {
     const all = {};
     for (const [key, value] of this.storage.entries()) {
@@ -104,12 +89,10 @@ class ConfigManager {
     return all;
   }
 
-  // Check if key exists
   has(key) {
     return this.storage.has(key);
   }
 
-  // Delete configuration key
   delete(key, options = {}) {
     const { silent = false } = options;
     const deletedValue = this.storage.get(key);
@@ -117,10 +100,8 @@ class ConfigManager {
     const success = this.storage.delete(key);
 
     if (success) {
-      // Notify watchers
       this._notifyWatchers(key, null, deletedValue);
 
-      // Emit configuration change event
       if (this.messages && !silent) {
         this.messages.emit('config:deleted', {
           key,
@@ -135,7 +116,6 @@ class ConfigManager {
     return success;
   }
 
-  // Register validator for a configuration key
   registerValidator(key, validatorFn, options = {}) {
     const { required = false, description = '' } = options;
 
@@ -148,13 +128,11 @@ class ConfigManager {
     Logger.debug('Configuration validator registered', { key, required, description });
   }
 
-  // Set default value for a key
   setDefault(key, defaultValue) {
     this.defaults.set(key, defaultValue);
     Logger.debug('Configuration default set', { key });
   }
 
-  // Watch for configuration changes
   watch(key, callback, options = {}) {
     const { pattern = false } = options;
 
@@ -167,7 +145,6 @@ class ConfigManager {
 
     Logger.debug('Configuration watcher added', { key, pattern });
 
-    // Return unwatch function
     return () => {
       const watchers = this.watchers.get(key);
       if (watchers) {
@@ -179,7 +156,6 @@ class ConfigManager {
     };
   }
 
-  // Batch operations
   setMultiple(configObject, options = {}) {
     const results = [];
     for (const [key, value] of Object.entries(configObject)) {
@@ -188,13 +164,11 @@ class ConfigManager {
     return results;
   }
 
-  // Load configuration from object
   load(configObject, options = {}) {
     const { validate = true, merge = true } = options;
     return this.setMultiple(configObject, { validate, merge });
   }
 
-  // Export configuration
   export() {
     return {
       config: this.getAll(),
@@ -209,7 +183,6 @@ class ConfigManager {
     };
   }
 
-  // Import configuration
   import(configExport, options = {}) {
     const { validate = true, merge = true } = options;
 
@@ -238,7 +211,6 @@ class ConfigManager {
     return [];
   }
 
-  // Get configuration statistics
   getStats() {
     return {
       ...this.storage.getStats(),
@@ -248,7 +220,6 @@ class ConfigManager {
     };
   }
 
-  // Clear all configuration
   clear() {
     const keys = Array.from(this.storage.keys());
     this.storage.clear();
@@ -263,53 +234,47 @@ class ConfigManager {
     Logger.info('Configuration cleared', { keyCount: keys.length });
   }
 
-  // Private methods
   _validateValue(key, value) {
     const validator = this.validators.get(key);
     if (!validator) return null;
 
     try {
       return validator.validator(value) ? null : `Validation failed for ${key}`;
-    } catch (error) {
-      return error.message;
-    }
-  }
-
-  _notifyWatchers(key, newValue, oldValue) {
-    const watchers = this.watchers.get(key);
-    if (!watchers) return;
-
-    for (const watcher of watchers) {
-      try {
-        watcher.callback(newValue, oldValue, key);
       } catch (error) {
-        Logger.error('Configuration watcher error', {
-          key,
-          error: error.message
-        });
+        return error.message;
       }
     }
-  }
-
-  // Create middleware for Messages.js integration
-  createMiddleware() {
+  
+    _notifyWatchers(key, newValue, oldValue) {
+      const watchers = this.watchers.get(key);
+      if (!watchers) return;
+  
+      for (const watcher of watchers) {
+        try {
+          watcher.callback(newValue, oldValue, key);
+        } catch (error) {
+          Logger.error('Configuration watcher error', {
+            key,
+            error: error.message
+          });
+        }
+      }
+    }
+  
+    createMiddleware() {
     return [
-      // Configuration validation middleware
       CommonMiddleware.validationMiddleware(['key'], {
         key: { type: 'string', required: true },
         value: { type: 'any' }
       }),
 
-      // Configuration logging middleware
       CommonMiddleware.loggingMiddleware({
         prefix: '[Config]',
         includeData: true
       }),
 
-      // Configuration processing middleware
       async (context, next) => {
         if (context.name.startsWith('config:')) {
-          // Handle configuration-specific operations
           await this._processConfigMessage(context);
         }
         return next();

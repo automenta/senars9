@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Storage } from './data-structures.js';
+import { Storage } from './collections.js';
 import { Retry } from './validation.js';
 
 class Messages extends Component {

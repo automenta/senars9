@@ -1,3 +1,5 @@
+import { Logger } from './utilities.js';
+
 class Validation {
   static requireProps(obj, props) {
     if (!obj) throw new Error('Object is required');
@@ -155,7 +157,5 @@ class Retry {
     };
   }
 }
-
-import { Logger } from './utilities.js';
 
 export { Validation, ErrorHandler, Retry };

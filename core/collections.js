@@ -188,4 +188,4 @@ class IndexManager {
   }
 }
 
-export { Cache, Storage, IndexManager };
+export { LRUMap, Cache, Storage, IndexManager };

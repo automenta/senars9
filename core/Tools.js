@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Storage } from './data-structures.js';
+import { Storage } from './collections.js';
 import { Validation, ErrorHandler } from './validation.js';
 
 class Tools extends Component {

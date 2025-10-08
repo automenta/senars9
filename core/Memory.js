@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Cache, Storage, IndexManager } from './data-structures.js';
+import { Cache, Storage, IndexManager } from './collections.js';
 import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
 import { Validation } from './validation.js';
 

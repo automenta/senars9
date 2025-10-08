@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Cache } from './data-structures.js';
+import { Cache } from './collections.js';
 import { ObjectUtils, Logger } from './utilities.js';
 
 class Config extends Component {

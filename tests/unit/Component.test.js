@@ -55,7 +55,6 @@ describe('Component', () => {
 
   describe('Event Handling', () => {
     beforeEach(() => {
-      // Spy on the messages component methods
       jest.spyOn(mockCore.messages, 'on');
       jest.spyOn(mockCore.messages, 'off');
       jest.spyOn(mockCore.messages, 'emit');
@@ -80,7 +79,7 @@ describe('Component', () => {
     });
 
     test('event handling should throw error if core.messages is not available', () => {
-      component.core = {}; // No messages component
+      component.core = {};
       const handler = () => {};
       expect(() => component.on('test', handler)).toThrow('Messages component not available on core.');
       expect(() => component.off('test', handler)).toThrow('Messages component not available on core.');

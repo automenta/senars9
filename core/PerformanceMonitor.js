@@ -1,4 +1,4 @@
-import { Storage } from './data-structures.js';
+import { Storage } from './collections.js';
 import { Logger } from './utilities.js';
 
 /**
