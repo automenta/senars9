@@ -1,4 +1,6 @@
 use super::term_type::TermType;
+use crate::parser;
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -8,6 +10,12 @@ use std::sync::Arc;
 ///
 /// `Term` is designed to be immutable, with its identity defined by its content hash.
 /// This allows for efficient storage and retrieval in memory.
+///
+/// # Serialization
+/// `Term` uses custom `Serialize` and `Deserialize` implementations.
+/// - It serializes into its Narsese string representation (e.g., `"(A --> B)"`).
+/// - It deserializes from this string back into a canonical, shared `Arc<Term>`,
+///   re-using the system's parser to ensure invariants are maintained.
 #[derive(Debug, Clone)]
 pub struct Term {
     /// The name of the term, which also serves as its string representation in Narsese.
@@ -193,6 +201,33 @@ impl PartialEq for Term {
 
 /// Implements Eq, marking that `Term` has a total equivalence relation.
 impl Eq for Term {}
+
+/// A helper module for `serde` to handle the custom serialization and deserialization
+/// of `Arc<Term>`. This is used with the `#[serde(with = "...")]` attribute.
+pub mod arc_term_serde {
+    use super::*;
+    use serde::{de::Error, Deserializer, Serializer};
+
+    /// Serializes an `Arc<Term>` into its Narsese string representation.
+    pub fn serialize<S>(term: &Arc<Term>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&term.name)
+    }
+
+    /// Deserializes an `Arc<Term>` from its Narsese string representation.
+    ///
+    /// This re-uses the main system parser to ensure that the reconstructed
+    /// term is canonical and shared, just like any other term created at runtime.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<Term>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        parser::parse_term(&s).map_err(D::Error::custom)
+    }
+}
 
 // All tests related to term creation and simplification will be moved to `src/memory/tests.rs`
 // to reflect that this logic is now owned by the `Memory` component.

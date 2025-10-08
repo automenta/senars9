@@ -2,6 +2,7 @@
 //! understanding of a `Term`.
 
 use super::term::Term;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Represents a concept in the SeNARS system.
@@ -10,9 +11,10 @@ use std::sync::Arc;
 /// immutable `Term` itself with metadata that can change over time, such as its
 /// activation level, access time, and semantic embedding. This separates the pure,
 //  syntactic `Term` from its context-dependent data within the system's memory.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Concept {
     /// The immutable term that this concept is about.
+    #[serde(with = "super::term::arc_term_serde")]
     pub term: Arc<Term>,
     /// The timestamp (ms) of when the concept was created.
     pub created_at: u64,

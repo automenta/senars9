@@ -4,6 +4,7 @@ use crate::data_structures::{
     concept::Concept, task::Task, term::Term, term_type::TermType,
 };
 use index_manager::IndexManager;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -13,7 +14,7 @@ use std::sync::Arc;
 /// and uses indexes for efficient, content-addressable retrieval of information. It is
 /// also responsible for the lifecycle of all `Concept` instances, ensuring that each unique
 /// term is represented by a single, canonical concept object.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Memory {
     /// Storage for all unique concepts in the system, ensuring that each term has a single instance.
     /// The key is the term's content hash.
@@ -26,10 +27,10 @@ pub struct Memory {
     pub long_term_tasks: HashMap<String, Arc<Task>>,
 
     /// The index manager handles all task indexing.
-    index_manager: IndexManager,
+    pub index_manager: IndexManager,
 
     // Statistics
-    total_tasks: u64,
+    pub total_tasks: u64,
     pub consolidation_count: u64,
     pub last_consolidation: u64,
 }

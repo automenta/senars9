@@ -1,15 +1,18 @@
 use super::punctuation::Punctuation;
 use super::term::Term;
 use super::truth_value::TruthValue;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;
 
 /// Represents a task in the SeNARS system, which can be a belief, goal, or question.
 ///
 /// Tasks are the primary units of work and information flow within the system.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Task {
     /// The term that this task is about.
+    /// This uses the custom `Serialize` for `Term` and `Deserialize` for `Arc<Term>`.
+    #[serde(with = "super::term::arc_term_serde")]
     pub term: Arc<Term>,
     /// The punctuation indicating the task type (e.g., Belief '.', Goal '!', Question '?').
     pub punctuation: Punctuation,
@@ -26,6 +29,8 @@ pub struct Task {
     /// The time at which the task becomes obsolete and can be forgotten.
     pub expiration_time: Option<u64>,
     /// A flag indicating if the task is currently in the focus set for a reasoning cycle.
+    /// This is a transient state and should not be serialized.
+    #[serde(skip, default)]
     pub is_in_focus_set: bool,
     /// A record of the reasoning steps that led to this task's creation.
     pub derivation_path: Option<Vec<String>>,

@@ -34,6 +34,21 @@ pub fn parse(
     build_task_from_pair(statement_pair, current_time)
 }
 
+/// Parses a Narsese string representing a term into a `Term`.
+///
+/// This is a convenience function for use in serialization and testing.
+///
+/// # Arguments
+/// * `input` - A string slice representing the Narsese term.
+///
+/// # Returns
+/// A `Result` containing the parsed `Term` or a `pest` error.
+pub fn parse_term(input: &str) -> Result<Arc<Term>, pest::error::Error<Rule>> {
+    let mut pairs = NarseseParser::parse(Rule::term, input)?;
+    build_term_from_pair(pairs.next().unwrap())
+}
+
+
 /// Constructs a `Task` from a `statement` grammar rule pair.
 fn build_task_from_pair(
     pair: pest::iterators::Pair<Rule>,

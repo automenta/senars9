@@ -1,4 +1,5 @@
 use crate::data_structures::task::Task;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
@@ -8,7 +9,7 @@ use std::sync::Arc;
 /// for efficient retrieval of tasks based on their content (e.g., by subject,
 /// predicate, or premise) or their occurrence time. It is owned by the `Memory`
 /// component, which delegates all indexing operations to it.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct IndexManager {
     /// Index for implication relationships: `premise_hash -> {task_hash, ...}`.
     pub implication_index: HashMap<String, HashSet<String>>,
