@@ -24,17 +24,21 @@ impl InferenceRule for ModusPonens {
     /// (the antecedent as a belief) in memory to derive the conclusion `B.`.
     fn apply(&self, implication_task: &Arc<Task>, memory: &mut Memory) -> Vec<Task> {
         let mut derived = Vec::new();
-        if let Some(antecedent) = &implication_task.term.subject {
+
+        if let (Some(antecedent), Some(consequent), Some(implication_truth)) = (
+            &implication_task.term.subject,
+            &implication_task.term.predicate,
+            implication_task.truth,
+        ) {
             // We have `(A ==> B)`. We need to check if `A.` exists in memory.
             if let Some(antecedent_task) = memory.get_task(&antecedent.hash) {
                 if antecedent_task.is_belief() {
-                    // `A.` exists. Derive `B.`.
-                    if let Some(consequent) = &implication_task.term.predicate {
-                        // TODO: Implement proper truth value calculation.
-                        let new_truth = TruthValue {
-                            frequency: 1.0,
-                            confidence: 0.81, // Simplified for now.
-                        };
+                    if let Some(antecedent_truth) = antecedent_task.truth {
+                        // `A.` exists with a truth value. Derive `B.`.
+
+                        // Calculate the truth value for the conclusion using the detachment function.
+                        let new_truth = TruthValue::detachment(&antecedent_truth, &implication_truth);
+
                         let new_task = Task::new(
                             Arc::clone(consequent),
                             Punctuation::Belief,

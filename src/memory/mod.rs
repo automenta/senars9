@@ -26,6 +26,9 @@ pub struct Memory {
     /// Index for inheritance relationships: `subject_hash -> {task_hash, ...}`.
     /// Allows for efficient lookup of inheritance statements `(subject --> predicate)`.
     inheritance_index: HashMap<String, HashSet<String>>,
+    /// Index for inheritance relationships: `predicate_hash -> {task_hash, ...}`.
+    /// Allows for efficient lookup of inheritance statements `(subject --> predicate)`.
+    inheritance_index_by_predicate: HashMap<String, HashSet<String>>,
     /// Index for similarity relationships: `term_hash -> {task_hash, ...}`.
     /// Allows for efficient lookup of similarity statements `(term1 <-> term2)`.
     similarity_index: HashMap<String, HashSet<String>>,
@@ -51,6 +54,7 @@ impl Memory {
             long_term_tasks: HashMap::new(),
             implication_index: HashMap::new(),
             inheritance_index: HashMap::new(),
+            inheritance_index_by_predicate: HashMap::new(),
             similarity_index: HashMap::new(),
             temporal_index: BTreeMap::new(),
             total_tasks: 0,
@@ -98,6 +102,12 @@ impl Memory {
                     self.inheritance_index
                         .entry(subject.hash.clone())
                         .or_default()
+                        .insert(term_hash.clone());
+                }
+                if let Some(predicate) = &task_arc.term.predicate {
+                    self.inheritance_index_by_predicate
+                        .entry(predicate.hash.clone())
+                        .or_default()
                         .insert(term_hash);
                 }
             }
@@ -120,6 +130,18 @@ impl Memory {
     pub fn get_implications_by_premise(&self, premise: &Term) -> Option<Vec<&Arc<Task>>> {
         self.implication_index
             .get(&premise.hash)
+            .map(|task_hashes| {
+                task_hashes
+                    .iter()
+                    .filter_map(|hash| self.get_task(hash))
+                    .collect()
+            })
+    }
+
+    /// Retrieves all inheritance tasks where the given term is the predicate.
+    pub fn get_inheritance_by_predicate(&self, predicate: &Term) -> Option<Vec<&Arc<Task>>> {
+        self.inheritance_index_by_predicate
+            .get(&predicate.hash)
             .map(|task_hashes| {
                 task_hashes
                     .iter()
@@ -313,6 +335,11 @@ impl Memory {
                 TermType::Implication => {
                     if let Some(premise) = &task.term.subject {
                         if let Some(hashes) = self.implication_index.get_mut(&premise.hash) {
+                            hashes.remove(term_hash);
+                        }
+                    }
+                    if let Some(predicate) = &task.term.predicate {
+                        if let Some(hashes) = self.inheritance_index_by_predicate.get_mut(&predicate.hash) {
                             hashes.remove(term_hash);
                         }
                     }

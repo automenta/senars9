@@ -4,7 +4,10 @@ pub mod rules;
 
 use self::{
     rule_engine::RuleEngine,
-    rules::{analogy::Analogy, deductive_syllogism::DeductiveSyllogism, modus_ponens::ModusPonens},
+    rules::{
+        abduction::Abduction, analogy::Analogy, deductive_syllogism::DeductiveSyllogism,
+        induction::Induction, modus_ponens::ModusPonens,
+    },
 };
 use crate::data_structures::task::Task;
 use crate::memory::Memory;
@@ -31,6 +34,8 @@ impl Reasoner {
         rule_engine.register(Box::new(DeductiveSyllogism));
         rule_engine.register(Box::new(ModusPonens));
         rule_engine.register(Box::new(Analogy));
+        rule_engine.register(Box::new(Induction));
+        rule_engine.register(Box::new(Abduction));
 
         Reasoner { rule_engine }
     }
