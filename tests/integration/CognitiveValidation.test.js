@@ -1,236 +1,269 @@
-import { jest } from '@jest/globals';
 import System from '../../core/System.js';
 
-describe('SeNARS Cognitive Validation Tests', () => {
+describe('Cognitive Validation Tests', () => {
   let system;
 
   beforeEach(async () => {
     system = new System({
-      components: {
-        memory: {
-          maxItems: 1000,
-          focusSetSize: 10
-        },
-        rules: {
-          maxRules: 100,
-          enablePrefiltering: true
-        }
+      config: {
+        maxTasks: 100,
+        maxRules: 50,
+        enableWebSocket: false // Disable for testing
       }
     });
     await system.start();
   });
 
   afterEach(async () => {
-    await system.stop();
+    if (system) {
+      await system.stop();
+    }
   });
 
   describe('Basic Cognitive Capabilities', () => {
-    test('should process and store beliefs', async () => {
-      const belief = system.remember('The sky is blue');
+    test('System initializes and runs basic cognitive cycle', async () => {
+      // System should be running
+      expect(system.getHealth().status).toBe('running');
 
-      expect(belief.term).toBe('The sky is blue');
-      expect(belief.punctuation).toBe('.');
-      expect(belief.truth.frequency).toBe(1.0);
+      // Should be able to input tasks
+      const task = system.input({
+        term: '(cat --> mammal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      });
+
+      expect(task.term).toBe('(cat --> mammal)');
+      expect(task.truth.frequency).toBe(1.0);
     });
 
-    test('should handle goals and desires', async () => {
-      const goal = system.want('Learn JavaScript', 0.9);
+    test('Can add and retrieve tasks from memory', async () => {
+      // Add a belief
+      const belief = system.remember('(dog --> mammal)', { frequency: 1.0, confidence: 0.9 });
+      expect(belief.term).toBe('(dog --> mammal)');
 
-      expect(goal.term).toBe('Learn JavaScript');
-      expect(goal.punctuation).toBe('!');
-      expect(goal.priority).toBe(0.9);
-    });
+      // Add a question
+      const question = system.input({
+        term: '(dog --> mammal)?',
+        punctuation: '?',
+        priority: 0.8
+      });
 
-    test('should process questions and store them for reasoning', async () => {
-      // First, add some knowledge
-      system.remember('JavaScript is a programming language');
-      system.remember('Programming languages run on computers');
-
-      // Ask a question (this creates a question task that can be processed)
-      const questionTask = {
-        term: 'What is JavaScript?',
-        punctuation: '?'
-      };
-
-      system.input(questionTask);
-
-      // Verify the question was processed
+      // Memory should contain tasks
       const health = system.getHealth();
-      expect(health.status).toBe('running');
       expect(health.tasksProcessed).toBeGreaterThan(0);
     });
-  });
 
-  describe('Reasoning and Inference', () => {
-    test('should perform basic deduction', async () => {
-      // Add implication rule: If it rains, then the ground is wet
-      system.remember('(rain --> wet_ground)');
+    test('Can apply rules to generate new tasks', async () => {
+      // Add premise tasks
+      system.input({
+        term: '(cat --> mammal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      });
 
-      // Add fact: It is raining
-      system.remember('rain');
+      system.input({
+        term: '(mammal --> animal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.95 }
+      });
 
-      // The system should be able to deduce that the ground is wet
-      // This would be validated through the reasoning component
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
+      // The reasoning component should be able to process these
+      const tasks = [
+        { term: '(cat --> mammal)', punctuation: '.', truth: { frequency: 1.0, confidence: 0.9 } },
+        { term: '(mammal --> animal)', punctuation: '.', truth: { frequency: 1.0, confidence: 0.95 } }
+      ];
+
+      const derivedTasks = await system.core.reasoning.reason(tasks);
+      expect(Array.isArray(derivedTasks)).toBe(true);
     });
 
-    test('should detect and handle contradictions', async () => {
-      // Add conflicting beliefs
-      system.remember('The cat is black', { frequency: 0.9, confidence: 0.8 });
-      system.remember('The cat is white', { frequency: 0.8, confidence: 0.7 });
-
-      // System should detect contradiction and create resolution task
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
-    });
-
-    test('should perform pattern induction', async () => {
-      // Add multiple similar observations
-      system.remember('Birds can fly');
-      system.remember('Eagles can fly');
-      system.remember('Sparrows can fly');
-
-      // System should induce that flying creatures exist
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
+    test('Has working API for core operations', () => {
+      // Test basic API methods exist and are functions
+      expect(typeof system.input).toBe('function');
+      expect(typeof system.remember).toBe('function');
+      expect(typeof system.want).toBe('function');
+      expect(typeof system.getHealth).toBe('function');
+      expect(typeof system.getStatus).toBe('function');
+      expect(typeof system.getMetrics).toBe('function');
     });
   });
 
-  describe('Memory and Attention', () => {
-    test('should manage focus sets and attention', async () => {
-      // Add multiple tasks with different priorities
-      for (let i = 0; i < 20; i++) {
-        system.remember(`Task ${i}`, {
-          frequency: 0.8,
-          confidence: 0.7
-        }, i * 0.05); // Increasing priority
+  describe('Component Integration', () => {
+    test('All core components are accessible', () => {
+      expect(system.core).toBeDefined();
+      expect(system.core.config).toBeDefined();
+      expect(system.core.messages).toBeDefined();
+      expect(system.core.rules).toBeDefined();
+      expect(system.core.memory).toBeDefined();
+      expect(system.core.reasoning).toBeDefined();
+    });
+
+    test('Components have required methods', () => {
+      // Config component
+      expect(typeof system.core.config.getHealth).toBe('function');
+
+      // Messages component
+      expect(typeof system.core.messages.emit).toBe('function');
+      expect(typeof system.core.messages.on).toBe('function');
+
+      // Rules component
+      expect(typeof system.core.rules.getHealth).toBe('function');
+
+      // Memory component
+      expect(typeof system.core.memory.getHealth).toBe('function');
+
+      // Reasoning component
+      expect(typeof system.core.reasoning.reason).toBe('function');
+      expect(typeof system.core.reasoning.getStats).toBe('function');
+    });
+  });
+
+  describe('Event System', () => {
+    test('Can register and trigger events', (done) => {
+      let eventTriggered = false;
+
+      system.on('test_event', (data) => {
+        eventTriggered = true;
+        expect(data.message).toBe('test');
+        done();
+      });
+
+      // Emit test event
+      system.core.messages.emit('test_event', { message: 'test' });
+
+      // Cleanup
+      setTimeout(() => {
+        if (!eventTriggered) {
+          done(new Error('Event was not triggered'));
+        }
+      }, 100);
+    });
+
+    test('Event handlers can be removed', () => {
+      let callCount = 0;
+
+      const handler = () => { callCount++; };
+
+      system.on('test_cleanup', handler);
+      system.core.messages.emit('test_cleanup', {});
+
+      expect(callCount).toBe(1);
+
+      system.off('test_cleanup', handler);
+      system.core.messages.emit('test_cleanup', {});
+
+      expect(callCount).toBe(1); // Should not increase after removal
+    });
+  });
+
+  describe('Reasoning Capabilities', () => {
+    test('Can perform basic inference operations', async () => {
+      const tasks = [
+        { term: '(sparrow --> bird)', punctuation: '.', truth: { frequency: 1.0, confidence: 0.9 } },
+        { term: '(bird --> animal)', punctuation: '.', truth: { frequency: 1.0, confidence: 0.95 } }
+      ];
+
+      const results = await system.core.reasoning.reason(tasks);
+
+      // Should return an array (even if empty for simple cases)
+      expect(Array.isArray(results)).toBe(true);
+
+      // Should have reasoning history
+      const history = system.core.reasoning.getReasoningHistory(10);
+      expect(Array.isArray(history)).toBe(true);
+    });
+
+    test('Reasoning component tracks performance', () => {
+      const stats = system.core.reasoning.getStats();
+
+      expect(stats).toHaveProperty('strategies');
+      expect(stats).toHaveProperty('inferenceRules');
+      expect(stats).toHaveProperty('historySize');
+      expect(typeof stats.strategies).toBe('number');
+      expect(typeof stats.inferenceRules).toBe('number');
+      expect(typeof stats.historySize).toBe('number');
+    });
+  });
+
+  describe('Memory Management', () => {
+    test('Memory component manages tasks efficiently', () => {
+      const health = system.core.memory.getHealth();
+      const stats = system.core.memory.getStats();
+
+      expect(health).toHaveProperty('status');
+      expect(health).toHaveProperty('issues');
+      expect(stats).toHaveProperty('storageSize');
+      expect(stats).toHaveProperty('focusSets');
+      expect(typeof stats.storageSize).toBe('number');
+    });
+
+    test('Can handle multiple tasks without errors', () => {
+      // Add multiple tasks rapidly
+      for (let i = 0; i < 10; i++) {
+        system.input({
+          term: `(task${i} --> test)`,
+          punctuation: '.',
+          truth: { frequency: 0.8, confidence: 0.7 }
+        });
       }
 
-      // Check that high-priority items are in focus
       const health = system.getHealth();
-      expect(health.coreHealth.memory).toBeDefined();
-    });
-
-    test('should retrieve relevant memories', async () => {
-      // Add various types of knowledge
-      system.remember('JavaScript is dynamically typed');
-      system.remember('Python is strongly typed');
-      system.remember('Type safety prevents runtime errors');
-
-      // Memory should be able to retrieve related items
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
+      expect(health.tasksProcessed).toBeGreaterThanOrEqual(10);
     });
   });
 
-  describe('Learning and Adaptation', () => {
-    test('should learn from experience', async () => {
-      // Simulate learning process
-      system.remember('Practice improves skills');
-      system.remember('Consistent effort leads to mastery');
+  describe('System Resilience', () => {
+    test('System handles invalid input gracefully', () => {
+      expect(() => {
+        system.input(null);
+      }).toThrow();
 
-      // System should adapt based on learning
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
+      expect(() => {
+        system.input({ invalid: 'task' });
+      }).toThrow();
+
+      // System should still be healthy after errors
+      expect(system.getHealth().status).toBe('running');
     });
 
-    test('should update beliefs based on new evidence', async () => {
-      // Initial belief
-      system.remember('It is sunny', { frequency: 0.8, confidence: 0.6 });
-
-      // Contradictory evidence
-      system.remember('It is raining', { frequency: 0.9, confidence: 0.8 });
-
-      // System should handle belief revision
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
-    });
-  });
-
-  describe('System Integration', () => {
-    test('should maintain coherence across components', async () => {
-      // Test that all components work together
-      system.remember('Integration test belief');
-      system.want('Integration test goal');
-
-      const status = system.getStatus();
-      expect(status.status).toBe('running');
-      expect(status.coreHealth).toBeDefined();
-    });
-
-    test('should handle errors gracefully', async () => {
-      // Test error handling
+    test('System provides meaningful error messages', () => {
       try {
-        system.input('Invalid task without term');
+        system.input(null);
+        fail('Should have thrown an error');
       } catch (error) {
         expect(error.message).toContain('Task must be an object');
       }
-
-      // System should still be running after error
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
-    });
-
-    test('should provide comprehensive metrics', async () => {
-      // Generate some activity
-      system.remember('Metrics test');
-      system.want('Monitor performance');
-
-      const metrics = system.getMetrics();
-      expect(metrics.system).toBeDefined();
-      expect(metrics.components).toBeDefined();
-      expect(metrics.system.tasksProcessed).toBeGreaterThan(0);
     });
   });
 
-  describe('Performance Validation', () => {
-    test('should respond within acceptable time limits', async () => {
+  describe('Performance Characteristics', () => {
+    test('Basic operations complete within reasonable time', async () => {
       const startTime = Date.now();
 
-      // Process multiple tasks
-      for (let i = 0; i < 10; i++) {
-        system.remember(`Performance test ${i}`);
+      // Perform several operations
+      for (let i = 0; i < 5; i++) {
+        system.input({
+          term: `(perf_test_${i} --> benchmark)`,
+          punctuation: '.',
+          truth: { frequency: 0.8, confidence: 0.7 }
+        });
       }
 
       const endTime = Date.now();
       const duration = endTime - startTime;
 
-      // Should complete within reasonable time (adjust as needed)
-      expect(duration).toBeLessThan(5000); // 5 seconds
+      // Should complete within 1 second for basic operations
+      expect(duration).toBeLessThan(1000);
     });
 
-    test('should handle memory pressure gracefully', async () => {
-      // Add many items to test memory management
-      for (let i = 0; i < 100; i++) {
-        system.remember(`Memory stress test ${i}`);
-      }
+    test('System provides performance metrics', () => {
+      const metrics = system.getMetrics();
 
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
-    });
-  });
-
-  describe('Cognitive Cycle Validation', () => {
-    test('should complete full cognitive cycles', async () => {
-      // Simulate a complete cognitive cycle
-      const perception = system.remember('Observed: red car');
-      const goal = system.want('Understand vehicle colors');
-
-      // The system should process these through the cognitive cycle
-      const status = system.getStatus();
-      expect(status.status).toBe('running');
-    });
-
-    test('should maintain cognitive coherence', async () => {
-      // Add related but not contradictory beliefs
-      system.remember('All men are mortal');
-      system.remember('Socrates is a man');
-      system.remember('Therefore Socrates is mortal');
-
-      // System should maintain logical consistency
-      const health = system.getHealth();
-      expect(health.status).toBe('running');
+      expect(metrics).toHaveProperty('system');
+      expect(metrics).toHaveProperty('components');
+      expect(metrics.system).toHaveProperty('uptime');
+      expect(metrics.system).toHaveProperty('tasksProcessed');
+      expect(metrics.system).toHaveProperty('isRunning');
     });
   });
 });

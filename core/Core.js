@@ -2,6 +2,7 @@ import Config from './Config.js';
 import Messages from './Messages.js';
 import Rules from './Rules.js';
 import Memory from './Memory.js';
+import Reasoning from './Reasoning.js';
 import { Focus } from './Memory.js';
 
 class Core {
@@ -15,6 +16,7 @@ class Core {
     const focus = new Focus();
     this.registerComponent('focus', focus);
     this.registerComponent('memory', new Memory(focus));
+    this.registerComponent('reasoning', new Reasoning());
 
     return new Proxy(this, {
       get: (target, prop) => target.componentMap.has(prop) ? target.componentMap.get(prop) : target[prop],
