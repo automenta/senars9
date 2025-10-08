@@ -1,5 +1,8 @@
 import Component from './Component.js';
-import { Storage, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager } from './Utils.js';
+import { Storage, IndexManager } from './data-structures.js';
+import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
+import { Validation } from './validation.js';
+import { ErrorHandler } from './validation.js';
 
 const COMPLEXITY_LEVELS = { simple: 1, medium: 2, complex: 3 };
 const MAX_PRIORITY = 10;

@@ -2,21 +2,37 @@
  * Data structure utilities for SeNARS
  */
 
+// Base class for LRU cache functionality
+class LRUMap extends Map {
+  constructor(maxSize = 1000) {
+    super();
+    this.maxSize = maxSize;
+  }
+
+  _touch(key, value) {
+    super.delete(key);
+    super.set(key, value);
+  }
+
+  _evict() {
+    this.size > this.maxSize && super.delete(this.keys().next().value);
+  }
+}
+
 class Cache {
   constructor(maxSize = 1000) {
-    this.maxSize = maxSize;
-    this.cache = new Map();
+    this.cache = new LRUMap(maxSize);
   }
 
   get(key) {
     const value = this.cache.get(key);
-    value !== undefined && this._touch(key, value);
+    value !== undefined && this.cache._touch(key, value);
     return value;
   }
 
   set(key, value) {
-    this._touch(key, value);
-    this._evict();
+    this.cache._touch(key, value);
+    this.cache._evict();
   }
 
   has(key) {
@@ -34,21 +50,11 @@ class Cache {
   get size() {
     return this.cache.size;
   }
-
-  _touch(key, value) {
-    this.cache.delete(key);
-    this.cache.set(key, value);
-  }
-
-  _evict() {
-    this.cache.size > this.maxSize && this.cache.delete(this.cache.keys().next().value);
-  }
 }
 
 class Storage {
   constructor(options = {}) {
-    this.data = new Map();
-    this.maxSize = options.maxSize || 1000;
+    this.data = new LRUMap(options.maxSize || 1000);
     this.enableEvents = options.enableEvents !== false;
     this.eventTarget = options.eventTarget || null;
     this.namespace = options.namespace || 'storage';
@@ -64,13 +70,8 @@ class Storage {
 
   set(key, value) {
     const previousValue = this.data.get(key);
-    this.data.set(key, value);
-
-    // Enforce max size limit
-    if (this.data.size > this.maxSize) {
-      const firstKey = this.data.keys().next().value;
-      this.data.delete(firstKey);
-    }
+    this.data._touch(key, value);
+    this.data._evict();
 
     if (this.enableEvents && this.eventTarget) {
       this.eventTarget.emit(`${this.namespace}:changed`, {

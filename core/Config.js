@@ -1,5 +1,6 @@
 import Component from './Component.js';
-import { Cache, ObjectUtils, Logger } from './Utils.js';
+import { Cache } from './data-structures.js';
+import { ObjectUtils, Logger } from './utilities.js';
 
 class Config extends Component {
   constructor() {

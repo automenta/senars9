@@ -1,5 +1,8 @@
 import Component from './Component.js';
-import { Cache, Storage, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager } from './Utils.js';
+import { Cache, Storage, IndexManager } from './data-structures.js';
+import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
+import { Validation } from './validation.js';
+import { ErrorHandler } from './validation.js';
 
 class Memory extends Component {
   constructor() {
@@ -28,8 +31,7 @@ class Memory extends Component {
     if (cached !== undefined) return cached;
 
     const value = this.storage.get(key);
-    if (value !== undefined) this.cache.set(key, value);
-    return value;
+    return value !== undefined ? (this.cache.set(key, value), value) : value;
   }
 
   set(key, value, options = {}) {
@@ -89,17 +91,13 @@ class Memory extends Component {
     focusSet.lastAccessed = Date.now();
     focusSet.accessCount++;
 
-    // Enhanced sorting with attention scoring
     return ArrayUtils.sortBy(Array.from(focusSet.items.entries()), ([, data]) => [
-      -(data.priority || 0), // Primary: priority (higher first)
-      data.timestamp,        // Secondary: recency (newer first)
-      -(data.accessCount || 0) // Tertiary: access frequency (higher first)
+      -(data.priority || 0),
+      data.timestamp,
+      -(data.accessCount || 0)
     ], 'asc')
       .slice(0, count)
-      .map(([key, value]) => {
-        value.accessCount = (value.accessCount || 0) + 1;
-        return [key, value];
-      });
+      .map(([key, value]) => (value.accessCount = (value.accessCount || 0) + 1, [key, value]));
   }
 
   query(criteria = {}) {
@@ -130,13 +128,11 @@ class Memory extends Component {
       .filter(([, value]) => value !== undefined);
 
     // Apply sorting if specified
-    if (sortBy) {
-      results.sort((a, b) => {
-        const aVal = this._getSortValue(a[1], sortBy);
-        const bVal = this._getSortValue(b[1], sortBy);
-        return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
-      });
-    }
+    sortBy && results.sort((a, b) => {
+      const aVal = this._getSortValue(a[1], sortBy);
+      const bVal = this._getSortValue(b[1], sortBy);
+      return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
+    });
 
     return results;
   }
@@ -243,21 +239,9 @@ class Memory extends Component {
     if (focusData.items.has(key)) return;
 
     focusData.items.set(key, { priority, timestamp: Date.now() });
-    this._evictFocusSet(focusData);
+    focusData.items.size > focusData.maxSize && focusData.items.delete([...focusData.items.keys()][0]);
   }
 
-  _evictFocusSet(focusData) {
-    if (focusData.items.size <= focusData.maxSize) return;
-
-    // Enhanced eviction with attention scoring
-    const items = ArrayUtils.sortBy(
-      Array.from(focusData.items.entries()),
-      ([, data]) => this._calculateAttentionScore(data, focusData),
-      'asc'
-    );
-
-    focusData.items.delete(items[0]?.[0]);
-  }
 
   _calculateAttentionScore(itemData, focusData) {
     const now = Date.now();

@@ -3,16 +3,8 @@
  */
 
 class Logger {
-  static log(level, message, data = {}) {
-    const logEntry = {
-      level,
-      message,
-      data,
-      timestamp: new Date().toISOString()
-    };
-    console[level] ? console[level](`[${level.toUpperCase()}]`, message, data) : console.log(`[${level.toUpperCase()}]`, message, data);
-    return logEntry;
-  }
+  static log = (level, message, data = {}) =>
+    (console[level] || console.log)(`[${level.toUpperCase()}]`, message, data);
 
   static info = (msg, data) => Logger.log('info', msg, data);
   static warn = (msg, data) => Logger.log('warn', msg, data);
@@ -33,13 +25,13 @@ class ObjectUtils {
   static isObject = item => item && typeof item === 'object' && !Array.isArray(item);
   static isEmpty = obj => !obj || Object.keys(obj).length === 0;
   static pick = (obj, keys) => keys.reduce((result, key) => (key in obj && (result[key] = obj[key]), result), {});
-  static omit = (obj, keys) => Object.keys(obj).reduce((result, key) => (keys.includes(key) || (result[key] = obj[key]), result), {});
+  static omit = (obj, keys) => Object.keys(obj).reduce((result, key) => (!keys.includes(key) && (result[key] = obj[key]), result), {});
 }
 
 class ArrayUtils {
   static groupBy = (array, keyFn) => array.reduce((groups, item) => {
     const key = keyFn(item);
-    return (groups[key] = groups[key] || []).push(item), groups;
+    return (groups[key] ||= []).push(item), groups;
   }, {});
 
   static sortBy = (array, keyFn, direction = 'asc') => [...array].sort((a, b) => {

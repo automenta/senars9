@@ -1,4 +1,5 @@
-import { Storage, Logger } from './Utils.js';
+import { Storage } from './data-structures.js';
+import { Logger } from './utilities.js';
 
 /**
  * Performance monitoring system using Messages.js event system

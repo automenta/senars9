@@ -1,5 +1,6 @@
 import Component from './Component.js';
-import { Storage, Validation, ErrorHandler } from './Utils.js';
+import { Storage } from './data-structures.js';
+import { Validation, ErrorHandler } from './validation.js';
 
 class Tools extends Component {
   constructor() {

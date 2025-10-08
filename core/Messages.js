@@ -1,5 +1,6 @@
 import Component from './Component.js';
-import { Storage, Retry } from './Utils.js';
+import { Storage } from './data-structures.js';
+import { Retry } from './validation.js';
 
 class Messages extends Component {
   constructor() {
@@ -96,21 +97,14 @@ class Messages extends Component {
 
     const executeWithRetry = (ctx) => {
       const policy = this.retryPolicies.get(command) || this.retryPolicies.get('default');
-      if (policy.maxRetries === 0) {
-        return handler(ctx.data);
-      }
-      return Retry.execute(() => handler(ctx.data), policy);
+      return policy.maxRetries === 0 ? handler(ctx.data) : Retry.execute(() => handler(ctx.data), policy);
     };
 
     const result = this._executeMiddleware(context, executeWithRetry);
 
     // For backward compatibility, if no middleware and no command-specific retries, return result directly
     const commandPolicy = this.retryPolicies.get(command);
-    if (this.middleware.length === 0 && (!commandPolicy || commandPolicy.maxRetries === 0)) {
-      return result;
-    }
-
-    return result;
+    return this.middleware.length === 0 && (!commandPolicy || commandPolicy.maxRetries === 0) ? result : result;
   }
 
   registerProcessor(name, processor, options = {}) {
@@ -240,25 +234,18 @@ class Messages extends Component {
   _executeMiddleware(context, final) {
     let index = -1;
     const dispatch = (i) => {
-      if (i <= index) {
-        throw new Error('next() called multiple times');
-      }
+      if (i <= index) throw new Error('next() called multiple times');
       index = i;
 
       if (context.cancelled) return;
 
-      let middleware = this.middleware[i];
-      if (i === this.middleware.length) {
-        return final(context);
-      }
+      const middleware = this.middleware[i];
+      if (i === this.middleware.length) return final(context);
 
-      if (!middleware || !middleware.enabled) {
-        return dispatch(i + 1);
-      }
+      if (!middleware || !middleware.enabled) return dispatch(i + 1);
 
       try {
-        const result = middleware.fn(context, () => dispatch(i + 1));
-        return result;
+        return middleware.fn(context, () => dispatch(i + 1));
       } catch (err) {
         return this._handleError(err, context, () => dispatch(i + 1));
       }

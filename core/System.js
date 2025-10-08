@@ -1,5 +1,5 @@
 import createCore from './createCore.js';
-import { Logger } from './Utils.js';
+import { Logger } from './utilities.js';
 
 class System {
   constructor(config = {}) {
@@ -9,7 +9,7 @@ class System {
 
   async start() {
     if (this.core) {
-      console.warn('System is already running.');
+      Logger.warn('System is already running.');
       return;
     }
     this.core = await createCore(this.config);

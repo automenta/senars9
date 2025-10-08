@@ -42,7 +42,7 @@ describe('System', () => {
 
       await system.start(); // Second start
 
-      expect(warnSpy).toHaveBeenCalledWith('System is already running.');
+      expect(warnSpy).toHaveBeenCalledWith('[WARN]', 'System is already running.', {});
       // start() should not have been called a second time.
       expect(startSpy).not.toHaveBeenCalled();
 

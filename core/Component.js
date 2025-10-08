@@ -92,30 +92,6 @@ class Component {
     }
   }
 
-  // Enhanced lifecycle methods that use Messages.js patterns
-  async initializeWithRetry(config = {}) {
-    return this._safeExecute(async () => {
-      await this.initialize(config);
-    }, 'initialize');
-  }
-
-  async startWithRetry() {
-    return this._safeExecute(async () => {
-      await this.start();
-    }, 'start');
-  }
-
-  async stopWithRetry() {
-    return this._safeExecute(async () => {
-      await this.stop();
-    }, 'stop');
-  }
-
-  async destroyWithRetry() {
-    return this._safeExecute(async () => {
-      await this.destroy();
-    }, 'destroy');
-  }
 
   // Enhanced event handling with Messages.js integration
   registerCommand(command, handler) {

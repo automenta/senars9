@@ -1,4 +1,5 @@
-import { Validation, Logger, ErrorHandler } from './Utils.js';
+import { Validation, ErrorHandler } from './validation.js';
+import { Logger } from './utilities.js';
 
 /**
  * Common middleware functions for use with Messages.js

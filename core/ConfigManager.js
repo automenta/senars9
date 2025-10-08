@@ -1,4 +1,6 @@
-import { Storage, Validation, Logger, ObjectUtils } from './Utils.js';
+import { Storage } from './data-structures.js';
+import { Logger, ObjectUtils } from './utilities.js';
+import { Validation } from './validation.js';
 import CommonMiddleware from './Middleware.js';
 
 /**

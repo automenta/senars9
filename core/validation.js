@@ -168,6 +168,6 @@ class Retry {
   }
 }
 
-import { Logger } from './Utils.js';
+import { Logger } from './utilities.js';
 
 export { Validation, ErrorHandler, Retry };
