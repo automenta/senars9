@@ -19,8 +19,8 @@ use std::sync::Arc;
 ///
 /// # Type Parameters
 /// * `QueryFn`: A closure that takes memory and components of the first premise,
-///   and returns a collection of candidate second premises. It must return an
-///   owned `Vec` to avoid borrow checker issues.
+///   and returns a collection of candidate second premises. It can return a
+///   `Vec` of references to avoid unnecessary cloning.
 /// * `ConstructFn`: A closure that takes the components of both premises and
 ///   returns the subject and predicate for the new derived term.
 /// * `TruthFn`: A closure that calculates the truth value of the conclusion.
@@ -44,7 +44,7 @@ pub fn apply_syllogistic_rule<QueryFn, ConstructFn, TruthFn>(
     exclude_self: bool,
 ) -> Vec<Task>
 where
-    QueryFn: Fn(&Memory, &Arc<Term>, &Arc<Term>) -> Option<Vec<Arc<Task>>>,
+    QueryFn: for<'a> Fn(&'a Memory, &'a Arc<Term>, &'a Arc<Term>) -> Option<Vec<&'a Arc<Task>>>,
     ConstructFn: Fn(&Arc<Term>, &Arc<Term>, &Arc<Term>, &Arc<Term>) -> (Arc<Term>, Arc<Term>),
     TruthFn: Fn(&TruthValue, &TruthValue) -> TruthValue,
 {
@@ -55,15 +55,16 @@ where
         (&premise1.term().subject, &premise1.term().predicate, premise1.truth)
     {
         // Find candidate second premises using the provided query function.
-        let premises2 = match query_premises2(memory, s1, p1) {
+        let premises2_refs = match query_premises2(memory, s1, p1) {
             Some(tasks) => tasks,
             None => return derived,
         };
 
-        // Iterate through the second premises to derive conclusions.
+        // Convert refs to owned Arcs and iterate.
+        let premises2: Vec<Arc<Task>> = premises2_refs.iter().map(|&task| task.clone()).collect();
         for premise2 in premises2 {
             // Skip if the rule requires excluding the premise itself.
-            if exclude_self && premise2.term().hash == premise1.term().hash {
+            if exclude_self && Arc::ptr_eq(&premise2, premise1) {
                 continue;
             }
 

@@ -30,13 +30,7 @@ impl InferenceRule for Abduction {
             // Query for the second premise: `(P --> M)`.
             // The key is `M`, which is the predicate of `premise1` (`S --> M`).
             // We search for premises where `M` is the predicate.
-            |mem, _s1, p1| {
-                mem.get_inheritance_by_predicate(p1).map(|v| {
-                    // The memory function returns a reference to a vector of references.
-                    // We need to iterate, dereference, and clone to get an owned Vec<Arc<Task>>.
-                    v.iter().map(|task_ref| (*task_ref).clone()).collect()
-                })
-            },
+            |mem, _s1, p1| mem.get_inheritance_by_predicate(p1),
             // Construct the conclusion: `(S --> P)`.
             // `S` is the subject of `premise1`, `P` is the subject of `premise2`.
             |s1, _p1, s2, _p2| (s1.clone(), s2.clone()),

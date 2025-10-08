@@ -30,13 +30,7 @@ impl InferenceRule for Induction {
             // Query for the second premise: `(M --> P)`.
             // The key is `M`, which is the subject of `premise1` (`M --> S`).
             // We search for premises where `M` is the subject.
-            |mem, s1, _p1| {
-                mem.get_inheritance_by_subject(s1).map(|v| {
-                    // The memory function returns a reference to a vector of references.
-                    // We need to iterate, dereference, and clone to get an owned Vec<Arc<Task>>.
-                    v.iter().map(|task_ref| (*task_ref).clone()).collect()
-                })
-            },
+            |mem, s1, _p1| mem.get_inheritance_by_subject(s1),
             // Construct the conclusion: `(S --> P)`.
             // `S` is the predicate of `premise1`, `P` is the predicate of `premise2`.
             |_s1, p1, _s2, p2| (p1.clone(), p2.clone()),

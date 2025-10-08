@@ -100,31 +100,25 @@ impl IndexManager {
         match task.term().term_type {
             TermType::Implication => {
                 if let Some(premise) = &task.term().subject {
-                    if let Some(hashes) = self.implication_index.get_mut(&premise.hash) {
-                        hashes.remove(term_hash);
-                    }
+                    Self::remove_from_hash_index(&mut self.implication_index, &premise.hash, term_hash);
                 }
             }
             TermType::Inheritance => {
                 if let Some(subject) = &task.term().subject {
-                    if let Some(hashes) = self.inheritance_index.get_mut(&subject.hash) {
-                        hashes.remove(term_hash);
-                    }
+                    Self::remove_from_hash_index(&mut self.inheritance_index, &subject.hash, term_hash);
                 }
                 if let Some(predicate) = &task.term().predicate {
-                    if let Some(hashes) = self.inheritance_index_by_predicate.get_mut(&predicate.hash) {
-                        hashes.remove(term_hash);
-                    }
+                    Self::remove_from_hash_index(
+                        &mut self.inheritance_index_by_predicate,
+                        &predicate.hash,
+                        term_hash,
+                    );
                 }
             }
             TermType::Similarity => {
                 if let (Some(subj), Some(pred)) = (&task.term().subject, &task.term().predicate) {
-                    if let Some(hashes) = self.similarity_index.get_mut(&subj.hash) {
-                        hashes.remove(term_hash);
-                    }
-                    if let Some(hashes) = self.similarity_index.get_mut(&pred.hash) {
-                        hashes.remove(term_hash);
-                    }
+                    Self::remove_from_hash_index(&mut self.similarity_index, &subj.hash, term_hash);
+                    Self::remove_from_hash_index(&mut self.similarity_index, &pred.hash, term_hash);
                 }
             }
             _ => {}
@@ -157,5 +151,21 @@ impl IndexManager {
             .range(start_time..=end_time)
             .flat_map(|(_, task_hashes)| task_hashes.iter())
             .collect()
+    }
+
+    /// A helper function to remove a value from a `HashSet` within a `HashMap`.
+    /// If the `HashSet` becomes empty after removal, the key is also removed
+    /// from the `HashMap`.
+    fn remove_from_hash_index(
+        index: &mut HashMap<String, HashSet<String>>,
+        key: &str,
+        value: &str,
+    ) {
+        if let Some(hashes) = index.get_mut(key) {
+            hashes.remove(value);
+            if hashes.is_empty() {
+                index.remove(key);
+            }
+        }
     }
 }

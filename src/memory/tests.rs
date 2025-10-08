@@ -155,7 +155,7 @@ fn test_remove_task_cleans_up_all_indexes() {
     memory.remove_task(&task_hash);
 
     // Check indexes are cleaned up
-    assert!(memory.index_manager.inheritance_index.get(&s.term.hash).unwrap().is_empty());
+    assert!(memory.index_manager.inheritance_index.get(&s.term.hash).is_none());
     assert!(memory.index_manager.temporal_index.get(&100).is_none());
 }
 

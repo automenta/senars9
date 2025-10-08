@@ -73,30 +73,22 @@ impl Memory {
 
     /// Retrieves all implication tasks where the given term is the premise.
     pub fn get_implications_by_premise(&self, premise: &Term) -> Option<Vec<&Arc<Task>>> {
-        self.index_manager
-            .get_implication_hashes_by_premise(&premise.hash)
-            .map(|hashes| self.get_tasks_from_hashes(hashes))
+        self.query_index(|im| im.get_implication_hashes_by_premise(&premise.hash))
     }
 
     /// Retrieves all inheritance tasks where the given term is the predicate.
     pub fn get_inheritance_by_predicate(&self, predicate: &Term) -> Option<Vec<&Arc<Task>>> {
-        self.index_manager
-            .get_inheritance_hashes_by_predicate(&predicate.hash)
-            .map(|hashes| self.get_tasks_from_hashes(hashes))
+        self.query_index(|im| im.get_inheritance_hashes_by_predicate(&predicate.hash))
     }
 
     /// Retrieves all inheritance tasks where the given term is the subject.
     pub fn get_inheritance_by_subject(&self, subject: &Term) -> Option<Vec<&Arc<Task>>> {
-        self.index_manager
-            .get_inheritance_hashes_by_subject(&subject.hash)
-            .map(|hashes| self.get_tasks_from_hashes(hashes))
+        self.query_index(|im| im.get_inheritance_hashes_by_subject(&subject.hash))
     }
 
     /// Retrieves all similarity tasks related to the given term.
     pub fn get_similarities(&self, term: &Term) -> Option<Vec<&Arc<Task>>> {
-        self.index_manager
-            .get_similarity_hashes(&term.hash)
-            .map(|hashes| self.get_tasks_from_hashes(hashes))
+        self.query_index(|im| im.get_similarity_hashes(&term.hash))
     }
 
     /// Returns an iterator over all tasks in both short-term and long-term memory.
@@ -108,6 +100,14 @@ impl Memory {
     pub fn get_tasks_by_time_range(&self, start_time: u64, end_time: u64) -> Vec<&Arc<Task>> {
         let hashes = self.index_manager.get_task_hashes_by_time_range(start_time, end_time);
         self.get_tasks_from_hashes(hashes)
+    }
+
+    /// A helper function to query an index and convert the resulting hashes to task references.
+    fn query_index<'a, F>(&'a self, query_fn: F) -> Option<Vec<&'a Arc<Task>>>
+    where
+        F: Fn(&'a IndexManager) -> Option<&'a std::collections::HashSet<String>>,
+    {
+        query_fn(&self.index_manager).map(|hashes| self.get_tasks_from_hashes(hashes))
     }
 
     /// A helper function to convert a collection of task hashes into a vector of task references.
