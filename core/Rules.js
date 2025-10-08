@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Index, Storage, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager } from './Utils.js';
+import { Storage, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager } from './Utils.js';
 
 const COMPLEXITY_LEVELS = { simple: 1, medium: 2, complex: 3 };
 const MAX_PRIORITY = 10;
@@ -10,6 +10,9 @@ class Rules extends Component {
     this.rules = [];
     this.indexes = new IndexManager();
     this.preFilters = new Set();
+    this.lastEvaluationTime = null;
+    this.evaluationTimeHistory = [];
+    this.maxHistorySize = 100;
   }
 
   async _doInitialize() {
@@ -123,8 +126,34 @@ class Rules extends Component {
       totalRules,
       types,
       preFilterTags,
-      averageRulesPerType: totalRules / Math.max(types.length, 1)
+      averageRulesPerType: totalRules / Math.max(types.length, 1),
+      indexesSize: this.indexes.indexes.size,
+      rulesByComplexity: this._getRulesByComplexityStats(),
+      rulesByPriority: this._getRulesByPriorityStats(),
+      performance: {
+        lastEvaluation: this.lastEvaluationTime,
+        averageEvaluationTime: this.evaluationTimeHistory.length > 0
+          ? this.evaluationTimeHistory.reduce((a, b) => a + b, 0) / this.evaluationTimeHistory.length
+          : 0
+      }
     };
+  }
+
+  _getRulesByComplexityStats() {
+    const stats = {};
+    for (const rule of this.rules) {
+      stats[rule.complexity] = (stats[rule.complexity] || 0) + 1;
+    }
+    return stats;
+  }
+
+  _getRulesByPriorityStats() {
+    const stats = {};
+    for (const rule of this.rules) {
+      const priority = rule.priority || 0;
+      stats[priority] = (stats[priority] || 0) + 1;
+    }
+    return stats;
   }
 
   clear() {
@@ -134,29 +163,78 @@ class Rules extends Component {
   }
 
   async evaluate(context, options = {}) {
-    // Use optimized candidate selection for better performance
-    let candidates = this.getOptimizedRuleCandidates(context, options);
+    const startTime = Date.now();
 
-    // Final filtering by condition evaluation
-    const applicableRules = candidates.filter(rule => {
-      try {
-        return rule.condition(context);
-      } catch (error) {
-        Logger.error(`Rule '${rule.name}' condition failed`, { rule: rule.name, error: error.message });
-        return false;
-      }
-    });
-
-    if (applicableRules.length === 0) return null;
-
-    this._sortByPriority(applicableRules);
-
-    const topRule = applicableRules[0];
     try {
-      return await topRule.action(context);
+      // Use optimized candidate selection for better performance
+      let candidates = this.getOptimizedRuleCandidates(context, options);
+
+      // Final filtering by condition evaluation
+      const applicableRules = candidates.filter(rule => {
+        try {
+          return rule.condition(context);
+        } catch (error) {
+          this.core?.messages?.emit('error:occurred', {
+            type: 'RuleConditionError',
+            rule: rule.name,
+            error: error.message,
+            stack: error.stack
+          }) || Logger.error(`Rule '${rule.name}' condition failed`, { rule: rule.name, error: error.message });
+          return false;
+        }
+      });
+
+      if (applicableRules.length === 0) {
+        this._recordEvaluationTime(Date.now() - startTime);
+        return null;
+      }
+
+      this._sortByPriority(applicableRules);
+
+      const topRule = applicableRules[0];
+      try {
+        const result = await topRule.action(context);
+
+        // Record successful evaluation
+        this._recordEvaluationTime(Date.now() - startTime);
+
+        // Emit performance metrics if messages component is available
+        if (this.core?.messages) {
+          this.core.messages.emit('rules:evaluated', {
+            ruleCount: candidates.length,
+            applicableCount: applicableRules.length,
+            selectedRule: topRule.name,
+            duration: Date.now() - startTime,
+            success: true,
+            timestamp: new Date()
+          });
+        }
+
+        return result;
+      } catch (error) {
+        this.core?.messages?.emit('error:occurred', {
+          type: 'RuleActionError',
+          rule: topRule.name,
+          error: error.message,
+          stack: error.stack
+        }) || Logger.error(`Rule '${topRule.name}' action failed`, { rule: topRule.name, error: error.message });
+
+        this._recordEvaluationTime(Date.now() - startTime);
+        return null;
+      }
     } catch (error) {
-      Logger.error(`Rule '${topRule.name}' action failed`, { rule: topRule.name, error: error.message });
-      return null;
+      this._recordEvaluationTime(Date.now() - startTime);
+      throw error;
+    }
+  }
+
+  _recordEvaluationTime(duration) {
+    this.lastEvaluationTime = duration;
+    this.evaluationTimeHistory.push(duration);
+
+    // Keep history size manageable
+    if (this.evaluationTimeHistory.length > this.maxHistorySize) {
+      this.evaluationTimeHistory = this.evaluationTimeHistory.slice(-this.maxHistorySize);
     }
   }
 

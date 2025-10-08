@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Cache, Index, Storage, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager } from './Utils.js';
+import { Cache, Storage, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager } from './Utils.js';
 
 class Memory extends Component {
   constructor() {
