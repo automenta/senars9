@@ -8,27 +8,30 @@ fn test_run_single_cycle() {
     let context = CycleContext { current_time: 100 };
 
     // Setup premises for a syllogism, now WITH truth values.
-    let mut premise1 = parser::parse("(cat --> mammal). %1.0;0.9%", &mut memory, 1).unwrap();
+    let mut premise1 = parser::parse("(cat --> mammal). %1.0;0.9%", 1).unwrap();
     premise1.priority = 0.9; // High priority to ensure it's selected
-    memory.add_task(premise1);
+    memory.add_task(premise1, 1);
 
-    let mut premise2 = parser::parse("(mammal --> animal). %1.0;0.8%", &mut memory, 2).unwrap();
+    let mut premise2 = parser::parse("(mammal --> animal). %1.0;0.8%", 2).unwrap();
     premise2.priority = 0.9; // High priority to ensure it's selected
-    memory.add_task(premise2);
+    memory.add_task(premise2, 2);
 
     // Add a low-priority task that should not be selected.
-    let mut low_priority_task = parser::parse("distraction.", &mut memory, 3).unwrap();
+    let mut low_priority_task = parser::parse("distraction.", 3).unwrap();
     low_priority_task.priority = 0.1;
-    memory.add_task(low_priority_task);
+    memory.add_task(low_priority_task, 3);
 
     // Run the single, stateless cycle function.
     run_single_cycle(&mut memory, &reasoner, &context);
 
     // After the cycle, the conclusion (cat --> animal) should be in memory.
-    let cat_concept = memory.create_or_get_atom("cat", 0);
-    let animal_concept = memory.create_or_get_atom("animal", 0);
-    let conclusion_concept =
-        memory.create_or_get_compound_term(TermType::Inheritance, vec![cat_concept, animal_concept], 0);
+    let cat_concept = memory.create_or_get_atom_concept("cat", 0);
+    let animal_concept = memory.create_or_get_atom_concept("animal", 0);
+    let conclusion_concept = memory.create_or_get_compound_concept(
+        TermType::Inheritance,
+        vec![cat_concept, animal_concept],
+        0,
+    );
 
     let conclusion_from_mem = memory.get_task(&conclusion_concept.term.hash);
 
@@ -50,10 +53,10 @@ fn test_select_focus_set_logic() {
 
     // Create more tasks than the FOCUS_SET_SIZE, with varying priorities.
     for i in 0..(FOCUS_SET_SIZE + 5) {
-        let mut task = parser::parse(&format!("task{}.", i), &mut memory, i as u64).unwrap();
+        let mut task = parser::parse(&format!("task{}.", i), i as u64).unwrap();
         // Assign priority in ascending order.
         task.priority = (i as f64) / 10.0;
-        memory.add_task(task);
+        memory.add_task(task, i as u64);
     }
 
     let focus_set = select_focus_set(&memory);

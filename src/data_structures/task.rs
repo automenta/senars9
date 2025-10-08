@@ -1,4 +1,3 @@
-use super::concept::Concept;
 use super::punctuation::Punctuation;
 use super::term::Term;
 use super::truth_value::TruthValue;
@@ -10,8 +9,8 @@ use std::sync::Arc;
 /// Tasks are the primary units of work and information flow within the system.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Task {
-    /// The concept that this task is about.
-    pub concept: Arc<Concept>,
+    /// The term that this task is about.
+    pub term: Arc<Term>,
     /// The punctuation indicating the task type (e.g., Belief '.', Goal '!', Question '?').
     pub punctuation: Punctuation,
     /// The truth value associated with the task, representing its evidential support.
@@ -36,20 +35,20 @@ impl Task {
     /// Creates a new `Task` with default values.
     ///
     /// # Arguments
-    /// * `concept` - The `Concept` this task is about.
+    /// * `term` - The `Term` this task is about.
     /// * `punctuation` - The `Punctuation` defining the task type.
     /// * `truth` - An optional `TruthValue` for beliefs.
     /// * `created_at` - The timestamp when the task was created.
     /// * `occurrence_time` - The timestamp of the event or conclusion.
     pub fn new(
-        concept: Arc<Concept>,
+        term: Arc<Term>,
         punctuation: Punctuation,
         truth: Option<TruthValue>,
         created_at: u64,
         occurrence_time: u64,
     ) -> Self {
         Task {
-            concept,
+            term,
             punctuation,
             truth,
             priority: 0.5, // Default priority
@@ -62,9 +61,9 @@ impl Task {
         }
     }
 
-    /// A helper method to get a reference to the term of the concept.
+    /// A helper method to get a reference to the term.
     pub fn term(&self) -> &Arc<Term> {
-        &self.concept.term
+        &self.term
     }
 
     /// Checks if the task is a belief.

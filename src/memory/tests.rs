@@ -1,12 +1,12 @@
 use super::*;
 use crate::data_structures::{
-    concept::Concept, punctuation::Punctuation, task::Task, term_type::TermType,
+    punctuation::Punctuation, task::Task, term::Term, term_type::TermType,
 };
 use std::sync::Arc;
 
-// Helper to create a new task with a given concept, time, priority, and optional expiration.
-fn create_task(concept: Arc<Concept>, time: u64, priority: f64, expiration: Option<u64>) -> Task {
-    let mut task = Task::new(concept, Punctuation::Belief, None, time, time);
+// Helper to create a new task with a given term, time, priority, and optional expiration.
+fn create_task(term: Arc<Term>, time: u64, priority: f64, expiration: Option<u64>) -> Task {
+    let mut task = Task::new(term, Punctuation::Belief, None, time, time);
     task.priority = priority;
     task.expiration_time = expiration;
     task
@@ -15,30 +15,34 @@ fn create_task(concept: Arc<Concept>, time: u64, priority: f64, expiration: Opti
 #[test]
 fn test_add_task_populates_indexes() {
     let mut memory = Memory::new();
-    let s = memory.create_or_get_atom("S", 0);
-    let p = memory.create_or_get_atom("P", 0);
-    let concept = memory.create_or_get_compound_term(TermType::Inheritance, vec![s.clone(), p.clone()], 0);
-    let task = create_task(concept.clone(), 100, 0.5, None);
+    let s_concept = memory.create_or_get_atom_concept("S", 0);
+    let p_concept = memory.create_or_get_atom_concept("P", 0);
+    let concept = memory.create_or_get_compound_concept(
+        TermType::Inheritance,
+        vec![s_concept.clone(), p_concept.clone()],
+        0,
+    );
+    let task = create_task(concept.term.clone(), 100, 0.5, None);
     let task_hash = task.term().hash.clone();
 
-    memory.add_task(task);
+    memory.add_task(task, 100);
 
     // Check temporal index
     assert!(memory.temporal_index.get(&100).unwrap().contains(&task_hash));
     // Check inheritance index
-    assert!(memory.inheritance_index.get(&s.term.hash).unwrap().contains(&task_hash));
+    assert!(memory.inheritance_index.get(&s_concept.term.hash).unwrap().contains(&task_hash));
 }
 
 #[test]
 fn test_get_tasks_by_time_range() {
     let mut memory = Memory::new();
-    let concept1 = memory.create_or_get_atom("term1", 0);
-    let concept2 = memory.create_or_get_atom("term2", 0);
-    let concept3 = memory.create_or_get_atom("term3", 0);
+    let concept1 = memory.create_or_get_atom_concept("term1", 0);
+    let concept2 = memory.create_or_get_atom_concept("term2", 0);
+    let concept3 = memory.create_or_get_atom_concept("term3", 0);
 
-    memory.add_task(create_task(concept1, 100, 0.5, None));
-    memory.add_task(create_task(concept2, 200, 0.5, None));
-    memory.add_task(create_task(concept3, 300, 0.5, None));
+    memory.add_task(create_task(concept1.term.clone(), 100, 0.5, None), 100);
+    memory.add_task(create_task(concept2.term.clone(), 200, 0.5, None), 200);
+    memory.add_task(create_task(concept3.term.clone(), 300, 0.5, None), 300);
 
     let tasks = memory.get_tasks_by_time_range(150, 350);
     assert_eq!(tasks.len(), 2);
@@ -49,8 +53,8 @@ fn test_get_tasks_by_time_range() {
 #[test]
 fn test_create_and_get_atom_reuse() {
     let mut memory = Memory::new();
-    let concept1 = memory.create_or_get_atom("A", 0);
-    let concept2 = memory.create_or_get_atom("A", 1); // different time, should still be reused
+    let concept1 = memory.create_or_get_atom_concept("A", 0);
+    let concept2 = memory.create_or_get_atom_concept("A", 1); // different time, should still be reused
     assert_eq!(Arc::ptr_eq(&concept1, &concept2), true);
     assert_eq!(memory.concept_storage.len(), 1);
 }
@@ -58,10 +62,12 @@ fn test_create_and_get_atom_reuse() {
 #[test]
 fn test_create_and_get_compound_term_reuse() {
     let mut memory = Memory::new();
-    let a = memory.create_or_get_atom("A", 0);
-    let b = memory.create_or_get_atom("B", 0);
-    let concept1 = memory.create_or_get_compound_term(TermType::Inheritance, vec![a.clone(), b.clone()], 0);
-    let concept2 = memory.create_or_get_compound_term(TermType::Inheritance, vec![a.clone(), b.clone()], 1);
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+    let concept1 =
+        memory.create_or_get_compound_concept(TermType::Inheritance, vec![a.clone(), b.clone()], 0);
+    let concept2 =
+        memory.create_or_get_compound_concept(TermType::Inheritance, vec![a.clone(), b.clone()], 1);
     assert_eq!(Arc::ptr_eq(&concept1, &concept2), true);
     assert_eq!(memory.concept_storage.len(), 3); // A, B, and (A --> B)
 }
@@ -69,11 +75,13 @@ fn test_create_and_get_compound_term_reuse() {
 #[test]
 fn test_canonicalization_commutative_sorting() {
     let mut memory = Memory::new();
-    let a = memory.create_or_get_atom("A", 0);
-    let b = memory.create_or_get_atom("B", 0);
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
     // Create terms in different orders
-    let concept1 = memory.create_or_get_compound_term(TermType::Conjunction, vec![a.clone(), b.clone()], 0);
-    let concept2 = memory.create_or_get_compound_term(TermType::Conjunction, vec![b.clone(), a.clone()], 0);
+    let concept1 =
+        memory.create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), b.clone()], 0);
+    let concept2 =
+        memory.create_or_get_compound_concept(TermType::Conjunction, vec![b.clone(), a.clone()], 0);
     // Pointers should be the same due to canonicalization
     assert_eq!(Arc::ptr_eq(&concept1, &concept2), true);
     // The name should be in the canonical (sorted) order.
@@ -83,30 +91,33 @@ fn test_canonicalization_commutative_sorting() {
 #[test]
 fn test_canonicalization_flattening_and_deduplication() {
     let mut memory = Memory::new();
-    let a = memory.create_or_get_atom("A", 0);
-    let b = memory.create_or_get_atom("B", 0);
-    let c = memory.create_or_get_atom("C", 0);
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+    let c = memory.create_or_get_atom_concept("C", 0);
 
     // Create (&, B, A)
-    let inner_conj = memory.create_or_get_compound_term(TermType::Conjunction, vec![b.clone(), a.clone()], 0);
+    let inner_conj =
+        memory.create_or_get_compound_concept(TermType::Conjunction, vec![b.clone(), a.clone()], 0);
     // Create (&, C, (&, B, A), A)
-    let concept = memory.create_or_get_compound_term(TermType::Conjunction, vec![c.clone(), inner_conj, a.clone()], 0);
+    let concept = memory
+        .create_or_get_compound_concept(TermType::Conjunction, vec![c.clone(), inner_conj, a.clone()], 0);
 
     // Should be simplified to (&, A, B, C)
     assert_eq!(concept.term.name, "(&, A, B, C)");
     assert_eq!(concept.term.components.as_ref().unwrap().len(), 3);
 
     // Check that the canonical version is also reused
-    let concept2 = memory.create_or_get_compound_term(TermType::Conjunction, vec![a.clone(), b.clone(), c.clone()], 0);
+    let concept2 = memory
+        .create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), b.clone(), c.clone()], 0);
     assert_eq!(Arc::ptr_eq(&concept, &concept2), true);
 }
 
 #[test]
 fn test_reduction_double_negation() {
     let mut memory = Memory::new();
-    let a = memory.create_or_get_atom("A", 0);
-    let neg_a = memory.create_or_get_compound_term(TermType::Negation, vec![a.clone()], 0);
-    let double_neg_a = memory.create_or_get_compound_term(TermType::Negation, vec![neg_a], 0);
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let neg_a = memory.create_or_get_compound_concept(TermType::Negation, vec![a.clone()], 0);
+    let double_neg_a = memory.create_or_get_compound_concept(TermType::Negation, vec![neg_a], 0);
 
     // (--, (--, A)) should reduce to A, so the pointers should be equal.
     assert_eq!(Arc::ptr_eq(&double_neg_a, &a), true);
@@ -115,8 +126,8 @@ fn test_reduction_double_negation() {
 #[test]
 fn test_remove_task_from_short_term() {
     let mut memory = Memory::new();
-    let concept = memory.create_or_get_atom("A", 0);
-    memory.add_task(create_task(concept.clone(), 100, 0.5, None));
+    let concept = memory.create_or_get_atom_concept("A", 0);
+    memory.add_task(create_task(concept.term.clone(), 100, 0.5, None), 100);
     assert_eq!(memory.short_term_tasks.len(), 1);
     assert_eq!(memory.total_tasks, 1);
 
@@ -129,11 +140,12 @@ fn test_remove_task_from_short_term() {
 #[test]
 fn test_remove_task_cleans_up_all_indexes() {
     let mut memory = Memory::new();
-    let s = memory.create_or_get_atom("S", 0);
-    let p = memory.create_or_get_atom("P", 0);
-    let concept = memory.create_or_get_compound_term(TermType::Inheritance, vec![s.clone(), p.clone()], 0);
+    let s = memory.create_or_get_atom_concept("S", 0);
+    let p = memory.create_or_get_atom_concept("P", 0);
+    let concept =
+        memory.create_or_get_compound_concept(TermType::Inheritance, vec![s.clone(), p.clone()], 0);
     let task_hash = concept.term.hash.clone();
-    memory.add_task(create_task(concept.clone(), 100, 0.5, None));
+    memory.add_task(create_task(concept.term.clone(), 100, 0.5, None), 100);
 
     // Check indexes were populated
     assert!(memory.inheritance_index.get(&s.term.hash).is_some());
@@ -150,13 +162,13 @@ fn test_remove_task_cleans_up_all_indexes() {
 #[test]
 fn test_consolidation_forgets_expired_tasks() {
     let mut memory = Memory::new();
-    let concept1 = memory.create_or_get_atom("expired", 0);
-    let concept2 = memory.create_or_get_atom("not_expired", 0);
+    let concept1 = memory.create_or_get_atom_concept("expired", 0);
+    let concept2 = memory.create_or_get_atom_concept("not_expired", 0);
 
     // Expired task (expiration time is in the past)
-    memory.add_task(create_task(concept1.clone(), 100, 0.5, Some(150)));
+    memory.add_task(create_task(concept1.term.clone(), 100, 0.5, Some(150)), 100);
     // Non-expired task
-    memory.add_task(create_task(concept2.clone(), 100, 0.5, Some(250)));
+    memory.add_task(create_task(concept2.term.clone(), 100, 0.5, Some(250)), 100);
 
     assert_eq!(memory.total_tasks, 2);
     memory.consolidate(200); // Current time is 200
@@ -168,14 +180,14 @@ fn test_consolidation_forgets_expired_tasks() {
 #[test]
 fn test_consolidation_forgets_and_promotes() {
     let mut memory = Memory::new();
-    let concept_expired = memory.create_or_get_atom("expired", 0);
-    let concept_high = memory.create_or_get_atom("high_priority", 0);
-    let concept_low = memory.create_or_get_atom("low_priority", 0);
+    let concept_expired = memory.create_or_get_atom_concept("expired", 0);
+    let concept_high = memory.create_or_get_atom_concept("high_priority", 0);
+    let concept_low = memory.create_or_get_atom_concept("low_priority", 0);
 
     // Add tasks
-    memory.add_task(create_task(concept_expired, 100, 0.9, Some(150))); // Expired
-    memory.add_task(create_task(concept_high.clone(), 100, 0.8, Some(250))); // High-priority, not expired
-    memory.add_task(create_task(concept_low.clone(), 100, 0.4, Some(250))); // Low-priority, not expired
+    memory.add_task(create_task(concept_expired.term.clone(), 100, 0.9, Some(150)), 100); // Expired
+    memory.add_task(create_task(concept_high.term.clone(), 100, 0.8, Some(250)), 100); // High-priority, not expired
+    memory.add_task(create_task(concept_low.term.clone(), 100, 0.4, Some(250)), 100); // Low-priority, not expired
 
     assert_eq!(memory.short_term_tasks.len(), 3);
     assert_eq!(memory.long_term_tasks.len(), 0);

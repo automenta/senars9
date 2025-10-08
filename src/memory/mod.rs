@@ -57,15 +57,21 @@ impl Memory {
         }
     }
 
-    /// Adds a new task to short-term memory and updates all relevant indexes.
-    pub fn add_task(&mut self, task: Task) {
+    /// Adds a new task to short-term memory, creating its concept if necessary,
+    /// and updates all relevant indexes.
+    pub fn add_task(&mut self, task: Task, current_time: u64) {
+        // First, ensure concepts for the task's term and all its sub-terms exist.
+        self.ensure_concept_exists_recursive(&task.term, current_time);
+
         let task_arc = Arc::new(task);
         let term_hash = task_arc.term().hash.clone();
 
+        // Add to task storage
         if self.short_term_tasks.insert(term_hash.clone(), task_arc.clone()).is_none() {
             self.total_tasks += 1;
         }
 
+        // Update temporal index
         if let Some(time) = task_arc.occurrence_time {
             self.temporal_index
                 .entry(time)
@@ -73,6 +79,7 @@ impl Memory {
                 .insert(term_hash.clone());
         }
 
+        // Update content-based indexes
         match task_arc.term().term_type {
             TermType::Implication => {
                 if let Some(premise) = &task_arc.term().subject {
@@ -174,83 +181,40 @@ impl Memory {
     }
 
     /// Creates or retrieves an atomic concept from memory, ensuring uniqueness.
-    pub fn create_or_get_atom(&mut self, name: &str, created_at: u64) -> Arc<Concept> {
+    pub fn create_or_get_atom_concept(&mut self, name: &str, created_at: u64) -> Arc<Concept> {
         let temp_hash = Term::compute_hash_for_atom(name);
 
         if let Some(concept) = self.concept_storage.get(&temp_hash) {
             return concept.clone();
         }
 
-        let new_term = Arc::new(Term::new_atom(name));
+        let new_term = Term::new_atom(name);
         let new_concept = Arc::new(Concept::new(new_term, created_at));
         self.concept_storage.insert(new_concept.term.hash.clone(), new_concept.clone());
         new_concept
     }
 
     /// Creates or retrieves a compound concept, applying simplification and canonicalization rules.
-    pub fn create_or_get_compound_term(
+    /// This method uses the term-level simplification logic and then handles concept storage.
+    pub fn create_or_get_compound_concept(
         &mut self,
         term_type: TermType,
         components: Vec<Arc<Concept>>,
         created_at: u64,
     ) -> Arc<Concept> {
-        // Extract terms from concepts for simplification logic
-        let mut term_components: Vec<Arc<Term>> = components.iter().map(|c| c.term.clone()).collect();
+        // Extract terms from concepts to pass to the term factory method.
+        let term_components: Vec<Arc<Term>> = components.iter().map(|c| c.term.clone()).collect();
 
-        // 1. Associativity (Flattening) for n-ary operators
-        if term_type == TermType::Conjunction || term_type == TermType::Disjunction {
-            term_components = term_components.into_iter().flat_map(|comp_term| {
-                if comp_term.term_type == term_type {
-                    comp_term.components.as_ref().unwrap().clone()
-                } else {
-                    vec![comp_term]
-                }
-            }).collect();
-        }
+        // Use the centralized term creation logic.
+        let simplified_term = Term::create_compound(term_type, term_components);
 
-        // 2. Commutativity (Sorting) and Idempotency (Deduplication)
-        let is_commutative = matches!(
-            term_type,
-            TermType::Conjunction | TermType::Disjunction | TermType::Similarity | TermType::Equivalence
-        );
-
-        if is_commutative {
-            term_components.sort_by(|a, b| a.name.cmp(&b.name));
-            term_components.dedup_by(|a, b| a.hash == b.hash);
-        }
-
-        // 3. 1-ary Reduction for Conjunction and Disjunction
-        if (term_type == TermType::Conjunction || term_type == TermType::Disjunction) && term_components.len() == 1 {
-            let reduced_term_hash = &term_components[0].hash;
-            return self.concept_storage.get(reduced_term_hash).unwrap().clone();
-        }
-
-        // 4. Double Negation Reduction: (--, (--, A)) => A
-        if term_type == TermType::Negation {
-            if let Some(component_term) = term_components.first() {
-                if component_term.term_type == TermType::Negation {
-                    let inner_term_hash = &component_term.components.as_ref().unwrap()[0].hash;
-                    return self.concept_storage.get(inner_term_hash).unwrap().clone();
-                }
-            }
-        }
-
-        let name = Term::generate_name(&term_type, &term_components);
-        let final_hash = Term::compute_hash(&name, &term_type, &Some(term_components.clone()));
-
-        if let Some(concept) = self.concept_storage.get(&final_hash) {
+        // Now, find or create the concept for this canonical term.
+        if let Some(concept) = self.concept_storage.get(&simplified_term.hash) {
             return concept.clone();
         }
 
-        let new_term = Arc::new(Term::create_compound_raw(
-            name,
-            term_type,
-            term_components,
-            final_hash,
-        ));
-
-        let new_concept = Arc::new(Concept::new(new_term, created_at));
-        self.concept_storage.insert(new_concept.term.hash.clone(), new_concept.clone());
+        let new_concept = Arc::new(Concept::new(simplified_term.clone(), created_at));
+        self.concept_storage.insert(simplified_term.hash.clone(), new_concept.clone());
         new_concept
     }
 
@@ -336,6 +300,23 @@ impl Memory {
 
         self.consolidation_count += 1;
         self.last_consolidation = current_time;
+    }
+
+    /// Recursively ensures that a concept for the given term and all its sub-terms exist in memory.
+    fn ensure_concept_exists_recursive(&mut self, term: &Arc<Term>, current_time: u64) {
+        // If it's a compound term, first ensure its components exist.
+        // This is the recursive step (post-order traversal).
+        if let Some(components) = &term.components {
+            for component in components {
+                self.ensure_concept_exists_recursive(component, current_time);
+            }
+        }
+
+        // Now, handle the current term. Use `entry` to insert only if it doesn't exist.
+        // This is the base case for the recursion and the final step after recursing.
+        self.concept_storage
+            .entry(term.hash.clone())
+            .or_insert_with(|| Arc::new(Concept::new(term.clone(), current_time)));
     }
 }
 

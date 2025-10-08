@@ -2,6 +2,10 @@
 //!
 //! This rule derives `B` from `(A ==> B)` and `A`.
 
+//! Implements the modus ponens inference rule.
+//!
+//! This rule derives `B` from `(A ==> B)` and `A`.
+
 use crate::cycle::context::CycleContext;
 use crate::data_structures::{
     punctuation::Punctuation, task::Task, term_type::TermType, truth_value::TruthValue,
@@ -36,18 +40,13 @@ impl InferenceRule for ModusPonens {
                 if antecedent_task.is_belief() {
                     if let Some(antecedent_truth) = antecedent_task.truth {
                         // `A.` exists with a truth value. Derive `B.`.
-
-                        // The conclusion is the consequent term `B`. We need its concept.
-                        let consequent_concept = match memory.concept_storage.get(&consequent_term.hash) {
-                            Some(c) => c.clone(),
-                            None => return derived, // Should not happen in a consistent memory
-                        };
+                        // The conclusion is simply the consequent term `B`.
 
                         // Calculate the truth value for the conclusion using the detachment function.
                         let new_truth = TruthValue::detachment(&antecedent_truth, &implication_truth);
 
                         let new_task = Task::new(
-                            consequent_concept,
+                            consequent_term.clone(),
                             Punctuation::Belief,
                             Some(new_truth),
                             context.current_time,

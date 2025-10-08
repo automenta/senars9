@@ -43,8 +43,8 @@ impl System {
     /// * `narsese_input` - The Narsese string to parse (e.g., "(cat --> mammal).").
     pub fn input(&mut self, narsese_input: &str) {
         let current_time = self.clock.get_time();
-        match parse(narsese_input, &mut self.memory, current_time) {
-            Ok(task) => self.memory.add_task(task),
+        match parse(narsese_input, current_time) {
+            Ok(task) => self.memory.add_task(task, current_time),
             Err(e) => {
                 // In a real application, this should use a proper logging framework.
                 eprintln!("Failed to parse input: {}", e);

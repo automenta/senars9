@@ -36,7 +36,7 @@ pub fn run_single_cycle(memory: &mut Memory, reasoner: &Reasoner, context: &Cycl
 
     // 3. Add derived tasks back to memory
     for task in derived_tasks {
-        memory.add_task(task);
+        memory.add_task(task, context.current_time);
     }
 
     // 4. Consolidate memory

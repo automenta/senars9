@@ -2,9 +2,13 @@
 //!
 //! This rule derives `(S --> P)` from `(S --> M)` and `(M --> P)`.
 
+//! Implements the deductive syllogism rule.
+//!
+//! This rule derives `(S --> P)` from `(S --> M)` and `(M --> P)`.
+
 use crate::cycle::context::CycleContext;
 use crate::data_structures::{
-    concept::Concept, punctuation::Punctuation, task::Task, term_type::TermType,
+    punctuation::Punctuation, task::Task, term::Term, term_type::TermType,
     truth_value::TruthValue,
 };
 use crate::memory::Memory;
@@ -34,50 +38,30 @@ impl InferenceRule for DeductiveSyllogism {
         ) {
             // We have (S --> M). We need to find premises (M --> P).
             // The subject of the second premise must be the predicate of the first.
-
-            let premises2_data: Vec<(Arc<Concept>, TruthValue)> =
-                if let Some(premises2) = memory.get_inheritance_by_subject(predicate1_term) {
-                    premises2
-                        .iter()
-                        .filter_map(|p| {
-                            if let (Some(predicate2_term), Some(truth)) = (&p.term().predicate, p.truth) {
-                                let predicate2_concept = memory.concept_storage.get(&predicate2_term.hash)?;
-                                Some((predicate2_concept.clone(), truth))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect()
-                } else {
-                    Vec::new()
-                };
-
-            if premises2_data.is_empty() {
-                return derived;
-            }
-
-            let subject1_concept = match memory.concept_storage.get(&subject1_term.hash) {
-                Some(c) => c.clone(),
+            let premises2 = match memory.get_inheritance_by_subject(predicate1_term) {
+                Some(tasks) => tasks,
                 None => return derived,
             };
 
-            for (predicate2_concept, truth2) in premises2_data {
-                let new_concept = memory.create_or_get_compound_term(
-                    TermType::Inheritance,
-                    vec![subject1_concept.clone(), predicate2_concept],
-                    context.current_time,
-                );
+            for premise2 in premises2 {
+                if let (Some(predicate2_term), Some(truth2)) = (&premise2.term().predicate, premise2.truth) {
+                    // Found (M --> P). Now derive (S --> P).
+                    let new_term = Term::create_compound(
+                        TermType::Inheritance,
+                        vec![subject1_term.clone(), predicate2_term.clone()],
+                    );
 
-                let new_truth = TruthValue::deduction(&truth1, &truth2);
+                    let new_truth = TruthValue::deduction(&truth1, &truth2);
 
-                let new_task = Task::new(
-                    new_concept,
-                    Punctuation::Belief,
-                    Some(new_truth),
-                    context.current_time,
-                    context.current_time,
-                );
-                derived.push(new_task);
+                    let new_task = Task::new(
+                        new_term,
+                        Punctuation::Belief,
+                        Some(new_truth),
+                        context.current_time,
+                        context.current_time,
+                    );
+                    derived.push(new_task);
+                }
             }
         }
         derived

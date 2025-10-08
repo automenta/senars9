@@ -28,9 +28,9 @@ fn test_system_end_to_end_reasoning() {
     // The system should have derived new knowledge. The most prominent is the syllogism.
     // Let's check for the derived task `(cat --> animal)`.
     // We create the concepts separately to avoid borrow checker errors.
-    let cat_concept = system.memory.create_or_get_atom("cat", 0);
-    let animal_concept = system.memory.create_or_get_atom("animal", 0);
-    let derived_concept = system.memory.create_or_get_compound_term(
+    let cat_concept = system.memory.create_or_get_atom_concept("cat", 0);
+    let animal_concept = system.memory.create_or_get_atom_concept("animal", 0);
+    let derived_concept = system.memory.create_or_get_compound_concept(
         app::data_structures::term_type::TermType::Inheritance,
         vec![
             cat_concept,

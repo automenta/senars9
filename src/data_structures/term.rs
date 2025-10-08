@@ -74,12 +74,63 @@ impl Term {
         }
     }
 
-    /// Creates a new atomic term. This is a "raw" constructor.
-    /// All term creation should go through the `Memory` component to ensure uniqueness.
-    pub(crate) fn new_atom(name: &str) -> Self {
+    /// Creates a new simplified and canonical compound term.
+    /// This is the primary factory method for creating all compound terms. It applies
+    /// simplification and canonicalization rules automatically.
+    pub fn create_compound(term_type: TermType, mut components: Vec<Arc<Term>>) -> Arc<Term> {
+        // 1. Associativity (Flattening) for n-ary operators
+        if term_type == TermType::Conjunction || term_type == TermType::Disjunction {
+            components = components.into_iter().flat_map(|comp_term| {
+                if comp_term.term_type == term_type {
+                    comp_term.components.as_ref().unwrap().clone()
+                } else {
+                    vec![comp_term]
+                }
+            }).collect();
+        }
+
+        // 2. Commutativity (Sorting) and Idempotency (Deduplication)
+        let is_commutative = matches!(
+            term_type,
+            TermType::Conjunction | TermType::Disjunction | TermType::Similarity | TermType::Equivalence
+        );
+
+        if is_commutative {
+            components.sort_by(|a, b| a.name.cmp(&b.name));
+            components.dedup_by(|a, b| a.hash == b.hash);
+        }
+
+        // 3. 1-ary Reduction for Conjunction and Disjunction
+        if (term_type == TermType::Conjunction || term_type == TermType::Disjunction) && components.len() == 1 {
+            return components.remove(0);
+        }
+
+        // 4. Double Negation Reduction: (--, (--, A)) => A
+        if term_type == TermType::Negation {
+            if let Some(component_term) = components.first() {
+                if component_term.term_type == TermType::Negation {
+                    // component_term is (--, A), its component is A
+                    return component_term.components.as_ref().unwrap()[0].clone();
+                }
+            }
+        }
+
+        let name = Term::generate_name(&term_type, &components);
+        let final_hash = Term::compute_hash(&name, &term_type, &Some(components.clone()));
+
+        Arc::new(Term::create_compound_raw(
+            name,
+            term_type,
+            components,
+            final_hash,
+        ))
+    }
+
+    /// Creates a new atomic term.
+    pub fn new_atom(name: &str) -> Arc<Term> {
         let term_type = TermType::Atom;
         let hash = Term::compute_hash(name, &term_type, &None);
-        Term {
+        Arc::new(Term {
             name: name.to_string(),
             term_type,
             complexity: 1,
@@ -87,7 +138,7 @@ impl Term {
             predicate: None,
             components: None,
             hash,
-        }
+        })
     }
 
     /// Creates a new compound term. This is a "raw" constructor.
