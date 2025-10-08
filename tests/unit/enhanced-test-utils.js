@@ -165,3 +165,196 @@ export const expectToBeHealthy = (component) => {
   expect(health.status).toBe('healthy');
   expect(health.issues).toEqual([]);
 };
+
+// Core lifecycle management utilities
+export const setupCore = async (config = {}) => {
+  const core = await createCore(config);
+  return { core };
+};
+
+export const teardownCore = async (core) => {
+  if (core) {
+    await core.stop();
+    await core.destroy();
+  }
+};
+
+export const withCoreSetup = (testFn) => {
+  return async () => {
+    const { core } = await setupCore();
+    try {
+      await testFn(core);
+    } finally {
+      await teardownCore(core);
+    }
+  };
+};
+
+// Common test data factories
+export const createTestRules = {
+  simple: (overrides = {}) => ({
+    name: 'test-rule',
+    condition: (ctx) => ctx?.term?.name === 'A',
+    action: (ctx) => ({ result: 'B' }),
+    priority: 5,
+    ...overrides
+  }),
+
+  deduction: (condition, action, priority = 10) => ({
+    name: `deduction-${Date.now()}`,
+    condition,
+    action,
+    priority,
+    type: 'inference',
+    complexity: 'simple'
+  }),
+
+  cognitive: (type, complexity = 'simple') => ({
+    name: `${type}-${Date.now()}`,
+    type,
+    complexity,
+    condition: (ctx) => true,
+    action: (ctx) => ({ result: `${type}-processed` }),
+    priority: 5
+  })
+};
+
+// Counter for unique key generation
+let itemCounter = 0;
+
+export const createTestMemoryItems = {
+  task: (content, priority = 5) => {
+    itemCounter++;
+    return {
+      key: `task-${Date.now()}-${itemCounter}`,
+      value: { content, type: 'task' },
+      options: { type: 'task', tags: ['test'], priority }
+    };
+  },
+
+  observation: (sensor, value, confidence = 0.9) => {
+    itemCounter++;
+    return {
+      key: `obs-${Date.now()}-${itemCounter}`,
+      value: { sensor, value, type: 'observation' },
+      options: { type: 'observation', tags: ['test'], priority: Math.floor(confidence * 10) }
+    };
+  },
+
+  pattern: (patternData, confidence = 0.8) => {
+    itemCounter++;
+    return {
+      key: `pattern-${Date.now()}-${itemCounter}`,
+      value: { pattern: patternData, type: 'pattern' },
+      options: { type: 'pattern', tags: ['analysis'], priority: Math.floor(confidence * 10) }
+    };
+  }
+};
+
+// Common assertion patterns
+export const expectRuleFired = (result, expectedResult) => {
+  expect(result).toBeDefined();
+  expect(result.result).toBe(expectedResult);
+};
+
+export const expectMemoryItem = (memory, key, expectedValue) => {
+  const item = memory.get(key);
+  expect(item).toBeDefined();
+  expect(item).toEqual(expectedValue);
+};
+
+export const expectPerformanceWithin = (actualTime, threshold) => {
+  expect(actualTime).toBeLessThan(threshold);
+};
+
+// Bulk test operations
+export const testBulkOperations = async (operation, itemCount, operationName) => {
+  const startTime = Date.now();
+
+  await measurePerformance(async () => {
+    for (let i = 0; i < itemCount; i++) {
+      await operation(i);
+    }
+  });
+
+  const totalTime = Date.now() - startTime;
+  expectPerformanceWithin(totalTime, performanceThresholds.bulkOperation);
+
+  return totalTime;
+};
+
+// Common test scenarios
+export const cognitiveCycleScenarios = {
+  perception: (core) => {
+    const rule = createTestRules.cognitive('perception');
+    rule.condition = (ctx) => ctx.inputType === 'observation' && ctx.confidence > 0.7;
+    rule.action = (ctx) => {
+      core.memory.set(`obs-${Date.now()}`, ctx.observation, {
+        type: 'observation',
+        tags: ['perceived'],
+        priority: Math.floor(ctx.confidence * 10)
+      });
+      return { result: 'perception-processed', stored: true };
+    };
+    core.rules.add(rule);
+
+    return {
+      input: {
+        inputType: 'observation',
+        confidence: 0.9,
+        observation: { sensor: 'test', value: 100 }
+      },
+      expectedResult: 'perception-processed'
+    };
+  },
+
+  patternRecognition: (core) => {
+    const rule = createTestRules.cognitive('reasoning', 'complex');
+    rule.condition = (ctx) => ctx.dataType === 'pattern' && ctx.size > 50;
+    rule.action = (ctx) => {
+      const insights = {
+        pattern: ctx.pattern,
+        confidence: ctx.confidence,
+        implications: ['trend-detected'],
+        generatedAt: new Date().toISOString()
+      };
+
+      core.memory.set(`insight-${Date.now()}`, insights, {
+        type: 'insight',
+        tags: ['pattern', 'analysis'],
+        priority: 8
+      });
+
+      return { result: 'reasoning-processed', insights };
+    };
+    core.rules.add(rule);
+
+    return {
+      input: {
+        dataType: 'pattern',
+        size: 120,
+        pattern: { type: 'trend', direction: 'up' }
+      },
+      expectedResult: 'reasoning-processed'
+    };
+  },
+
+  decision: (core) => {
+    const rule = createTestRules.cognitive('decision');
+    rule.condition = (ctx) => ctx.requiresAction && ctx.urgency > 7;
+    rule.action = (ctx) => ({
+      result: 'decision-made',
+      decision: { action: ctx.recommendedAction }
+    });
+    core.rules.add(rule);
+
+    return {
+      input: {
+        requiresAction: true,
+        urgency: 9,
+        recommendedAction: 'test-action'
+      },
+      expectedResult: 'decision-made'
+    };
+  }
+};

@@ -5,7 +5,10 @@ import {
   createTestData,
   measurePerformance,
   expectPerformance,
-  performanceThresholds
+  performanceThresholds,
+  createTestMemoryItems,
+  expectMemoryItem,
+  testBulkOperations
 } from './enhanced-test-utils.js';
 
 const createMemory = (config = {}) => {
@@ -87,17 +90,20 @@ describe('Memory', () => {
       const memory = await createMemory();
       const itemCount = 100;
 
-      // Load data
-      await measurePerformance(async () => {
-        for (let i = 0; i < itemCount; i++) {
-          memory.set(`key${i}`, `value${i}`);
-        }
-      });
+      // Load data using consolidated utility
+      await testBulkOperations(
+        async (i) => {
+          const item = createTestMemoryItems.task(`value${i}`, 5);
+          memory.set(item.key, item.value, item.options);
+        },
+        itemCount,
+        'memory-load'
+      );
 
       // Test retrieval performance
       const retrievalTime = await measurePerformance(async () => {
         for (let i = 0; i < itemCount; i++) {
-          memory.get(`key${i}`);
+          memory.get(`task-${Date.now() - itemCount + i}`);
         }
       });
 

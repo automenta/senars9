@@ -1,31 +1,20 @@
-/**
- * @file: tests/integration/Foundation.test.js
- * @description: Integration tests for the foundational components (Core, Messages, Rules, Memory).
- */
-
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import createCore from '../../core/createCore.js';
+import { describe, test, expect } from '@jest/globals';
+import {
+  withCoreSetup,
+  createTestRules,
+  createTestMemoryItems,
+  expectRuleFired,
+  expectMemoryItem,
+  testBulkOperations
+} from '../unit/enhanced-test-utils.js';
 
 describe('Core Foundation Integration Test', () => {
-  let core;
 
-  beforeEach(async () => {
-    core = await createCore();
-  });
-
-  afterEach(async () => {
-    if (core) {
-      await core.stop();
-      await core.destroy();
-    }
-  });
-
-  test('should process an input task and derive a new task via the rules engine', async () => {
-    // 1. Define a simple rule using the new API
-    const deductionRule = {
-      name: 'deduction-A-to-B',
-      condition: (context) => context.term.name === 'A',
-      action: (context) => {
+  test('should process an input task and derive a new task via the rules engine', withCoreSetup(async (core) => {
+    // Setup rule using consolidated utility
+    const deductionRule = createTestRules.deduction(
+      (context) => context.term.name === 'A',
+      (context) => {
         const derivedTask = {
           term: { type: 'belief', name: 'B' },
           punctuation: '.',
@@ -34,25 +23,18 @@ describe('Core Foundation Integration Test', () => {
         };
         core.messages.emit('task.derived', derivedTask);
       },
-      priority: 10,
-    };
-
-    // 2. Add the rule to the engine
+      10
+    );
     core.rules.add(deductionRule);
 
-    // 3. Set up a listener for the output (derived task)
+    // Setup listener for derived task
     let derivedTask = null;
-    const derivedTaskHandler = (task) => {
-      derivedTask = task;
-    };
-    core.messages.on('task.derived', derivedTaskHandler);
+    core.messages.on('task.derived', (task) => { derivedTask = task; });
 
-    // 4. For this test, we'll listen for an input task and trigger the rules engine.
-    core.messages.on('task.input', (task) => {
-      core.rules.evaluate(task);
-    });
+    // Setup input handler
+    core.messages.on('task.input', (task) => { core.rules.evaluate(task); });
 
-    // 5. Input a task that should trigger the rule
+    // Input test task
     const inputTask = {
       id: 'task-1',
       term: { type: 'belief', name: 'A' },
@@ -61,16 +43,16 @@ describe('Core Foundation Integration Test', () => {
     };
     core.messages.emit('task.input', inputTask);
 
-    // 6. Assert that the rule was triggered and a new task was derived
+    // Assertions
     expect(derivedTask).not.toBeNull();
     expect(derivedTask.term.name).toBe('B');
     expect(derivedTask.derivedFrom).toEqual(['task-1']);
-  });
+  }));
 
-  test('should demonstrate enhanced rule pre-filtering and indexing', async () => {
-    // Create rules with different types, complexities, and pre-filter tags
+  test('should demonstrate enhanced rule pre-filtering and indexing', withCoreSetup(async (core) => {
+    // Create rules using consolidated utilities
     const rules = [
-      {
+      createTestRules.simple({
         name: 'simple-deduction',
         type: 'inference',
         complexity: 'simple',
@@ -78,8 +60,8 @@ describe('Core Foundation Integration Test', () => {
         condition: (ctx) => ctx.term?.name === 'A',
         action: (ctx) => ({ result: 'deduced-B', confidence: ctx.truth?.confidence || 0 }),
         priority: 5
-      },
-      {
+      }),
+      createTestRules.simple({
         name: 'complex-induction',
         type: 'inference',
         complexity: 'complex',
@@ -87,8 +69,8 @@ describe('Core Foundation Integration Test', () => {
         condition: (ctx) => ctx.term?.type === 'pattern',
         action: (ctx) => ({ result: 'induced-pattern', complexity: 'high' }),
         priority: 8
-      },
-      {
+      }),
+      createTestRules.simple({
         name: 'low-priority-general',
         type: 'general',
         complexity: 'simple',
@@ -96,7 +78,7 @@ describe('Core Foundation Integration Test', () => {
         condition: (ctx) => true,
         action: (ctx) => ({ result: 'general-response' }),
         priority: 1
-      }
+      })
     ];
 
     // Add all rules
@@ -120,9 +102,9 @@ describe('Core Foundation Integration Test', () => {
     if (result1 && result1.result === 'deduced-B') {
       expect(result1.confidence).toBe(0.9);
     }
-  });
+  }));
 
-  test('should demonstrate enhanced memory focus sets and attention', async () => {
+  test('should demonstrate enhanced memory focus sets and attention', withCoreSetup(async (core) => {
     // Create focus sets for different attention areas
     core.memory.createFocusSet('working-memory', 5);
     core.memory.createFocusSet('long-term-storage', 10);
@@ -131,27 +113,19 @@ describe('Core Foundation Integration Test', () => {
     // Set current focus
     core.memory.setFocus('working-memory');
 
-    // Add items with different priorities and metadata
-    core.memory.set('task-1', { content: 'urgent task', priority: 10 }, {
-      type: 'task',
-      tags: ['urgent', 'immediate'],
-      priority: 10
-    });
-    core.memory.set('task-2', { content: 'normal task', priority: 5 }, {
-      type: 'task',
-      tags: ['normal'],
-      priority: 5
-    });
-    core.memory.set('memory-1', { content: 'long term memory', priority: 3 }, {
-      type: 'memory',
-      tags: ['reference'],
-      priority: 3
-    });
+    // Add test memory items using consolidated utilities
+    const taskItem1 = createTestMemoryItems.task('urgent task', 10);
+    const taskItem2 = createTestMemoryItems.task('normal task', 5);
+    const memoryItem1 = createTestMemoryItems.task('long term memory', 3);
+
+    core.memory.set(taskItem1.key, taskItem1.value, taskItem1.options);
+    core.memory.set(taskItem2.key, taskItem2.value, taskItem2.options);
+    core.memory.set(memoryItem1.key, memoryItem1.value, { ...memoryItem1.options, type: 'memory', tags: ['reference'] });
 
     // Update focus sets for items
-    core.memory._updateFocusSets('task-1', { focusSet: 'working-memory' });
-    core.memory._updateFocusSets('task-2', { focusSet: 'working-memory' });
-    core.memory._updateFocusSets('memory-1', { focusSet: 'long-term-storage' });
+    core.memory._updateFocusSets(taskItem1.key, { focusSet: 'working-memory' });
+    core.memory._updateFocusSets(taskItem2.key, { focusSet: 'working-memory' });
+    core.memory._updateFocusSets(memoryItem1.key, { focusSet: 'long-term-storage' });
 
     // Test focus set retrieval with attention scoring
     const focusItems = core.memory.getFocusItems(3);
@@ -174,27 +148,28 @@ describe('Core Foundation Integration Test', () => {
     expect(highPriorityItems.length).toBeGreaterThan(0);
 
     // Also test basic memory retrieval
-    const task1 = core.memory.get('task-1');
-    expect(task1.content).toBe('urgent task');
-  });
+    expectMemoryItem(core.memory, taskItem1.key, taskItem1.value);
+  }));
 
-  test('should demonstrate component interaction and performance', async () => {
+  test('should demonstrate component interaction and performance', withCoreSetup(async (core) => {
     const ruleCount = 100;
 
-    // Test bulk rule addition performance
-    const addStartTime = Date.now();
-    for (let i = 0; i < ruleCount; i++) {
-      core.rules.add({
-        name: `rule-${i}`,
-        type: i % 2 === 0 ? 'inference' : 'general',
-        complexity: i % 3 === 0 ? 'complex' : 'simple',
-        preFilterTags: [`tag-${i % 5}`],
-        condition: (ctx) => ctx?.id === i,
-        action: (ctx) => ({ result: `processed-${i}` }),
-        priority: Math.floor(i / 10)
-      });
-    }
-    const ruleAddTime = Date.now() - addStartTime;
+    // Test bulk rule addition performance using consolidated utility
+    const ruleAddTime = await testBulkOperations(
+      async (i) => {
+        core.rules.add(createTestRules.simple({
+          name: `rule-${i}`,
+          type: i % 2 === 0 ? 'inference' : 'general',
+          complexity: i % 3 === 0 ? 'complex' : 'simple',
+          preFilterTags: [`tag-${i % 5}`],
+          condition: (ctx) => ctx?.id === i,
+          action: (ctx) => ({ result: `processed-${i}` }),
+          priority: Math.floor(i / 10)
+        }));
+      },
+      ruleCount,
+      'rule-addition'
+    );
 
     // Verify rules were added and system remains functional
     const inferenceRules = core.rules.getRulesByType('inference');
@@ -222,13 +197,15 @@ describe('Core Foundation Integration Test', () => {
     expect(systemHealth.ruleCount).toBeGreaterThan(0);
 
     // Add some memory items to ensure storage size is measurable
-    core.memory.set('test-item-1', { content: 'test' });
-    core.memory.set('test-item-2', { content: 'test2' });
+    const testItem1 = createTestMemoryItems.task('test');
+    const testItem2 = createTestMemoryItems.task('test2');
+    core.memory.set(testItem1.key, testItem1.value, testItem1.options);
+    core.memory.set(testItem2.key, testItem2.value, testItem2.options);
 
     const updatedMemoryStats = core.memory.getStats();
     expect(updatedMemoryStats.storageSize).toBeGreaterThan(0);
 
     // Log performance metrics for monitoring (no hard assertions)
     console.log('Performance metrics:', systemHealth);
-  });
+  }));
 });
