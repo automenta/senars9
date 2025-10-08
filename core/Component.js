@@ -12,7 +12,9 @@ class Component {
 
   async initialize(config = {}) {
     this.config = config;
-    await this._doInitialize(config);
+    await this._safeExecute(async () => {
+      await this._doInitialize(config);
+    }, 'initialize');
     this._setState(STATES.INITIALIZED, { initialized: true });
   }
 
@@ -80,19 +82,11 @@ class Component {
   }
 
   async _safeExecute(operation, operationName) {
-    const errorBoundary = ErrorHandler.createErrorBoundary(this.constructor.name, this.core?.messages);
-    const wrappedOperation = errorBoundary.wrap(operation);
-
-    try {
-      return await wrappedOperation();
-    } catch (error) {
-      Logger.error(`${this.constructor.name}:${operationName} failed`, {
-        operation: operationName,
-        error: error.message,
-        component: this.constructor.name
-      });
-      throw error;
-    }
+    return ErrorHandler.withErrorHandling(
+      operation,
+      { component: this.constructor.name, operation: operationName },
+      this.core?.messages
+    );
   }
 
   registerCommand(command, handler) {

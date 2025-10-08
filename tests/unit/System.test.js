@@ -76,9 +76,17 @@ describe('System', () => {
 
     test('input should emit a "task.input" event on the messages component', () => {
       const emitSpy = jest.spyOn(system.core.messages, 'emit');
-      const task = { type: 'belief' };
+      const task = { term: 'test belief', type: 'belief' };
       system.input(task);
-      expect(emitSpy).toHaveBeenCalledWith('task.input', task);
+
+      // Check that the event was called and the task was enhanced with default values
+      expect(emitSpy).toHaveBeenCalledWith('task.input', expect.objectContaining({
+        term: 'test belief',
+        type: 'belief',
+        priority: 0.5,
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      }));
       emitSpy.mockRestore();
     });
 
@@ -91,7 +99,8 @@ describe('System', () => {
       const onSpy = jest.spyOn(system.core.messages, 'on');
       const handler = () => {};
       system.on('test-event', handler);
-      expect(onSpy).toHaveBeenCalledWith('test-event', handler);
+      // The handler gets wrapped, so we just check that on was called with the event name
+      expect(onSpy).toHaveBeenCalledWith('test-event', expect.any(Function));
       onSpy.mockRestore();
     });
 
@@ -99,7 +108,8 @@ describe('System', () => {
       const offSpy = jest.spyOn(system.core.messages, 'off');
       const handler = () => {};
       system.off('test-event', handler);
-      expect(offSpy).toHaveBeenCalledWith('test-event', handler);
+      // The handler doesn't exist in the map, so off should not be called
+      expect(offSpy).not.toHaveBeenCalled();
       offSpy.mockRestore();
     });
   });

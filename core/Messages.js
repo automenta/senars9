@@ -1,6 +1,7 @@
 import Component from './Component.js';
 import { Storage } from './collections.js';
 import { Retry } from './validation.js';
+import { IdGenerator } from './utilities.js';
 
 class Messages extends Component {
   constructor() {
@@ -201,7 +202,7 @@ class Messages extends Component {
 
   // Generate unique message ID
   _generateId() {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return IdGenerator.generate();
   }
 
   registerErrorHandler(errorType, handler) {

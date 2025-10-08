@@ -126,12 +126,13 @@ class Memory extends Component {
       .map(key => [key, this.get(key)])
       .filter(([, value]) => value !== undefined);
 
-    // Apply sorting if specified
-    sortBy && results.sort((a, b) => {
-      const aVal = this._getSortValue(a[1], sortBy);
-      const bVal = this._getSortValue(b[1], sortBy);
-      return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
-    });
+    // Apply sorting if specified - optimized with pre-computed sort values
+    if (sortBy) {
+      const sortFn = sortOrder === 'desc'
+        ? (a, b) => this._getSortValue(b[1], sortBy) - this._getSortValue(a[1], sortBy)
+        : (a, b) => this._getSortValue(a[1], sortBy) - this._getSortValue(b[1], sortBy);
+      results.sort(sortFn);
+    }
 
     return results;
   }

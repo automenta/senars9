@@ -109,7 +109,8 @@ class Storage {
   update(key, updateFn) {
     const currentValue = this.get(key);
     const newValue = updateFn(currentValue);
-    return this.set(key, newValue), newValue;
+    this.set(key, newValue);
+    return newValue;
   }
 
   setMany(entries) {

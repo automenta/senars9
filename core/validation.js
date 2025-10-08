@@ -1,4 +1,4 @@
-import { Logger } from './utilities.js';
+import { Logger, IdGenerator } from './utilities.js';
 
 class Validation {
   static requireProps(obj, props) {
@@ -81,7 +81,7 @@ class ErrorHandler {
   }
 
   static _generateErrorId() {
-    return `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return IdGenerator.generateErrorId();
   }
 
   static createErrorBoundary(componentName, messagesComponent = null) {
@@ -155,6 +155,30 @@ class Retry {
         }
       }
     };
+  }
+
+  static async withErrorHandling(fn, context = '', messagesComponent = null) {
+    try {
+      return await fn();
+    } catch (error) {
+      const errorInfo = {
+        error: error.message,
+        stack: error.stack,
+        context,
+        timestamp: new Date().toISOString(),
+        errorId: this._generateErrorId()
+      };
+
+      messagesComponent ? messagesComponent.emit('error:occurred', {
+        error: errorInfo.error,
+        errorId: errorInfo.errorId,
+        context,
+        stack: errorInfo.stack,
+        timestamp: errorInfo.timestamp
+      }) : Logger.error('Handled error', errorInfo);
+
+      throw error;
+    }
   }
 }
 

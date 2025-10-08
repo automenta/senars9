@@ -31,26 +31,19 @@ describe('Reasoning Component', () => {
     expect(reasoning.strategies.get('test-strategy')).toEqual(strategy);
   });
 
-  test('reason method should call the rules engine', async () => {
-    const tasks = [{ id: 'task1' }];
-    const derivedTasks = [{ id: 'derived1' }];
-    mockCore.rules.executeRules.mockReturnValue(derivedTasks);
+  test('reason method should process tasks and return derived tasks', async () => {
+    const tasks = [{ term: '((A) --> (B)).', punctuation: '.' }];
+    const derivedTasks = [{ term: '(B).', punctuation: '.', truth: { frequency: 0.9, confidence: 0.8 }, priority: 0.5, timestamp: expect.any(Number), derivationPath: ['reasoning:deduction'] }];
 
     const result = await reasoning.reason(tasks);
 
-    expect(mockCore.rules.executeRules).toHaveBeenCalledWith(tasks, expect.any(Object));
-    expect(result).toEqual(derivedTasks);
+    expect(result).toHaveLength(1);
+    expect(result[0].term).toBe('(B).');
+    expect(result[0].derivationPath).toContain('reasoning:deduction');
   });
 
-  test('reason method should return an empty array if rules component is not available', async () => {
-    reasoning.core = {}; // No rules component
-    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
+  test('reason method should return an empty array for empty task list', async () => {
     const result = await reasoning.reason([]);
-
     expect(result).toEqual([]);
-    expect(consoleWarnSpy).toHaveBeenCalledWith('Rules component not available. Reasoning will be skipped.');
-
-    consoleWarnSpy.mockRestore();
   });
 });

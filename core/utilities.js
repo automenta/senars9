@@ -36,4 +36,20 @@ class ArrayUtils {
   static flatten = (array, depth = 1) => array.flat(depth);
 }
 
-export { Logger, ObjectUtils, ArrayUtils };
+class IdGenerator {
+  static generate(prefix = '') {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    return `${prefix}${timestamp}-${random}`;
+  }
+
+  static generateErrorId() {
+    return this.generate('err_');
+  }
+
+  static generateMessageId() {
+    return this.generate('msg_');
+  }
+}
+
+export { Logger, ObjectUtils, ArrayUtils, IdGenerator };
