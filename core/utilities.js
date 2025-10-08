@@ -1,10 +1,10 @@
 class Logger {
-  static log(level, message, data = {}) {
-    const consoleMethod = level === 'warn' ? 'warn' : level === 'error' ? 'error' : 'log';
+    static log(level, message, data = {}) {
+    const method = console[level] || console.log;
     const upperLevel = level && typeof level === 'string' ? level.toUpperCase() : 'LOG';
-    return console[consoleMethod](`[${upperLevel}]`, message, data);
+    return method(`[${upperLevel}]`, message, data);
   }
-
+  
   static info = (msg, data) => {
     // Only log info in development/debug mode
     if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
