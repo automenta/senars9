@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import createCore from '../../core/createCore.js';
 
-describe('Memory System Examples - Unit Tests', () => {
+describe('Memory System Examples', () => {
   let core;
 
   beforeEach(async () => {
@@ -13,177 +13,125 @@ describe('Memory System Examples - Unit Tests', () => {
     await core.destroy();
   });
 
-  describe('Focus Sets Management', () => {
-    test('should create and manage focus sets correctly', () => {
-      // Create focus sets for different attention areas
-      core.memory.createFocusSet('working-memory', 5);
-      core.memory.createFocusSet('long-term-storage', 10);
-      core.memory.createFocusSet('attention-focus', 3);
-      core.memory.createFocusSet('pattern-buffer', 8);
+  describe('Focus Sets', () => {
+    test('should create and manage focus sets', () => {
+      const focusSets = [
+        { name: 'working-memory', capacity: 5 },
+        { name: 'long-term-storage', capacity: 10 },
+        { name: 'attention-focus', capacity: 3 },
+        { name: 'pattern-buffer', capacity: 8 },
+      ];
 
-      // Set current focus to working memory
+      focusSets.forEach(({ name, capacity }) => {
+        core.memory.createFocusSet(name, capacity);
+      });
+
       core.memory.setFocus('working-memory');
-
-      // Verify focus was set
-      const currentFocus = core.memory.getCurrentFocus();
-      expect(currentFocus).toBe('working-memory');
+      expect(core.memory.getCurrentFocus()).toBe('working-memory');
     });
 
-    test('should add items with different priorities and metadata', () => {
-      const items = [
+    test('should add items with metadata', () => {
+      const testItems = [
         {
-          key: 'urgent-alert-001',
-          value: {
-            content: 'Critical system temperature exceeded threshold',
-            priority: 10,
-            type: 'alert',
-            severity: 'critical'
-          },
-          options: {
-            type: 'alert',
-            tags: ['urgent', 'system', 'temperature'],
-            priority: 10
-          }
+          key: 'urgent-alert',
+          value: { content: 'Critical system temperature exceeded threshold', priority: 10, type: 'alert' },
+          options: { type: 'alert', tags: ['urgent', 'system'], priority: 10 }
         },
         {
-          key: 'task-meeting-0900',
-          value: {
-            content: 'Daily standup meeting at 9:00 AM',
-            priority: 7,
-            type: 'task',
-            category: 'meeting'
-          },
-          options: {
-            type: 'task',
-            tags: ['meeting', 'daily', 'scheduled'],
-            priority: 7
-          }
+          key: 'meeting-task',
+          value: { content: 'Daily standup meeting', priority: 7, type: 'task' },
+          options: { type: 'task', tags: ['meeting', 'daily'], priority: 7 }
+        },
+        {
+          key: 'low-priority',
+          value: { content: 'Background monitoring', priority: 3, type: 'system' },
+          options: { type: 'system', tags: ['background'], priority: 3 }
         }
       ];
 
-      // Add items to memory
-      items.forEach(({ key, value, options }) => {
+      testItems.forEach(({ key, value, options }) => {
         core.memory.set(key, value, options);
       });
 
-      // Verify items were stored
-      expect(core.memory.has('urgent-alert-001')).toBe(true);
-      expect(core.memory.has('task-meeting-0900')).toBe(true);
+      testItems.forEach(({ key }) => {
+        expect(core.memory.has(key)).toBe(true);
+      });
 
-      // Verify item data
-      const urgentItem = core.memory.get('urgent-alert-001');
+      const urgentItem = core.memory.get('urgent-alert');
       expect(urgentItem.priority).toBe(10);
       expect(urgentItem.type).toBe('alert');
     });
 
     test('should manage focus set assignments', () => {
-      // Add test item
       core.memory.set('test-item', { content: 'test' }, { priority: 5 });
-
-      // Update focus set assignment
       core.memory._updateFocusSets('test-item', { focusSet: 'working-memory' });
 
-      // Verify assignment (this tests internal focus set management)
       const focusItems = core.memory.getFocusItems(10);
       expect(Array.isArray(focusItems)).toBe(true);
     });
   });
 
   describe('Attention Mechanism', () => {
-    test('should update and retrieve focus attention correctly', () => {
-      // Create focus sets first
+    test('should update focus attention', () => {
       core.memory.createFocusSet('working-memory', 5);
       core.memory.createFocusSet('attention-focus', 3);
 
-      // Update attention for different focus sets
       core.memory.updateFocusAttention('working-memory', 0.8);
       core.memory.updateFocusAttention('attention-focus', 0.6);
 
-      // Get focus set stats
-      const focusStats = core.memory.getFocusSetStats();
-
-      // Verify attention scores were updated
-      expect(focusStats['working-memory']).toBeDefined();
-      expect(focusStats['attention-focus']).toBeDefined();
+      const stats = core.memory.getFocusSetStats();
+      expect(stats['working-memory']).toBeDefined();
+      expect(stats['attention-focus']).toBeDefined();
     });
 
-    test('should retrieve items based on attention focus', () => {
-      // Create focus set and add item
+    test('should retrieve items by attention focus', () => {
       core.memory.createFocusSet('test-focus', 5);
       core.memory.set('attention-item', { content: 'test', priority: 8 });
       core.memory._updateFocusSets('attention-item', { focusSet: 'test-focus' });
 
-      // Switch focus and get items
       core.memory.setFocus('test-focus');
-      const attentionItems = core.memory.getFocusItems(5);
-
-      // Verify attention-based retrieval
-      expect(Array.isArray(attentionItems)).toBe(true);
+      const items = core.memory.getFocusItems(5);
+      expect(Array.isArray(items)).toBe(true);
     });
   });
 
   describe('Query Optimization', () => {
-    test('should query by priority correctly', () => {
-      // Add items with different priorities
+    test('should query by priority', () => {
       core.memory.set('high-priority', { content: 'high' }, { priority: 9 });
       core.memory.set('medium-priority', { content: 'medium' }, { priority: 6 });
       core.memory.set('low-priority', { content: 'low' }, { priority: 3 });
 
-      // Query by priority
-      const highPriorityItems = core.memory.query({
-        minPriority: 8,
-        limit: 5
-      });
-
-      // Should find high priority item
-      expect(highPriorityItems.length).toBeGreaterThan(0);
+      const results = core.memory.query({ minPriority: 8, limit: 5 });
+      expect(results.length).toBeGreaterThan(0);
     });
 
-    test('should query by type correctly', () => {
-      // Add items with different types
+    test('should query by type', () => {
       core.memory.set('alert-1', { content: 'alert' }, { type: 'alert' });
       core.memory.set('task-1', { content: 'task' }, { type: 'task' });
 
-      // Query by type
-      const alertItems = core.memory.query({
-        type: 'alert',
-        limit: 5
-      });
-
-      // Should find alert items
-      expect(alertItems.length).toBeGreaterThan(0);
+      const results = core.memory.query({ type: 'alert', limit: 5 });
+      expect(results.length).toBeGreaterThan(0);
     });
 
-    test('should query by tags correctly', () => {
-      // Add items with tags
+    test('should query by tags', () => {
       core.memory.set('urgent-item', { content: 'urgent' }, {
         tags: ['urgent', 'system']
       });
 
-      // Query by tags
-      const urgentItems = core.memory.query({
-        tags: ['urgent'],
-        limit: 5
-      });
-
-      // Should find urgent items
-      expect(urgentItems.length).toBeGreaterThan(0);
+      const results = core.memory.query({ tags: ['urgent'], limit: 5 });
+      expect(results.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Memory Statistics', () => {
-    test('should provide comprehensive memory statistics', () => {
-      // Add some items
+  describe('Statistics', () => {
+    test('should provide memory statistics', () => {
       core.memory.set('stat-test-1', { content: 'test1' });
       core.memory.set('stat-test-2', { content: 'test2' });
 
-      // Get statistics
-      const memStats = core.memory.getStats();
-
-      // Verify statistics structure
-      expect(memStats).toBeDefined();
-      expect(typeof memStats.storageSize).toBe('number');
-      expect(memStats.storageSize).toBeGreaterThan(0);
+      const stats = core.memory.getStats();
+      expect(stats).toBeDefined();
+      expect(typeof stats.storageSize).toBe('number');
+      expect(stats.storageSize).toBeGreaterThan(0);
     });
   });
 });

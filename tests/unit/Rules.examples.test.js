@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import createCore from '../../core/createCore.js';
 
-describe('Rules Engine Examples - Unit Tests', () => {
+describe('Rules Engine Examples', () => {
   let core;
 
   beforeEach(async () => {
@@ -13,9 +13,9 @@ describe('Rules Engine Examples - Unit Tests', () => {
     await core.destroy();
   });
 
-  describe('Rule Creation and Management', () => {
+  describe('Rule Management', () => {
     test('should create rules with different types and complexities', () => {
-      const rules = [
+      const testRules = [
         {
           name: 'urgent-task-handler',
           type: 'task',
@@ -57,41 +57,32 @@ describe('Rules Engine Examples - Unit Tests', () => {
         }
       ];
 
-      // Add all rules
-      rules.forEach(rule => core.rules.add(rule));
-
-      // Verify rules were added
-      const allRules = core.rules.rules;
-      expect(allRules.length).toBeGreaterThanOrEqual(3);
+      testRules.forEach(rule => core.rules.add(rule));
+      expect(core.rules.rules.length).toBeGreaterThanOrEqual(3);
     });
 
     test('should provide rule indexing and fast lookups', () => {
-      // Add test rules
-      core.rules.add({
-        name: 'test-task-rule',
-        type: 'task',
-        complexity: 'simple',
-        condition: () => true,
-        action: () => ({ result: 'test' }),
-        priority: 5
+      const indexTestRules = [
+        { name: 'test-task-rule', type: 'task', complexity: 'simple', priority: 5 },
+        { name: 'test-analysis-rule', type: 'analysis', complexity: 'complex', priority: 8 }
+      ];
+
+      indexTestRules.forEach(({ name, type, complexity, priority }) => {
+        core.rules.add({
+          name,
+          type,
+          complexity,
+          condition: () => true,
+          action: () => ({ result: 'test' }),
+          priority
+        });
       });
 
-      core.rules.add({
-        name: 'test-analysis-rule',
-        type: 'analysis',
-        complexity: 'complex',
-        condition: () => true,
-        action: () => ({ result: 'test' }),
-        priority: 8
-      });
-
-      // Test rule indexing
       const taskRules = core.rules.getRulesByType('task');
       const analysisRules = core.rules.getRulesByType('analysis');
       const simpleRules = core.rules.getRulesByComplexity('simple');
       const highPriorityRules = core.rules.getRulesByPriority(10);
 
-      // Verify indexing works
       expect(Array.isArray(taskRules)).toBe(true);
       expect(Array.isArray(analysisRules)).toBe(true);
       expect(Array.isArray(simpleRules)).toBe(true);
@@ -101,7 +92,6 @@ describe('Rules Engine Examples - Unit Tests', () => {
 
   describe('Rule Pre-filtering', () => {
     test('should optimize rule candidates using pre-filtering', () => {
-      // Add test rule with pre-filter tags
       core.rules.add({
         name: 'urgent-rule',
         type: 'task',
@@ -118,20 +108,17 @@ describe('Rules Engine Examples - Unit Tests', () => {
         tags: ['urgent', 'immediate', 'system']
       };
 
-      // Test pre-filtering optimization
       const candidates = core.rules.getOptimizedRuleCandidates(urgentContext, {
         ruleType: 'task',
         maxComplexity: 'simple'
       });
 
-      // Should find candidate rules
       expect(Array.isArray(candidates)).toBe(true);
     });
   });
 
   describe('Rule Evaluation', () => {
     test('should evaluate rules correctly with different contexts', async () => {
-      // Add test rule
       core.rules.add({
         name: 'priority-rule',
         type: 'task',
@@ -144,7 +131,6 @@ describe('Rules Engine Examples - Unit Tests', () => {
         priority: 10
       });
 
-      // Test with matching context
       const highPriorityContext = {
         priority: 9,
         term: { name: 'urgent-task' },
@@ -155,7 +141,6 @@ describe('Rules Engine Examples - Unit Tests', () => {
       expect(result).toBeDefined();
       expect(result.result).toBe('high-priority-processed');
 
-      // Test with non-matching context
       const lowPriorityContext = {
         priority: 3,
         term: { name: 'normal-task' },
@@ -167,9 +152,8 @@ describe('Rules Engine Examples - Unit Tests', () => {
     });
   });
 
-  describe('Rule Statistics', () => {
-    test('should provide comprehensive rule statistics', () => {
-      // Add test rules
+  describe('Statistics', () => {
+    test('should provide rule statistics', () => {
       core.rules.add({
         name: 'stat-test-1',
         type: 'task',
@@ -188,10 +172,7 @@ describe('Rules Engine Examples - Unit Tests', () => {
         priority: 8
       });
 
-      // Get statistics
       const stats = core.rules.getStats();
-
-      // Verify statistics structure
       expect(stats).toBeDefined();
       expect(typeof stats.totalRules).toBe('number');
       expect(stats.totalRules).toBeGreaterThan(0);

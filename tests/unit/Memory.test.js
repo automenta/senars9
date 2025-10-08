@@ -1,72 +1,107 @@
 import Memory from '../../core/Memory.js';
+import {
+  createTestComponent,
+  testLifecycleTransitions,
+  createTestData,
+  measurePerformance,
+  expectPerformance,
+  performanceThresholds
+} from './test-utils.js';
 
-describe('Memory Component', () => {
-  let memory;
+const createMemory = (config = {}) => {
+  const memory = new Memory();
+  return memory.initialize({ cacheSize: 3, ...config }).then(() => memory);
+};
 
-  beforeEach(async () => {
-    memory = new Memory();
-    await memory.initialize({ cacheSize: 3 });
+describe('Memory', () => {
+  const basicOperations = [
+    {
+      name: 'set and get',
+      setup: (mem) => mem.set('key', 'value'),
+      test: (mem) => expect(mem.get('key')).toBe('value')
+    },
+    {
+      name: 'non-existent key',
+      setup: () => {},
+      test: (mem) => expect(mem.get('non-existent')).toBeUndefined()
+    },
+    {
+      name: 'delete value',
+      setup: (mem) => mem.set('key', 'value'),
+      test: (mem) => {
+        mem.delete('key');
+        expect(mem.get('key')).toBeUndefined();
+      }
+    },
+    {
+      name: 'check existence',
+      setup: (mem) => mem.set('key', 'value'),
+      test: (mem) => {
+        expect(mem.has('key')).toBe(true);
+        expect(mem.has('non-existent')).toBe(false);
+      }
+    },
+    {
+      name: 'clear all',
+      setup: (mem) => {
+        mem.set('key1', 'value1');
+        mem.set('key2', 'value2');
+      },
+      test: (mem) => {
+        mem.clear();
+        expect(mem.has('key1')).toBe(false);
+        expect(mem.has('key2')).toBe(false);
+      }
+    }
+  ];
+
+  basicOperations.forEach(({ name, setup, test: testFn }) => {
+    test(`should ${name}`, async () => {
+      const memory = await createMemory();
+      await setup(memory);
+      testFn(memory);
+    });
   });
 
-  test('should set and get a value', () => {
-    memory.set('key', 'value');
-    expect(memory.get('key')).toBe('value');
-  });
-
-  test('should return undefined for a non-existent key', () => {
-    expect(memory.get('non-existent')).toBeUndefined();
-  });
-
-  test('should delete a value', () => {
-    memory.set('key', 'value');
-    memory.delete('key');
-    expect(memory.get('key')).toBeUndefined();
-  });
-
-  test('should check if a key exists', () => {
-    memory.set('key', 'value');
-    expect(memory.has('key')).toBe(true);
-    expect(memory.has('non-existent')).toBe(false);
-  });
-
-  test('should clear all values', () => {
+  test('should provide memory statistics', async () => {
+    const memory = await createMemory();
     memory.set('key1', 'value1');
     memory.set('key2', 'value2');
-    memory.clear();
-    expect(memory.has('key1')).toBe(false);
-    expect(memory.has('key2')).toBe(false);
+
+    const stats = memory.getStats();
+    expect(stats.storageSize).toBeGreaterThan(0);
+    expect(stats.cacheSize).toBeGreaterThanOrEqual(0);
+    expect(stats.focusSets).toBeDefined();
   });
 
   describe('Performance', () => {
-    test('should provide fast access to recently used items', () => {
+    test('should provide fast single access', async () => {
+      const memory = await createMemory();
       memory.set('key', 'value');
-      const startTime = Date.now();
-      memory.get('key');
-      const accessTime = Date.now() - startTime;
-      expect(accessTime).toBeLessThan(5); // Should be very fast
+
+      const accessTime = await measurePerformance(() => memory.get('key'));
+      expectPerformance(accessTime, performanceThresholds.memoryOperation);
     });
 
-    test('should maintain performance under load', () => {
-      for (let i = 0; i < 100; i++) {
-        memory.set(`key${i}`, `value${i}`);
-      }
+    test('should maintain performance under load', async () => {
+      const memory = await createMemory();
+      const itemCount = 100;
 
-      const startTime = Date.now();
-      for (let i = 0; i < 100; i++) {
-        memory.get(`key${i}`);
-      }
-      const totalTime = Date.now() - startTime;
-      expect(totalTime).toBeLessThan(100); // Should handle load efficiently
-    });
+      // Load data
+      await measurePerformance(async () => {
+        for (let i = 0; i < itemCount; i++) {
+          memory.set(`key${i}`, `value${i}`);
+        }
+      });
 
-    test('should provide memory usage statistics', () => {
-      memory.set('key1', 'value1');
-      memory.set('key2', 'value2');
+      // Test retrieval performance
+      const retrievalTime = await measurePerformance(async () => {
+        for (let i = 0; i < itemCount; i++) {
+          memory.get(`key${i}`);
+        }
+      });
 
-      const stats = memory.getStats();
-      expect(stats.storageSize).toBeGreaterThan(0);
-      expect(stats.cacheSize).toBeGreaterThanOrEqual(0);
-      expect(stats.focusSets).toBeDefined();
+      expectPerformance(retrievalTime, performanceThresholds.bulkOperation);
     });
   });
 });
