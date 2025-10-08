@@ -15,6 +15,10 @@
   ],
   "author": "SeNARS Community",
   "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "langchain": "^0.3.0",
+    "@xenova/transformers": "^2.17.2"
+  },
   "devDependencies": {
     "jest": "^30.2.0"
   }
