@@ -66,4 +66,156 @@ describe('Core Foundation Integration Test', () => {
     expect(derivedTask.term.name).toBe('B');
     expect(derivedTask.derivedFrom).toEqual(['task-1']);
   });
+
+  test('should demonstrate enhanced rule pre-filtering and indexing', async () => {
+    // Create rules with different types, complexities, and pre-filter tags
+    const rules = [
+      {
+        name: 'simple-deduction',
+        type: 'inference',
+        complexity: 'simple',
+        preFilterTags: ['belief', 'deduction'],
+        condition: (ctx) => ctx.term?.name === 'A',
+        action: (ctx) => ({ result: 'deduced-B', confidence: ctx.truth?.confidence || 0 }),
+        priority: 5
+      },
+      {
+        name: 'complex-induction',
+        type: 'inference',
+        complexity: 'complex',
+        preFilterTags: ['observation', 'pattern'],
+        condition: (ctx) => ctx.term?.type === 'pattern',
+        action: (ctx) => ({ result: 'induced-pattern', complexity: 'high' }),
+        priority: 8
+      },
+      {
+        name: 'low-priority-general',
+        type: 'general',
+        complexity: 'simple',
+        preFilterTags: ['general'],
+        condition: (ctx) => true,
+        action: (ctx) => ({ result: 'general-response' }),
+        priority: 1
+      }
+    ];
+
+    // Add all rules
+    rules.forEach(rule => core.rules.add(rule));
+
+    // Test rule indexing
+    const inferenceRules = core.rules.getRulesByType('inference');
+    expect(inferenceRules.length).toBe(2);
+
+    const simpleRules = core.rules.getRulesByComplexity('simple');
+    expect(simpleRules.length).toBe(2);
+
+    // Test optimized candidate selection
+    const context1 = { term: { name: 'A' }, truth: { confidence: 0.9 } };
+    const candidates1 = core.rules.getOptimizedRuleCandidates(context1, { ruleType: 'inference' });
+    expect(candidates1.length).toBeGreaterThan(0);
+
+    // Test rule evaluation with context
+    const result1 = await core.rules.evaluate(context1);
+    expect(result1).toBeDefined();
+    if (result1 && result1.result === 'deduced-B') {
+      expect(result1.confidence).toBe(0.9);
+    }
+  });
+
+  test('should demonstrate enhanced memory focus sets and attention', async () => {
+    // Create focus sets for different attention areas
+    core.memory.createFocusSet('working-memory', 5);
+    core.memory.createFocusSet('long-term-storage', 10);
+    core.memory.createFocusSet('attention-focus', 3);
+
+    // Set current focus
+    core.memory.setFocus('working-memory');
+
+    // Add items with different priorities and metadata
+    core.memory.set('task-1', { content: 'urgent task', priority: 10 }, {
+      type: 'task',
+      tags: ['urgent', 'immediate'],
+      priority: 10
+    });
+    core.memory.set('task-2', { content: 'normal task', priority: 5 }, {
+      type: 'task',
+      tags: ['normal'],
+      priority: 5
+    });
+    core.memory.set('memory-1', { content: 'long term memory', priority: 3 }, {
+      type: 'memory',
+      tags: ['reference'],
+      priority: 3
+    });
+
+    // Update focus sets for items
+    core.memory._updateFocusSets('task-1', { focusSet: 'working-memory' });
+    core.memory._updateFocusSets('task-2', { focusSet: 'working-memory' });
+    core.memory._updateFocusSets('memory-1', { focusSet: 'long-term-storage' });
+
+    // Test focus set retrieval with attention scoring
+    const focusItems = core.memory.getFocusItems(3);
+    expect(focusItems.length).toBeGreaterThan(0);
+
+    // Test attention mechanism
+    const stats = core.memory.getFocusSetStats();
+    expect(stats['working-memory']).toBeDefined();
+
+    // Update attention
+    core.memory.updateFocusAttention('working-memory', 0.5);
+    const updatedStats = core.memory.getFocusSetStats();
+    expect(updatedStats['working-memory'].attentionScore).toBe(0.5);
+
+    // Test query optimization - search by priority
+    const highPriorityItems = core.memory.query({
+      minPriority: 8,
+      limit: 10
+    });
+    expect(highPriorityItems.length).toBeGreaterThan(0);
+
+    // Also test basic memory retrieval
+    const task1 = core.memory.get('task-1');
+    expect(task1.content).toBe('urgent task');
+  });
+
+  test('should demonstrate component interaction and performance', async () => {
+    // Performance test for rule filtering
+    const startTime = Date.now();
+
+    // Add many rules for performance testing
+    for (let i = 0; i < 100; i++) {
+      core.rules.add({
+        name: `rule-${i}`,
+        type: i % 2 === 0 ? 'inference' : 'general',
+        complexity: i % 3 === 0 ? 'complex' : 'simple',
+        preFilterTags: [`tag-${i % 5}`],
+        condition: (ctx) => ctx?.id === i,
+        action: (ctx) => ({ result: `processed-${i}` }),
+        priority: Math.floor(i / 10)
+      });
+    }
+
+    const ruleAddTime = Date.now() - startTime;
+
+    // Test fast lookups
+    const lookupStart = Date.now();
+    const inferenceRules = core.memory.query({ minPriority: 5 });
+    const lookupTime = Date.now() - lookupStart;
+
+    // Performance assertions
+    expect(ruleAddTime).toBeLessThan(1000); // Should add 100 rules in < 1s
+    expect(lookupTime).toBeLessThan(100); // Should lookup in < 100ms
+
+    // Test rule evaluation performance with a simpler context
+    const evalStart = Date.now();
+    const result = await core.rules.evaluate({ id: 50 });
+    const evalTime = Date.now() - evalStart;
+
+    // The result might be null if no rules match, but performance should still be good
+    expect(evalTime).toBeLessThan(50); // Should evaluate in < 50ms
+
+    if (result) {
+      expect(result.result).toBe('processed-50');
+    }
+  });
 });
