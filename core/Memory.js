@@ -4,8 +4,9 @@ import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
 import { Validation } from './validation.js';
 import { DEFAULTS } from './constants.js';
 
-class Focus {
+class Focus extends Component {
   constructor() {
+    super();
     this.focusSets = new Map();
     this.currentFocus = null;
     this.focusSize = DEFAULTS.FOCUS_SIZE;
@@ -96,11 +97,11 @@ class Focus {
 }
 
 class Memory extends Component {
-  constructor() {
+  constructor(focus = null) {
     super();
     this.storage = new Storage();
     this.cache = new Cache(DEFAULTS.CACHE_SIZE);
-    this.focus = new Focus();
+    this.focus = focus;
     this.indexes = new IndexManager();
   }
 
@@ -109,9 +110,11 @@ class Memory extends Component {
     if (config.cacheSize) {
       this.cache = new Cache(config.cacheSize);
     }
-    this.focus.focusSize = config.focusSize || DEFAULTS.FOCUS_SIZE;
-    this.focus.currentFocus = config.defaultFocus || null;
-    this.focus.focusSets.clear();
+    if (this.focus) {
+      this.focus.focusSize = config.focusSize || DEFAULTS.FOCUS_SIZE;
+      this.focus.currentFocus = config.defaultFocus || null;
+      this.focus.focusSets.clear();
+    }
     this.indexes.clear();
   }
 
@@ -143,27 +146,27 @@ class Memory extends Component {
     this.storage.clear();
     this.cache.clear();
     this.indexes.clear();
-    this.focus.clear();
+    this.focus?.clear();
   }
 
   has(key) {
     return this.cache.has(key) || this.storage.has(key);
   }
 
-  createFocusSet(name, maxSize = this.focus.focusSize) {
-    this.focus.createFocusSet(name, maxSize);
+  createFocusSet(name, maxSize = this.focus?.focusSize) {
+    this.focus?.createFocusSet(name, maxSize);
   }
 
   setFocus(name) {
-    this.focus.setFocus(name);
+    this.focus?.setFocus(name);
   }
 
   getCurrentFocus() {
-    return this.focus.getCurrentFocus();
+    return this.focus?.getCurrentFocus();
   }
 
   getFocusItems(count = 10) {
-    return this.focus.getFocusItems(count);
+    return this.focus?.getFocusItems(count) || [];
   }
 
   query(criteria = {}) {
@@ -232,7 +235,7 @@ class Memory extends Component {
     return {
       totalKeys: this.storage.size(),
       cachedKeys: this.cache.size,
-      focusSets: this.focus.focusSets.size,
+      focusSets: this.focus?.focusSets.size || 0,
       indexes: this.indexes.indexes.size,
       cacheHitRate: this.cache.hitRate || 0
     };
@@ -260,7 +263,7 @@ class Memory extends Component {
       storageSize: this.storage.size(),
       cacheSize: this.cache.cache.size,
       cacheMaxSize: this.cache.maxSize,
-      focusSets: this.focus.getFocusSetStats(),
+      focusSets: this.focus?.getFocusSetStats() || {},
       indexes: this.indexes.indexes.size
     };
   }
@@ -281,7 +284,7 @@ class Memory extends Component {
   }
 
   _updateFocusSets(key, options) {
-    this.focus.updateFocusSets(key, options);
+    this.focus?.updateFocusSets(key, options);
   }
 
 
@@ -303,16 +306,17 @@ class Memory extends Component {
   }
 
   updateFocusAttention(name, delta) {
-    this.focus.updateFocusAttention(name, delta);
+    this.focus?.updateFocusAttention(name, delta);
   }
 
   getFocusSetStats() {
-    return this.focus.getFocusSetStats();
+    return this.focus?.getFocusSetStats() || {};
   }
 
   _removeFromFocusSets(key) {
-    this.focus.removeFromFocusSets(key);
+    this.focus?.removeFromFocusSets(key);
   }
 }
 
 export default Memory;
+export { Focus };
