@@ -2,6 +2,7 @@ class Logger {
   static log(level, message, data = {}) {
     return (console[level] || console.log)(`[${level.toUpperCase()}]`, message, data);
   }
+
   static info = (msg, data) => Logger.log('info', msg, data);
   static warn = (msg, data) => Logger.log('warn', msg, data);
   static error = (msg, data) => Logger.log('error', msg, data);
@@ -15,7 +16,6 @@ class ObjectUtils {
   }
 
   static deepClone = obj => obj && typeof obj === 'object' ? JSON.parse(JSON.stringify(obj)) : obj;
-
   static isObject = item => item && typeof item === 'object' && !Array.isArray(item);
   static isEmpty = obj => !obj || Object.keys(obj).length === 0;
   static pick = (obj, keys) => keys.reduce((result, key) => (key in obj && (result[key] = obj[key]), result), {});
@@ -24,7 +24,6 @@ class ObjectUtils {
 
 class ArrayUtils {
   static groupBy = (array, keyFn) => array.reduce((groups, item) => ((groups[keyFn(item)] ||= []).push(item), groups), {});
-
   static sortBy = (array, keyFn, direction = 'asc') => [...array].sort((a, b) => {
     const aVal = keyFn(a), bVal = keyFn(b);
     return direction === 'desc' ? (bVal < aVal ? -1 : bVal > aVal ? 1 : 0) : (aVal < bVal ? -1 : aVal > bVal ? 1 : 0);

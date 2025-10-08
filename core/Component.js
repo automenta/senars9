@@ -7,14 +7,11 @@ class Component {
   constructor() {
     this.status = STATES.UNINITIALIZED;
     this.flags = { initialized: false, started: false };
-    this._eventHandlers = new Map();
   }
 
   async initialize(config = {}) {
     this.config = config;
-    await this._safeExecute(async () => {
-      await this._doInitialize(config);
-    }, 'initialize');
+    await this._safeExecute(async () => await this._doInitialize(config), 'initialize');
     this._setState(STATES.INITIALIZED, { initialized: true });
   }
 
@@ -37,7 +34,6 @@ class Component {
   async destroy() {
     await this._doDestroy();
     this._setState(STATES.DESTROYED, { initialized: false, started: false });
-    this._eventHandlers.clear();
   }
 
   async _doDestroy() {}

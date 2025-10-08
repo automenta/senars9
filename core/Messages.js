@@ -39,8 +39,6 @@ class Messages extends Component {
       timeout: options.timeout || 5000
     };
     this.middleware.push(middleware);
-
-    // Sort middleware by priority (higher priority first)
     this.middleware.sort((a, b) => b.priority - a.priority);
   }
 
@@ -102,8 +100,6 @@ class Messages extends Component {
     };
 
     const result = this._executeMiddleware(context, executeWithRetry);
-
-    // For backward compatibility, if no middleware and no command-specific retries, return result directly
     const commandPolicy = this.retryPolicies.get(command);
     return this.middleware.length === 0 && (!commandPolicy || commandPolicy.maxRetries === 0) ? result : result;
   }
@@ -124,7 +120,6 @@ class Messages extends Component {
     const { type, name, data, metadata = {} } = message;
     const { skipMiddleware = false, timeout = 10000 } = options;
 
-    // Create enhanced context for unified processing
     const context = {
       type,
       name,
@@ -137,12 +132,10 @@ class Messages extends Component {
       results: []
     };
 
-    // Apply preprocessing filters
     if (!this._applyPreprocessingFilters(context)) {
       return { success: false, reason: 'filtered', context };
     }
 
-    // Process through middleware unless skipped
     if (!skipMiddleware && this.middleware.length > 0) {
       try {
         await this._executeMiddlewareAsync(context, async (ctx) => {
@@ -153,7 +146,6 @@ class Messages extends Component {
         return this._handleProcessingError(error, context);
       }
     } else {
-      // Direct processing without middleware
       await this._processMessageCore(context);
       context.processed = true;
     }
@@ -165,7 +157,6 @@ class Messages extends Component {
     };
   }
 
-  // Core message processing logic
   async _processMessageCore(context) {
     if (context.type === 'command') {
       const result = await this.execute(context.name, context.data);
@@ -178,19 +169,15 @@ class Messages extends Component {
     }
   }
 
-  // Apply preprocessing filters
   _applyPreprocessingFilters(context) {
-    // Message type filter
     if (!['command', 'event'].includes(context.type)) {
       return false;
     }
 
-    // Name validation filter
     if (!context.name || typeof context.name !== 'string') {
       return false;
     }
 
-    // Custom filters from processors
     for (const [name, processor] of this.processors.entries()) {
       if (processor.filter && !processor.filter(context)) {
         return false;

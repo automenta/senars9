@@ -23,8 +23,7 @@ class Cache {
 
   get(key) {
     const value = this.cache.get(key);
-    value !== undefined && this.cache._touch(key, value);
-    return value;
+    return value !== undefined ? (this.cache._touch(key, value), value) : value;
   }
 
   set(key, value) {
@@ -142,8 +141,8 @@ class Storage {
   getStats() {
     return {
       size: this.size(),
-      maxSize: this.maxSize,
-      utilization: this.size() / this.maxSize,
+      maxSize: this.data.maxSize,
+      utilization: this.size() / this.data.maxSize,
       namespace: this.namespace
     };
   }

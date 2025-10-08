@@ -26,34 +26,34 @@ class Rules extends Component {
   add(rule) {
     Validation.requireProps(rule, ['name', 'condition', 'action']);
 
-    const enhancedRule = {
+    this.rules.push({
       priority: 0,
       type: 'general',
       complexity: 'simple',
       preFilterTags: [],
       ...rule
-    };
+    });
 
-    this.rules.push(enhancedRule);
-    this._updateIndexes(enhancedRule);
+    this._updateIndexes(this.rules[this.rules.length - 1]);
   }
 
   remove(name) {
     const index = this.rules.findIndex(rule => rule.name === name);
-    index !== -1 && ((rule) => {
+    if (index !== -1) {
+      const rule = this.rules[index];
       this.rules.splice(index, 1);
       this._removeFromIndexes(rule);
-    })(this.rules[index]);
+    }
   }
 
   _updateIndexes(rule) {
-    this.indexes.add(rule.type, rule.name, rule);
-    this.indexes.add(`complexity_${rule.complexity}`, rule.name, rule);
-    this.indexes.add(`priority_${rule.priority}`, rule.name, rule);
+    this.indexes.add(rule.type, rule.name);
+    this.indexes.add(`complexity_${rule.complexity}`, rule.name);
+    this.indexes.add(`priority_${rule.priority}`, rule.name);
 
     rule.preFilterTags?.forEach(tag => {
       this.preFilters.add(tag);
-      this.indexes.add(`prefilter_${tag}`, rule.name, rule);
+      this.indexes.add(`prefilter_${tag}`, rule.name);
     });
   }
 
@@ -87,13 +87,7 @@ class Rules extends Component {
   }
 
   getOptimizedRuleCandidates(context, options = {}) {
-    let candidates = [];
-
-    if (options.ruleType) {
-      candidates = this.getRulesByType(options.ruleType);
-    } else {
-      candidates = this.rules;
-    }
+    let candidates = options.ruleType ? this.getRulesByType(options.ruleType) : this.rules;
 
     if (options.maxComplexity) {
       const maxLevel = COMPLEXITY_LEVELS[options.maxComplexity] || COMPLEXITY_LEVELS.complex;
@@ -161,10 +155,8 @@ class Rules extends Component {
     const startTime = Date.now();
 
     try {
-      // Use optimized candidate selection for better performance
       let candidates = this.getOptimizedRuleCandidates(context, options);
 
-      // Final filtering by condition evaluation
       const applicableRules = candidates.filter(rule => {
         try {
           return rule.condition(context);
@@ -189,11 +181,8 @@ class Rules extends Component {
       const topRule = applicableRules[0];
       try {
         const result = await topRule.action(context);
-
-        // Record successful evaluation
         this._recordEvaluationTime(Date.now() - startTime);
 
-        // Emit performance metrics if messages component is available
         if (this.core?.messages) {
           this.core.messages.emit('rules:evaluated', {
             ruleCount: candidates.length,

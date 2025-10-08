@@ -38,7 +38,7 @@ class Memory extends Component {
     if (cached !== undefined) return cached;
 
     const value = this.storage.get(key);
-    return value !== undefined ? (this.cache.set(key, value), value) : value;
+    return value !== undefined ? (this.cache.set(key, value), value) : undefined;
   }
 
   set(key, value, options = {}) {
@@ -111,21 +111,20 @@ class Memory extends Component {
     const { type, tags, minPriority, limit = QUERY_LIMIT, sortBy, sortOrder = 'desc' } = criteria;
     let candidates = new Set(this.storage.keys());
 
-    // Optimized query execution with early termination
     if (type) {
       const typeKeys = this.indexes.get(type);
-      if (typeKeys.length === 0) return []; // Early return if no matches
+      if (typeKeys.length === 0) return [];
       candidates = this._intersectKeys(candidates, typeKeys);
     }
 
     if (tags?.length) {
       candidates = this._intersectTags(candidates, tags);
-      if (candidates.size === 0) return []; // Early return if no matches
+      if (candidates.size === 0) return [];
     }
 
     if (minPriority !== undefined) {
       candidates = this._intersectPriority(candidates, minPriority);
-      if (candidates.size === 0) return []; // Early return if no matches
+      if (candidates.size === 0) return [];
     }
 
     let results = Array.from(candidates)
@@ -170,7 +169,6 @@ class Memory extends Component {
     return sortMap[sortBy] ?? 0;
   }
 
-  // Enhanced query optimization methods
   getQueryStats() {
     return {
       totalKeys: this.storage.size(),
