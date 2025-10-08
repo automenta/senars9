@@ -9,6 +9,7 @@ const GOAL_PRIORITY = 0.8;
 const DEFAULT_FREQUENCY = 1.0;
 const DEFAULT_CONFIDENCE = 0.9;
 const VERSION = '2.0.0';
+const BYTES_TO_MB = 1024 * 1024;
 
 class System {
   constructor(config = {}) {
@@ -20,9 +21,19 @@ class System {
     this.eventHandlers = new Map();
   }
 
+  _requireRunning(operation) {
+    if (!this.core) {
+      throw new Error(`${this.constructor.name}: System is not running. Call start() before ${operation}.`);
+    }
+  }
+
+  _logError(message, error) {
+    Logger.error(`${this.constructor.name}: ${message}`, error);
+  }
+
   async start() {
     if (this.core) {
-      Logger.warn('System is already running.');
+      Logger.warn(`${this.constructor.name}: System is already running.`);
       return;
     }
 
@@ -32,12 +43,11 @@ class System {
       this.isRunning = true;
       this.startTime = Date.now();
 
-      // Set up default event handlers
       this._setupDefaultEventHandlers();
 
-      Logger.debug('SeNARS system started successfully');
+      Logger.debug(`${this.constructor.name}: System started successfully`);
     } catch (error) {
-      Logger.error('Failed to start system:', error);
+      Logger.error(`${this.constructor.name}: Failed to start system:`, error);
       throw error;
     }
   }
@@ -51,29 +61,24 @@ class System {
       this.core = null;
       this.isRunning = false;
 
-      // Clean up event handlers
       this.eventHandlers.clear();
 
-      Logger.debug('SeNARS system stopped');
+      Logger.debug(`${this.constructor.name}: System stopped`);
     } catch (error) {
-      Logger.error('Error stopping system:', error);
+      this._logError('Error stopping system:', error);
       throw error;
     }
   }
 
-  // Enhanced task input with validation and processing
   input(task) {
-    if (!this.core) {
-      throw new Error('System is not running. Call start() before inputting tasks.');
-    }
+    this._requireRunning('inputting tasks');
 
-    // Validate task format
     if (!task || typeof task !== 'object') {
-      throw new Error('Task must be an object');
+      throw new Error(`${this.constructor.name}: Task must be an object`);
     }
 
     if (!task.term || typeof task.term !== 'string') {
-      throw new Error('Task must have a valid term');
+      throw new Error(`${this.constructor.name}: Task must have a valid term`);
     }
 
     const enhancedTask = {
@@ -93,22 +98,18 @@ class System {
     return enhancedTask;
   }
 
-  // Enhanced event handling with automatic cleanup
   on(event, handler) {
-    if (!this.core) {
-      throw new Error('System is not running. Call start() before registering event handlers.');
-    }
+    this._requireRunning('registering event handlers');
 
     if (typeof handler !== 'function') {
-      throw new Error('Event handler must be a function');
+      throw new Error(`${this.constructor.name}: Event handler must be a function`);
     }
 
-    // Wrap handler to track and manage it
     const wrappedHandler = (...args) => {
       try {
         return handler(...args);
       } catch (error) {
-        Logger.error(`Error in event handler for '${event}':`, error);
+        this._logError(`Error in event handler for '${event}':`, error);
       }
     };
 
@@ -132,11 +133,8 @@ class System {
     return this; // For method chaining
   }
 
-  // Convenience method for asking questions
   async ask(question, options = {}) {
-    if (!this.core) {
-      throw new Error('System is not running. Call start() before asking questions.');
-    }
+    this._requireRunning('asking questions');
 
     const questionTask = {
       term: question,
@@ -163,9 +161,7 @@ class System {
   }
 
   remember(statement, truth = { frequency: DEFAULT_FREQUENCY, confidence: DEFAULT_CONFIDENCE }) {
-    if (!this.core) {
-      throw new Error('System is not running. Call start() before remembering statements.');
-    }
+    this._requireRunning('remembering statements');
 
     const beliefTask = {
       term: statement,
@@ -178,9 +174,7 @@ class System {
   }
 
   want(goal, priority = GOAL_PRIORITY) {
-    if (!this.core) {
-      throw new Error('System is not running. Call start() before setting goals.');
-    }
+    this._requireRunning('setting goals');
 
     const goalTask = {
       term: goal,
@@ -192,7 +186,6 @@ class System {
     return this.input(goalTask);
   }
 
-  // Get system health and status
   getHealth() {
     if (!this.core) {
       return { status: 'stopped', uptime: 0, tasksProcessed: 0 };
@@ -215,7 +208,6 @@ class System {
     };
   }
 
-  // Get comprehensive system status
   getStatus() {
     const health = this.getHealth();
 
@@ -225,14 +217,13 @@ class System {
       config: this.config,
       timestamp: Date.now(),
       memoryUsage: process.memoryUsage ? {
-        rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
-        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+        rss: Math.round(process.memoryUsage().rss / BYTES_TO_MB),
+        heapUsed: Math.round(process.memoryUsage().heapUsed / BYTES_TO_MB),
+        heapTotal: Math.round(process.memoryUsage().heapTotal / BYTES_TO_MB)
       } : null
     };
   }
 
-  // Get system metrics for monitoring
   getMetrics() {
     if (!this.core) {
       return {};
@@ -255,56 +246,46 @@ class System {
     };
   }
 
-  // Execute a command through the system
   async execute(command, data = {}) {
-    if (!this.core) {
-      throw new Error('System is not running. Call start() before executing commands.');
-    }
+    this._requireRunning('executing commands');
 
     try {
       return await this.core.messages.execute(command, data);
     } catch (error) {
-      Logger.error(`Error executing command '${command}':`, error);
+      this._logError(`Error executing command '${command}':`, error);
       throw error;
     }
   }
 
-  // Process a message through the system
   async process(message) {
-    if (!this.core) {
-      throw new Error('System is not running. Call start() before processing messages.');
-    }
+    this._requireRunning('processing messages');
 
     try {
       return await this.core.messages.process(message);
     } catch (error) {
-      Logger.error('Error processing message:', error);
+      this._logError('Error processing message:', error);
       throw error;
     }
   }
 
-  // Set up default event handlers for common system events
   _setupDefaultEventHandlers() {
-    // Log important system events
     this.on('task.input', (task) => {
-      Logger.debug('Task input:', task.term);
+      Logger.debug(`${this.constructor.name}: Task input:`, task.term);
     });
 
     this.on('reasoning_error', (error) => {
-      Logger.error('Reasoning error:', error);
+      Logger.error(`${this.constructor.name}: Reasoning error:`, error);
     });
 
     this.on('memory.full', (info) => {
-      Logger.warn('Memory capacity reached:', info);
+      Logger.warn(`${this.constructor.name}: Memory capacity reached:`, info);
     });
 
-    // Track task processing
     this.on('task.processed', (result) => {
       this.taskCount++;
     });
   }
 
-  // Clean up all event handlers
   removeAllListeners() {
     for (const [handler, info] of this.eventHandlers) {
       this.off(info.event, handler);

@@ -42,17 +42,9 @@ class Component {
     Object.assign(this.flags, flags);
   }
 
-  getHealth() {
-    return { status: 'healthy', issues: [] };
-  }
-
-  getMetrics() {
-    return {};
-  }
-
-  getStatus() {
-    return { status: this.status };
-  }
+  getHealth() { return { status: 'healthy', issues: [] }; }
+  getMetrics() { return {}; }
+  getStatus() { return { status: this.status }; }
 
   on(event, handler) {
     this._requireMessages().on(event, handler);
@@ -67,7 +59,7 @@ class Component {
   }
 
   _requireMessages() {
-    if (!this.core?.messages) throw new Error('Messages component not available on core.');
+    if (!this.core?.messages) throw new Error(`${this.constructor.name}: Messages component not available on core.`);
     return this.core.messages;
   }
 
@@ -109,13 +101,10 @@ class Component {
   }
 
   getPerformanceStats() {
-    return {
-      ...this.getHealth(),
-      ...this.getMetrics(),
-      ...this.getStatus(),
+    return Object.assign(this.getHealth(), this.getMetrics(), this.getStatus(), {
       component: this.constructor.name,
       timestamp: new Date().toISOString()
-    };
+    });
   }
 }
 

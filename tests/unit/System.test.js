@@ -42,7 +42,7 @@ describe('System', () => {
 
       await system.start(); // Second start
 
-      expect(warnSpy).toHaveBeenCalledWith('[WARN]', 'System is already running.', {});
+      expect(warnSpy).toHaveBeenCalledWith('[WARN]', 'System: System is already running.', {});
       // start() should not have been called a second time.
       expect(startSpy).not.toHaveBeenCalled();
 
@@ -92,7 +92,7 @@ describe('System', () => {
 
     test('input should throw an error if the system is not running', async () => {
       await system.stop(); // Stop the system first
-      expect(() => system.input({})).toThrow('System is not running. Call start() before inputting tasks.');
+      expect(() => system.input({})).toThrow('System: System is not running. Call start() before inputting tasks.');
     });
 
     test('on should register an event handler on the messages component', () => {

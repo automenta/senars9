@@ -11,9 +11,7 @@ class LRUMap extends Map {
     super.set(key, value);
   }
 
-  _evict() {
-    this.size > this.maxSize && super.delete(this.keys().next().value);
-  }
+  _evict() { this.size > this.maxSize && super.delete(this.keys().next().value); }
 }
 
 class Cache {

@@ -5,6 +5,7 @@
 
 import { jest } from '@jest/globals';
 import Tools from '../../core/Tools.js';
+import { Logger } from '../../core/utilities.js';
 
 describe('Tools Component', () => {
   let tools;
@@ -51,11 +52,15 @@ describe('Tools Component', () => {
   test('should handle tool execution errors', async () => {
     const error = new Error('Tool failed');
     mockTool.execute.mockRejectedValue(error);
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Mock Logger.error to suppress console output during testing
+    const errorSpy = jest.spyOn(Logger, 'error').mockImplementation(() => {});
 
     await expect(tools.execute('mock-tool', { param1: 'value' })).rejects.toThrow('Tool failed');
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error executing tool "mock-tool":', error);
 
-    consoleErrorSpy.mockRestore();
+    // Verify that Logger.error was called (error handling works)
+    expect(errorSpy).toHaveBeenCalled();
+
+    errorSpy.mockRestore();
   });
 });

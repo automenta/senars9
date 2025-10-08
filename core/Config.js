@@ -21,7 +21,7 @@ class Config extends Component {
     if (cached !== undefined) return cached;
 
     const value = ObjectUtils.safeAccess(this.config, key, undefined);
-    return value !== undefined ? (this.cache.set(key, value), value) : defaultValue;
+    return value !== undefined ? (this.cache.set(key, value) || value) : defaultValue;
   }
 
   set(key, value) {
@@ -39,17 +39,12 @@ class Config extends Component {
   }
 
   _deepMerge(target, source) {
-    if (!ObjectUtils.isObject(target) || !ObjectUtils.isObject(source)) {
-      return source ?? target;
-    }
+    if (!ObjectUtils.isObject(target) || !ObjectUtils.isObject(source)) return source ?? target;
 
-    const result = { ...target };
-    Object.keys(source).forEach(key => {
-      result[key] = ObjectUtils.isObject(source[key])
+    return Object.keys(source).reduce((result, key) =>
+      Object.assign(result, { [key]: ObjectUtils.isObject(source[key])
         ? this._deepMerge(target[key] || {}, source[key])
-        : source[key];
-    });
-    return result;
+        : source[key] }), { ...target });
   }
 }
 

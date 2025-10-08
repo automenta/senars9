@@ -66,7 +66,7 @@ describe('LM Component', () => {
   });
 
   test('throws error if provider not found', async () => {
-    await expect(lm.generateText('prompt', {}, 'nonexistent')).rejects.toThrow('LM provider "nonexistent" not found or no default provider is set.');
+    await expect(lm.generateText('prompt', {}, 'nonexistent')).rejects.toThrow('LM: Provider "nonexistent" not found or no default provider is set.');
   });
 
   test('throws error if hypothesis generation not supported', async () => {
@@ -76,7 +76,7 @@ describe('LM Component', () => {
     };
 
     lm.registerProvider('simple', provider);
-    await expect(lm.generateHypothesis([], {}, 'simple')).rejects.toThrow('Provider "simple" does not support hypothesis generation.');
+    await expect(lm.generateHypothesis([], {}, 'simple')).rejects.toThrow('LM: Provider "simple" does not support hypothesis generation.');
   });
 
   test('integrates with LangChain provider', () => {

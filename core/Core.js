@@ -37,33 +37,22 @@ class Core {
  async initialize(config = {}) {
    await this.config.initialize(config);
 
-   const initPromises = this.registrationOrder.map(async (name) => {
-     if (name !== 'config') {
-       const component = this.componentMap.get(name);
-       const componentConfig = this.config.get(`components.${name}`, {});
-       await component.initialize(componentConfig);
-     }
-   });
+   const initPromises = this.registrationOrder.map(async (name) =>
+     name !== 'config' && await this.componentMap.get(name).initialize(this.config.get(`components.${name}`, {})));
 
    await Promise.all(initPromises);
  }
 
  async start() {
-   const startPromises = this.registrationOrder.map(name =>
-     this.componentMap.get(name).start());
-   await Promise.all(startPromises);
+   await Promise.all(this.registrationOrder.map(name => this.componentMap.get(name).start()));
  }
 
  async stop() {
-   const stopPromises = [...this.registrationOrder].reverse().map(name =>
-     this.componentMap.get(name).stop());
-   await Promise.all(stopPromises);
+   await Promise.all([...this.registrationOrder].reverse().map(name => this.componentMap.get(name).stop()));
  }
 
  async destroy() {
-   const destroyPromises = [...this.registrationOrder].reverse().map(name =>
-     this.componentMap.get(name).destroy());
-   await Promise.all(destroyPromises);
+   await Promise.all([...this.registrationOrder].reverse().map(name => this.componentMap.get(name).destroy()));
  }
 }
 

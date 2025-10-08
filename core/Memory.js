@@ -153,21 +153,10 @@ class Memory extends Component {
     return this.cache.has(key) || this.storage.has(key);
   }
 
-  createFocusSet(name, maxSize = this.focus?.focusSize) {
-    this.focus?.createFocusSet(name, maxSize);
-  }
-
-  setFocus(name) {
-    this.focus?.setFocus(name);
-  }
-
-  getCurrentFocus() {
-    return this.focus?.getCurrentFocus();
-  }
-
-  getFocusItems(count = 10) {
-    return this.focus?.getFocusItems(count) || [];
-  }
+  createFocusSet(name, maxSize = this.focus?.focusSize) { this.focus?.createFocusSet(name, maxSize); }
+  setFocus(name) { this.focus?.setFocus(name); }
+  getCurrentFocus() { return this.focus?.getCurrentFocus(); }
+  getFocusItems(count = 10) { return this.focus?.getFocusItems(count) || []; }
 
   query(criteria = {}) {
     const { type, tags, minPriority, limit = DEFAULTS.QUERY_LIMIT, sortBy, sortOrder = 'desc' } = criteria;
@@ -222,13 +211,12 @@ class Memory extends Component {
   }
 
   _getSortValue(item, sortBy) {
-    const sortMap = {
+    return ({
       priority: item.priority || 0,
       timestamp: item.timestamp || 0,
       accessCount: item.accessCount || 0,
       key: item.key || ''
-    };
-    return sortMap[sortBy] ?? 0;
+    })[sortBy] ?? 0;
   }
 
   getQueryStats() {
@@ -305,17 +293,9 @@ class Memory extends Component {
     return (priorityScore * PRIORITY_WEIGHT) + (recencyScore * RECENCY_WEIGHT) + (frequencyScore * FREQUENCY_WEIGHT) + (focusAttention * FOCUS_WEIGHT);
   }
 
-  updateFocusAttention(name, delta) {
-    this.focus?.updateFocusAttention(name, delta);
-  }
-
-  getFocusSetStats() {
-    return this.focus?.getFocusSetStats() || {};
-  }
-
-  _removeFromFocusSets(key) {
-    this.focus?.removeFromFocusSets(key);
-  }
+  updateFocusAttention(name, delta) { this.focus?.updateFocusAttention(name, delta); }
+  getFocusSetStats() { return this.focus?.getFocusSetStats() || {}; }
+  _removeFromFocusSets(key) { this.focus?.removeFromFocusSets(key); }
 }
 
 export default Memory;

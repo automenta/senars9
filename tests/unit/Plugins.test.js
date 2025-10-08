@@ -69,7 +69,7 @@ describe('Plugins Component', () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     await expect(plugins.loadPlugin(mockPlugin)).rejects.toThrow('Install failed');
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load plugin "mock-plugin":', error);
+    expect(consoleErrorSpy).toHaveBeenCalledWith('[ERROR]', 'Plugins: Failed to load plugin "mock-plugin":', error);
 
     consoleErrorSpy.mockRestore();
   });

@@ -1,4 +1,6 @@
+import { jest } from '@jest/globals';
 import Component from '../../core/Component.js';
+import { Logger } from '../../core/utilities.js';
 
 describe('Component', () => {
   let component;
@@ -56,10 +58,18 @@ describe('Component', () => {
     test('should handle errors gracefully during operations', async () => {
       component._doInitialize = () => { throw new Error('Test error'); };
 
+      // Mock Logger.error to suppress console output during testing
+      const errorSpy = jest.spyOn(Logger, 'error').mockImplementation(() => {});
+
       // Component handles errors internally, so initialize should succeed
       // but the error should be logged through the error handling system
       await component.initialize({});
       expect(component.getStatus().status).toBe('initialized');
+
+      // Verify that Logger.error was called (error handling works)
+      expect(errorSpy).toHaveBeenCalled();
+
+      errorSpy.mockRestore();
     });
 
     test('should provide health information', () => {

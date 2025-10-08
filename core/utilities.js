@@ -1,8 +1,7 @@
 class Logger {
   static log(level, message, data = {}) {
     const method = console[level] || console.log;
-    const upperLevel = level?.toUpperCase() || 'LOG';
-    return method(`[${upperLevel}]`, message, data);
+    return method(`[${level?.toUpperCase() || 'LOG'}]`, message, data);
   }
 
   static info = (msg, data) =>
@@ -33,8 +32,8 @@ class ObjectUtils {
 class ArrayUtils {
   static groupBy = (array, keyFn) => array.reduce((groups, item) => ((groups[keyFn(item)] ||= []).push(item), groups), {});
   static sortBy = (array, keyFn, direction = 'asc') => [...array].sort((a, b) => {
-    const aVal = keyFn(a), bVal = keyFn(b);
-    return direction === 'desc' ? (bVal < aVal ? -1 : bVal > aVal ? 1 : 0) : (aVal < bVal ? -1 : aVal > bVal ? 1 : 0);
+    const aVal = keyFn(a), bVal = keyFn(b), comparator = direction === 'desc' ? [bVal, aVal] : [aVal, bVal];
+    return comparator[0] < comparator[1] ? -1 : comparator[0] > comparator[1] ? 1 : 0;
   });
 
   static unique = (array, keyFn) => keyFn
@@ -54,6 +53,9 @@ class IdGenerator {
 
   static generateErrorId = () => IdGenerator.generate('err_');
   static generateMessageId = () => IdGenerator.generate('msg_');
+
+  static calculateBackoffDelay = (baseDelay, attempt, multiplier = 2) =>
+    baseDelay * Math.pow(multiplier, attempt);
 }
 
 export { Logger, ObjectUtils, ArrayUtils, IdGenerator };

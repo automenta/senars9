@@ -1,12 +1,10 @@
-import { Logger, IdGenerator } from './utilities.js';
+import { Logger, IdGenerator, ObjectUtils } from './utilities.js';
 import { DEFAULTS, RETRYABLE_ERRORS } from './constants.js';
 
 class Validation {
   static requireProps(obj, props) {
     if (!obj) throw new Error('Object is required');
-    props.forEach(prop => {
-      if (!obj[prop]) throw new Error(`${prop} is required`);
-    });
+    props.forEach(prop => { if (!obj[prop]) throw new Error(`${prop} is required`); });
   }
 
   static validateType(value, type, name) {
@@ -139,7 +137,7 @@ class Retry {
       } catch (error) {
         lastError = error;
         if (attempt < maxRetries) {
-          const delay = retryDelay * Math.pow(backoffMultiplier, attempt);
+          const delay = ObjectUtils.calculateBackoffDelay(retryDelay, attempt, backoffMultiplier);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }

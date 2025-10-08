@@ -1,5 +1,6 @@
 import Component from './Component.js';
 import { Validation, ErrorHandler } from './validation.js';
+import { Logger } from './utilities.js';
 
 class Plugins extends Component {
   constructor() {
@@ -14,14 +15,14 @@ class Plugins extends Component {
   async loadPlugin(plugin) {
     Validation.validatePlugin(plugin);
 
-    this.plugins.has(plugin.id) && console.warn(`Plugin "${plugin.id}" already loaded`);
+    this.plugins.has(plugin.id) && Logger.warn(`${this.constructor.name}: Plugin "${plugin.id}" already loaded`);
 
     try {
       await plugin.install(this.core);
       this.plugins.set(plugin.id, plugin);
       this.emit('plugin.loaded', { id: plugin.id });
     } catch (error) {
-      console.error(`Failed to load plugin "${plugin.id}":`, error);
+      Logger.error(`${this.constructor.name}: Failed to load plugin "${plugin.id}":`, error);
       throw error;
     }
   }
@@ -30,7 +31,7 @@ class Plugins extends Component {
     const plugin = Validation.ensureExists(this.plugins.get(pluginId), pluginId, 'Plugin');
 
     typeof plugin.uninstall === 'function' && await plugin.uninstall(this.core).catch(error =>
-      console.error(`Error uninstalling plugin "${pluginId}":`, error));
+      Logger.error(`${this.constructor.name}: Error uninstalling plugin "${pluginId}":`, error));
 
     this.plugins.delete(pluginId);
     this.emit('plugin.unloaded', { id: pluginId });
@@ -44,7 +45,7 @@ class Plugins extends Component {
     return Array.from(this.plugins.values()).map(p => ({
       id: p.id,
       version: p.version || 'N/A',
-      description: p.description || 'No description',
+      description: p.description || 'No description'
     }));
   }
 }

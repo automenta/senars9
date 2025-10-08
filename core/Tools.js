@@ -1,6 +1,7 @@
 import Component from './Component.js';
 import { Storage } from './collections.js';
 import { Validation, ErrorHandler } from './validation.js';
+import { Logger } from './utilities.js';
 
 class Tools extends Component {
   constructor() {
@@ -15,7 +16,7 @@ class Tools extends Component {
   registerTool(tool) {
     Validation.validateTool(tool);
 
-    this.tools.has(tool.id) && console.warn(`Tool "${tool.id}" already registered. Overwriting.`);
+    this.tools.has(tool.id) && Logger.warn(`${this.constructor.name}: Tool "${tool.id}" already registered. Overwriting.`);
     this.tools.set(tool.id, tool);
   }
 
@@ -24,13 +25,13 @@ class Tools extends Component {
 
     tool.parameters?.forEach(param => {
       param.required && !(param.name in params) &&
-        (() => { throw new Error(`Missing required parameter "${param.name}" for tool "${toolId}".`); })();
+        (() => { throw new Error(`${this.constructor.name}: Missing required parameter "${param.name}" for tool "${toolId}".`); })();
     });
 
     try {
       return await tool.execute(params);
     } catch (error) {
-      console.error(`Error executing tool "${toolId}":`, error);
+      Logger.error(`${this.constructor.name}: Error executing tool "${toolId}":`, error);
       throw error;
     }
   }
@@ -39,7 +40,7 @@ class Tools extends Component {
     return Array.from(this.tools.values()).map(tool => ({
       id: tool.id,
       description: tool.description,
-      parameters: tool.parameters,
+      parameters: tool.parameters
     }));
   }
 }

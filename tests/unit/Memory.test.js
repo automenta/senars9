@@ -3,9 +3,9 @@ import Memory from '../../core/Memory.js';
 describe('Memory Component', () => {
   let memory;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     memory = new Memory();
-    memory.initialize({ cacheSize: 3 });
+    await memory.initialize({ cacheSize: 3 });
   });
 
   test('should set and get a value', () => {

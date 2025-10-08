@@ -1,5 +1,5 @@
 import { Validation, ErrorHandler } from './validation.js';
-import { Logger } from './utilities.js';
+import { Logger, ObjectUtils } from './utilities.js';
 
 /**
  * Common middleware functions for use with Messages.js
@@ -297,7 +297,7 @@ export class CommonMiddleware {
                              error.message?.includes('temporary');
 
           if (attempt < maxRetries && isRetryable) {
-            const delay = retryDelay * Math.pow(backoffMultiplier, attempt);
+            const delay = ObjectUtils.calculateBackoffDelay(retryDelay, attempt, backoffMultiplier);
 
             Logger.warn(`Retrying operation`, {
               type: context.type,
