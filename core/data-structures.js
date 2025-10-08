@@ -1,8 +1,3 @@
-/**
- * Data structure utilities for SeNARS
- */
-
-// Base class for LRU cache functionality
 class LRUMap extends Map {
   constructor(maxSize = 1000) {
     super();
@@ -62,10 +57,7 @@ class Storage {
 
   get(key) {
     const value = this.data.get(key);
-    if (this.enableEvents && this.eventTarget) {
-      this.eventTarget.emit(`${this.namespace}:accessed`, { key, value, action: 'get' });
-    }
-    return value;
+    return this.enableEvents && this.eventTarget && this.eventTarget.emit(`${this.namespace}:accessed`, { key, value, action: 'get' }), value;
   }
 
   set(key, value) {
@@ -73,25 +65,16 @@ class Storage {
     this.data._touch(key, value);
     this.data._evict();
 
-    if (this.enableEvents && this.eventTarget) {
-      this.eventTarget.emit(`${this.namespace}:changed`, {
-        key,
-        value,
-        previousValue,
-        action: 'set'
-      });
-    }
+    this.enableEvents && this.eventTarget && this.eventTarget.emit(`${this.namespace}:changed`, {
+      key, value, previousValue, action: 'set'
+    });
   }
 
   delete(key) {
     const deleted = this.data.delete(key);
-    if (deleted && this.enableEvents && this.eventTarget) {
-      this.eventTarget.emit(`${this.namespace}:changed`, {
-        key,
-        action: 'delete'
-      });
-    }
-    return deleted;
+    return deleted && this.enableEvents && this.eventTarget && this.eventTarget.emit(`${this.namespace}:changed`, {
+      key, action: 'delete'
+    }), deleted;
   }
 
   has(key) {
@@ -100,9 +83,7 @@ class Storage {
 
   clear() {
     this.data.clear();
-    if (this.enableEvents && this.eventTarget) {
-      this.eventTarget.emit(`${this.namespace}:cleared`, {});
-    }
+    this.enableEvents && this.eventTarget && this.eventTarget.emit(`${this.namespace}:cleared`, {});
   }
 
   size() {
@@ -121,7 +102,6 @@ class Storage {
     return this.data.entries();
   }
 
-  // Enhanced methods for better functionality
   getOrDefault(key, defaultValue) {
     return this.has(key) ? this.get(key) : defaultValue;
   }
@@ -129,11 +109,9 @@ class Storage {
   update(key, updateFn) {
     const currentValue = this.get(key);
     const newValue = updateFn(currentValue);
-    this.set(key, newValue);
-    return newValue;
+    return this.set(key, newValue), newValue;
   }
 
-  // Bulk operations
   setMany(entries) {
     entries.forEach(([key, value]) => this.set(key, value));
   }
@@ -142,13 +120,10 @@ class Storage {
     keys.forEach(key => this.delete(key));
   }
 
-  // Advanced querying
   find(predicate) {
     const results = [];
     for (const [key, value] of this.entries()) {
-      if (predicate(value, key)) {
-        results.push({ key, value });
-      }
+      predicate(value, key) && results.push({ key, value });
     }
     return results;
   }
@@ -156,14 +131,11 @@ class Storage {
   filter(predicate) {
     const results = new Map();
     for (const [key, value] of this.entries()) {
-      if (predicate(value, key)) {
-        results.set(key, value);
-      }
+      predicate(value, key) && results.set(key, value);
     }
     return results;
   }
 
-  // Statistics and monitoring
   getStats() {
     return {
       size: this.size(),
@@ -179,10 +151,8 @@ class IndexManager {
     this.indexes = new Map();
   }
 
-  add(type, key, value) {
-    if (!this.indexes.has(type)) {
-      this.indexes.set(type, new Set());
-    }
+  add(type, key) {
+    this.indexes.has(type) || this.indexes.set(type, new Set());
     this.indexes.get(type).add(key);
   }
 
@@ -190,9 +160,7 @@ class IndexManager {
     if (!this.indexes.has(type)) return;
     const keys = this.indexes.get(type);
     keys.delete(key);
-    if (keys.size === 0) {
-      this.indexes.delete(type);
-    }
+    keys.size === 0 && this.indexes.delete(type);
   }
 
   get(type) {
@@ -207,7 +175,6 @@ class IndexManager {
     this.indexes.clear();
   }
 
-  // Advanced filtering operations
   intersect(candidates, filterFn) {
     return new Set([...candidates].filter(filterFn));
   }

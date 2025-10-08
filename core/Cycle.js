@@ -33,43 +33,25 @@ class Cycle extends Component {
   async _runCycle() {
     if (!this.core) return;
 
-    // 1. Perception: Convert external input to tasks (handled externally, tasks are added to memory)
-
-    // 2. Prioritization: Calculate task priorities (handled by a future PriorityManager or within Memory)
-
-    // 3. Focus Selection: Select tasks for the current cycle
     const focusSet = await this._selectFocusSet();
 
-    // 4. Reasoning: Apply inference rules to the focus set
     if (this.core.reasoner) {
       const derivedTasks = await this.core.reasoner.reason(focusSet);
       if (derivedTasks.length > 0 && this.core.memory) {
-        // await this.core.memory.addTasks(derivedTasks); // Assumes an addTasks method
+        // await this.core.memory.addTasks(derivedTasks);
       }
     }
 
-    // 5. Meta-Cognition: Detect contradictions and conflicts (future implementation)
-
-    // 6. Neural Enrichment: Use LMs for insights (future implementation)
-
-    // 7. Planning: Create action sequences for goals (future implementation)
-
-    // 8. Action Execution: Execute plans (future implementation)
-
-    // 9. Learning: Consolidate new knowledge into memory
     if (this.core.memory) {
       await this.core.memory.consolidateKnowledge();
     }
-
-    // Adaptive Timing: Adjust cycle interval based on system load (future implementation)
   }
 
   async _selectFocusSet() {
     if (!this.core || !this.core.memory) {
       return [];
     }
-    // Simple strategy: get a few of the most recently added tasks
-    const allTasks = await this.core.memory.queryTasks({}); // A simple query for now
+    const allTasks = await this.core.memory.queryTasks({});
     allTasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     const focusSetSize = this.core.config.get('core.focusSetSize', 10);
     return allTasks.slice(0, focusSetSize);

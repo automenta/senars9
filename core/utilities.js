@@ -1,11 +1,5 @@
-/**
- * General utility functions for SeNARS
- */
-
 class Logger {
-  static log = (level, message, data = {}) =>
-    (console[level] || console.log)(`[${level.toUpperCase()}]`, message, data);
-
+  static log = (level, message, data = {}) => (console[level] || console.log)(`[${level.toUpperCase()}]`, message, data);
   static info = (msg, data) => Logger.log('info', msg, data);
   static warn = (msg, data) => Logger.log('warn', msg, data);
   static error = (msg, data) => Logger.log('error', msg, data);
@@ -18,9 +12,7 @@ class ObjectUtils {
       (current && typeof current === 'object' && key in current) ? current[key] : undefined, obj) ?? defaultValue;
   }
 
-  static deepClone(obj) {
-    return obj && typeof obj === 'object' ? JSON.parse(JSON.stringify(obj)) : obj;
-  }
+  static deepClone = obj => obj && typeof obj === 'object' ? JSON.parse(JSON.stringify(obj)) : obj;
 
   static isObject = item => item && typeof item === 'object' && !Array.isArray(item);
   static isEmpty = obj => !obj || Object.keys(obj).length === 0;
@@ -29,10 +21,7 @@ class ObjectUtils {
 }
 
 class ArrayUtils {
-  static groupBy = (array, keyFn) => array.reduce((groups, item) => {
-    const key = keyFn(item);
-    return (groups[key] ||= []).push(item), groups;
-  }, {});
+  static groupBy = (array, keyFn) => array.reduce((groups, item) => ((groups[keyFn(item)] ||= []).push(item), groups), {});
 
   static sortBy = (array, keyFn, direction = 'asc') => [...array].sort((a, b) => {
     const aVal = keyFn(a), bVal = keyFn(b);

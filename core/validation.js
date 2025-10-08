@@ -1,7 +1,3 @@
-/**
- * Validation and error handling utilities for SeNARS
- */
-
 class Validation {
   static requireProps(obj, props) {
     if (!obj) throw new Error('Object is required');
@@ -54,19 +50,13 @@ class ErrorHandler {
       errorId: this._generateErrorId()
     };
 
-    // Use Messages.js error handling if available
-    if (messagesComponent) {
-      messagesComponent.emit('error:occurred', {
-        error: errorInfo.error,
-        errorId: errorInfo.errorId,
-        context,
-        stack: errorInfo.stack,
-        timestamp: errorInfo.timestamp
-      });
-    } else {
-      // Fallback to console logging if no messages component
-      Logger.error('Handled error', errorInfo);
-    }
+    messagesComponent ? messagesComponent.emit('error:occurred', {
+      error: errorInfo.error,
+      errorId: errorInfo.errorId,
+      context,
+      stack: errorInfo.stack,
+      timestamp: errorInfo.timestamp
+    }) : Logger.error('Handled error', errorInfo);
 
     return errorInfo;
   }
@@ -94,18 +84,16 @@ class ErrorHandler {
 
   static createErrorBoundary(componentName, messagesComponent = null) {
     return {
-      wrap: (fn) => {
-        return async (...args) => {
-          try {
-            return await fn.apply(this, args);
-          } catch (error) {
-            const enhancedError = this.createEnhanced(error, {
-              component: componentName,
-              type: 'ComponentError'
-            });
-            return this.handle(enhancedError, componentName, messagesComponent);
-          }
-        };
+      wrap: (fn) => async (...args) => {
+        try {
+          return await fn.apply(this, args);
+        } catch (error) {
+          const enhancedError = this.createEnhanced(error, {
+            component: componentName,
+            type: 'ComponentError'
+          });
+          return this.handle(enhancedError, componentName, messagesComponent);
+        }
       },
 
       wrapMethod: (obj, methodName) => {
@@ -141,7 +129,7 @@ class Retry {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const result = await fn();
-        if (attempt > 0) Logger.info(`Operation succeeded after ${attempt} retries`);
+        attempt > 0 && Logger.info(`Operation succeeded after ${attempt} retries`);
         return result;
       } catch (error) {
         lastError = error;

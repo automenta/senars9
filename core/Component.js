@@ -92,8 +92,6 @@ class Component {
     }
   }
 
-
-  // Enhanced event handling with Messages.js integration
   registerCommand(command, handler) {
     this._requireMessages().registerCommand(command, handler);
   }
@@ -110,7 +108,6 @@ class Component {
     return this._requireMessages().process(message, options);
   }
 
-  // Enhanced error handling integration
   registerErrorHandler(errorType, handler) {
     this._requireMessages().registerErrorHandler(errorType, handler);
   }
@@ -119,7 +116,6 @@ class Component {
     this._requireMessages().setRetryPolicy(operation, policy);
   }
 
-  // Performance monitoring integration
   getPerformanceStats() {
     const health = this.getHealth();
     const metrics = this.getMetrics();

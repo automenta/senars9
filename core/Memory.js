@@ -2,7 +2,6 @@ import Component from './Component.js';
 import { Cache, Storage, IndexManager } from './data-structures.js';
 import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
 import { Validation } from './validation.js';
-import { ErrorHandler } from './validation.js';
 
 class Memory extends Component {
   constructor() {

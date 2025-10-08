@@ -2,7 +2,6 @@ import Component from './Component.js';
 import { Storage, IndexManager } from './data-structures.js';
 import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
 import { Validation } from './validation.js';
-import { ErrorHandler } from './validation.js';
 
 const COMPLEXITY_LEVELS = { simple: 1, medium: 2, complex: 3 };
 const MAX_PRIORITY = 10;
@@ -48,12 +47,10 @@ class Rules extends Component {
   }
 
   _updateIndexes(rule) {
-    // Enhanced indexing for fast lookups
     this.indexes.add(rule.type, rule.name, rule);
     this.indexes.add(`complexity_${rule.complexity}`, rule.name, rule);
     this.indexes.add(`priority_${rule.priority}`, rule.name, rule);
 
-    // Index by pre-filter tags for advanced filtering
     rule.preFilterTags?.forEach(tag => {
       this.preFilters.add(tag);
       this.indexes.add(`prefilter_${tag}`, rule.name, rule);
@@ -92,14 +89,12 @@ class Rules extends Component {
   getOptimizedRuleCandidates(context, options = {}) {
     let candidates = [];
 
-    // Use indexes for fast initial filtering
     if (options.ruleType) {
       candidates = this.getRulesByType(options.ruleType);
     } else {
       candidates = this.rules;
     }
 
-    // Apply complexity filter using index if specified
     if (options.maxComplexity) {
       const maxLevel = COMPLEXITY_LEVELS[options.maxComplexity] || COMPLEXITY_LEVELS.complex;
       const complexityCandidates = new Set();
@@ -114,10 +109,7 @@ class Rules extends Component {
       candidates = candidates.filter(rule => complexityCandidates.has(rule));
     }
 
-    // Apply pre-filtering for context relevance
-    candidates = this._preFilterRules(candidates, context);
-
-    return candidates;
+    return this._preFilterRules(candidates, context);
   }
 
   getStats() {
@@ -255,7 +247,6 @@ class Rules extends Component {
     const contextKeys = Object.keys(context);
     if (contextKeys.length === 0) return rules;
 
-    // Advanced pre-filtering for 60-80% performance improvement
     return rules.filter(rule => {
       const tags = rule.preFilterTags || [];
       return tags.length === 0 || tags.some(tag => contextKeys.includes(tag));
