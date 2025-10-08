@@ -48,7 +48,7 @@ impl RuleEngine {
     /// An `Option<&Vec<Box<dyn InferenceRule>>>` containing the slice of applicable
     /// rules if any are found.
     pub fn get_applicable_rules(&self, task: &Arc<Task>) -> Option<&Vec<Box<dyn InferenceRule>>> {
-        self.rules.get(&task.term.term_type)
+        self.rules.get(&task.term().term_type)
     }
 }
 

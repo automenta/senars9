@@ -9,6 +9,7 @@ use self::{
         induction::Induction, modus_ponens::ModusPonens,
     },
 };
+use crate::cycle::context::CycleContext;
 use crate::data_structures::task::Task;
 use crate::memory::Memory;
 use std::sync::Arc;
@@ -47,19 +48,24 @@ impl Reasoner {
     ///
     /// # Arguments
     /// * `focus_set` - A slice of `Arc<Task>` representing the tasks to reason about.
-    /// * `memory` - A mutable reference to the system's `Memory` to look up
-    ///   related knowledge and create new terms.
+    /// * `memory` - A mutable reference to the system's `Memory`.
+    /// * `context` - The context object for the current cycle.
     ///
     /// # Returns
     /// A `Vec<Task>` containing all newly derived tasks.
-    pub fn reason(&self, focus_set: &[Arc<Task>], memory: &mut Memory) -> Vec<Task> {
+    pub fn reason(
+        &self,
+        focus_set: &[Arc<Task>],
+        memory: &mut Memory,
+        context: &CycleContext,
+    ) -> Vec<Task> {
         let mut derived_tasks = Vec::new();
 
         for task in focus_set {
             // Find and apply all rules relevant to the current task.
             if let Some(applicable_rules) = self.rule_engine.get_applicable_rules(task) {
                 for rule in applicable_rules {
-                    derived_tasks.extend(rule.apply(task, memory));
+                    derived_tasks.extend(rule.apply(task, memory, context));
                 }
             }
         }

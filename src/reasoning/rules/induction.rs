@@ -2,8 +2,10 @@
 //!
 //! This rule derives `(S --> P)` from `(M --> S)` and `(M --> P)`.
 
+use crate::cycle::context::CycleContext;
 use crate::data_structures::{
-    punctuation::Punctuation, task::Task, term::Term, term_type::TermType, truth_value::TruthValue,
+    concept::Concept, punctuation::Punctuation, task::Task, term_type::TermType,
+    truth_value::TruthValue,
 };
 use crate::memory::Memory;
 use crate::reasoning::inference_rule::InferenceRule;
@@ -22,27 +24,27 @@ impl InferenceRule for Induction {
     ///
     /// Given a premise `(M --> S).` (premise1), it looks for a second premise
     /// `(M --> P).` in memory to derive the conclusion `(S --> P).`.
-    fn apply(&self, premise1: &Arc<Task>, memory: &mut Memory) -> Vec<Task> {
+    fn apply(&self, premise1: &Arc<Task>, memory: &mut Memory, context: &CycleContext) -> Vec<Task> {
         let mut derived = Vec::new();
 
-        if let (Some(subject1), Some(predicate1), Some(truth1)) = (
-            &premise1.term.subject,
-            &premise1.term.predicate,
+        if let (Some(subject1_term), Some(predicate1_term), Some(truth1)) = (
+            &premise1.term().subject,
+            &premise1.term().predicate,
             premise1.truth,
         ) {
             // We have (M --> S). We need to find premises (M --> P).
             // The subject of the second premise must be the same as the first.
 
-            // Collect the required data from the second premises to avoid borrow checker issues.
-            let premises2_data: Vec<(Arc<Term>, TruthValue)> =
-                if let Some(premises2) = memory.get_inheritance_by_subject(subject1) {
+            let premises2_data: Vec<(Arc<Concept>, TruthValue)> =
+                if let Some(premises2) = memory.get_inheritance_by_subject(subject1_term) {
                     premises2
                         .iter()
                         // Exclude the premise task itself from being the second premise.
-                        .filter(|p| p.term.hash != premise1.term.hash)
+                        .filter(|p| p.term().hash != premise1.term().hash)
                         .filter_map(|p| {
-                            if let (Some(pred), Some(truth)) = (&p.term.predicate, p.truth) {
-                                Some((Arc::clone(pred), truth))
+                            if let (Some(pred_term), Some(truth)) = (&p.term().predicate, p.truth) {
+                                let pred_concept = memory.concept_storage.get(&pred_term.hash)?;
+                                Some((pred_concept.clone(), truth))
                             } else {
                                 None
                             }
@@ -52,18 +54,32 @@ impl InferenceRule for Induction {
                     Vec::new()
                 };
 
-            // Now, iterate over the collected data to derive conclusions.
-            for (predicate2, truth2) in premises2_data {
+            if premises2_data.is_empty() {
+                return derived;
+            }
+
+            let predicate1_concept = match memory.concept_storage.get(&predicate1_term.hash) {
+                Some(c) => c.clone(),
+                None => return derived,
+            };
+
+            for (predicate2_concept, truth2) in premises2_data {
                 // Found (M --> P). Now derive (S --> P).
-                let new_term = memory.create_or_get_compound_term(
+                let new_concept = memory.create_or_get_compound_term(
                     TermType::Inheritance,
-                    vec![Arc::clone(predicate1), predicate2],
+                    vec![predicate1_concept.clone(), predicate2_concept],
+                    context.current_time,
                 );
 
-                // Calculate the truth value for the conclusion using the induction function.
                 let new_truth = TruthValue::induction(&truth1, &truth2);
 
-                let new_task = Task::new(new_term, Punctuation::Belief, Some(new_truth));
+                let new_task = Task::new(
+                    new_concept,
+                    Punctuation::Belief,
+                    Some(new_truth),
+                    context.current_time,
+                    context.current_time,
+                );
                 derived.push(new_task);
             }
         }

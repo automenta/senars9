@@ -1,4 +1,6 @@
-use crate::data_structures::{task::Task, term::Term, term_type::TermType};
+use crate::data_structures::{
+    concept::Concept, task::Task, term::Term, term_type::TermType,
+};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
@@ -6,13 +8,13 @@ use std::sync::Arc;
 ///
 /// The memory is designed with a dual storage architecture (short-term and long-term)
 /// and uses indexes for efficient, content-addressable retrieval of information. It is
-/// also responsible for the lifecycle of all `Term` instances, ensuring that each unique
-/// term is represented by a single, canonical object.
+/// also responsible for the lifecycle of all `Concept` instances, ensuring that each unique
+/// term is represented by a single, canonical concept object.
 #[derive(Debug, Default)]
 pub struct Memory {
-    /// Storage for all unique terms in the system, ensuring that each term has a single instance.
+    /// Storage for all unique concepts in the system, ensuring that each term has a single instance.
     /// The key is the term's content hash.
-    pub term_storage: HashMap<String, Arc<Term>>,
+    pub concept_storage: HashMap<String, Arc<Concept>>,
     /// Short-term memory for recently added or accessed tasks. This acts as a buffer
     /// for new information before it's evaluated for long-term storage.
     pub short_term_tasks: HashMap<String, Arc<Task>>,
@@ -21,27 +23,19 @@ pub struct Memory {
     pub long_term_tasks: HashMap<String, Arc<Task>>,
 
     /// Index for implication relationships: `premise_hash -> {task_hash, ...}`.
-    /// Allows for efficient lookup of implications `(premise ==> conclusion)`.
     implication_index: HashMap<String, HashSet<String>>,
     /// Index for inheritance relationships: `subject_hash -> {task_hash, ...}`.
-    /// Allows for efficient lookup of inheritance statements `(subject --> predicate)`.
     inheritance_index: HashMap<String, HashSet<String>>,
     /// Index for inheritance relationships: `predicate_hash -> {task_hash, ...}`.
-    /// Allows for efficient lookup of inheritance statements `(subject --> predicate)`.
     inheritance_index_by_predicate: HashMap<String, HashSet<String>>,
     /// Index for similarity relationships: `term_hash -> {task_hash, ...}`.
-    /// Allows for efficient lookup of similarity statements `(term1 <-> term2)`.
     similarity_index: HashMap<String, HashSet<String>>,
     /// Index for temporal relationships: `timestamp -> {task_hash, ...}`.
-    /// Using a `BTreeMap` allows for efficient time-based range queries.
     temporal_index: BTreeMap<u64, HashSet<String>>,
 
     // Statistics
-    /// Total number of tasks currently in memory (both short-term and long-term).
     total_tasks: u64,
-    /// Number of consolidation cycles performed.
     pub consolidation_count: u64,
-    /// Timestamp of the last consolidation cycle.
     pub last_consolidation: u64,
 }
 
@@ -49,7 +43,7 @@ impl Memory {
     /// Creates a new, empty `Memory` component.
     pub fn new() -> Self {
         Memory {
-            term_storage: HashMap::new(),
+            concept_storage: HashMap::new(),
             short_term_tasks: HashMap::new(),
             long_term_tasks: HashMap::new(),
             implication_index: HashMap::new(),
@@ -64,22 +58,14 @@ impl Memory {
     }
 
     /// Adds a new task to short-term memory and updates all relevant indexes.
-    ///
-    /// If a task with the same term hash already exists, it will be overwritten.
-    /// This method is the primary way to introduce new information into the system.
-    ///
-    /// # Arguments
-    /// * `task` - The `Task` to be added to memory.
     pub fn add_task(&mut self, task: Task) {
         let task_arc = Arc::new(task);
-        let term_hash = task_arc.term.hash.clone();
+        let term_hash = task_arc.term().hash.clone();
 
-        // Add to short-term memory, overwriting if it exists.
         if self.short_term_tasks.insert(term_hash.clone(), task_arc.clone()).is_none() {
             self.total_tasks += 1;
         }
 
-        // Update temporal index if the task has an occurrence time.
         if let Some(time) = task_arc.occurrence_time {
             self.temporal_index
                 .entry(time)
@@ -87,10 +73,9 @@ impl Memory {
                 .insert(term_hash.clone());
         }
 
-        // Update content-based indexes based on the term type.
-        match task_arc.term.term_type {
+        match task_arc.term().term_type {
             TermType::Implication => {
-                if let Some(premise) = &task_arc.term.subject {
+                if let Some(premise) = &task_arc.term().subject {
                     self.implication_index
                         .entry(premise.hash.clone())
                         .or_default()
@@ -98,13 +83,13 @@ impl Memory {
                 }
             }
             TermType::Inheritance => {
-                if let Some(subject) = &task_arc.term.subject {
+                if let Some(subject) = &task_arc.term().subject {
                     self.inheritance_index
                         .entry(subject.hash.clone())
                         .or_default()
                         .insert(term_hash.clone());
                 }
-                if let Some(predicate) = &task_arc.term.predicate {
+                if let Some(predicate) = &task_arc.term().predicate {
                     self.inheritance_index_by_predicate
                         .entry(predicate.hash.clone())
                         .or_default()
@@ -112,7 +97,7 @@ impl Memory {
                 }
             }
             TermType::Similarity => {
-                if let (Some(subj), Some(pred)) = (&task_arc.term.subject, &task_arc.term.predicate) {
+                if let (Some(subj), Some(pred)) = (&task_arc.term().subject, &task_arc.term().predicate) {
                     self.similarity_index.entry(subj.hash.clone()).or_default().insert(term_hash.clone());
                     self.similarity_index.entry(pred.hash.clone()).or_default().insert(term_hash);
                 }
@@ -121,7 +106,7 @@ impl Memory {
         }
     }
 
-    /// Retrieves a task from memory by its term hash, checking both short-term and long-term memory.
+    /// Retrieves a task from memory by its term hash.
     pub fn get_task(&self, term_hash: &str) -> Option<&Arc<Task>> {
         self.short_term_tasks.get(term_hash).or_else(|| self.long_term_tasks.get(term_hash))
     }
@@ -180,10 +165,6 @@ impl Memory {
     }
 
     /// Retrieves tasks within a specific time range.
-    ///
-    /// # Arguments
-    /// * `start_time` - The start of the time range (inclusive).
-    /// * `end_time` - The end of the time range (inclusive).
     pub fn get_tasks_by_time_range(&self, start_time: u64, end_time: u64) -> Vec<&Arc<Task>> {
         self.temporal_index
             .range(start_time..=end_time)
@@ -192,62 +173,37 @@ impl Memory {
             .collect()
     }
 
-    /// Creates or retrieves an atomic term from memory, ensuring uniqueness.
-    ///
-    /// If an atomic term with the given `name` already exists in `term_storage`, a
-    /// reference to the existing term is returned. Otherwise, a new `Term` is created,
-    /// stored, and a reference to it is returned. This ensures that every unique
-    /// atomic term is represented by a single object in memory.
-    ///
-    /// # Arguments
-    /// * `name` - The string name of the atomic term (e.g., "cat", "A").
-    ///
-    /// # Returns
-    /// An `Arc<Term>` pointing to the unique instance of the atomic term.
-    pub fn create_or_get_atom(&mut self, name: &str) -> Arc<Term> {
-        let _term_type = TermType::Atom;
-        // Simplified hash calculation for lookup, must match Term's internal logic.
+    /// Creates or retrieves an atomic concept from memory, ensuring uniqueness.
+    pub fn create_or_get_atom(&mut self, name: &str, created_at: u64) -> Arc<Concept> {
         let temp_hash = Term::compute_hash_for_atom(name);
 
-        if let Some(term) = self.term_storage.get(&temp_hash) {
-            return term.clone();
+        if let Some(concept) = self.concept_storage.get(&temp_hash) {
+            return concept.clone();
         }
 
-        let new_term = Arc::new(Term::new_atom(name, 0)); // `created_at` is set to 0 initially.
-        self.term_storage.insert(new_term.hash.clone(), new_term.clone());
-        new_term
+        let new_term = Arc::new(Term::new_atom(name));
+        let new_concept = Arc::new(Concept::new(new_term, created_at));
+        self.concept_storage.insert(new_concept.term.hash.clone(), new_concept.clone());
+        new_concept
     }
 
-    /// Creates or retrieves a compound term, applying simplification and canonicalization rules.
-    ///
-    /// This method is the sole entry point for creating compound terms. It performs several
-    /// critical functions to ensure terms are stored in a canonical form:
-    /// 1.  **Simplification**: Applies logical reduction rules, such as flattening nested
-    ///     associative operators (e.g., `(&, A, (&, B, C))` becomes `(&, A, B, C)`) and
-    ///     reducing double negations.
-    /// 2.  **Canonicalization**: For commutative operators, it sorts components by hash to
-    ///     ensure a consistent, canonical representation (e.g., `(&, B, A)` becomes `(&, A, B)`).
-    /// 3.  **Uniqueness**: Checks if a term with the same canonical hash already exists in
-    ///     `term_storage`. If so, it returns a reference to the existing term. Otherwise, it
-    ///     creates and stores a new one.
-    ///
-    /// # Arguments
-    /// * `term_type` - The `TermType` of the compound term to create.
-    /// * `components` - A `Vec<Arc<Term>>` of the components of the term.
-    ///
-    /// # Returns
-    /// An `Arc<Term>` pointing to the unique, canonical instance of the compound term.
-    pub fn create_or_get_compound_term(&mut self, term_type: TermType, mut components: Vec<Arc<Term>>) -> Arc<Term> {
-        // --- Apply simplification and canonicalization rules ---
-        // This logic is moved from the original `Term::create_compound`
+    /// Creates or retrieves a compound concept, applying simplification and canonicalization rules.
+    pub fn create_or_get_compound_term(
+        &mut self,
+        term_type: TermType,
+        components: Vec<Arc<Concept>>,
+        created_at: u64,
+    ) -> Arc<Concept> {
+        // Extract terms from concepts for simplification logic
+        let mut term_components: Vec<Arc<Term>> = components.iter().map(|c| c.term.clone()).collect();
 
         // 1. Associativity (Flattening) for n-ary operators
         if term_type == TermType::Conjunction || term_type == TermType::Disjunction {
-            components = components.into_iter().flat_map(|comp| {
-                if comp.term_type == term_type {
-                    comp.components.as_ref().unwrap().clone()
+            term_components = term_components.into_iter().flat_map(|comp_term| {
+                if comp_term.term_type == term_type {
+                    comp_term.components.as_ref().unwrap().clone()
                 } else {
-                    vec![comp]
+                    vec![comp_term]
                 }
             }).collect();
         }
@@ -259,68 +215,53 @@ impl Memory {
         );
 
         if is_commutative {
-            // Sort by name for a predictable, alphabetical canonical order.
-            components.sort_by(|a, b| a.name.cmp(&b.name));
-            components.dedup_by(|a, b| a.hash == b.hash);
+            term_components.sort_by(|a, b| a.name.cmp(&b.name));
+            term_components.dedup_by(|a, b| a.hash == b.hash);
         }
 
         // 3. 1-ary Reduction for Conjunction and Disjunction
-        if (term_type == TermType::Conjunction || term_type == TermType::Disjunction) && components.len() == 1 {
-            return components.pop().unwrap();
+        if (term_type == TermType::Conjunction || term_type == TermType::Disjunction) && term_components.len() == 1 {
+            let reduced_term_hash = &term_components[0].hash;
+            return self.concept_storage.get(reduced_term_hash).unwrap().clone();
         }
 
         // 4. Double Negation Reduction: (--, (--, A)) => A
         if term_type == TermType::Negation {
-            if let Some(component) = components.first() {
-                if component.term_type == TermType::Negation {
-                    return component.components.as_ref().unwrap()[0].clone();
+            if let Some(component_term) = term_components.first() {
+                if component_term.term_type == TermType::Negation {
+                    let inner_term_hash = &component_term.components.as_ref().unwrap()[0].hash;
+                    return self.concept_storage.get(inner_term_hash).unwrap().clone();
                 }
             }
         }
 
-        // --- End of simplification rules ---
+        let name = Term::generate_name(&term_type, &term_components);
+        let final_hash = Term::compute_hash(&name, &term_type, &Some(term_components.clone()));
 
-        let name = Term::generate_name(&term_type, &components);
-        let final_hash = Term::compute_hash(&name, &term_type, &Some(components.clone()));
-
-        if let Some(term) = self.term_storage.get(&final_hash) {
-            return term.clone();
+        if let Some(concept) = self.concept_storage.get(&final_hash) {
+            return concept.clone();
         }
 
         let new_term = Arc::new(Term::create_compound_raw(
             name,
             term_type,
-            components,
-            0, // `created_at` timestamp
+            term_components,
             final_hash,
         ));
 
-        self.term_storage.insert(new_term.hash.clone(), new_term.clone());
-        new_term
+        let new_concept = Arc::new(Concept::new(new_term, created_at));
+        self.concept_storage.insert(new_concept.term.hash.clone(), new_concept.clone());
+        new_concept
     }
 
-    /// Removes a task from memory completely, including from all storage and indexes.
-    ///
-    /// This method ensures that all traces of a task are purged from the system. It removes
-    /// the task from both short-term and long-term storage and cleans up any references
-    /// in the `implication_index`, `inheritance_index`, `similarity_index`, and `temporal_index`.
-    ///
-    /// # Arguments
-    /// * `term_hash` - The hash of the term identifying the task to remove.
-    ///
-    /// # Returns
-    /// `true` if the task was found and removed, `false` otherwise.
+    /// Removes a task from memory completely.
     pub fn remove_task(&mut self, term_hash: &str) -> bool {
-        let task_to_remove = if let Some(task) = self.short_term_tasks.remove(term_hash) {
-            Some(task)
-        } else {
-            self.long_term_tasks.remove(term_hash)
-        };
+        let task_to_remove = self.short_term_tasks.remove(term_hash)
+            .or_else(|| self.long_term_tasks.remove(term_hash));
 
         if let Some(task) = task_to_remove {
             self.total_tasks -= 1;
 
-            // Remove from temporal index
             if let Some(time) = task.occurrence_time {
                 if let Some(hashes) = self.temporal_index.get_mut(&time) {
                     hashes.remove(term_hash);
@@ -330,29 +271,28 @@ impl Memory {
                 }
             }
 
-            // Remove from content-based indexes
-            match task.term.term_type {
+            match task.term().term_type {
                 TermType::Implication => {
-                    if let Some(premise) = &task.term.subject {
+                    if let Some(premise) = &task.term().subject {
                         if let Some(hashes) = self.implication_index.get_mut(&premise.hash) {
-                            hashes.remove(term_hash);
-                        }
-                    }
-                    if let Some(predicate) = &task.term.predicate {
-                        if let Some(hashes) = self.inheritance_index_by_predicate.get_mut(&predicate.hash) {
                             hashes.remove(term_hash);
                         }
                     }
                 }
                 TermType::Inheritance => {
-                    if let Some(subject) = &task.term.subject {
+                    if let Some(subject) = &task.term().subject {
                         if let Some(hashes) = self.inheritance_index.get_mut(&subject.hash) {
+                            hashes.remove(term_hash);
+                        }
+                    }
+                    if let Some(predicate) = &task.term().predicate {
+                        if let Some(hashes) = self.inheritance_index_by_predicate.get_mut(&predicate.hash) {
                             hashes.remove(term_hash);
                         }
                     }
                 }
                 TermType::Similarity => {
-                    if let (Some(subj), Some(pred)) = (&task.term.subject, &task.term.predicate) {
+                    if let (Some(subj), Some(pred)) = (&task.term().subject, &task.term().predicate) {
                         if let Some(hashes) = self.similarity_index.get_mut(&subj.hash) {
                             hashes.remove(term_hash);
                         }
@@ -369,42 +309,25 @@ impl Memory {
         }
     }
 
-    /// Performs a memory consolidation cycle, which involves two main operations:
-    ///
-    /// 1.  **Forgetting**: Iterates through all tasks and removes any that have expired
-    ///     based on their `expiration_time` relative to the `current_time`.
-    /// 2.  **Promotion**: Moves high-priority tasks (priority >= 0.7) from short-term
-    ///     memory to long-term memory, signifying their importance and persistence.
-    ///
-    /// This method is crucial for managing memory growth and focusing the system's
-    /// attention on relevant information.
-    ///
-    /// # Arguments
-    /// * `current_time` - The current system time, used to check for task expiration.
+    /// Performs a memory consolidation cycle.
     pub fn consolidate(&mut self, current_time: u64) {
-        // --- 1. Forget Expired Tasks ---
-        // Collect hashes of all expired tasks to avoid borrowing issues.
         let expired_task_hashes: Vec<String> = self
             .get_all_tasks_iter()
             .filter(|task| task.is_expired(current_time))
-            .map(|task| task.term.hash.clone())
+            .map(|task| task.term().hash.clone())
             .collect();
 
-        // Remove each expired task from memory.
         for hash in expired_task_hashes {
             self.remove_task(&hash);
         }
 
-        // --- 2. Promote High-Priority Tasks ---
         let mut tasks_to_move = Vec::new();
-        // Identify tasks in short-term memory that are ready for promotion.
         for (hash, task) in self.short_term_tasks.iter() {
-            if task.priority >= 0.7 { // Priority threshold for consolidation.
+            if task.priority >= 0.7 {
                 tasks_to_move.push(hash.clone());
             }
         }
 
-        // Move the selected tasks from short-term to long-term memory.
         for hash in tasks_to_move {
             if let Some(task) = self.short_term_tasks.remove(&hash) {
                 self.long_term_tasks.insert(hash, task);

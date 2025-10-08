@@ -1,3 +1,4 @@
+use super::concept::Concept;
 use super::punctuation::Punctuation;
 use super::term::Term;
 use super::truth_value::TruthValue;
@@ -9,8 +10,8 @@ use std::sync::Arc;
 /// Tasks are the primary units of work and information flow within the system.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Task {
-    /// The term that this task is about.
-    pub term: Arc<Term>,
+    /// The concept that this task is about.
+    pub concept: Arc<Concept>,
     /// The punctuation indicating the task type (e.g., Belief '.', Goal '!', Question '?').
     pub punctuation: Punctuation,
     /// The truth value associated with the task, representing its evidential support.
@@ -35,24 +36,35 @@ impl Task {
     /// Creates a new `Task` with default values.
     ///
     /// # Arguments
-    /// * `term` - The `Term` this task is about.
+    /// * `concept` - The `Concept` this task is about.
     /// * `punctuation` - The `Punctuation` defining the task type.
     /// * `truth` - An optional `TruthValue` for beliefs.
-    pub fn new(term: Arc<Term>, punctuation: Punctuation, truth: Option<TruthValue>) -> Self {
-        // Timestamps would typically be set by a central time source.
-        let current_time = 0;
+    /// * `created_at` - The timestamp when the task was created.
+    /// * `occurrence_time` - The timestamp of the event or conclusion.
+    pub fn new(
+        concept: Arc<Concept>,
+        punctuation: Punctuation,
+        truth: Option<TruthValue>,
+        created_at: u64,
+        occurrence_time: u64,
+    ) -> Self {
         Task {
-            term,
+            concept,
             punctuation,
             truth,
             priority: 0.5, // Default priority
-            accessed_at: current_time,
-            created_at: current_time,
-            occurrence_time: Some(current_time),
+            accessed_at: created_at,
+            created_at,
+            occurrence_time: Some(occurrence_time),
             expiration_time: None, // No expiration by default
             is_in_focus_set: false,
             derivation_path: None,
         }
+    }
+
+    /// A helper method to get a reference to the term of the concept.
+    pub fn term(&self) -> &Arc<Term> {
+        &self.concept.term
     }
 
     /// Checks if the task is a belief.
@@ -86,7 +98,7 @@ impl Task {
 /// Implements the Display trait to provide a Narsese-like representation of the Task.
 impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let term_str = self.term.to_string();
+        let term_str = self.term().to_string();
         let punc_str = self.punctuation.to_string();
         match &self.truth {
             Some(truth) => write!(f, "{}{} {}", term_str, punc_str, truth),

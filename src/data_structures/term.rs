@@ -22,10 +22,6 @@ pub struct Term {
     pub predicate: Option<Arc<Term>>,
     /// The components of a compound term.
     pub components: Option<Vec<Arc<Term>>>,
-    /// The semantic embedding vector for the term, used for neural-symbolic integration.
-    pub embedding: Option<Vec<f32>>,
-    /// The timestamp (ms) of when the term was created.
-    pub created_at: u64,
     /// A unique hash identifying the term's content, used for equality checks and hashing.
     pub hash: String,
 }
@@ -80,7 +76,7 @@ impl Term {
 
     /// Creates a new atomic term. This is a "raw" constructor.
     /// All term creation should go through the `Memory` component to ensure uniqueness.
-    pub(crate) fn new_atom(name: &str, created_at: u64) -> Self {
+    pub(crate) fn new_atom(name: &str) -> Self {
         let term_type = TermType::Atom;
         let hash = Term::compute_hash(name, &term_type, &None);
         Term {
@@ -90,8 +86,6 @@ impl Term {
             subject: None,
             predicate: None,
             components: None,
-            embedding: None,
-            created_at,
             hash,
         }
     }
@@ -102,7 +96,6 @@ impl Term {
         name: String,
         term_type: TermType,
         components: Vec<Arc<Term>>,
-        created_at: u64,
         hash: String,
     ) -> Self {
         let complexity = 1 + components.iter().map(|c| c.complexity).sum::<u64>();
@@ -119,8 +112,6 @@ impl Term {
             subject,
             predicate,
             components: Some(components),
-            embedding: None,
-            created_at,
             hash,
         }
     }

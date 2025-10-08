@@ -3,7 +3,10 @@
 //! This rule generates questions based on similarity. For example, from
 //! `(S <-> M)` and `(S --> P)`, it derives `(M --> P)?`.
 
-use crate::data_structures::{punctuation::Punctuation, task::Task, term::Term, term_type::TermType};
+use crate::cycle::context::CycleContext;
+use crate::data_structures::{
+    concept::Concept, punctuation::Punctuation, task::Task, term_type::TermType,
+};
 use crate::memory::Memory;
 use crate::reasoning::inference_rule::InferenceRule;
 use std::sync::Arc;
@@ -22,38 +25,67 @@ impl InferenceRule for Analogy {
     /// Given a premise `(S <-> M).` and another premise `(S --> P).`, it derives
     /// a new question `(M --> P)?`. This rule generates questions based on similarity.
     /// It works symmetrically, also deriving `(S --> P)?` from `(M --> P).`.
-    fn apply(&self, similarity_task: &Arc<Task>, memory: &mut Memory) -> Vec<Task> {
+    fn apply(&self, similarity_task: &Arc<Task>, memory: &mut Memory, context: &CycleContext) -> Vec<Task> {
         let mut derived = Vec::new();
-        if let (Some(s), Some(m)) = (&similarity_task.term.subject, &similarity_task.term.predicate)
-        {
+        if let (Some(s_term), Some(m_term)) = (
+            &similarity_task.term().subject,
+            &similarity_task.term().predicate,
+        ) {
+            // Get the concepts for S and M from memory.
+            let s_concept = match memory.concept_storage.get(&s_term.hash) {
+                Some(c) => c.clone(),
+                None => return derived,
+            };
+            let m_concept = match memory.concept_storage.get(&m_term.hash) {
+                Some(c) => c.clone(),
+                None => return derived,
+            };
+
             // This helper function encapsulates the logic for one direction of the analogy.
-            let mut derive_questions = |term1: &Arc<Term>, term2: &Arc<Term>| {
+            let mut derive_questions = |concept1: &Arc<Concept>, concept2: &Arc<Concept>| {
                 let mut questions = Vec::new();
-                let properties_of_term1_preds: Vec<Arc<Term>> =
-                    if let Some(properties) = memory.get_inheritance_by_subject(term1) {
+
+                // Find all terms P such that (concept1.term --> P) exists.
+                let properties_of_concept1: Vec<Arc<Concept>> =
+                    if let Some(properties) = memory.get_inheritance_by_subject(&concept1.term) {
                         properties
                             .iter()
-                            .filter_map(|t| t.term.predicate.clone())
+                            .filter_map(|t| {
+                                // Get the predicate term P
+                                let p_term = t.term().predicate.as_ref()?;
+                                // Get the concept for P from memory
+                                memory.concept_storage.get(&p_term.hash).cloned()
+                            })
                             .collect()
                     } else {
                         Vec::new()
                     };
 
-                for p in properties_of_term1_preds {
-                    // Found (term1 --> P), derive (term2 --> P)?
-                    let new_term = memory
-                        .create_or_get_compound_term(TermType::Inheritance, vec![Arc::clone(term2), p]);
-                    let new_question = Task::new(new_term, Punctuation::Question, None);
+                // For each found property P, create the question (concept2.term --> P)?
+                for p_concept in properties_of_concept1 {
+                    // Found (concept1 --> P), derive (concept2 --> P)?
+                    let new_concept = memory.create_or_get_compound_term(
+                        TermType::Inheritance,
+                        vec![concept2.clone(), p_concept],
+                        context.current_time,
+                    );
+                    let new_question = Task::new(
+                        new_concept,
+                        Punctuation::Question,
+                        None,
+                        context.current_time,
+                        context.current_time,
+                    );
                     questions.push(new_question);
                 }
                 questions
             };
 
             // Case 1: Find properties of S to ask about M. (S --> P) => (M --> P)?
-            derived.extend(derive_questions(s, m));
+            derived.extend(derive_questions(&s_concept, &m_concept));
 
             // Case 2: Find properties of M to ask about S. (M --> P) => (S --> P)?
-            derived.extend(derive_questions(m, s));
+            derived.extend(derive_questions(&m_concept, &s_concept));
         }
         derived
     }

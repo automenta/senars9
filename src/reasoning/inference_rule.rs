@@ -1,6 +1,7 @@
 //! This module defines the `InferenceRule` trait, which provides a common
 //! interface for all inference rules in the system.
 
+use crate::cycle::context::CycleContext;
 use crate::data_structures::{task::Task, term_type::TermType};
 use crate::memory::Memory;
 use std::sync::Arc;
@@ -21,9 +22,10 @@ pub trait InferenceRule: Send + Sync {
     /// * `task` - The task that has triggered the rule.
     /// * `memory` - A mutable reference to the system's memory, allowing the rule
     ///   to look up related knowledge and create new terms.
+    /// * `context` - The context for the current reasoning cycle.
     ///
     /// # Returns
     /// A `Vec<Task>` containing any newly derived tasks. If no tasks are derived,
     /// an empty vector is returned.
-    fn apply(&self, task: &Arc<Task>, memory: &mut Memory) -> Vec<Task>;
+    fn apply(&self, task: &Arc<Task>, memory: &mut Memory, context: &CycleContext) -> Vec<Task>;
 }

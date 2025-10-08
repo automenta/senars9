@@ -1,7 +1,7 @@
 use crate::data_structures::{
+    concept::Concept,
     punctuation::Punctuation,
     task::Task,
-    term::Term,
     term_type::TermType,
     truth_value::TruthValue,
 };
@@ -20,61 +20,62 @@ pub struct NarseseParser;
 ///
 /// # Arguments
 /// * `input` - A string slice representing the Narsese statement.
+/// * `memory` - A mutable reference to the system's `Memory`.
+/// * `current_time` - The current timestamp to assign to the created task and concepts.
 ///
 /// # Returns
 /// A `Result` containing either the parsed `Task` or a `pest` error.
 pub fn parse(
     input: &str,
     memory: &mut crate::memory::Memory,
+    current_time: u64,
 ) -> Result<Task, pest::error::Error<Rule>> {
     let pairs = NarseseParser::parse(Rule::narsese_entry, input)?;
     let statement_pair = pairs.into_iter().next().unwrap().into_inner().next().unwrap();
-    build_task_from_pair(statement_pair, memory)
+    build_task_from_pair(statement_pair, memory, current_time)
 }
 
 /// Constructs a `Task` from a `statement` grammar rule pair.
 fn build_task_from_pair(
     pair: pest::iterators::Pair<Rule>,
     memory: &mut crate::memory::Memory,
+    current_time: u64,
 ) -> Result<Task, pest::error::Error<Rule>> {
     let inner_pair = pair.into_inner().next().unwrap();
     match inner_pair.as_rule() {
         Rule::belief => {
             let mut inner = inner_pair.into_inner();
-            let term = build_term_from_pair(inner.next().unwrap(), memory)?;
-            // The next item is belief_punct, which we can ignore as we already know the type.
-            inner.next();
-            // The next item *might* be the truth value.
+            let concept = build_concept_from_pair(inner.next().unwrap(), memory, current_time)?;
+            inner.next(); // Skip punctuation
             let truth = inner.next().map(build_truth_from_pair).transpose()?.flatten();
-            Ok(Task::new(term, Punctuation::Belief, truth))
+            Ok(Task::new(concept, Punctuation::Belief, truth, current_time, current_time))
         }
         Rule::goal => {
             let mut inner = inner_pair.into_inner();
-            let term = build_term_from_pair(inner.next().unwrap(), memory)?;
-            Ok(Task::new(term, Punctuation::Goal, None))
+            let concept = build_concept_from_pair(inner.next().unwrap(), memory, current_time)?;
+            Ok(Task::new(concept, Punctuation::Goal, None, current_time, current_time))
         }
         Rule::question => {
             let mut inner = inner_pair.into_inner();
-            let term = build_term_from_pair(inner.next().unwrap(), memory)?;
-            Ok(Task::new(term, Punctuation::Question, None))
+            let concept = build_concept_from_pair(inner.next().unwrap(), memory, current_time)?;
+            Ok(Task::new(concept, Punctuation::Question, None, current_time, current_time))
         }
         _ => unreachable!("Parser encountered unexpected statement rule: {:?}", inner_pair.as_rule()),
     }
 }
 
-/// Recursively constructs a `Term` from a `term` grammar rule pair.
-fn build_term_from_pair(
+/// Recursively constructs a `Concept` from a `term` grammar rule pair.
+fn build_concept_from_pair(
     pair: pest::iterators::Pair<Rule>,
     memory: &mut crate::memory::Memory,
-) -> Result<Arc<Term>, pest::error::Error<Rule>> {
+    current_time: u64,
+) -> Result<Arc<Concept>, pest::error::Error<Rule>> {
     match pair.as_rule() {
         Rule::term | Rule::compound_term => {
-            // These are wrapper rules, so descend into the actual content.
-            build_term_from_pair(pair.into_inner().next().unwrap(), memory)
+            build_concept_from_pair(pair.into_inner().next().unwrap(), memory, current_time)
         }
-        Rule::atom => Ok(memory.create_or_get_atom(pair.as_str())),
+        Rule::atom => Ok(memory.create_or_get_atom(pair.as_str(), current_time)),
         rule => {
-            // This is a compound term rule.
             let term_type = match rule {
                 Rule::negation => TermType::Negation,
                 Rule::product => TermType::Product,
@@ -95,10 +96,10 @@ fn build_term_from_pair(
 
             let components = pair
                 .into_inner()
-                .map(|p| build_term_from_pair(p, memory)) // Recursively build Arc<Term>
+                .map(|p| build_concept_from_pair(p, memory, current_time))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(memory.create_or_get_compound_term(term_type, components))
+            Ok(memory.create_or_get_compound_term(term_type, components, current_time))
         }
     }
 }
@@ -115,7 +116,6 @@ fn build_truth_from_pair(
         confidence,
     }))
 }
-
 
 #[cfg(test)]
 mod tests;
