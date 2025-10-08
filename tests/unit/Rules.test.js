@@ -1,12 +1,7 @@
-/**
- * @file: tests/unit/Rules.test.js
- * @description: Unit tests for the Rules component.
- */
-
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import Rules from '../../core/Rules.js';
 
-describe('Rules Component', () => {
+describe('Rules', () => {
   let rules;
 
   beforeEach(() => {
@@ -14,7 +9,7 @@ describe('Rules Component', () => {
     rules.initialize();
   });
 
-  test('should add and retrieve a rule', () => {
+  test('add and retrieve rule', () => {
     const rule = { name: 'test-rule', condition: () => true, action: () => 'fired' };
     rules.add(rule);
     const found = rules.find(r => r.name === 'test-rule');
@@ -22,7 +17,7 @@ describe('Rules Component', () => {
     expect(found[0].name).toBe('test-rule');
   });
 
-  test('should remove a rule by name', () => {
+  test('remove rule by name', () => {
     const rule = { name: 'test-rule', condition: () => true, action: () => {} };
     rules.add(rule);
     rules.remove('test-rule');
@@ -30,14 +25,14 @@ describe('Rules Component', () => {
     expect(found).toHaveLength(0);
   });
 
-  test('should throw an error if a rule is missing required properties', () => {
+  test('throw error for missing required properties', () => {
     expect(() => rules.add({})).toThrow('name is required');
     expect(() => rules.add({ name: 'test' })).toThrow('condition is required');
     expect(() => rules.add({ name: 'test', condition: () => true })).toThrow('action is required');
   });
 
   describe('evaluate', () => {
-    test('should execute the action of a matching rule', async () => {
+    test('execute matching rule action', async () => {
       let actionFired = false;
       const action = () => { actionFired = true; };
       rules.add({ name: 'test-rule', condition: () => true, action });
@@ -45,7 +40,7 @@ describe('Rules Component', () => {
       expect(actionFired).toBe(true);
     });
 
-    test('should not execute the action of a non-matching rule', async () => {
+    test('not execute non-matching rule action', async () => {
       let actionFired = false;
       const action = () => { actionFired = true; };
       rules.add({ name: 'test-rule', condition: () => false, action });
@@ -53,7 +48,7 @@ describe('Rules Component', () => {
       expect(actionFired).toBe(false);
     });
 
-    test('should execute the highest priority rule', async () => {
+    test('execute highest priority rule', async () => {
       let highPriorityFired = false;
       let lowPriorityFired = false;
       const lowPriorityAction = () => { lowPriorityFired = true; };
@@ -65,7 +60,7 @@ describe('Rules Component', () => {
       expect(lowPriorityFired).toBe(false);
     });
 
-    test('should pass the context to the condition and action', async () => {
+    test('pass context to condition and action', async () => {
       const context = { value: 42 };
       let conditionContext = null;
       let actionContext = null;
@@ -80,13 +75,13 @@ describe('Rules Component', () => {
       expect(actionContext).toBe(context);
     });
 
-    test('should return the result of the action', async () => {
+    test('return action result', async () => {
       rules.add({ name: 'return-rule', condition: () => true, action: () => 'result' });
       const result = await rules.evaluate({});
       expect(result).toBe('result');
     });
 
-    test('should return null if no rules match', async () => {
+    test('return null if no rules match', async () => {
       const result = await rules.evaluate({});
       expect(result).toBeNull();
     });

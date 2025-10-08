@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import createCore from '../../core/createCore.js';
 
-describe('Memory System Examples', () => {
+describe('Memory Examples', () => {
   let core;
 
   beforeEach(async () => {
@@ -14,7 +14,7 @@ describe('Memory System Examples', () => {
   });
 
   describe('Focus Sets', () => {
-    test('should create and manage focus sets', () => {
+    test('create and manage focus sets', () => {
       const focusSets = [
         { name: 'working-memory', capacity: 5 },
         { name: 'long-term-storage', capacity: 10 },
@@ -30,7 +30,7 @@ describe('Memory System Examples', () => {
       expect(core.memory.getCurrentFocus()).toBe('working-memory');
     });
 
-    test('should add items with metadata', () => {
+    test('add items with metadata', () => {
       const testItems = [
         {
           key: 'urgent-alert',
@@ -62,7 +62,7 @@ describe('Memory System Examples', () => {
       expect(urgentItem.type).toBe('alert');
     });
 
-    test('should manage focus set assignments', () => {
+    test('manage focus set assignments', () => {
       core.memory.set('test-item', { content: 'test' }, { priority: 5 });
       core.memory._updateFocusSets('test-item', { focusSet: 'working-memory' });
 
@@ -72,7 +72,7 @@ describe('Memory System Examples', () => {
   });
 
   describe('Attention Mechanism', () => {
-    test('should update focus attention', () => {
+    test('update focus attention', () => {
       core.memory.createFocusSet('working-memory', 5);
       core.memory.createFocusSet('attention-focus', 3);
 
@@ -84,7 +84,7 @@ describe('Memory System Examples', () => {
       expect(stats['attention-focus']).toBeDefined();
     });
 
-    test('should retrieve items by attention focus', () => {
+    test('retrieve items by attention focus', () => {
       core.memory.createFocusSet('test-focus', 5);
       core.memory.set('attention-item', { content: 'test', priority: 8 });
       core.memory._updateFocusSets('attention-item', { focusSet: 'test-focus' });
@@ -96,7 +96,7 @@ describe('Memory System Examples', () => {
   });
 
   describe('Query Optimization', () => {
-    test('should query by priority', () => {
+    test('query by priority', () => {
       core.memory.set('high-priority', { content: 'high' }, { priority: 9 });
       core.memory.set('medium-priority', { content: 'medium' }, { priority: 6 });
       core.memory.set('low-priority', { content: 'low' }, { priority: 3 });
@@ -105,7 +105,7 @@ describe('Memory System Examples', () => {
       expect(results.length).toBeGreaterThan(0);
     });
 
-    test('should query by type', () => {
+    test('query by type', () => {
       core.memory.set('alert-1', { content: 'alert' }, { type: 'alert' });
       core.memory.set('task-1', { content: 'task' }, { type: 'task' });
 
@@ -113,7 +113,7 @@ describe('Memory System Examples', () => {
       expect(results.length).toBeGreaterThan(0);
     });
 
-    test('should query by tags', () => {
+    test('query by tags', () => {
       core.memory.set('urgent-item', { content: 'urgent' }, {
         tags: ['urgent', 'system']
       });
@@ -124,7 +124,7 @@ describe('Memory System Examples', () => {
   });
 
   describe('Statistics', () => {
-    test('should provide memory statistics', () => {
+    test('provide memory statistics', () => {
       core.memory.set('stat-test-1', { content: 'test1' });
       core.memory.set('stat-test-2', { content: 'test2' });
 

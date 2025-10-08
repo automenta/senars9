@@ -6,7 +6,7 @@ import {
   measurePerformance,
   expectPerformance,
   performanceThresholds
-} from './test-utils.js';
+} from './enhanced-test-utils.js';
 
 const createMemory = (config = {}) => {
   const memory = new Memory();

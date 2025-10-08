@@ -123,10 +123,10 @@ export const createTestData = {
 };
 
 export const performanceThresholds = {
-  ruleEvaluation: 50, // ms
-  memoryOperation: 10, // ms
-  componentLifecycle: 100, // ms
-  bulkOperation: 1000, // ms for 100+ operations
+  ruleEvaluation: 50,
+  memoryOperation: 10,
+  componentLifecycle: 100,
+  bulkOperation: 1000,
 };
 
 export const measurePerformance = async (operation) => {
@@ -137,4 +137,31 @@ export const measurePerformance = async (operation) => {
 
 export const expectPerformance = (actualTime, threshold) => {
   expect(actualTime).toBeLessThan(threshold);
+};
+
+// Common test patterns
+export const testErrorHandling = (operation, error, expectedError) => {
+  test(`should handle ${error.name} errors`, async () => {
+    const component = createTestComponent();
+    component.triggerError('initialize', error);
+    await expect(operation(component)).rejects.toThrow(expectedError || error.message);
+  });
+};
+
+export const testPerformanceThreshold = (operation, threshold, description) => {
+  test(`should meet performance threshold: ${description}`, async () => {
+    const time = await measurePerformance(operation);
+    expectPerformance(time, threshold);
+  });
+};
+
+// Common assertion helpers
+export const expectToHaveStatus = (component, expectedStatus) => {
+  expect(component.getStatus().status).toBe(expectedStatus);
+};
+
+export const expectToBeHealthy = (component) => {
+  const health = component.getHealth();
+  expect(health.status).toBe('healthy');
+  expect(health.issues).toEqual([]);
 };
