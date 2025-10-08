@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Cache, Index, Storage, Validation, ErrorHandler } from './Utils.js';
+import { Cache, Index, Storage, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager } from './Utils.js';
 
 class Memory extends Component {
   constructor() {
@@ -10,7 +10,7 @@ class Memory extends Component {
     this.focusSets = new Map();
     this.currentFocus = null;
     this.focusSize = 50;
-    this.indexes = new Index();
+    this.indexes = new IndexManager();
   }
 
   async _doInitialize(config = {}) {
@@ -90,28 +90,13 @@ class Memory extends Component {
     focusSet.accessCount++;
 
     // Enhanced sorting with attention scoring
-    return Array.from(focusSet.items.entries())
-      .sort((a, b) => {
-        const aData = a[1];
-        const bData = b[1];
-
-        // Primary: priority (higher first)
-        const priorityDiff = (bData.priority || 0) - (aData.priority || 0);
-        if (priorityDiff !== 0) return priorityDiff;
-
-        // Secondary: recency with decay (newer first)
-        const now = Date.now();
-        const aRecency = now - aData.timestamp;
-        const bRecency = now - bData.timestamp;
-        const recencyDiff = bRecency - aRecency;
-        if (recencyDiff !== 0) return recencyDiff;
-
-        // Tertiary: access frequency
-        return (bData.accessCount || 0) - (aData.accessCount || 0);
-      })
+    return ArrayUtils.sortBy(Array.from(focusSet.items.entries()), ([, data]) => [
+      -(data.priority || 0), // Primary: priority (higher first)
+      data.timestamp,        // Secondary: recency (newer first)
+      -(data.accessCount || 0) // Tertiary: access frequency (higher first)
+    ], 'asc')
       .slice(0, count)
       .map(([key, value]) => {
-        // Increment access count for attention tracking
         value.accessCount = (value.accessCount || 0) + 1;
         return [key, value];
       });
@@ -157,33 +142,30 @@ class Memory extends Component {
   }
 
   _intersectKeys(candidates, keys) {
-    return new Set([...candidates].filter(key => keys.includes(key)));
+    return this.indexes.intersect(candidates, key => keys.includes(key));
   }
 
   _intersectTags(candidates, tags) {
-    const tagCandidates = new Set();
-    tags.forEach(tag => {
-      this.indexes.get(tag).forEach(key => tagCandidates.add(key));
-    });
-    return new Set([...candidates].filter(key => tagCandidates.has(key)));
+    const tagCandidates = new Set(tags.flatMap(tag => this.indexes.get(tag)));
+    return this.indexes.intersect(candidates, key => tagCandidates.has(key));
   }
 
   _intersectPriority(candidates, minPriority) {
-    const priorityCandidates = new Set();
+    const priorityKeys = new Set();
     for (let priority = minPriority; priority <= 10; priority++) {
-      this.indexes.get(`priority_${priority}`).forEach(key => priorityCandidates.add(key));
+      this.indexes.get(`priority_${priority}`).forEach(key => priorityKeys.add(key));
     }
-    return new Set([...candidates].filter(key => priorityCandidates.has(key)));
+    return this.indexes.intersect(candidates, key => priorityKeys.has(key));
   }
 
   _getSortValue(item, sortBy) {
-    switch (sortBy) {
-      case 'priority': return item.priority || 0;
-      case 'timestamp': return item.timestamp || 0;
-      case 'accessCount': return item.accessCount || 0;
-      case 'key': return item.key || '';
-      default: return 0;
-    }
+    const sortMap = {
+      priority: item.priority || 0,
+      timestamp: item.timestamp || 0,
+      accessCount: item.accessCount || 0,
+      key: item.key || ''
+    };
+    return sortMap[sortBy] ?? 0;
   }
 
   // Enhanced query optimization methods
@@ -247,8 +229,9 @@ class Memory extends Component {
   }
 
   _removeFromIndexes(key) {
-    for (const [type, keys] of this.indexes.indexes.entries()) {
-      keys.delete(key) && keys.size === 0 && this.indexes.indexes.delete(type);
+    // IndexManager handles cleanup automatically in remove method
+    for (const [type] of this.indexes.indexes.entries()) {
+      this.indexes.remove(type, key);
     }
   }
 
@@ -267,14 +250,13 @@ class Memory extends Component {
     if (focusData.items.size <= focusData.maxSize) return;
 
     // Enhanced eviction with attention scoring
-    const items = Array.from(focusData.items.entries())
-      .map(([key, data]) => ({
-        key,
-        score: this._calculateAttentionScore(data, focusData)
-      }))
-      .sort((a, b) => a.score - b.score);
+    const items = ArrayUtils.sortBy(
+      Array.from(focusData.items.entries()),
+      ([, data]) => this._calculateAttentionScore(data, focusData),
+      'asc'
+    );
 
-    focusData.items.delete(items[0].key);
+    focusData.items.delete(items[0]?.[0]);
   }
 
   _calculateAttentionScore(itemData, focusData) {

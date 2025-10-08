@@ -198,7 +198,12 @@ class Validation {
 
 class ErrorHandler {
   static handle(error, context = '') {
-    const errorInfo = { error: error.message, stack: error.stack, context };
+    const errorInfo = {
+      error: error.message,
+      stack: error.stack,
+      context,
+      timestamp: new Date().toISOString()
+    };
     console.error('Handled error:', errorInfo);
     return errorInfo;
   }
@@ -210,6 +215,114 @@ class ErrorHandler {
       return this.handle(error, context);
     }
   }
+
+  static createEnhanced(error, context = {}) {
+    const enhanced = new Error(`${context.type || 'Error'}: ${error.message}`);
+    enhanced.originalError = error;
+    enhanced.context = context;
+    enhanced.timestamp = new Date().toISOString();
+    return enhanced;
+  }
 }
 
-export { Cache, Index, Storage, Retry, Validation, ErrorHandler };
+class Logger {
+  static log(level, message, data = {}) {
+    const logEntry = {
+      level,
+      message,
+      data,
+      timestamp: new Date().toISOString()
+    };
+    console[level] ? console[level](`[${level.toUpperCase()}]`, message, data) : console.log(`[${level.toUpperCase()}]`, message, data);
+    return logEntry;
+  }
+
+  static info = (msg, data) => Logger.log('info', msg, data);
+  static warn = (msg, data) => Logger.log('warn', msg, data);
+  static error = (msg, data) => Logger.log('error', msg, data);
+  static debug = (msg, data) => Logger.log('debug', msg, data);
+}
+
+class ObjectUtils {
+  static safeAccess(obj, path, defaultValue) {
+    return path.split('.').reduce((current, key) =>
+      (current && typeof current === 'object' && key in current) ? current[key] : undefined, obj) ?? defaultValue;
+  }
+
+  static deepClone(obj) {
+    return obj && typeof obj === 'object' ? JSON.parse(JSON.stringify(obj)) : obj;
+  }
+
+  static isObject = item => item && typeof item === 'object' && !Array.isArray(item);
+  static isEmpty = obj => !obj || Object.keys(obj).length === 0;
+  static pick = (obj, keys) => keys.reduce((result, key) => (key in obj && (result[key] = obj[key]), result), {});
+  static omit = (obj, keys) => Object.keys(obj).reduce((result, key) => (keys.includes(key) || (result[key] = obj[key]), result), {});
+}
+
+class ArrayUtils {
+  static groupBy = (array, keyFn) => array.reduce((groups, item) => {
+    const key = keyFn(item);
+    return (groups[key] = groups[key] || []).push(item), groups;
+  }, {});
+
+  static sortBy = (array, keyFn, direction = 'asc') => [...array].sort((a, b) => {
+    const aVal = keyFn(a), bVal = keyFn(b);
+    return direction === 'desc' ? (bVal < aVal ? -1 : bVal > aVal ? 1 : 0) : (aVal < bVal ? -1 : aVal > bVal ? 1 : 0);
+  });
+
+  static unique = (array, keyFn) => keyFn
+    ? [...ArrayUtils.groupBy(array, keyFn)].map(([, group]) => group[0])
+    : [...new Set(array)];
+
+  static compact = array => array.filter(Boolean);
+  static flatten = (array, depth = 1) => array.flat(depth);
+}
+
+class IndexManager {
+  constructor() {
+    this.indexes = new Map();
+  }
+
+  add(type, key, value) {
+    if (!this.indexes.has(type)) {
+      this.indexes.set(type, new Set());
+    }
+    this.indexes.get(type).add(key);
+  }
+
+  remove(type, key) {
+    if (!this.indexes.has(type)) return;
+    const keys = this.indexes.get(type);
+    keys.delete(key);
+    if (keys.size === 0) {
+      this.indexes.delete(type);
+    }
+  }
+
+  get(type) {
+    return this.indexes.has(type) ? Array.from(this.indexes.get(type)) : [];
+  }
+
+  has(type, key) {
+    return this.indexes.has(type) && this.indexes.get(type).has(key);
+  }
+
+  clear() {
+    this.indexes.clear();
+  }
+
+  // Advanced filtering operations
+  intersect(candidates, filterFn) {
+    return new Set([...candidates].filter(filterFn));
+  }
+
+  union(...sets) {
+    return new Set(sets.flatMap(set => [...set]));
+  }
+
+  difference(setA, setB) {
+    return new Set([...setA].filter(item => !setB.has(item)));
+  }
+}
+
+export { Cache, Index, Storage, Retry, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager };

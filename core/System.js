@@ -1,4 +1,5 @@
 import createCore from './createCore.js';
+import { Logger } from './Utils.js';
 
 class System {
   constructor(config = {}) {
@@ -26,15 +27,11 @@ class System {
     if (!this.core) {
       throw new Error('System is not running. Call start() before inputting tasks.');
     }
-    // Emitting an event is a decoupled way to introduce tasks.
-    // A dedicated component like Memory will listen for this event.
     this.core.messages.emit('task.input', task);
   }
 
   on(event, handler) {
     if (!this.core) {
-      // Allow registering handlers before start, but they will be on a non-existent core.
-      // Let's enforce that the system must be started.
       throw new Error('System is not running. Call start() before registering event handlers.');
     }
     this.core.messages.on(event, handler);

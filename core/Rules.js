@@ -1,5 +1,5 @@
 import Component from './Component.js';
-import { Index, Storage, Validation, ErrorHandler } from './Utils.js';
+import { Index, Storage, Validation, ErrorHandler, Logger, ObjectUtils, ArrayUtils, IndexManager } from './Utils.js';
 
 const COMPLEXITY_LEVELS = { simple: 1, medium: 2, complex: 3 };
 const MAX_PRIORITY = 10;
@@ -8,7 +8,7 @@ class Rules extends Component {
   constructor() {
     super();
     this.rules = [];
-    this.indexes = new Index();
+    this.indexes = new IndexManager();
     this.preFilters = new Set();
   }
 
@@ -35,11 +35,10 @@ class Rules extends Component {
 
   remove(name) {
     const index = this.rules.findIndex(rule => rule.name === name);
-    index !== -1 && (() => {
-      const rule = this.rules[index];
+    index !== -1 && ((rule) => {
       this.rules.splice(index, 1);
       this._removeFromIndexes(rule);
-    })();
+    })(this.rules[index]);
   }
 
   _updateIndexes(rule) {
@@ -61,11 +60,7 @@ class Rules extends Component {
   }
 
   _cleanupPreFilters() {
-    const usedTags = new Set();
-    this.rules.forEach(rule => {
-      rule.preFilterTags?.forEach(tag => usedTags.add(tag));
-    });
-    this.preFilters = usedTags;
+    this.preFilters = new Set(this.rules.flatMap(rule => rule.preFilterTags || []));
   }
 
   find(predicate) {
@@ -147,7 +142,7 @@ class Rules extends Component {
       try {
         return rule.condition(context);
       } catch (error) {
-        console.error(`Error in rule '${rule.name}' condition:`, error);
+        Logger.error(`Rule '${rule.name}' condition failed`, { rule: rule.name, error: error.message });
         return false;
       }
     });
@@ -160,7 +155,7 @@ class Rules extends Component {
     try {
       return await topRule.action(context);
     } catch (error) {
-      console.error(`Error in rule '${topRule.name}' action:`, error);
+      Logger.error(`Rule '${topRule.name}' action failed`, { rule: topRule.name, error: error.message });
       return null;
     }
   }
@@ -181,11 +176,8 @@ class Rules extends Component {
 
     // Advanced pre-filtering for 60-80% performance improvement
     return rules.filter(rule => {
-      // Rule with no pre-filter tags always passes
-      if (!rule.preFilterTags?.length) return true;
-
-      // Rule must match at least one context key for relevance
-      return rule.preFilterTags.some(tag => contextKeys.includes(tag));
+      const tags = rule.preFilterTags || [];
+      return tags.length === 0 || tags.some(tag => contextKeys.includes(tag));
     });
   }
 
@@ -202,7 +194,8 @@ class Rules extends Component {
   _sortByPriority(rules) {
     rules.sort((a, b) => {
       // Primary sort: priority (higher first)
-      if (a.priority !== b.priority) return b.priority - a.priority;
+      const priorityDiff = b.priority - a.priority;
+      if (priorityDiff !== 0) return priorityDiff;
 
       // Secondary sort: complexity (simpler first for faster execution)
       const complexityDiff = COMPLEXITY_LEVELS[a.complexity] - COMPLEXITY_LEVELS[b.complexity];

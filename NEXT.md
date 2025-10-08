@@ -35,7 +35,7 @@
   - *Dependencies*: Focus set management
   - *Validation*: Memory queries return in < 10ms
 
-### WebSocket Server ✅ CRITICAL PRIORITY
+### WebSocket Server ✅ MEDIUM PRIORITY
 - [ ] Implement WebSocket server for real-time communication
   - *Effectiveness*: CRITICAL - Enables GUI and inter-NARS communication
   - *Implementability*: HIGH - Standard WebSocket patterns with ws library
