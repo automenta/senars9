@@ -121,9 +121,13 @@ class ErrorHandler {
   }
 }
 
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_RETRY_DELAY = 1000;
+const DEFAULT_BACKOFF_MULTIPLIER = 2;
+
 class Retry {
   static async execute(fn, options = {}) {
-    const { maxRetries = 3, retryDelay = 1000, backoffMultiplier = 2 } = options;
+    const { maxRetries = DEFAULT_MAX_RETRIES, retryDelay = DEFAULT_RETRY_DELAY, backoffMultiplier = DEFAULT_BACKOFF_MULTIPLIER } = options;
     let lastError;
 
     if (maxRetries === 0) return fn();

@@ -1,5 +1,7 @@
 class Logger {
-  static log = (level, message, data = {}) => (console[level] || console.log)(`[${level.toUpperCase()}]`, message, data);
+  static log(level, message, data = {}) {
+    return (console[level] || console.log)(`[${level.toUpperCase()}]`, message, data);
+  }
   static info = (msg, data) => Logger.log('info', msg, data);
   static warn = (msg, data) => Logger.log('warn', msg, data);
   static error = (msg, data) => Logger.log('error', msg, data);
@@ -38,18 +40,11 @@ class ArrayUtils {
 
 class IdGenerator {
   static generate(prefix = '') {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
-    return `${prefix}${timestamp}-${random}`;
+    return `${prefix}${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  static generateErrorId() {
-    return this.generate('err_');
-  }
-
-  static generateMessageId() {
-    return this.generate('msg_');
-  }
+  static generateErrorId = () => IdGenerator.generate('err_');
+  static generateMessageId = () => IdGenerator.generate('msg_');
 }
 
 export { Logger, ObjectUtils, ArrayUtils, IdGenerator };

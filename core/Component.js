@@ -114,14 +114,10 @@ class Component {
   }
 
   getPerformanceStats() {
-    const health = this.getHealth();
-    const metrics = this.getMetrics();
-    const status = this.getStatus();
-
     return {
-      ...health,
-      ...metrics,
-      ...status,
+      ...this.getHealth(),
+      ...this.getMetrics(),
+      ...this.getStatus(),
       component: this.constructor.name,
       timestamp: new Date().toISOString()
     };

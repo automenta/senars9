@@ -1,5 +1,7 @@
+const DEFAULT_LRU_SIZE = 1000;
+
 class LRUMap extends Map {
-  constructor(maxSize = 1000) {
+  constructor(maxSize = DEFAULT_LRU_SIZE) {
     super();
     this.maxSize = maxSize;
   }
@@ -49,7 +51,7 @@ class Cache {
 
 class Storage {
   constructor(options = {}) {
-    this.data = new LRUMap(options.maxSize || 1000);
+    this.data = new LRUMap(options.maxSize || DEFAULT_LRU_SIZE);
     this.enableEvents = options.enableEvents !== false;
     this.eventTarget = options.eventTarget || null;
     this.namespace = options.namespace || 'storage';

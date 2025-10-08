@@ -3,22 +3,30 @@ import { Cache, Storage, IndexManager } from './collections.js';
 import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
 import { Validation } from './validation.js';
 
+const CACHE_SIZE = 1000;
+const FOCUS_SIZE = 50;
+const ATTENTION_DECAY = 0.9;
+const PRIORITY_LEVELS = 10;
+const QUERY_LIMIT = 100;
+const ACCESS_WEIGHT = 100;
+const DECAY_HOURS = 24;
+
 class Memory extends Component {
   constructor() {
     super();
     this.storage = new Storage();
     this.cache = new Cache();
-    this._cacheSize = 1000;
+    this._cacheSize = CACHE_SIZE;
     this.focusSets = new Map();
     this.currentFocus = null;
-    this.focusSize = 50;
+    this.focusSize = FOCUS_SIZE;
     this.indexes = new IndexManager();
   }
 
   async _doInitialize(config = {}) {
     this.storage.clear();
     this.cache = new Cache(config.cacheSize || this._cacheSize);
-    this.focusSize = config.focusSize || this.focusSize;
+    this.focusSize = config.focusSize || FOCUS_SIZE;
     this.currentFocus = config.defaultFocus || null;
     this.focusSets.clear();
     this.indexes.clear();
@@ -70,7 +78,7 @@ class Memory extends Component {
       lastAccessed: Date.now(),
       createdAt: Date.now(),
       attentionScore: 0,
-      decayFactor: 0.9 // Attention decay over time
+      decayFactor: ATTENTION_DECAY
     });
   }
 
@@ -100,7 +108,7 @@ class Memory extends Component {
   }
 
   query(criteria = {}) {
-    const { type, tags, minPriority, limit = 100, sortBy, sortOrder = 'desc' } = criteria;
+    const { type, tags, minPriority, limit = QUERY_LIMIT, sortBy, sortOrder = 'desc' } = criteria;
     let candidates = new Set(this.storage.keys());
 
     // Optimized query execution with early termination
@@ -120,13 +128,11 @@ class Memory extends Component {
       if (candidates.size === 0) return []; // Early return if no matches
     }
 
-    // Convert to array and apply sorting/optimization
     let results = Array.from(candidates)
       .slice(0, limit)
       .map(key => [key, this.get(key)])
       .filter(([, value]) => value !== undefined);
 
-    // Apply sorting if specified - optimized with pre-computed sort values
     if (sortBy) {
       const sortFn = sortOrder === 'desc'
         ? (a, b) => this._getSortValue(b[1], sortBy) - this._getSortValue(a[1], sortBy)
@@ -148,7 +154,7 @@ class Memory extends Component {
 
   _intersectPriority(candidates, minPriority) {
     const priorityKeys = new Set();
-    for (let priority = minPriority; priority <= 10; priority++) {
+    for (let priority = minPriority; priority <= PRIORITY_LEVELS; priority++) {
       this.indexes.get(`priority_${priority}`).forEach(key => priorityKeys.add(key));
     }
     return this.indexes.intersect(candidates, key => priorityKeys.has(key));
@@ -176,10 +182,7 @@ class Memory extends Component {
   }
 
   optimizeIndexes() {
-    // Remove unused indexes to save memory
     const usedTypes = new Set();
-
-    // Collect all types from storage metadata
     for (const [key, value] of this.storage.entries()) {
       if (value._metadata) {
         const { type, tags } = value._metadata;
@@ -188,7 +191,6 @@ class Memory extends Component {
       }
     }
 
-    // Clean up unused indexes
     for (const type of this.indexes.indexes.keys()) {
       if (!usedTypes.has(type) && !type.startsWith('priority_')) {
         this.indexes.indexes.delete(type);
@@ -246,13 +248,18 @@ class Memory extends Component {
   _calculateAttentionScore(itemData, focusData) {
     const now = Date.now();
     const age = now - itemData.timestamp;
-    const recencyScore = Math.exp(-age / (24 * 60 * 60 * 1000)); // Decay over 24h
+    const recencyScore = Math.exp(-age / (DECAY_HOURS * 60 * 60 * 1000));
 
-    const priorityScore = (itemData.priority || 0) / 10;
-    const frequencyScore = Math.min((itemData.accessCount || 0) / 100, 1);
+    const priorityScore = (itemData.priority || 0) / PRIORITY_LEVELS;
+    const frequencyScore = Math.min((itemData.accessCount || 0) / ACCESS_WEIGHT, 1);
     const focusAttention = focusData.attentionScore || 0;
 
-    return (priorityScore * 0.4) + (recencyScore * 0.3) + (frequencyScore * 0.2) + (focusAttention * 0.1);
+    const PRIORITY_WEIGHT = 0.4;
+    const RECENCY_WEIGHT = 0.3;
+    const FREQUENCY_WEIGHT = 0.2;
+    const FOCUS_WEIGHT = 0.1;
+
+    return (priorityScore * PRIORITY_WEIGHT) + (recencyScore * RECENCY_WEIGHT) + (frequencyScore * FREQUENCY_WEIGHT) + (focusAttention * FOCUS_WEIGHT);
   }
 
   updateFocusAttention(name, delta) {

@@ -1,6 +1,15 @@
 import createCore from './createCore.js';
 import { Logger } from './utilities.js';
 
+const DEFAULT_PRIORITY = 0.5;
+const QUESTION_PRIORITY = 0.7;
+const QUESTION_TIMEOUT = 30000;
+const BELIEF_PRIORITY = 0.6;
+const GOAL_PRIORITY = 0.8;
+const DEFAULT_FREQUENCY = 1.0;
+const DEFAULT_CONFIDENCE = 0.9;
+const VERSION = '2.0.0';
+
 class System {
   constructor(config = {}) {
     this.config = config;
@@ -67,12 +76,11 @@ class System {
       throw new Error('Task must have a valid term');
     }
 
-    // Set default values
     const enhancedTask = {
       term: task.term,
       punctuation: task.punctuation || '.',
-      truth: task.truth || { frequency: 1.0, confidence: 0.9 },
-      priority: task.priority || 0.5,
+      truth: task.truth || { frequency: DEFAULT_FREQUENCY, confidence: DEFAULT_CONFIDENCE },
+      priority: task.priority || DEFAULT_PRIORITY,
       timestamp: Date.now(),
       accessedAt: Date.now(),
       createdAt: Date.now(),
@@ -133,8 +141,8 @@ class System {
     const questionTask = {
       term: question,
       punctuation: '?',
-      priority: options.priority || 0.7,
-      timeout: options.timeout || 30000
+      priority: options.priority || QUESTION_PRIORITY,
+      timeout: options.timeout || QUESTION_TIMEOUT
     };
 
     return new Promise((resolve, reject) => {
@@ -154,8 +162,7 @@ class System {
     });
   }
 
-  // Convenience method for making statements/beliefs
-  remember(statement, truth = { frequency: 1.0, confidence: 0.9 }) {
+  remember(statement, truth = { frequency: DEFAULT_FREQUENCY, confidence: DEFAULT_CONFIDENCE }) {
     if (!this.core) {
       throw new Error('System is not running. Call start() before remembering statements.');
     }
@@ -164,14 +171,13 @@ class System {
       term: statement,
       punctuation: '.',
       truth,
-      priority: 0.6
+      priority: BELIEF_PRIORITY
     };
 
     return this.input(beliefTask);
   }
 
-  // Convenience method for setting goals
-  want(goal, priority = 0.8) {
+  want(goal, priority = GOAL_PRIORITY) {
     if (!this.core) {
       throw new Error('System is not running. Call start() before setting goals.');
     }
@@ -179,7 +185,7 @@ class System {
     const goalTask = {
       term: goal,
       punctuation: '!',
-      truth: { frequency: 1.0, confidence: 0.9 },
+      truth: { frequency: DEFAULT_FREQUENCY, confidence: DEFAULT_CONFIDENCE },
       priority
     };
 
@@ -215,7 +221,7 @@ class System {
 
     return {
       ...health,
-      version: '2.0.0',
+      version: VERSION,
       config: this.config,
       timestamp: Date.now(),
       memoryUsage: process.memoryUsage ? {

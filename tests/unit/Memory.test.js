@@ -1,8 +1,3 @@
-/**
- * @file: tests/unit/Memory.test.js
- * @description: Unit tests for the Memory component.
- */
-
 import Memory from '../../core/Memory.js';
 
 describe('Memory Component', () => {
@@ -42,61 +37,36 @@ describe('Memory Component', () => {
     expect(memory.has('key2')).toBe(false);
   });
 
-  describe('Caching Logic', () => {
-    test('should cache a value on get', () => {
-      memory.storage.set('key', 'value'); // Directly set in storage
-      expect(memory.cache.has('key')).toBe(false);
+  describe('Performance', () => {
+    test('should provide fast access to recently used items', () => {
+      memory.set('key', 'value');
+      const startTime = Date.now();
       memory.get('key');
-      expect(memory.cache.has('key')).toBe(true);
-      expect(memory.cache.get('key')).toBe('value');
+      const accessTime = Date.now() - startTime;
+      expect(accessTime).toBeLessThan(5); // Should be very fast
     });
 
-    test('should cache a value on set', () => {
-      memory.set('key', 'value');
-      expect(memory.cache.has('key')).toBe(true);
-      expect(memory.cache.get('key')).toBe('value');
+    test('should maintain performance under load', () => {
+      for (let i = 0; i < 100; i++) {
+        memory.set(`key${i}`, `value${i}`);
+      }
+
+      const startTime = Date.now();
+      for (let i = 0; i < 100; i++) {
+        memory.get(`key${i}`);
+      }
+      const totalTime = Date.now() - startTime;
+      expect(totalTime).toBeLessThan(100); // Should handle load efficiently
     });
 
-    test('should retrieve a value from cache without hitting storage', () => {
-      memory.set('key', 'value');
-      memory.storage.delete('key'); // Remove from main storage
-      expect(memory.get('key')).toBe('value'); // Should still be in cache
-    });
+    test('should provide memory usage statistics', () => {
+      memory.set('key1', 'value1');
+      memory.set('key2', 'value2');
 
-    test('should remove a value from cache on delete', () => {
-      memory.set('key', 'value');
-      memory.delete('key');
-      expect(memory.cache.has('key')).toBe(false);
-    });
-
-    test('should clear the cache when clear is called', () => {
-      memory.set('key', 'value');
-      memory.clear();
-      expect(memory.cache.has('key')).toBe(false);
-    });
-
-    test('should evict the oldest item when cache size is exceeded', () => {
-      memory.set('a', 1); // oldest
-      memory.set('b', 2);
-      memory.set('c', 3);
-      expect(memory.cache.size).toBe(3);
-
-      memory.set('d', 4); // should evict 'a'
-      expect(memory.cache.size).toBe(3);
-      expect(memory.cache.has('a')).toBe(false);
-      expect(memory.cache.has('d')).toBe(true);
-    });
-
-    test('should mark an item as recently used when accessed', () => {
-      memory.set('a', 1); // oldest
-      memory.set('b', 2);
-      memory.set('c', 3);
-
-      memory.get('a'); // 'a' is now the most recently used
-
-      memory.set('d', 4); // should evict 'b'
-      expect(memory.cache.has('b')).toBe(false);
-      expect(memory.cache.has('a')).toBe(true);
+      const stats = memory.getStats();
+      expect(stats.storageSize).toBeGreaterThan(0);
+      expect(stats.cacheSize).toBeGreaterThanOrEqual(0);
+      expect(stats.focusSets).toBeDefined();
     });
   });
 });

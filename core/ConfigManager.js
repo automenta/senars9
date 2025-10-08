@@ -3,13 +3,15 @@ import { Logger, ObjectUtils } from './utilities.js';
 import { Validation } from './validation.js';
 import CommonMiddleware from './Middleware.js';
 
+const CONFIG_STORAGE_SIZE = 1000;
+
 class ConfigManager {
   constructor(messagesComponent = null) {
     this.storage = new Storage({
       enableEvents: true,
       eventTarget: messagesComponent,
       namespace: 'config',
-      maxSize: 1000
+      maxSize: CONFIG_STORAGE_SIZE
     });
     this.messages = messagesComponent;
     this.validators = new Map();

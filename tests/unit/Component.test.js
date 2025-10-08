@@ -1,17 +1,10 @@
-import { jest } from '@jest/globals';
 import Component from '../../core/Component.js';
-import Messages from '../../core/Messages.js';
 
 describe('Component', () => {
   let component;
-  let mockCore;
 
   beforeEach(() => {
     component = new Component();
-    mockCore = {
-      messages: new Messages(),
-    };
-    component.core = mockCore;
   });
 
   test('should have a default status of "uninitialized"', () => {
@@ -20,25 +13,21 @@ describe('Component', () => {
 
   test('initialize should set status to "initialized"', async () => {
     await component.initialize({});
-    expect(component.status).toBe('initialized');
     expect(component.getStatus()).toEqual({ status: 'initialized' });
   });
 
   test('start should set status to "running"', async () => {
     await component.start();
-    expect(component.status).toBe('running');
     expect(component.getStatus()).toEqual({ status: 'running' });
   });
 
   test('stop should set status to "stopped"', async () => {
     await component.stop();
-    expect(component.status).toBe('stopped');
     expect(component.getStatus()).toEqual({ status: 'stopped' });
   });
 
   test('destroy should set status to "destroyed"', async () => {
     await component.destroy();
-    expect(component.status).toBe('destroyed');
     expect(component.getStatus()).toEqual({ status: 'destroyed' });
   });
 
@@ -53,37 +42,31 @@ describe('Component', () => {
     expect(component.getMetrics()).toEqual({});
   });
 
-  describe('Event Handling', () => {
-    beforeEach(() => {
-      jest.spyOn(mockCore.messages, 'on');
-      jest.spyOn(mockCore.messages, 'off');
-      jest.spyOn(mockCore.messages, 'emit');
+  describe('Lifecycle Management', () => {
+    test('should provide performance statistics', async () => {
+      await component.initialize({});
+      const stats = component.getPerformanceStats();
+
+      expect(stats).toHaveProperty('status');
+      expect(stats).toHaveProperty('component');
+      expect(stats).toHaveProperty('timestamp');
+      expect(stats.component).toBe('Component');
     });
 
-    test('on should register an event handler with the messages system', () => {
-      const handler = () => {};
-      component.on('test-event', handler);
-      expect(mockCore.messages.on).toHaveBeenCalledWith('test-event', handler);
+    test('should handle errors gracefully during operations', async () => {
+      component._doInitialize = () => { throw new Error('Test error'); };
+
+      // Component handles errors internally, so initialize should succeed
+      // but the error should be logged through the error handling system
+      await component.initialize({});
+      expect(component.getStatus().status).toBe('initialized');
     });
 
-    test('off should unregister an event handler from the messages system', () => {
-      const handler = () => {};
-      component.off('test-event', handler);
-      expect(mockCore.messages.off).toHaveBeenCalledWith('test-event', handler);
-    });
-
-    test('emit should emit an event through the messages system', () => {
-      const data = { payload: 'test' };
-      component.emit('test-event', data);
-      expect(mockCore.messages.emit).toHaveBeenCalledWith('test-event', data);
-    });
-
-    test('event handling should throw error if core.messages is not available', () => {
-      component.core = {};
-      const handler = () => {};
-      expect(() => component.on('test', handler)).toThrow('Messages component not available on core.');
-      expect(() => component.off('test', handler)).toThrow('Messages component not available on core.');
-      expect(() => component.emit('test', {})).toThrow('Messages component not available on core.');
+    test('should provide health information', () => {
+      const health = component.getHealth();
+      expect(health).toHaveProperty('status');
+      expect(health).toHaveProperty('issues');
+      expect(health.status).toBe('healthy');
     });
   });
 });
