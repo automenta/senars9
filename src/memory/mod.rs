@@ -1,7 +1,10 @@
+pub mod index_manager;
+
 use crate::data_structures::{
     concept::Concept, task::Task, term::Term, term_type::TermType,
 };
-use std::collections::{BTreeMap, HashMap, HashSet};
+use index_manager::IndexManager;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Represents the memory of the SeNARS system, storing knowledge and active tasks.
@@ -22,16 +25,8 @@ pub struct Memory {
     /// from short-term memory if they are deemed important enough.
     pub long_term_tasks: HashMap<String, Arc<Task>>,
 
-    /// Index for implication relationships: `premise_hash -> {task_hash, ...}`.
-    implication_index: HashMap<String, HashSet<String>>,
-    /// Index for inheritance relationships: `subject_hash -> {task_hash, ...}`.
-    inheritance_index: HashMap<String, HashSet<String>>,
-    /// Index for inheritance relationships: `predicate_hash -> {task_hash, ...}`.
-    inheritance_index_by_predicate: HashMap<String, HashSet<String>>,
-    /// Index for similarity relationships: `term_hash -> {task_hash, ...}`.
-    similarity_index: HashMap<String, HashSet<String>>,
-    /// Index for temporal relationships: `timestamp -> {task_hash, ...}`.
-    temporal_index: BTreeMap<u64, HashSet<String>>,
+    /// The index manager handles all task indexing.
+    index_manager: IndexManager,
 
     // Statistics
     total_tasks: u64,
@@ -46,11 +41,7 @@ impl Memory {
             concept_storage: HashMap::new(),
             short_term_tasks: HashMap::new(),
             long_term_tasks: HashMap::new(),
-            implication_index: HashMap::new(),
-            inheritance_index: HashMap::new(),
-            inheritance_index_by_predicate: HashMap::new(),
-            similarity_index: HashMap::new(),
-            temporal_index: BTreeMap::new(),
+            index_manager: IndexManager::new(),
             total_tasks: 0,
             consolidation_count: 0,
             last_consolidation: 0,
@@ -58,7 +49,7 @@ impl Memory {
     }
 
     /// Adds a new task to short-term memory, creating its concept if necessary,
-    /// and updates all relevant indexes.
+    /// and updates all relevant indexes via the `IndexManager`.
     pub fn add_task(&mut self, task: Task, current_time: u64) {
         // First, ensure concepts for the task's term and all its sub-terms exist.
         self.ensure_concept_exists_recursive(&task.term, current_time);
@@ -66,51 +57,13 @@ impl Memory {
         let task_arc = Arc::new(task);
         let term_hash = task_arc.term().hash.clone();
 
-        // Add to task storage
-        if self.short_term_tasks.insert(term_hash.clone(), task_arc.clone()).is_none() {
+        // Add to task storage and update count if it's a new task.
+        if self.short_term_tasks.insert(term_hash, task_arc.clone()).is_none() {
             self.total_tasks += 1;
         }
 
-        // Update temporal index
-        if let Some(time) = task_arc.occurrence_time {
-            self.temporal_index
-                .entry(time)
-                .or_default()
-                .insert(term_hash.clone());
-        }
-
-        // Update content-based indexes
-        match task_arc.term().term_type {
-            TermType::Implication => {
-                if let Some(premise) = &task_arc.term().subject {
-                    self.implication_index
-                        .entry(premise.hash.clone())
-                        .or_default()
-                        .insert(term_hash);
-                }
-            }
-            TermType::Inheritance => {
-                if let Some(subject) = &task_arc.term().subject {
-                    self.inheritance_index
-                        .entry(subject.hash.clone())
-                        .or_default()
-                        .insert(term_hash.clone());
-                }
-                if let Some(predicate) = &task_arc.term().predicate {
-                    self.inheritance_index_by_predicate
-                        .entry(predicate.hash.clone())
-                        .or_default()
-                        .insert(term_hash);
-                }
-            }
-            TermType::Similarity => {
-                if let (Some(subj), Some(pred)) = (&task_arc.term().subject, &task_arc.term().predicate) {
-                    self.similarity_index.entry(subj.hash.clone()).or_default().insert(term_hash.clone());
-                    self.similarity_index.entry(pred.hash.clone()).or_default().insert(term_hash);
-                }
-            }
-            _ => {}
-        }
+        // Delegate indexing to the IndexManager.
+        self.index_manager.add_task(&task_arc);
     }
 
     /// Retrieves a task from memory by its term hash.
@@ -120,50 +73,30 @@ impl Memory {
 
     /// Retrieves all implication tasks where the given term is the premise.
     pub fn get_implications_by_premise(&self, premise: &Term) -> Option<Vec<&Arc<Task>>> {
-        self.implication_index
-            .get(&premise.hash)
-            .map(|task_hashes| {
-                task_hashes
-                    .iter()
-                    .filter_map(|hash| self.get_task(hash))
-                    .collect()
-            })
+        self.index_manager
+            .get_implication_hashes_by_premise(&premise.hash)
+            .map(|hashes| self.get_tasks_from_hashes(hashes))
     }
 
     /// Retrieves all inheritance tasks where the given term is the predicate.
     pub fn get_inheritance_by_predicate(&self, predicate: &Term) -> Option<Vec<&Arc<Task>>> {
-        self.inheritance_index_by_predicate
-            .get(&predicate.hash)
-            .map(|task_hashes| {
-                task_hashes
-                    .iter()
-                    .filter_map(|hash| self.get_task(hash))
-                    .collect()
-            })
+        self.index_manager
+            .get_inheritance_hashes_by_predicate(&predicate.hash)
+            .map(|hashes| self.get_tasks_from_hashes(hashes))
     }
 
     /// Retrieves all inheritance tasks where the given term is the subject.
     pub fn get_inheritance_by_subject(&self, subject: &Term) -> Option<Vec<&Arc<Task>>> {
-        self.inheritance_index
-            .get(&subject.hash)
-            .map(|task_hashes| {
-                task_hashes
-                    .iter()
-                    .filter_map(|hash| self.get_task(hash))
-                    .collect()
-            })
+        self.index_manager
+            .get_inheritance_hashes_by_subject(&subject.hash)
+            .map(|hashes| self.get_tasks_from_hashes(hashes))
     }
 
     /// Retrieves all similarity tasks related to the given term.
     pub fn get_similarities(&self, term: &Term) -> Option<Vec<&Arc<Task>>> {
-        self.similarity_index
-            .get(&term.hash)
-            .map(|task_hashes| {
-                task_hashes
-                    .iter()
-                    .filter_map(|hash| self.get_task(hash))
-                    .collect()
-            })
+        self.index_manager
+            .get_similarity_hashes(&term.hash)
+            .map(|hashes| self.get_tasks_from_hashes(hashes))
     }
 
     /// Returns an iterator over all tasks in both short-term and long-term memory.
@@ -173,9 +106,14 @@ impl Memory {
 
     /// Retrieves tasks within a specific time range.
     pub fn get_tasks_by_time_range(&self, start_time: u64, end_time: u64) -> Vec<&Arc<Task>> {
-        self.temporal_index
-            .range(start_time..=end_time)
-            .flat_map(|(_, task_hashes)| task_hashes.iter())
+        let hashes = self.index_manager.get_task_hashes_by_time_range(start_time, end_time);
+        self.get_tasks_from_hashes(hashes)
+    }
+
+    /// A helper function to convert a collection of task hashes into a vector of task references.
+    fn get_tasks_from_hashes<'a, T: IntoIterator<Item = &'a String>>(&'a self, task_hashes: T) -> Vec<&'a Arc<Task>> {
+        task_hashes
+            .into_iter()
             .filter_map(|hash| self.get_task(hash))
             .collect()
     }
@@ -218,57 +156,20 @@ impl Memory {
         new_concept
     }
 
-    /// Removes a task from memory completely.
+    /// Removes a task from memory completely, updating storage and indexes.
     pub fn remove_task(&mut self, term_hash: &str) -> bool {
+        // Remove from storage first. If it doesn't exist, there's nothing to do.
         let task_to_remove = self.short_term_tasks.remove(term_hash)
             .or_else(|| self.long_term_tasks.remove(term_hash));
 
         if let Some(task) = task_to_remove {
+            // If the task was removed, update the total count.
             self.total_tasks -= 1;
-
-            if let Some(time) = task.occurrence_time {
-                if let Some(hashes) = self.temporal_index.get_mut(&time) {
-                    hashes.remove(term_hash);
-                    if hashes.is_empty() {
-                        self.temporal_index.remove(&time);
-                    }
-                }
-            }
-
-            match task.term().term_type {
-                TermType::Implication => {
-                    if let Some(premise) = &task.term().subject {
-                        if let Some(hashes) = self.implication_index.get_mut(&premise.hash) {
-                            hashes.remove(term_hash);
-                        }
-                    }
-                }
-                TermType::Inheritance => {
-                    if let Some(subject) = &task.term().subject {
-                        if let Some(hashes) = self.inheritance_index.get_mut(&subject.hash) {
-                            hashes.remove(term_hash);
-                        }
-                    }
-                    if let Some(predicate) = &task.term().predicate {
-                        if let Some(hashes) = self.inheritance_index_by_predicate.get_mut(&predicate.hash) {
-                            hashes.remove(term_hash);
-                        }
-                    }
-                }
-                TermType::Similarity => {
-                    if let (Some(subj), Some(pred)) = (&task.term().subject, &task.term().predicate) {
-                        if let Some(hashes) = self.similarity_index.get_mut(&subj.hash) {
-                            hashes.remove(term_hash);
-                        }
-                        if let Some(hashes) = self.similarity_index.get_mut(&pred.hash) {
-                            hashes.remove(term_hash);
-                        }
-                    }
-                }
-                _ => {}
-            }
+            // Delegate the removal of the task from all indexes.
+            self.index_manager.remove_task(&task);
             true
         } else {
+            // Task was not found in memory.
             false
         }
     }

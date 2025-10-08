@@ -28,9 +28,9 @@ fn test_add_task_populates_indexes() {
     memory.add_task(task, 100);
 
     // Check temporal index
-    assert!(memory.temporal_index.get(&100).unwrap().contains(&task_hash));
+    assert!(memory.index_manager.temporal_index.get(&100).unwrap().contains(&task_hash));
     // Check inheritance index
-    assert!(memory.inheritance_index.get(&s_concept.term.hash).unwrap().contains(&task_hash));
+    assert!(memory.index_manager.inheritance_index.get(&s_concept.term.hash).unwrap().contains(&task_hash));
 }
 
 #[test]
@@ -148,15 +148,15 @@ fn test_remove_task_cleans_up_all_indexes() {
     memory.add_task(create_task(concept.term.clone(), 100, 0.5, None), 100);
 
     // Check indexes were populated
-    assert!(memory.inheritance_index.get(&s.term.hash).is_some());
-    assert!(memory.temporal_index.get(&100).is_some());
+    assert!(memory.index_manager.inheritance_index.get(&s.term.hash).is_some());
+    assert!(memory.index_manager.temporal_index.get(&100).is_some());
 
     // Remove the task
     memory.remove_task(&task_hash);
 
     // Check indexes are cleaned up
-    assert!(memory.inheritance_index.get(&s.term.hash).unwrap().is_empty());
-    assert!(memory.temporal_index.get(&100).is_none());
+    assert!(memory.index_manager.inheritance_index.get(&s.term.hash).unwrap().is_empty());
+    assert!(memory.index_manager.temporal_index.get(&100).is_none());
 }
 
 #[test]
