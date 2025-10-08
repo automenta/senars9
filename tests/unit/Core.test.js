@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals';
 import Core from '../../core/Core.js';
 import Component from '../../core/Component.js';
 import Config from '../../core/Config.js';
@@ -51,13 +50,15 @@ describe('Core', () => {
       core = new Core();
       callOrder = [];
 
-      const realConfig = new Config();
-      jest.spyOn(realConfig, 'initialize').mockImplementation(async (cfg) => {
-        callOrder.push('init:config');
-        await Config.prototype.initialize.call(realConfig, cfg);
-      });
+      // Create a test config that tracks initialization
+      class TestConfig extends Config {
+        async initialize(cfg) {
+          callOrder.push('init:config');
+          return super.initialize(cfg);
+        }
+      }
 
-      core.componentMap.set('config', realConfig);
+      core.componentMap.set('config', new TestConfig());
       core.componentMap.set('messages', new TestComponent('messages', callOrder));
 
       compA = new TestComponent('compA', callOrder);
@@ -83,13 +84,29 @@ describe('Core', () => {
     });
 
     test('stop should stop all components in reverse registration order', async () => {
-      jest.spyOn(core.config, 'stop').mockImplementation(async () => { callOrder.push('stop:config'); });
+      // Create a test config that tracks stop calls
+      class TestConfig extends Config {
+        async stop() {
+          callOrder.push('stop:config');
+          return super.stop();
+        }
+      }
+
+      core.componentMap.set('config', new TestConfig());
       await core.stop();
       expect(callOrder).toEqual(['stop:compB', 'stop:compA', 'stop:messages', 'stop:config']);
     });
 
     test('destroy should destroy all components in reverse registration order', async () => {
-      jest.spyOn(core.config, 'destroy').mockImplementation(async () => { callOrder.push('destroy:config'); });
+      // Create a test config that tracks destroy calls
+      class TestConfig extends Config {
+        async destroy() {
+          callOrder.push('destroy:config');
+          return super.destroy();
+        }
+      }
+
+      core.componentMap.set('config', new TestConfig());
       await core.destroy();
       expect(callOrder).toEqual(['destroy:compB', 'destroy:compA', 'destroy:messages', 'destroy:config']);
     });

@@ -1,24 +1,17 @@
 class Logger {
-    static log(level, message, data = {}) {
+  static log(level, message, data = {}) {
     const method = console[level] || console.log;
-    const upperLevel = level && typeof level === 'string' ? level.toUpperCase() : 'LOG';
+    const upperLevel = level?.toUpperCase() || 'LOG';
     return method(`[${upperLevel}]`, message, data);
   }
-  
-  static info = (msg, data) => {
-    // Only log info in development/debug mode
-    if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
-      Logger.log('info', msg, data);
-    }
-  };
+
+  static info = (msg, data) =>
+    (process.env.NODE_ENV === 'development' || process.env.DEBUG) && Logger.log('info', msg, data);
+
   static warn = (msg, data) => Logger.log('warn', msg, data);
   static error = (msg, data) => Logger.log('error', msg, data);
-  static debug = (msg, data) => {
-    // Only log debug in development mode
-    if (process.env.NODE_ENV === 'development') {
-      Logger.log('debug', msg, data);
-    }
-  };
+  static debug = (msg, data) =>
+    process.env.NODE_ENV === 'development' && Logger.log('debug', msg, data);
 }
 
 class ObjectUtils {
@@ -32,6 +25,9 @@ class ObjectUtils {
   static isEmpty = obj => !obj || Object.keys(obj).length === 0;
   static pick = (obj, keys) => keys.reduce((result, key) => (key in obj && (result[key] = obj[key]), result), {});
   static omit = (obj, keys) => Object.keys(obj).reduce((result, key) => (!keys.includes(key) && (result[key] = obj[key]), result), {});
+
+  static mapKeys = (obj, keyMapper) => Object.keys(obj).reduce((result, key) => (result[keyMapper(key)] = obj[key], result), {});
+  static filterValues = (obj, predicate) => Object.keys(obj).reduce((result, key) => (predicate(obj[key], key) && (result[key] = obj[key]), result), {});
 }
 
 class ArrayUtils {
@@ -47,6 +43,8 @@ class ArrayUtils {
 
   static compact = array => array.filter(Boolean);
   static flatten = (array, depth = 1) => array.flat(depth);
+  static partition = (array, predicate) => array.reduce((result, item) => (result[predicate(item) ? 0 : 1].push(item), result), [[], []]);
+  static countBy = (array, keyFn) => array.reduce((counts, item) => (counts[keyFn(item)] = (counts[keyFn(item)] || 0) + 1, counts), {});
 }
 
 class IdGenerator {

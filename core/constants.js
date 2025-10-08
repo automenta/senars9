@@ -1,5 +1,5 @@
-// Shared constants across the system
 export const DEFAULTS = {
+  CACHE_SIZE: 1000,
   FOCUS_SIZE: 50,
   ATTENTION_DECAY: 0.9,
   PRIORITY_LEVELS: 10,

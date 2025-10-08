@@ -2,36 +2,118 @@ import Component from './Component.js';
 import { Cache, Storage, IndexManager } from './collections.js';
 import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
 import { Validation } from './validation.js';
+import { DEFAULTS } from './constants.js';
 
-const CACHE_SIZE = 1000;
-const FOCUS_SIZE = 50;
-const ATTENTION_DECAY = 0.9;
-const PRIORITY_LEVELS = 10;
-const QUERY_LIMIT = 100;
-const ACCESS_WEIGHT = 100;
-const DECAY_HOURS = 24;
+class Focus {
+  constructor() {
+    this.focusSets = new Map();
+    this.currentFocus = null;
+    this.focusSize = DEFAULTS.FOCUS_SIZE;
+  }
+
+  createFocusSet(name, maxSize = this.focusSize) {
+    Validation.ensureCondition(!this.focusSets.has(name), `Focus set '${name}' already exists`);
+    this.focusSets.set(name, {
+      items: new Map(),
+      maxSize,
+      accessCount: 0,
+      lastAccessed: Date.now(),
+      createdAt: Date.now(),
+      attentionScore: 0,
+      decayFactor: DEFAULTS.ATTENTION_DECAY
+    });
+  }
+
+  setFocus(name) {
+    Validation.ensureCondition(this.focusSets.has(name), `Focus set '${name}' does not exist`);
+    this.currentFocus = name;
+  }
+
+  getCurrentFocus() {
+    return this.currentFocus;
+  }
+
+  getFocusItems(count = 10) {
+    const focusSet = this.focusSets.get(this.currentFocus);
+    if (!focusSet) return [];
+
+    focusSet.lastAccessed = Date.now();
+    focusSet.accessCount++;
+
+    return ArrayUtils.sortBy(Array.from(focusSet.items.entries()), ([, data]) => [
+      -(data.priority || 0),
+      data.timestamp,
+      -(data.accessCount || 0)
+    ], 'asc')
+      .slice(0, count)
+      .map(([key, value]) => (value.accessCount = (value.accessCount || 0) + 1, [key, value]));
+  }
+
+  updateFocusAttention(name, delta) {
+    const focusSet = this.focusSets.get(name);
+    if (focusSet) {
+      focusSet.attentionScore = Math.max(0, Math.min(1, (focusSet.attentionScore || 0) + delta));
+    }
+  }
+
+  getFocusSetStats() {
+    const stats = {};
+    this.focusSets.forEach((data, name) => {
+      stats[name] = {
+        size: data.items.size,
+        maxSize: data.maxSize,
+        accessCount: data.accessCount,
+        attentionScore: data.attentionScore,
+        utilization: data.items.size / data.maxSize,
+        age: Date.now() - data.createdAt
+      };
+    });
+    return stats;
+  }
+
+  updateFocusSets(key, options) {
+    const { focusSet, priority = 0 } = options;
+    if (!focusSet || !this.focusSets.has(focusSet)) return;
+
+    const focusData = this.focusSets.get(focusSet);
+    if (focusData.items.has(key)) return;
+
+    focusData.items.set(key, { priority, timestamp: Date.now() });
+    if (focusData.items.size > focusData.maxSize) {
+      const firstKey = focusData.items.keys().next().value;
+      focusData.items.delete(firstKey);
+    }
+  }
+
+  removeFromFocusSets(key) {
+    this.focusSets.forEach(focusData => focusData.items.delete(key));
+  }
+
+  clear() {
+    this.focusSets.clear();
+    this.currentFocus = null;
+  }
+}
 
 class Memory extends Component {
   constructor() {
     super();
     this.storage = new Storage();
-    this.cache = new Cache();
-    this._cacheSize = CACHE_SIZE;
-    this.focusSets = new Map();
-    this.currentFocus = null;
-    this.focusSize = FOCUS_SIZE;
+    this.cache = new Cache(DEFAULTS.CACHE_SIZE);
+    this.focus = new Focus();
     this.indexes = new IndexManager();
   }
 
   async _doInitialize(config = {}) {
     this.storage.clear();
-    this.cache = new Cache(config.cacheSize || this._cacheSize);
-    this.focusSize = config.focusSize || FOCUS_SIZE;
-    this.currentFocus = config.defaultFocus || null;
-    this.focusSets.clear();
+    if (config.cacheSize) {
+      this.cache = new Cache(config.cacheSize);
+    }
+    this.focus.focusSize = config.focusSize || DEFAULTS.FOCUS_SIZE;
+    this.focus.currentFocus = config.defaultFocus || null;
+    this.focus.focusSets.clear();
     this.indexes.clear();
   }
-
 
   get(key) {
     const cached = this.cache.get(key);
@@ -61,54 +143,31 @@ class Memory extends Component {
     this.storage.clear();
     this.cache.clear();
     this.indexes.clear();
-    this.focusSets.clear();
-    this.currentFocus = null;
+    this.focus.clear();
   }
 
   has(key) {
     return this.cache.has(key) || this.storage.has(key);
   }
 
-  createFocusSet(name, maxSize = this.focusSize) {
-    Validation.ensureCondition(!this.focusSets.has(name), `Focus set '${name}' already exists`);
-    this.focusSets.set(name, {
-      items: new Map(),
-      maxSize,
-      accessCount: 0,
-      lastAccessed: Date.now(),
-      createdAt: Date.now(),
-      attentionScore: 0,
-      decayFactor: ATTENTION_DECAY
-    });
+  createFocusSet(name, maxSize = this.focus.focusSize) {
+    this.focus.createFocusSet(name, maxSize);
   }
 
   setFocus(name) {
-    Validation.ensureCondition(this.focusSets.has(name), `Focus set '${name}' does not exist`);
-    this.currentFocus = name;
+    this.focus.setFocus(name);
   }
 
   getCurrentFocus() {
-    return this.currentFocus;
+    return this.focus.getCurrentFocus();
   }
 
   getFocusItems(count = 10) {
-    const focusSet = this.focusSets.get(this.currentFocus);
-    if (!focusSet) return [];
-
-    focusSet.lastAccessed = Date.now();
-    focusSet.accessCount++;
-
-    return ArrayUtils.sortBy(Array.from(focusSet.items.entries()), ([, data]) => [
-      -(data.priority || 0),
-      data.timestamp,
-      -(data.accessCount || 0)
-    ], 'asc')
-      .slice(0, count)
-      .map(([key, value]) => (value.accessCount = (value.accessCount || 0) + 1, [key, value]));
+    return this.focus.getFocusItems(count);
   }
 
   query(criteria = {}) {
-    const { type, tags, minPriority, limit = QUERY_LIMIT, sortBy, sortOrder = 'desc' } = criteria;
+    const { type, tags, minPriority, limit = DEFAULTS.QUERY_LIMIT, sortBy, sortOrder = 'desc' } = criteria;
     let candidates = new Set(this.storage.keys());
 
     if (type) {
@@ -153,7 +212,7 @@ class Memory extends Component {
 
   _intersectPriority(candidates, minPriority) {
     const priorityKeys = new Set();
-    for (let priority = minPriority; priority <= PRIORITY_LEVELS; priority++) {
+    for (let priority = minPriority; priority <= DEFAULTS.PRIORITY_LEVELS; priority++) {
       this.indexes.get(`priority_${priority}`).forEach(key => priorityKeys.add(key));
     }
     return this.indexes.intersect(candidates, key => priorityKeys.has(key));
@@ -173,7 +232,7 @@ class Memory extends Component {
     return {
       totalKeys: this.storage.size(),
       cachedKeys: this.cache.size,
-      focusSets: this.focusSets.size,
+      focusSets: this.focus.focusSets.size,
       indexes: this.indexes.indexes.size,
       cacheHitRate: this.cache.hitRate || 0
     };
@@ -197,21 +256,11 @@ class Memory extends Component {
   }
 
   getStats() {
-    const focusSetStats = {};
-    this.focusSets.forEach((data, name) => {
-      focusSetStats[name] = {
-        size: data.items.size,
-        maxSize: data.maxSize,
-        accessCount: data.accessCount,
-        lastAccessed: data.lastAccessed
-      };
-    });
-
     return {
       storageSize: this.storage.size(),
       cacheSize: this.cache.cache.size,
       cacheMaxSize: this.cache.maxSize,
-      focusSets: focusSetStats,
+      focusSets: this.focus.getFocusSetStats(),
       indexes: this.indexes.indexes.size
     };
   }
@@ -232,24 +281,17 @@ class Memory extends Component {
   }
 
   _updateFocusSets(key, options) {
-    const { focusSet, priority = 0 } = options;
-    if (!focusSet || !this.focusSets.has(focusSet)) return;
-
-    const focusData = this.focusSets.get(focusSet);
-    if (focusData.items.has(key)) return;
-
-    focusData.items.set(key, { priority, timestamp: Date.now() });
-    focusData.items.size > focusData.maxSize && focusData.items.delete([...focusData.items.keys()][0]);
+    this.focus.updateFocusSets(key, options);
   }
 
 
   _calculateAttentionScore(itemData, focusData) {
     const now = Date.now();
     const age = now - itemData.timestamp;
-    const recencyScore = Math.exp(-age / (DECAY_HOURS * 60 * 60 * 1000));
+    const recencyScore = Math.exp(-age / (DEFAULTS.DECAY_HOURS * 60 * 60 * 1000));
 
-    const priorityScore = (itemData.priority || 0) / PRIORITY_LEVELS;
-    const frequencyScore = Math.min((itemData.accessCount || 0) / ACCESS_WEIGHT, 1);
+    const priorityScore = (itemData.priority || 0) / DEFAULTS.PRIORITY_LEVELS;
+    const frequencyScore = Math.min((itemData.accessCount || 0) / DEFAULTS.ACCESS_WEIGHT, 1);
     const focusAttention = focusData.attentionScore || 0;
 
     const PRIORITY_WEIGHT = 0.4;
@@ -261,29 +303,15 @@ class Memory extends Component {
   }
 
   updateFocusAttention(name, delta) {
-    const focusSet = this.focusSets.get(name);
-    if (focusSet) {
-      focusSet.attentionScore = Math.max(0, Math.min(1, (focusSet.attentionScore || 0) + delta));
-    }
+    this.focus.updateFocusAttention(name, delta);
   }
 
   getFocusSetStats() {
-    const stats = {};
-    this.focusSets.forEach((data, name) => {
-      stats[name] = {
-        size: data.items.size,
-        maxSize: data.maxSize,
-        accessCount: data.accessCount,
-        attentionScore: data.attentionScore,
-        utilization: data.items.size / data.maxSize,
-        age: Date.now() - data.createdAt
-      };
-    });
-    return stats;
+    return this.focus.getFocusSetStats();
   }
 
   _removeFromFocusSets(key) {
-    this.focusSets.forEach(focusData => focusData.items.delete(key));
+    this.focus.removeFromFocusSets(key);
   }
 }
 
