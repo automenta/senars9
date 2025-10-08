@@ -3,6 +3,7 @@ import { Storage } from './collections.js';
 import { Retry } from './validation.js';
 import { IdGenerator } from './utilities.js';
 import { RETRYABLE_ERRORS, DEFAULTS } from './constants.js';
+import { Logger } from './utilities.js';
 
 class Messages extends Component {
   constructor() {
@@ -86,7 +87,7 @@ class Messages extends Component {
 
   registerCommand(command, handler) {
     if (this.commands.has(command)) {
-      console.warn(`Command "${command}" is already registered. Overwriting.`);
+      Logger.warn(`Command "${command}" is already registered. Overwriting.`);
     }
     this.commands.set(command, handler);
   }
@@ -315,7 +316,7 @@ class Messages extends Component {
     };
 
     // Log error for debugging
-    console.error(`[Messages:${errorId}] Error in ${context.type} "${context.name}":`, {
+    Logger.error(`[Messages:${errorId}] Error in ${context.type} "${context.name}"`, {
       error: error.message,
       stack: error.stack,
       context: {
@@ -336,7 +337,7 @@ class Messages extends Component {
           }
           if (result) return result;
         } catch (handlerError) {
-          console.error(`[Messages:${errorId}] Error handler failed:`, handlerError);
+          Logger.error(`[Messages:${errorId}] Error handler failed`, handlerError);
         }
       }
     };
@@ -347,7 +348,7 @@ class Messages extends Component {
         const result = tryHandlers(this.errorHandlers.get(errorType));
         if (result) return result;
       } catch (handlerError) {
-        console.error(`[Messages:${errorId}] Specific error handlers failed:`, handlerError);
+        Logger.error(`[Messages:${errorId}] Specific error handlers failed`, handlerError);
       }
     }
 
@@ -357,13 +358,13 @@ class Messages extends Component {
         const result = tryHandlers(this.errorHandlers.get('Error'));
         if (result) return result;
       } catch (handlerError) {
-        console.error(`[Messages:${errorId}] Generic error handlers failed:`, handlerError);
+        Logger.error(`[Messages:${errorId}] Generic error handlers failed`, handlerError);
       }
     }
 
     // Default recovery strategies
     if (retryFn && this._shouldRetry(error, errorContext)) {
-      console.warn(`[Messages:${errorId}] Attempting retry for ${context.type} "${context.name}"`);
+      Logger.warn(`[Messages:${errorId}] Attempting retry for ${context.type} "${context.name}"`);
       return retryFn();
     }
 
@@ -405,7 +406,7 @@ class Messages extends Component {
     };
 
     // Log the processing error
-    console.error(`[Messages:${errorResult.errorId}] Processing failed:`, {
+    Logger.error(`[Messages:${errorResult.errorId}] Processing failed`, {
       error: error.message,
       context: errorResult.context
     });

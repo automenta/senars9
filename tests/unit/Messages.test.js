@@ -57,7 +57,7 @@ describe('Messages', () => {
       const handler2 = jest.fn();
       messages.registerCommand('overwrite-cmd', handler1);
       messages.registerCommand('overwrite-cmd', handler2);
-      expect(warnSpy).toHaveBeenCalledWith('Command "overwrite-cmd" is already registered. Overwriting.');
+      expect(warnSpy).toHaveBeenCalledWith('[WARN]', 'Command "overwrite-cmd" is already registered. Overwriting.', {});
       messages.execute('overwrite-cmd', 'data');
       expect(handler1).not.toHaveBeenCalled();
       expect(handler2).toHaveBeenCalledWith('data');

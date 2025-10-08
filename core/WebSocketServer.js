@@ -1,6 +1,7 @@
 import { WebSocketServer as WSServer } from 'ws';
 import { createServer } from 'http';
 import Component from './Component.js';
+import { Logger } from './utilities.js';
 
 class WebSocketServer extends Component {
   constructor() {
@@ -31,7 +32,7 @@ class WebSocketServer extends Component {
     });
 
     this.wss.on('error', (error) => {
-      console.error('WebSocket server error:', error);
+      Logger.error('WebSocket server error', error);
     });
 
     this.heartbeatInterval = heartbeatInterval;
@@ -50,7 +51,7 @@ class WebSocketServer extends Component {
         } else {
           this.isRunning = true;
           this._startHeartbeat();
-          console.log(`WebSocket server running on ws://${host}:${port}`);
+          Logger.debug(`WebSocket server running on ws://${host}:${port}`);
           resolve();
         }
       });
@@ -72,7 +73,7 @@ class WebSocketServer extends Component {
       this.wss.close(() => {
         this.server.close(() => {
           this.isRunning = false;
-          console.log('WebSocket server stopped');
+          Logger.debug('WebSocket server stopped');
           resolve();
         });
       });
@@ -125,7 +126,7 @@ class WebSocketServer extends Component {
     });
 
     ws.on('error', (error) => {
-      console.error(`WebSocket error for client ${clientId}:`, error);
+      Logger.error(`WebSocket error for client ${clientId}`, error);
       this._handleDisconnection(clientId);
     });
 
@@ -136,7 +137,7 @@ class WebSocketServer extends Component {
       timestamp: new Date().toISOString()
     });
 
-    console.log(`Client connected: ${clientId}`);
+    Logger.debug(`Client connected: ${clientId}`);
   }
 
   _handleMessage(clientId, data) {
@@ -174,7 +175,7 @@ class WebSocketServer extends Component {
         });
       }
     } catch (error) {
-      console.error(`Error parsing message from client ${clientId}:`, error);
+      Logger.error(`Error parsing message from client ${clientId}`, error);
     }
   }
 
@@ -195,7 +196,7 @@ class WebSocketServer extends Component {
        });
      }
 
-     console.log(`Client ${clientId} identified as: ${client.type} (v${client.version})`);
+     Logger.debug(`Client ${clientId} identified as: ${client.type} (v${client.version})`);
    }
 
   _handleSubscription(clientId, message) {
@@ -304,7 +305,7 @@ class WebSocketServer extends Component {
   _handleDisconnection(clientId) {
     const client = this.clients.get(clientId);
     if (client) {
-      console.log(`Client disconnected: ${clientId} (${client.type})`);
+      Logger.debug(`Client disconnected: ${clientId} (${client.type})`);
       this.clients.delete(clientId);
     }
   }
@@ -321,7 +322,7 @@ class WebSocketServer extends Component {
       // Check for dead connections
       for (const [clientId, client] of this.clients) {
         if (now - client.lastSeen > timeout) {
-          console.log(`Client ${clientId} timed out`);
+          Logger.debug(`Client ${clientId} timed out`);
           client.ws.close(1000, 'Heartbeat timeout');
           this.clients.delete(clientId);
         } else {

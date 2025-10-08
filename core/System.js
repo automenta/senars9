@@ -47,7 +47,7 @@ class System {
 
       Logger.debug(`${this.constructor.name}: System started successfully`);
     } catch (error) {
-      Logger.error(`${this.constructor.name}: Failed to start system:`, error);
+      Logger.error(`${this.constructor.name}: Failed to start system`, error);
       throw error;
     }
   }
@@ -65,7 +65,7 @@ class System {
 
       Logger.debug(`${this.constructor.name}: System stopped`);
     } catch (error) {
-      this._logError('Error stopping system:', error);
+      this._logError('Error stopping system', error);
       throw error;
     }
   }
@@ -109,7 +109,7 @@ class System {
       try {
         return handler(...args);
       } catch (error) {
-        this._logError(`Error in event handler for '${event}':`, error);
+        this._logError(`Error in event handler for '${event}'`, error);
       }
     };
 
@@ -252,7 +252,7 @@ class System {
     try {
       return await this.core.messages.execute(command, data);
     } catch (error) {
-      this._logError(`Error executing command '${command}':`, error);
+      this._logError(`Error executing command '${command}'`, error);
       throw error;
     }
   }
@@ -263,7 +263,7 @@ class System {
     try {
       return await this.core.messages.process(message);
     } catch (error) {
-      this._logError('Error processing message:', error);
+      this._logError('Error processing message', error);
       throw error;
     }
   }
@@ -274,11 +274,11 @@ class System {
     });
 
     this.on('reasoning_error', (error) => {
-      Logger.error(`${this.constructor.name}: Reasoning error:`, error);
+      Logger.error(`${this.constructor.name}: Reasoning error`, error);
     });
 
     this.on('memory.full', (info) => {
-      Logger.warn(`${this.constructor.name}: Memory capacity reached:`, info);
+      Logger.warn(`${this.constructor.name}: Memory capacity reached`, info);
     });
 
     this.on('task.processed', (result) => {

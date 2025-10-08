@@ -1,4 +1,5 @@
 import Component from './Component.js';
+import { Logger } from './utilities.js';
 
 class Reasoning extends Component {
   constructor() {
@@ -71,7 +72,7 @@ class Reasoning extends Component {
       return derivedTasks;
 
     } catch (error) {
-      console.error('Error during reasoning:', error);
+      Logger.error('Error during reasoning', error);
       this.emit('reasoning_error', { error: error.message, context: reasoningContext });
       return [];
     }
@@ -206,7 +207,7 @@ class Reasoning extends Component {
         const ruleInferences = ruleFunction(tasks, context);
         inferences.push(...ruleInferences);
       } catch (error) {
-        console.warn(`Error applying inference rule ${ruleName}:`, error);
+        Logger.warn(`Error applying inference rule ${ruleName}`, error);
       }
     }
 
