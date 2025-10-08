@@ -1,9 +1,11 @@
 use crate::data_structures::{punctuation::Punctuation, term_type::TermType};
+use crate::memory::Memory;
 use crate::parser::parse;
 
 #[test]
 fn test_parse_atom_belief() {
-    let task = parse("my_atom.").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("my_atom.", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Belief);
     assert_eq!(task.term.term_type, TermType::Atom);
     assert_eq!(task.term.name, "my_atom");
@@ -12,21 +14,24 @@ fn test_parse_atom_belief() {
 
 #[test]
 fn test_parse_atom_question() {
-    let task = parse("my_atom?").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("my_atom?", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Question);
     assert_eq!(task.term.name, "my_atom");
 }
 
 #[test]
 fn test_parse_atom_goal() {
-    let task = parse("my_goal!").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("my_goal!", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Goal);
     assert_eq!(task.term.name, "my_goal");
 }
 
 #[test]
 fn test_parse_inheritance_with_truth() {
-    let task = parse("(cat --> mammal). %1.0;0.9%").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(cat --> mammal). %1.0;0.9%", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Belief);
     assert_eq!(task.term.term_type, TermType::Inheritance);
     assert_eq!(task.term.subject.as_ref().unwrap().name, "cat");
@@ -38,26 +43,30 @@ fn test_parse_inheritance_with_truth() {
 
 #[test]
 fn test_parse_implication_question() {
-    let task = parse("(raining ==> wet_streets)?").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(raining ==> wet_streets)?", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Question);
     assert_eq!(task.term.term_type, TermType::Implication);
 }
 
 #[test]
 fn test_parse_conjunction() {
-    let task = parse("(&, cat, furry, pet)!").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(&, cat, furry, pet)!", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Goal);
     assert_eq!(task.term.term_type, TermType::Conjunction);
     let components = task.term.components.as_ref().unwrap();
-    assert_eq!(components.len(), 3);
-    assert_eq!(components[0].name, "cat");
-    assert_eq!(components[1].name, "furry");
-    assert_eq!(components[2].name, "pet");
+    let names: Vec<_> = components.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names.len(), 3);
+    assert!(names.contains(&"cat"));
+    assert!(names.contains(&"furry"));
+    assert!(names.contains(&"pet"));
 }
 
 #[test]
 fn test_parse_nested_term() {
-    let task = parse("(&/, (add ^ (1, 2)), (is_even ==> true)). %0.5;0.75%").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(&/, (add ^ (1, 2)), (is_even ==> true)). %0.5;0.75%", &mut memory).unwrap();
     let term = task.term;
     assert_eq!(term.term_type, TermType::SequentialConjunction);
 
@@ -76,19 +85,21 @@ fn test_parse_nested_term() {
 
 #[test]
 fn test_invalid_statement() {
+    let mut memory = Memory::new();
     // Invalid term structure
-    assert!(parse("(cat -> mammal).").is_err());
+    assert!(parse("(cat -> mammal).", &mut memory).is_err());
     // Missing punctuation
-    assert!(parse("(cat --> mammal)").is_err());
+    assert!(parse("(cat --> mammal)", &mut memory).is_err());
     // Truth value on a question
-    assert!(parse("(cat --> mammal)? %1.0;0.9%").is_err());
+    assert!(parse("(cat --> mammal)? %1.0;0.9%", &mut memory).is_err());
     // Incomplete truth value
-    assert!(parse("(cat --> mammal). %1.0;%").is_err());
+    assert!(parse("(cat --> mammal). %1.0;%", &mut memory).is_err());
 }
 
 #[test]
 fn test_parse_similarity() {
-    let task = parse("(dog <-> wolf)?").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(dog <-> wolf)?", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Question);
     assert_eq!(task.term.term_type, TermType::Similarity);
     assert_eq!(task.term.subject.as_ref().unwrap().name, "dog");
@@ -97,14 +108,16 @@ fn test_parse_similarity() {
 
 #[test]
 fn test_parse_equivalence() {
-    let task = parse("(cat <=> feline).").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(cat <=> feline).", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Belief);
     assert_eq!(task.term.term_type, TermType::Equivalence);
 }
 
 #[test]
 fn test_parse_disjunction() {
-    let task = parse("(|, cat, dog, bird)!").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(|, cat, dog, bird)!", &mut memory).unwrap();
     assert_eq!(task.punctuation, Punctuation::Goal);
     assert_eq!(task.term.term_type, TermType::Disjunction);
     let components = task.term.components.as_ref().unwrap();
@@ -113,7 +126,8 @@ fn test_parse_disjunction() {
 
 #[test]
 fn test_parse_negation() {
-    let task = parse("(--, (cat --> bird)).").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(--, (cat --> bird)).", &mut memory).unwrap();
     assert_eq!(task.term.term_type, TermType::Negation);
     let inner_term = &task.term.components.as_ref().unwrap()[0];
     assert_eq!(inner_term.term_type, TermType::Inheritance);
@@ -122,25 +136,29 @@ fn test_parse_negation() {
 
 #[test]
 fn test_parse_product() {
-    let task = parse("(a, b, c)?").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(a, b, c)?", &mut memory).unwrap();
     assert_eq!(task.term.term_type, TermType::Product);
 }
 
 #[test]
 fn test_parse_instance() {
-    let task = parse("(fluffy {-- cat).").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(fluffy {-- cat).", &mut memory).unwrap();
     assert_eq!(task.term.term_type, TermType::Instance);
 }
 
 #[test]
 fn test_parse_property() {
-    let task = parse("(cat --} furry).").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("(cat --} furry).", &mut memory).unwrap();
     assert_eq!(task.term.term_type, TermType::Property);
 }
 
 #[test]
 fn test_parse_extensional_set() {
-    let task = parse("{cat, dog, bird}.").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("{cat, dog, bird}.", &mut memory).unwrap();
     assert_eq!(task.term.term_type, TermType::ExtensionalSet);
     let components = task.term.components.as_ref().unwrap();
     assert_eq!(components.len(), 3);
@@ -148,7 +166,8 @@ fn test_parse_extensional_set() {
 
 #[test]
 fn test_parse_intensional_set() {
-    let task = parse("[furry, pet, mammal].").unwrap();
+    let mut memory = Memory::new();
+    let task = parse("[furry, pet, mammal].", &mut memory).unwrap();
     assert_eq!(task.term.term_type, TermType::IntensionalSet);
     let components = task.term.components.as_ref().unwrap();
     assert_eq!(components.len(), 3);

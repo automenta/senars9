@@ -13,9 +13,9 @@ fn test_full_reasoning_cycle_syllogism() {
     let reasoner = Reasoner::new();
 
     // 2. Populate memory with initial knowledge
-    let premise1 = parser::parse("(bird --> animal).").unwrap();
+    let premise1 = parser::parse("(bird --> animal).", &mut memory).unwrap();
     memory.add_task(premise1);
-    let premise2 = parser::parse("(animal --> living_thing).").unwrap();
+    let premise2 = parser::parse("(animal --> living_thing).", &mut memory).unwrap();
     memory.add_task(premise2);
 
     // 3. Run the cognitive cycle
@@ -23,7 +23,7 @@ fn test_full_reasoning_cycle_syllogism() {
     cycle.run_cycle();
 
     // 4. Verify that the conclusion was derived and learned
-    let conclusion_term = parser::parse("(bird --> living_thing).").unwrap().term;
+    let conclusion_term = parser::parse("(bird --> living_thing).", &mut memory).unwrap().term;
     let derived_task = memory.get_task(&conclusion_term.hash);
 
     assert!(derived_task.is_some(), "System did not derive the expected conclusion: (bird --> living_thing).");
@@ -36,9 +36,9 @@ fn test_full_reasoning_cycle_analogy() {
     let reasoner = Reasoner::new();
 
     // 2. Populate memory with initial knowledge
-    let premise1 = parser::parse("(dog <-> wolf).").unwrap();
+    let premise1 = parser::parse("(dog <-> wolf).", &mut memory).unwrap();
     memory.add_task(premise1);
-    let premise2 = parser::parse("(dog --> has_fur).").unwrap();
+    let premise2 = parser::parse("(dog --> has_fur).", &mut memory).unwrap();
     memory.add_task(premise2);
 
     // 3. Run the cognitive cycle
@@ -46,7 +46,7 @@ fn test_full_reasoning_cycle_analogy() {
     cycle.run_cycle();
 
     // 4. Verify that the question was derived and learned
-    let conclusion_term = parser::parse("(wolf --> has_fur)?").unwrap().term;
+    let conclusion_term = parser::parse("(wolf --> has_fur)?", &mut memory).unwrap().term;
     let derived_task = memory.get_task(&conclusion_term.hash);
 
     assert!(derived_task.is_some(), "System did not derive the expected question: (wolf --> has_fur)?");

@@ -23,19 +23,25 @@ pub struct NarseseParser;
 ///
 /// # Returns
 /// A `Result` containing either the parsed `Task` or a `pest` error.
-pub fn parse(input: &str) -> Result<Task, pest::error::Error<Rule>> {
+pub fn parse(
+    input: &str,
+    memory: &mut crate::memory::Memory,
+) -> Result<Task, pest::error::Error<Rule>> {
     let pairs = NarseseParser::parse(Rule::narsese_entry, input)?;
     let statement_pair = pairs.into_iter().next().unwrap().into_inner().next().unwrap();
-    build_task_from_pair(statement_pair)
+    build_task_from_pair(statement_pair, memory)
 }
 
 /// Constructs a `Task` from a `statement` grammar rule pair.
-fn build_task_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Task, pest::error::Error<Rule>> {
+fn build_task_from_pair(
+    pair: pest::iterators::Pair<Rule>,
+    memory: &mut crate::memory::Memory,
+) -> Result<Task, pest::error::Error<Rule>> {
     let inner_pair = pair.into_inner().next().unwrap();
     match inner_pair.as_rule() {
         Rule::belief => {
             let mut inner = inner_pair.into_inner();
-            let term = build_term_from_pair(inner.next().unwrap())?;
+            let term = build_term_from_pair(inner.next().unwrap(), memory)?;
             // The next item is belief_punct, which we can ignore as we already know the type.
             inner.next();
             // The next item *might* be the truth value.
@@ -44,12 +50,12 @@ fn build_task_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Task, pest:
         }
         Rule::goal => {
             let mut inner = inner_pair.into_inner();
-            let term = build_term_from_pair(inner.next().unwrap())?;
+            let term = build_term_from_pair(inner.next().unwrap(), memory)?;
             Ok(Task::new(term, Punctuation::Goal, None))
         }
         Rule::question => {
             let mut inner = inner_pair.into_inner();
-            let term = build_term_from_pair(inner.next().unwrap())?;
+            let term = build_term_from_pair(inner.next().unwrap(), memory)?;
             Ok(Task::new(term, Punctuation::Question, None))
         }
         _ => unreachable!("Parser encountered unexpected statement rule: {:?}", inner_pair.as_rule()),
@@ -59,13 +65,14 @@ fn build_task_from_pair(pair: pest::iterators::Pair<Rule>) -> Result<Task, pest:
 /// Recursively constructs a `Term` from a `term` grammar rule pair.
 fn build_term_from_pair(
     pair: pest::iterators::Pair<Rule>,
+    memory: &mut crate::memory::Memory,
 ) -> Result<Arc<Term>, pest::error::Error<Rule>> {
     match pair.as_rule() {
         Rule::term | Rule::compound_term => {
             // These are wrapper rules, so descend into the actual content.
-            build_term_from_pair(pair.into_inner().next().unwrap())
+            build_term_from_pair(pair.into_inner().next().unwrap(), memory)
         }
-        Rule::atom => Ok(Arc::new(Term::new_atom(pair.as_str()))),
+        Rule::atom => Ok(memory.create_or_get_atom(pair.as_str())),
         rule => {
             // This is a compound term rule.
             let term_type = match rule {
@@ -88,10 +95,10 @@ fn build_term_from_pair(
 
             let components = pair
                 .into_inner()
-                .map(|p| build_term_from_pair(p)) // Recursively build Arc<Term>
+                .map(|p| build_term_from_pair(p, memory)) // Recursively build Arc<Term>
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(Term::create_compound(term_type, components))
+            Ok(memory.create_or_get_compound_term(term_type, components))
         }
     }
 }

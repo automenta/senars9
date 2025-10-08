@@ -33,7 +33,7 @@ impl Reasoner {
     ///
     /// # Returns
     /// A `Vec<Task>` containing all newly derived tasks.
-    pub fn reason(&self, focus_set: &[Arc<Task>], memory: &Memory) -> Vec<Task> {
+    pub fn reason(&self, focus_set: &[Arc<Task>], memory: &mut Memory) -> Vec<Task> {
         let mut derived_tasks = Vec::new();
 
         for task in focus_set {
@@ -61,32 +61,32 @@ impl Reasoner {
     ///
     /// Given a premise `(S --> M).`, it looks for a second premise `(M --> P).`
     /// in memory to derive the conclusion `(S --> P).`.
-    fn deductive_syllogism(&self, premise1: &Arc<Task>, memory: &Memory) -> Vec<Task> {
+    fn deductive_syllogism(&self, premise1: &Arc<Task>, memory: &mut Memory) -> Vec<Task> {
         let mut derived = Vec::new();
         if let (Some(subject1), Some(predicate1)) = (&premise1.term.subject, &premise1.term.predicate) {
-            // `premise1` is (S --> M). We need to find tasks of the form (M --> P).
-            // The `inheritance_index` in memory stores tasks by their subject.
-            // So, we look for tasks where the subject is `predicate1` (M).
-            if let Some(premises2) = memory.get_inheritance_by_subject(predicate1) {
-                for premise2 in premises2 {
-                    if let Some(predicate2) = &premise2.term.predicate {
-                        // Found (M --> P). Now derive (S --> P).
-                        let new_term = Term::create_compound(
-                            TermType::Inheritance,
-                            vec![Arc::clone(subject1), Arc::clone(predicate2)],
-                        );
+            // Collect the predicates from the second premise to release the immutable borrow on memory.
+            let second_premises_predicates: Vec<Arc<Term>> =
+                if let Some(premises2) = memory.get_inheritance_by_subject(predicate1) {
+                    premises2.iter().filter_map(|p| p.term.predicate.clone()).collect()
+                } else {
+                    Vec::new()
+                };
 
-                        // TODO: Implement proper truth value calculation.
-                        let new_truth = TruthValue {
-                            frequency: 1.0,
-                            confidence: 0.81, // Simplified for now.
-                        };
+            for predicate2 in second_premises_predicates {
+                // Found (M --> P). Now derive (S --> P).
+                let new_term = memory.create_or_get_compound_term(
+                    TermType::Inheritance,
+                    vec![Arc::clone(subject1), predicate2],
+                );
 
-                        let new_task =
-                            Task::new(new_term, Punctuation::Belief, Some(new_truth));
-                        derived.push(new_task);
-                    }
-                }
+                // TODO: Implement proper truth value calculation.
+                let new_truth = TruthValue {
+                    frequency: 1.0,
+                    confidence: 0.81, // Simplified for now.
+                };
+
+                let new_task = Task::new(new_term, Punctuation::Belief, Some(new_truth));
+                derived.push(new_task);
             }
         }
         derived
@@ -96,7 +96,7 @@ impl Reasoner {
     ///
     /// Given a premise `(A ==> B).` (an implication), it looks for a second premise `A.`
     /// (the antecedent as a belief) in memory to derive the conclusion `B.`.
-    fn modus_ponens(&self, implication_task: &Arc<Task>, memory: &Memory) -> Vec<Task> {
+    fn modus_ponens(&self, implication_task: &Arc<Task>, memory: &mut Memory) -> Vec<Task> {
         let mut derived = Vec::new();
         if let Some(antecedent) = &implication_task.term.subject {
             // We have `(A ==> B)`. We need to check if `A.` exists in memory.
@@ -125,31 +125,37 @@ impl Reasoner {
     ///
     /// Given a premise `(S <-> M).` and another premise `(S --> P).`, it derives
     /// a new question `(M --> P)?`. This rule generates questions based on similarity.
-    fn analogy(&self, similarity_task: &Arc<Task>, memory: &Memory) -> Vec<Task> {
+    fn analogy(&self, similarity_task: &Arc<Task>, memory: &mut Memory) -> Vec<Task> {
         let mut derived = Vec::new();
         if let (Some(s), Some(m)) = (&similarity_task.term.subject, &similarity_task.term.predicate) {
             // Case 1: Find properties of S to ask about M.
-            if let Some(properties_of_s) = memory.get_inheritance_by_subject(s) {
-                for property_task in properties_of_s {
-                    if let Some(p) = &property_task.term.predicate {
-                        // Found (S --> P), derive (M --> P)?
-                        let new_term = Term::create_compound(TermType::Inheritance, vec![Arc::clone(m), Arc::clone(p)]);
-                        let new_question = Task::new(new_term, Punctuation::Question, None);
-                        derived.push(new_question);
-                    }
-                }
+            let properties_of_s_preds: Vec<Arc<Term>> =
+                if let Some(properties_of_s) = memory.get_inheritance_by_subject(s) {
+                    properties_of_s.iter().filter_map(|t| t.term.predicate.clone()).collect()
+                } else {
+                    Vec::new()
+                };
+
+            for p in properties_of_s_preds {
+                // Found (S --> P), derive (M --> P)?
+                let new_term = memory.create_or_get_compound_term(TermType::Inheritance, vec![Arc::clone(m), p]);
+                let new_question = Task::new(new_term, Punctuation::Question, None);
+                derived.push(new_question);
             }
 
             // Case 2: Find properties of M to ask about S.
-            if let Some(properties_of_m) = memory.get_inheritance_by_subject(m) {
-                for property_task in properties_of_m {
-                    if let Some(p) = &property_task.term.predicate {
-                        // Found (M --> P), derive (S --> P)?
-                        let new_term = Term::create_compound(TermType::Inheritance, vec![Arc::clone(s), Arc::clone(p)]);
-                        let new_question = Task::new(new_term, Punctuation::Question, None);
-                        derived.push(new_question);
-                    }
-                }
+            let properties_of_m_preds: Vec<Arc<Term>> =
+                if let Some(properties_of_m) = memory.get_inheritance_by_subject(m) {
+                    properties_of_m.iter().filter_map(|t| t.term.predicate.clone()).collect()
+                } else {
+                    Vec::new()
+                };
+
+            for p in properties_of_m_preds {
+                // Found (M --> P), derive (S --> P)?
+                let new_term = memory.create_or_get_compound_term(TermType::Inheritance, vec![Arc::clone(s), p]);
+                let new_question = Task::new(new_term, Punctuation::Question, None);
+                derived.push(new_question);
             }
         }
         derived

@@ -7,11 +7,11 @@ fn test_select_focus_set_priority() {
     let reasoner = Reasoner::new();
 
     // Create tasks with different priorities
-    let mut task1 = parser::parse("task1.").unwrap();
+    let mut task1 = parser::parse("task1.", &mut memory).unwrap();
     task1.priority = 0.2;
-    let mut task2 = parser::parse("task2.").unwrap();
+    let mut task2 = parser::parse("task2.", &mut memory).unwrap();
     task2.priority = 0.8;
-    let mut task3 = parser::parse("task3.").unwrap();
+    let mut task3 = parser::parse("task3.", &mut memory).unwrap();
     task3.priority = 0.5;
 
     memory.add_task(task1);
@@ -35,7 +35,7 @@ fn test_select_focus_set_limited_by_size() {
 
     // Create more tasks than the FOCUS_SET_SIZE
     for i in 0..FOCUS_SET_SIZE + 5 {
-        let mut task = parser::parse(&format!("task{}.", i)).unwrap();
+        let mut task = parser::parse(&format!("task{}.", i), &mut memory).unwrap();
         task.priority = (i as f64) / 10.0;
         memory.add_task(task);
     }
@@ -55,15 +55,17 @@ fn test_cycle_adds_derived_task_to_memory() {
     let reasoner = Reasoner::new();
 
     // Setup premises for a syllogism
-    memory.add_task(parser::parse("(cat --> mammal).").unwrap());
-    memory.add_task(parser::parse("(mammal --> animal).").unwrap());
+    let premise1 = parser::parse("(cat --> mammal).", &mut memory).unwrap();
+    memory.add_task(premise1);
+    let premise2 = parser::parse("(mammal --> animal).", &mut memory).unwrap();
+    memory.add_task(premise2);
 
     // Run the cycle
     let mut cycle = Cycle::new(&mut memory, &reasoner);
     cycle.run_cycle();
 
     // Verify that the conclusion was added to memory
-    let conclusion_term = parser::parse("(cat --> animal).").unwrap().term;
+    let conclusion_term = parser::parse("(cat --> animal).", &mut memory).unwrap().term;
     let conclusion_from_mem = memory.get_task(&conclusion_term.hash);
     assert!(
         conclusion_from_mem.is_some(),
