@@ -13,7 +13,12 @@ export const setupLangChainProvider = (lm, config, providerId = 'langchain') => 
   if (missingFields.length > 0) {
     // In test environment or when explicitly testing error handling, don't throw
     if (process.env.NODE_ENV === 'test' || config._testMode) {
-      console.warn(`Missing required configuration fields: ${missingFields.join(', ')}. Provider may not function correctly.`);
+      // Only warn if not in a test scenario that expects missing config
+      const isExpectedMissingConfig = process.env.NODE_ENV === 'test' &&
+        (config.apiKey === undefined || config.baseURL === undefined);
+      if (!isExpectedMissingConfig) {
+        console.warn(`Missing required configuration fields: ${missingFields.join(', ')}. Provider may not function correctly.`);
+      }
     } else {
       throw new Error(`Configuration error: ${missingFields[0]} is required`);
     }
