@@ -46,6 +46,7 @@ impl<'a> Cycle<'a> {
     /// 1. Selecting a "focus set" of high-priority tasks from memory.
     /// 2. Passing the focus set to the reasoner to derive new tasks (conclusions).
     /// 3. Adding the newly derived tasks back into memory.
+    /// 4. Performing memory consolidation to manage knowledge.
     pub fn run_cycle(&mut self) {
         // 1. Select focus set
         let focus_set = self.select_focus_set();
@@ -60,6 +61,10 @@ impl<'a> Cycle<'a> {
         for task in derived_tasks {
             self.memory.add_task(task);
         }
+
+        // 4. Consolidate memory
+        // TODO: Use a real timestamp from the system clock or environment.
+        self.memory.consolidate(0);
     }
 }
 
