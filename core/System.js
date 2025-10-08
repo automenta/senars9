@@ -1,15 +1,6 @@
 import createCore from './createCore.js';
 import { Logger } from './utilities.js';
-
-const DEFAULT_PRIORITY = 0.5;
-const QUESTION_PRIORITY = 0.7;
-const QUESTION_TIMEOUT = 30000;
-const BELIEF_PRIORITY = 0.6;
-const GOAL_PRIORITY = 0.8;
-const DEFAULT_FREQUENCY = 1.0;
-const DEFAULT_CONFIDENCE = 0.9;
-const VERSION = '2.0.0';
-const BYTES_TO_MB = 1024 * 1024;
+import { DEFAULTS } from './constants.js';
 
 class System {
   constructor(config = {}) {
@@ -46,6 +37,14 @@ class System {
       this._setupDefaultEventHandlers();
 
       Logger.debug(`${this.constructor.name}: System started successfully`);
+      
+      // Emit system start event
+      if (this.core.messages) {
+        this.core.messages.emit('system.started', { 
+          timestamp: this.startTime, 
+          version: this.config.version || '2.0.0' 
+        });
+      }
     } catch (error) {
       Logger.error(`${this.constructor.name}: Failed to start system`, error);
       throw error;
@@ -58,9 +57,17 @@ class System {
     try {
       await this.core.stop();
       await this.core.destroy();
-      this.core = null;
       this.isRunning = false;
 
+      // Emit system stop event BEFORE nullifying core
+      if (this.core.messages) {
+        this.core.messages.emit('system.stopped', { 
+          timestamp: Date.now(),
+          uptime: this.startTime ? Date.now() - this.startTime : 0 
+        });
+      }
+      
+      this.core = null;
       this.eventHandlers.clear();
 
       Logger.debug(`${this.constructor.name}: System stopped`);
@@ -84,8 +91,8 @@ class System {
     const enhancedTask = {
       term: task.term,
       punctuation: task.punctuation || '.',
-      truth: task.truth || { frequency: DEFAULT_FREQUENCY, confidence: DEFAULT_CONFIDENCE },
-      priority: task.priority || DEFAULT_PRIORITY,
+      truth: task.truth || { frequency: DEFAULTS.DEFAULT_FREQUENCY, confidence: DEFAULTS.DEFAULT_CONFIDENCE },
+      priority: task.priority || DEFAULTS.DEFAULT_PRIORITY,
       timestamp: Date.now(),
       accessedAt: Date.now(),
       createdAt: Date.now(),
@@ -139,8 +146,8 @@ class System {
     const questionTask = {
       term: question,
       punctuation: '?',
-      priority: options.priority || QUESTION_PRIORITY,
-      timeout: options.timeout || QUESTION_TIMEOUT
+      priority: options.priority ?? DEFAULTS.QUESTION_PRIORITY,
+      timeout: options.timeout ?? DEFAULTS.QUESTION_TIMEOUT
     };
 
     return new Promise((resolve, reject) => {
@@ -160,26 +167,26 @@ class System {
     });
   }
 
-  remember(statement, truth = { frequency: DEFAULT_FREQUENCY, confidence: DEFAULT_CONFIDENCE }) {
+  remember(statement, truth = { frequency: DEFAULTS.DEFAULT_FREQUENCY, confidence: DEFAULTS.DEFAULT_CONFIDENCE }) {
     this._requireRunning('remembering statements');
 
     const beliefTask = {
       term: statement,
       punctuation: '.',
       truth,
-      priority: BELIEF_PRIORITY
+      priority: DEFAULTS.BELIEF_PRIORITY
     };
 
     return this.input(beliefTask);
   }
 
-  want(goal, priority = GOAL_PRIORITY) {
+  want(goal, priority = DEFAULTS.GOAL_PRIORITY) {
     this._requireRunning('setting goals');
 
     const goalTask = {
       term: goal,
       punctuation: '!',
-      truth: { frequency: DEFAULT_FREQUENCY, confidence: DEFAULT_CONFIDENCE },
+      truth: { frequency: DEFAULTS.DEFAULT_FREQUENCY, confidence: DEFAULTS.DEFAULT_CONFIDENCE },
       priority
     };
 
@@ -213,15 +220,20 @@ class System {
 
     return {
       ...health,
-      version: VERSION,
+      version: this.config.version || '2.0.0',
       config: this.config,
       timestamp: Date.now(),
-      memoryUsage: process.memoryUsage ? {
-        rss: Math.round(process.memoryUsage().rss / BYTES_TO_MB),
-        heapUsed: Math.round(process.memoryUsage().heapUsed / BYTES_TO_MB),
-        heapTotal: Math.round(process.memoryUsage().heapTotal / BYTES_TO_MB)
-      } : null
+      memoryUsage: this._getMemoryUsage()
     };
+  }
+
+  _getMemoryUsage() {
+    const BYTES_TO_MB = 1024 * 1024;
+    return process.memoryUsage ? {
+      rss: Math.round(process.memoryUsage().rss / BYTES_TO_MB),
+      heapUsed: Math.round(process.memoryUsage().heapUsed / BYTES_TO_MB),
+      heapTotal: Math.round(process.memoryUsage().heapTotal / BYTES_TO_MB)
+    } : null;
   }
 
   getMetrics() {

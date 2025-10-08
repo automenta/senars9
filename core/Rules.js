@@ -2,7 +2,7 @@ import Component from './Component.js';
 import { Storage, IndexManager } from './collections.js';
 import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
 import { Validation } from './validation.js';
-import { COMPLEXITY_LEVELS, MAX_PRIORITY } from './constants.js';
+import { COMPLEXITY_LEVELS, MAX_PRIORITY, DEFAULTS } from './constants.js';
 
 class Rules extends Component {
   constructor() {
@@ -12,7 +12,7 @@ class Rules extends Component {
     this.preFilters = new Set();
     this.lastEvaluationTime = null;
     this.evaluationTimeHistory = [];
-    this.maxHistorySize = 100;
+    this.maxHistorySize = DEFAULTS.MAX_HISTORY_SIZE;
   }
 
   async _doInitialize() {
@@ -23,6 +23,14 @@ class Rules extends Component {
 
   add(rule) {
     Validation.requireProps(rule, ['name', 'condition', 'action']);
+
+    if (typeof rule.condition !== 'function') {
+      throw new Error('Rule condition must be a function');
+    }
+    
+    if (typeof rule.action !== 'function') {
+      throw new Error('Rule action must be a function');
+    }
 
     this.rules.push({
       priority: 0,
@@ -36,6 +44,8 @@ class Rules extends Component {
   }
 
   remove(name) {
+    if (!name) return;
+    
     const index = this.rules.findIndex(rule => rule.name === name);
     if (index !== -1) {
       const rule = this.rules[index];
@@ -45,19 +55,25 @@ class Rules extends Component {
   }
 
   _updateIndexes(rule) {
+    if (!rule.name) return;
+    
     this.indexes.add(rule.type, rule.name);
     this.indexes.add(`complexity_${rule.complexity}`, rule.name);
     this.indexes.add(`priority_${rule.priority}`, rule.name);
 
-    rule.preFilterTags?.forEach(tag => {
-      this.preFilters.add(tag);
-      this.indexes.add(`prefilter_${tag}`, rule.name);
-    });
+    if (rule.preFilterTags?.length > 0) {
+      for (const tag of rule.preFilterTags) {
+        this.preFilters.add(tag);
+        this.indexes.add(`prefilter_${tag}`, rule.name);
+      }
+    }
   }
 
   _removeFromIndexes(rule) {
+    if (!rule.name) return;
+    
     this.indexes.remove(rule.type, rule.name);
-    rule.preFilterTags?.length > 0 && this._cleanupPreFilters();
+    this._cleanupPreFilters();
   }
 
   _cleanupPreFilters() {
@@ -65,27 +81,32 @@ class Rules extends Component {
   }
 
   find(predicate) {
+    if (typeof predicate !== 'function') return [];
     return this.rules.filter(predicate);
   }
 
   getRulesByType(type) {
+    if (!type) return [];
     return this.indexes.get(type);
   }
 
   getRulesByComplexity(complexity) {
+    if (!complexity) return [];
     return this.indexes.get(`complexity_${complexity}`) || [];
   }
 
   getRulesByPriority(priority) {
+    if (priority === undefined || priority === null) return [];
     return this.indexes.get(`priority_${priority}`) || [];
   }
 
   getRulesByPreFilterTag(tag) {
+    if (!tag) return [];
     return this.indexes.get(`prefilter_${tag}`) || [];
   }
 
   getOptimizedRuleCandidates(context, options = {}) {
-    let candidates = options.ruleType ? this.getRulesByType(options.ruleType) : this.rules;
+    let candidates = options.ruleType ? this.getRulesByType(options.ruleType) : [...this.rules];
 
     if (options.maxComplexity) {
       const maxLevel = COMPLEXITY_LEVELS[options.maxComplexity] || COMPLEXITY_LEVELS.complex;
@@ -94,7 +115,8 @@ class Rules extends Component {
       for (let level = 1; level <= maxLevel; level++) {
         const levelName = Object.keys(COMPLEXITY_LEVELS).find(key => COMPLEXITY_LEVELS[key] === level);
         if (levelName) {
-          this.getRulesByComplexity(levelName).forEach(rule => complexityCandidates.add(rule));
+          const rules = this.getRulesByComplexity(levelName);
+          rules.forEach(rule => complexityCandidates.add(rule));
         }
       }
 
@@ -121,7 +143,8 @@ class Rules extends Component {
         lastEvaluation: this.lastEvaluationTime,
         averageEvaluationTime: this.evaluationTimeHistory.length > 0
           ? this.evaluationTimeHistory.reduce((a, b) => a + b, 0) / this.evaluationTimeHistory.length
-          : 0
+          : 0,
+        evaluationCount: this.evaluationTimeHistory.length
       }
     };
   }
@@ -147,27 +170,47 @@ class Rules extends Component {
     this.rules = [];
     this.indexes.clear();
     this.preFilters.clear();
+    this.evaluationTimeHistory = [];
+    this.lastEvaluationTime = null;
   }
 
   async evaluate(context, options = {}) {
+    if (!context || typeof context !== 'object') {
+      Logger.warn('Rules evaluation called with invalid context');
+      return null;
+    }
+    
     const startTime = Date.now();
 
     try {
       let candidates = this.getOptimizedRuleCandidates(context, options);
 
-      const applicableRules = candidates.filter(rule => {
+      // Validate and filter applicable rules
+      const applicableRules = [];
+      for (const rule of candidates) {
         try {
-          return rule.condition(context);
+          if (rule.condition(context)) {
+            applicableRules.push(rule);
+          }
         } catch (error) {
-          this.core?.messages?.emit('error:occurred', {
-            type: 'RuleConditionError',
-            rule: rule.name,
+          Logger.warn(`Rule '${rule.name}' condition failed`, { 
+            rule: rule.name, 
             error: error.message,
-            stack: error.stack
-          }) || Logger.error(`Rule '${rule.name}' condition failed`, { rule: rule.name, error: error.message });
-          return false;
+            context: Object.keys(context)
+          });
+          
+          // Emit error event if available
+          if (this.core?.messages) {
+            this.core.messages.emit('error:occurred', {
+              type: 'RuleConditionError',
+              rule: rule.name,
+              error: error.message,
+              stack: error.stack,
+              contextKeys: Object.keys(context)
+            });
+          }
         }
-      });
+      }
 
       if (applicableRules.length === 0) {
         this._recordEvaluationTime(Date.now() - startTime);
@@ -181,6 +224,7 @@ class Rules extends Component {
         const result = await topRule.action(context);
         this._recordEvaluationTime(Date.now() - startTime);
 
+        // Emit evaluation event if messaging is available
         if (this.core?.messages) {
           this.core.messages.emit('rules:evaluated', {
             ruleCount: candidates.length,
@@ -188,18 +232,27 @@ class Rules extends Component {
             selectedRule: topRule.name,
             duration: Date.now() - startTime,
             success: true,
-            timestamp: new Date()
+            timestamp: Date.now()
           });
         }
 
         return result;
       } catch (error) {
-        this.core?.messages?.emit('error:occurred', {
-          type: 'RuleActionError',
-          rule: topRule.name,
+        Logger.error(`Rule '${topRule.name}' action failed`, { 
+          rule: topRule.name, 
           error: error.message,
-          stack: error.stack
-        }) || Logger.error(`Rule '${topRule.name}' action failed`, { rule: topRule.name, error: error.message });
+          context: Object.keys(context)
+        });
+
+        if (this.core?.messages) {
+          this.core.messages.emit('error:occurred', {
+            type: 'RuleActionError',
+            rule: topRule.name,
+            error: error.message,
+            stack: error.stack,
+            contextKeys: Object.keys(context)
+          });
+        }
 
         this._recordEvaluationTime(Date.now() - startTime);
         return null;
@@ -221,7 +274,7 @@ class Rules extends Component {
   }
 
   _applyFilters(rules, context, filters) {
-    let filtered = rules;
+    let filtered = [...rules]; // Create a copy to avoid modifying original
     if (filters.preFilter) filtered = this._preFilterRules(filtered, context);
     if (filters.ruleType) filtered = this._filterByType(filtered, filters.ruleType);
     if (filters.maxComplexity) filtered = this._filterByComplexity(filtered, filters.maxComplexity);
@@ -229,9 +282,9 @@ class Rules extends Component {
   }
 
   _preFilterRules(rules, context) {
-    if (rules.length === 0) return rules;
+    if (!Array.isArray(rules) || rules.length === 0) return rules;
 
-    const contextKeys = Object.keys(context);
+    const contextKeys = Object.keys(context || {});
     if (contextKeys.length === 0) return rules;
 
     return rules.filter(rule => {
@@ -241,27 +294,33 @@ class Rules extends Component {
   }
 
   _filterByType(rules, type) {
+    if (!type) return rules;
     const typeRules = this.indexes.get(type);
-    return rules.filter(rule => typeRules.includes(rule));
+    return rules.filter(rule => typeRules.includes(rule.name));
   }
 
   _filterByComplexity(rules, maxComplexity) {
+    if (!maxComplexity) return rules;
     const maxLevel = COMPLEXITY_LEVELS[maxComplexity] || COMPLEXITY_LEVELS.complex;
     return rules.filter(rule => (COMPLEXITY_LEVELS[rule.complexity] || 1) <= maxLevel);
   }
 
   _sortByPriority(rules) {
+    if (!Array.isArray(rules)) return;
+    
     rules.sort((a, b) => {
       // Primary sort: priority (higher first)
-      const priorityDiff = b.priority - a.priority;
+      const priorityDiff = (b.priority ?? 0) - (a.priority ?? 0);
       if (priorityDiff !== 0) return priorityDiff;
 
       // Secondary sort: complexity (simpler first for faster execution)
-      const complexityDiff = COMPLEXITY_LEVELS[a.complexity] - COMPLEXITY_LEVELS[b.complexity];
+      const complexityA = COMPLEXITY_LEVELS[a.complexity] ?? 1;
+      const complexityB = COMPLEXITY_LEVELS[b.complexity] ?? 1;
+      const complexityDiff = complexityA - complexityB;
       if (complexityDiff !== 0) return complexityDiff;
 
       // Tertiary sort: rule name for deterministic ordering
-      return a.name.localeCompare(b.name);
+      return (a.name ?? '').localeCompare(b.name ?? '');
     });
   }
 }

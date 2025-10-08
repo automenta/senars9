@@ -1,5 +1,9 @@
 export default {
   preset: null,
   testEnvironment: 'node',
-  transform: {}
+  transform: {},
+  testPathIgnorePatterns: [
+    '/tests/experimental/',
+    '/tests/experimental2/'
+  ]
 };

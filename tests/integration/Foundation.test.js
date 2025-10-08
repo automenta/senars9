@@ -204,8 +204,5 @@ describe('Core Foundation Integration Test', () => {
 
     const updatedMemoryStats = core.memory.getStats();
     expect(updatedMemoryStats.storageSize).toBeGreaterThan(0);
-
-    // Log performance metrics for monitoring (no hard assertions)
-    console.log('Performance metrics:', systemHealth);
   }));
 });

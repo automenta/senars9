@@ -17,21 +17,21 @@ class Component {
   async _doInitialize() {}
 
   async start() {
-    await this._doStart();
+    await this._safeExecute(async () => await this._doStart(), 'start');
     this._setState(STATES.RUNNING, { started: true });
   }
 
   async _doStart() {}
 
   async stop() {
-    await this._doStop();
+    await this._safeExecute(async () => await this._doStop(), 'stop');
     this._setState(STATES.STOPPED, { started: false });
   }
 
   async _doStop() {}
 
   async destroy() {
-    await this._doDestroy();
+    await this._safeExecute(async () => await this._doDestroy(), 'destroy');
     this._setState(STATES.DESTROYED, { initialized: false, started: false });
   }
 

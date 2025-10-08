@@ -7,3 +7,4 @@ async function createCore(config = {}) {
 }
 
 export default createCore;
+export { createCore };

@@ -1,7 +1,7 @@
 import Component from './Component.js';
 import { Cache } from './collections.js';
 import { ObjectUtils } from './utilities.js';
-import { STATES } from './constants.js';
+import { STATES, DEFAULTS } from './constants.js';
 
 class Config extends Component {
   constructor() {
@@ -17,19 +17,35 @@ class Config extends Component {
   }
 
   get(key, defaultValue) {
+    // Check cache first
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
 
+    // Extract value from config using dot notation
     const value = ObjectUtils.safeAccess(this.config, key, undefined);
-    return value !== undefined ? (this.cache.set(key, value) || value) : defaultValue;
+    
+    if (value !== undefined) {
+      // Cache the value for future access
+      this.cache.set(key, value);
+      return value;
+    }
+
+    return defaultValue;
   }
 
   set(key, value) {
+    // Parse the key using dot notation to support nested properties
     const keys = key.split('.');
     const lastKey = keys.pop();
+    
+    // Navigate to the correct nested object
     const target = keys.reduce((obj, k) =>
       ObjectUtils.isObject(obj[k]) ? obj[k] : (obj[k] = {}), this.config);
+    
+    // Set the value
     target[lastKey] = value;
+    
+    // Clear cache since we changed the config
     this.cache.clear();
   }
 
@@ -39,12 +55,21 @@ class Config extends Component {
   }
 
   _deepMerge(target, source) {
-    if (!ObjectUtils.isObject(target) || !ObjectUtils.isObject(source)) return source ?? target;
+    if (!ObjectUtils.isObject(target) || !ObjectUtils.isObject(source)) {
+      return source ?? target;
+    }
 
-    return Object.keys(source).reduce((result, key) =>
-      Object.assign(result, { [key]: ObjectUtils.isObject(source[key])
-        ? this._deepMerge(target[key] || {}, source[key])
-        : source[key] }), { ...target });
+    const result = { ...target };
+    
+    for (const key of Object.keys(source)) {
+      if (ObjectUtils.isObject(source[key])) {
+        result[key] = this._deepMerge(result[key] || {}, source[key]);
+      } else {
+        result[key] = source[key];
+      }
+    }
+    
+    return result;
   }
 }
 

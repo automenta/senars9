@@ -41,13 +41,34 @@ class Focus extends Component {
     focusSet.lastAccessed = Date.now();
     focusSet.accessCount++;
 
-    return ArrayUtils.sortBy(Array.from(focusSet.items.entries()), ([, data]) => [
-      -(data.priority || 0),
-      data.timestamp,
-      -(data.accessCount || 0)
-    ], 'asc')
-      .slice(0, count)
-      .map(([key, value]) => (value.accessCount = (value.accessCount || 0) + 1, [key, value]));
+    // Convert entries to array for processing
+    const entries = Array.from(focusSet.items.entries());
+    
+    // Sort by priority, timestamp, and access count
+    const sortedEntries = entries.sort(([, dataA], [, dataB]) => {
+      const priorityA = dataA.priority || 0;
+      const priorityB = dataB.priority || 0;
+      
+      if (priorityA !== priorityB) return priorityB - priorityA; // Higher priority first
+      
+      const timestampA = dataA.timestamp || 0;
+      const timestampB = dataB.timestamp || 0;
+      
+      if (timestampA !== timestampB) return timestampB - timestampA; // More recent first
+      
+      const accessCountA = dataA.accessCount || 0;
+      const accessCountB = dataB.accessCount || 0;
+      
+      return accessCountB - accessCountA; // More accessed first
+    });
+
+    // Slice and update access counts
+    const result = sortedEntries.slice(0, count).map(([key, value]) => {
+      value.accessCount = (value.accessCount || 0) + 1;
+      return [key, value];
+    });
+    
+    return result;
   }
 
   updateFocusAttention(name, delta) {
@@ -119,11 +140,17 @@ class Memory extends Component {
   }
 
   get(key) {
+    // Check cache first
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
 
+    // Get from storage if not in cache
     const value = this.storage.get(key);
-    return value !== undefined ? (this.cache.set(key, value), value) : undefined;
+    if (value !== undefined) {
+      // Add to cache
+      this.cache.set(key, value);
+    }
+    return value;
   }
 
   set(key, value, options = {}) {
@@ -150,44 +177,71 @@ class Memory extends Component {
   }
 
   has(key) {
+    // Check cache first, then storage
     return this.cache.has(key) || this.storage.has(key);
   }
 
-  createFocusSet(name, maxSize = this.focus?.focusSize) { this.focus?.createFocusSet(name, maxSize); }
-  setFocus(name) { this.focus?.setFocus(name); }
-  getCurrentFocus() { return this.focus?.getCurrentFocus(); }
-  getFocusItems(count = 10) { return this.focus?.getFocusItems(count) || []; }
+  createFocusSet(name, maxSize = this.focus?.focusSize) { 
+    this.focus?.createFocusSet(name, maxSize); 
+  }
+  
+  setFocus(name) { 
+    this.focus?.setFocus(name); 
+  }
+  
+  getCurrentFocus() { 
+    return this.focus?.getCurrentFocus(); 
+  }
+  
+  getFocusItems(count = 10) { 
+    return this.focus?.getFocusItems(count) || []; 
+  }
 
   query(criteria = {}) {
-    const { type, tags, minPriority, limit = DEFAULTS.QUERY_LIMIT, sortBy, sortOrder = 'desc' } = criteria;
+    const { 
+      type, 
+      tags, 
+      minPriority, 
+      limit = DEFAULTS.QUERY_LIMIT, 
+      sortBy, 
+      sortOrder = 'desc' 
+    } = criteria;
+    
+    // Start with all keys from storage
     let candidates = new Set(this.storage.keys());
 
+    // Apply type filter
     if (type) {
       const typeKeys = this.indexes.get(type);
       if (typeKeys.length === 0) return [];
       candidates = this._intersectKeys(candidates, typeKeys);
     }
 
+    // Apply tags filter
     if (tags?.length) {
       candidates = this._intersectTags(candidates, tags);
       if (candidates.size === 0) return [];
     }
 
+    // Apply minimum priority filter
     if (minPriority !== undefined) {
       candidates = this._intersectPriority(candidates, minPriority);
       if (candidates.size === 0) return [];
     }
 
+    // Get the actual data for the candidate keys
     let results = Array.from(candidates)
       .slice(0, limit)
       .map(key => [key, this.get(key)])
       .filter(([, value]) => value !== undefined);
 
+    // Apply sorting if specified
     if (sortBy) {
-      const sortFn = sortOrder === 'desc'
-        ? (a, b) => this._getSortValue(b[1], sortBy) - this._getSortValue(a[1], sortBy)
-        : (a, b) => this._getSortValue(a[1], sortBy) - this._getSortValue(b[1], sortBy);
-      results.sort(sortFn);
+      results.sort((a, b) => {
+        const valA = this._getSortValue(a[1], sortBy);
+        const valB = this._getSortValue(b[1], sortBy);
+        return sortOrder === 'desc' ? valB - valA : valA - valB;
+      });
     }
 
     return results;
@@ -211,12 +265,15 @@ class Memory extends Component {
   }
 
   _getSortValue(item, sortBy) {
-    return ({
-      priority: item.priority || 0,
-      timestamp: item.timestamp || 0,
-      accessCount: item.accessCount || 0,
-      key: item.key || ''
-    })[sortBy] ?? 0;
+    if (!item) return 0;
+    
+    switch (sortBy) {
+      case 'priority': return item.priority || 0;
+      case 'timestamp': return item.timestamp || 0;
+      case 'accessCount': return item.accessCount || 0;
+      case 'key': return item.key || '';
+      default: return 0;
+    }
   }
 
   getQueryStats() {
@@ -249,8 +306,8 @@ class Memory extends Component {
   getStats() {
     return {
       storageSize: this.storage.size(),
-      cacheSize: this.cache.cache.size,
-      cacheMaxSize: this.cache.maxSize,
+      cacheSize: this.cache.size, // Fixed: was accessing cache.cache.size instead of cache.size
+      cacheMaxSize: this.cache.cache.maxSize,
       focusSets: this.focus?.getFocusSetStats() || {},
       indexes: this.indexes.indexes.size
     };
@@ -260,7 +317,9 @@ class Memory extends Component {
     const { type, tags, priority } = options;
 
     if (type) this.indexes.add(type, key);
-    tags?.forEach(tag => this.indexes.add(tag, key));
+    if (tags && Array.isArray(tags)) {
+      tags.forEach(tag => this.indexes.add(tag, key));
+    }
     if (priority !== undefined) this.indexes.add(`priority_${priority}`, key);
   }
 
@@ -275,27 +334,60 @@ class Memory extends Component {
     this.focus?.updateFocusSets(key, options);
   }
 
-
   _calculateAttentionScore(itemData, focusData) {
+    if (!itemData) return 0;
+    
     const now = Date.now();
-    const age = now - itemData.timestamp;
+    const age = now - (itemData.timestamp || 0);
     const recencyScore = Math.exp(-age / (DEFAULTS.DECAY_HOURS * 60 * 60 * 1000));
 
-    const priorityScore = (itemData.priority || 0) / DEFAULTS.PRIORITY_LEVELS;
+    const priorityScore = Math.min((itemData.priority || 0) / DEFAULTS.PRIORITY_LEVELS, 1);
     const frequencyScore = Math.min((itemData.accessCount || 0) / DEFAULTS.ACCESS_WEIGHT, 1);
-    const focusAttention = focusData.attentionScore || 0;
+    const focusAttention = focusData?.attentionScore || 0;
 
     const PRIORITY_WEIGHT = 0.4;
     const RECENCY_WEIGHT = 0.3;
     const FREQUENCY_WEIGHT = 0.2;
     const FOCUS_WEIGHT = 0.1;
 
-    return (priorityScore * PRIORITY_WEIGHT) + (recencyScore * RECENCY_WEIGHT) + (frequencyScore * FREQUENCY_WEIGHT) + (focusAttention * FOCUS_WEIGHT);
+    return (priorityScore * PRIORITY_WEIGHT) + 
+           (recencyScore * RECENCY_WEIGHT) + 
+           (frequencyScore * FREQUENCY_WEIGHT) + 
+           (focusAttention * FOCUS_WEIGHT);
   }
 
-  updateFocusAttention(name, delta) { this.focus?.updateFocusAttention(name, delta); }
-  getFocusSetStats() { return this.focus?.getFocusSetStats() || {}; }
-  _removeFromFocusSets(key) { this.focus?.removeFromFocusSets(key); }
+  async consolidateKnowledge() {
+    // Perform knowledge consolidation operations
+    // This could include:
+    // - Compacting similar entries
+    // - Removing outdated entries
+    // - Updating index structures
+    // - Optimizing storage
+    
+    // For now, we'll just trigger the index optimization
+    this.optimizeIndexes();
+    
+    // Emit a consolidation event if messaging is available
+    if (this.core?.messages) {
+      this.core.messages.emit('memory.consolidated', {
+        timestamp: Date.now(),
+        storageSize: this.storage.size(),
+        indexesSize: this.indexes.indexes.size
+      });
+    }
+  }
+
+  updateFocusAttention(name, delta) { 
+    this.focus?.updateFocusAttention(name, delta); 
+  }
+  
+  getFocusSetStats() { 
+    return this.focus?.getFocusSetStats() || {}; 
+  }
+  
+  _removeFromFocusSets(key) { 
+    this.focus?.removeFromFocusSets(key); 
+  }
 }
 
 export default Memory;

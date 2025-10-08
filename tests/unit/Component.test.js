@@ -7,6 +7,19 @@ import {
 } from './enhanced-test-utils.js';
 
 describe('Component', () => {
+  let originalConsoleError;
+
+  beforeEach(() => {
+    // Store original console.error and suppress it during tests to keep output clean
+    originalConsoleError = console.error;
+    console.error = () => {};
+  });
+
+  afterEach(() => {
+    // Restore original console.error
+    console.error = originalConsoleError;
+  });
+
   testLifecycleTransitions(() => createTestComponent());
 
   test('should provide default health status', () => {

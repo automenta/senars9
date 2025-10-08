@@ -1,9 +1,8 @@
 import Component from './Component.js';
 import { Storage } from './collections.js';
 import { Retry } from './validation.js';
-import { IdGenerator } from './utilities.js';
+import { IdGenerator, Logger } from './utilities.js';
 import { RETRYABLE_ERRORS, DEFAULTS } from './constants.js';
-import { Logger } from './utilities.js';
 
 class Messages extends Component {
   constructor() {
@@ -26,20 +25,25 @@ class Messages extends Component {
     this.retryPolicies.clear();
 
     this.retryPolicies.set('default', {
-      maxRetries: config.maxRetries || DEFAULTS.MAX_RETRIES,
-      retryDelay: config.retryDelay || DEFAULTS.RETRY_DELAY,
+      maxRetries: config.maxRetries ?? DEFAULTS.MAX_RETRIES,
+      retryDelay: config.retryDelay ?? DEFAULTS.RETRY_DELAY,
       backoffMultiplier: DEFAULTS.BACKOFF_MULTIPLIER
     });
   }
 
   use(middlewareFn, options = {}) {
+    if (typeof middlewareFn !== 'function') {
+      throw new Error('Middleware must be a function');
+    }
+    
     const middleware = {
       fn: middlewareFn,
-      priority: options.priority || 0,
+      priority: options.priority ?? 0,
       name: options.name || `middleware_${this.middleware.length}`,
       enabled: options.enabled !== false,
-      timeout: options.timeout || DEFAULTS.MIDDLEWARE_TIMEOUT
+      timeout: options.timeout ?? DEFAULTS.MIDDLEWARE_TIMEOUT
     };
+    
     this.middleware.push(middleware);
     this.middleware.sort((a, b) => b.priority - a.priority);
   }
@@ -58,13 +62,17 @@ class Messages extends Component {
   setMiddlewareEnabled(name, enabled) {
     const middleware = this.middleware.find(m => m.name === name);
     if (middleware) {
-      middleware.enabled = enabled;
+      middleware.enabled = !!enabled;
       return true;
     }
     return false;
   }
 
   on(event, handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('Event handler must be a function');
+    }
+    
     const handlers = this.events.get(event) || [];
     handlers.push(handler);
     this.events.set(event, handlers);
@@ -75,17 +83,47 @@ class Messages extends Component {
     if (!handlers) return;
 
     const filtered = handlers.filter(h => h !== handler);
-    filtered.length ? this.events.set(event, filtered) : this.events.delete(event);
+    if (filtered.length > 0) {
+      this.events.set(event, filtered);
+    } else {
+      this.events.delete(event);
+    }
   }
 
   emit(event, data) {
-    const context = { type: 'event', name: event, data, cancelled: false };
+    if (!event) {
+      Logger.warn('Attempted to emit an event without a name');
+      return;
+    }
+    
+    const context = { 
+      type: 'event', 
+      name: event, 
+      data, 
+      cancelled: false,
+      timestamp: Date.now()
+    };
+    
     this._executeMiddleware(context, (ctx) => {
-      this.events.get(ctx.name)?.forEach(handler => handler(ctx.data));
+      const eventHandlers = this.events.get(ctx.name);
+      if (eventHandlers) {
+        // Execute handlers in parallel but catch individual errors
+        for (const handler of eventHandlers) {
+          try {
+            handler(ctx.data);
+          } catch (error) {
+            Logger.error(`Error in event handler for "${ctx.name}":`, error);
+          }
+        }
+      }
     });
   }
 
   registerCommand(command, handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('Command handler must be a function');
+    }
+    
     if (this.commands.has(command)) {
       Logger.warn(`Command "${command}" is already registered. Overwriting.`);
     }
@@ -93,27 +131,47 @@ class Messages extends Component {
   }
 
   execute(command, data) {
-    const handler = this.commands.has(command) ? this.commands.get(command) : (() => { throw new Error(`Command "${command}" not found.`); })();
-    const context = { type: 'command', name: command, data, cancelled: false };
+    if (!command) {
+      throw new Error('Command name is required');
+    }
+    
+    const handler = this.commands.get(command);
+    if (!handler) {
+      throw new Error(`Command "${command}" not found.`);
+    }
+    
+    const context = { 
+      type: 'command', 
+      name: command, 
+      data, 
+      cancelled: false,
+      timestamp: Date.now()
+    };
 
     const executeWithRetry = (ctx) => {
       const policy = this.retryPolicies.get(command) || this.retryPolicies.get('default');
-      return policy.maxRetries === 0 ? handler(ctx.data) : Retry.execute(() => handler(ctx.data), policy);
+      if (policy.maxRetries === 0) {
+        return handler(ctx.data);
+      }
+      return Retry.execute(() => handler(ctx.data), policy);
     };
 
-    const result = this._executeMiddleware(context, executeWithRetry);
-    const commandPolicy = this.retryPolicies.get(command);
-    return this.middleware.length === 0 && (!commandPolicy || commandPolicy.maxRetries === 0) ? result : result;
+    return this._executeMiddleware(context, executeWithRetry);
   }
 
   registerProcessor(name, processor, options = {}) {
-    const { events = [], commands = [], priority = 0 } = options;
+    if (typeof processor !== 'function') {
+      throw new Error('Processor must be a function');
+    }
+    
+    const { events = [], commands = [], priority = 0, filter } = options;
 
     this.processors.set(name, {
       processor,
       events: new Set(events),
       commands: new Set(commands),
       priority,
+      filter, // Filter function to determine if the processor should handle a message
       registeredAt: new Date()
     });
   }
@@ -122,12 +180,22 @@ class Messages extends Component {
     const { type, name, data, metadata = {} } = message;
     const { skipMiddleware = false, timeout = DEFAULTS.MESSAGE_TIMEOUT } = options;
 
+    // Validate message structure
+    if (!type || !name) {
+      return { 
+        success: false, 
+        reason: 'invalid_message', 
+        error: 'Message must have type and name properties',
+        context: { type, name }
+      };
+    }
+
     const context = {
       type,
       name,
       data,
       metadata,
-      timestamp: new Date(),
+      timestamp: Date.now(),
       id: metadata.id || this._generateId(),
       processed: false,
       cancelled: false,
@@ -180,9 +248,17 @@ class Messages extends Component {
       return false;
     }
 
+    // Apply processor-specific filters
     for (const [name, processor] of this.processors.entries()) {
-      if (processor.filter && !processor.filter(context)) {
-        return false;
+      if (processor.filter && typeof processor.filter === 'function') {
+        try {
+          if (!processor.filter(context)) {
+            return false;
+          }
+        } catch (filterError) {
+          Logger.error(`Filter error in processor "${name}":`, filterError);
+          return false;
+        }
       }
     }
 
@@ -195,6 +271,10 @@ class Messages extends Component {
   }
 
   registerErrorHandler(errorType, handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('Error handler must be a function');
+    }
+    
     if (!this.errorHandlers.has(errorType)) {
       this.errorHandlers.set(errorType, []);
     }
@@ -202,10 +282,14 @@ class Messages extends Component {
   }
 
   setRetryPolicy(operation, policy) {
+    if (!operation || !policy) {
+      throw new Error('Operation and policy are required for retry policy');
+    }
+    
     this.retryPolicies.set(operation, {
-      maxRetries: policy.maxRetries || 3,
-      retryDelay: policy.retryDelay || 1000,
-      backoffMultiplier: policy.backoffMultiplier || 2
+      maxRetries: policy.maxRetries ?? DEFAULTS.MAX_RETRIES,
+      retryDelay: policy.retryDelay ?? DEFAULTS.RETRY_DELAY,
+      backoffMultiplier: policy.backoffMultiplier ?? DEFAULTS.BACKOFF_MULTIPLIER
     });
   }
 
@@ -217,11 +301,15 @@ class Messages extends Component {
       middleware: this.middleware.length,
       errorHandlers: this.errorHandlers.size(),
       retryPolicies: this.retryPolicies.size(),
-      isHealthy: true // Could add more sophisticated health checks
+      isHealthy: this.commands.size() > 0 || this.events.size() > 0 || this.middleware.length > 0
     };
   }
 
   _executeMiddleware(context, final) {
+    if (this.middleware.length === 0) {
+      return final(context);
+    }
+    
     let index = -1;
     const dispatch = (i) => {
       if (i <= index) throw new Error('next() called multiple times');
@@ -244,7 +332,11 @@ class Messages extends Component {
     return dispatch(0);
   }
 
-  async _executeMiddlewareAsync(context, final, timeout = 5000) {
+  async _executeMiddlewareAsync(context, final, timeout = DEFAULTS.MESSAGE_TIMEOUT) {
+    if (this.middleware.length === 0) {
+      return await final(context);
+    }
+    
     let index = -1;
 
     const dispatch = async (i) => {
@@ -255,36 +347,39 @@ class Messages extends Component {
 
       if (context.cancelled) return;
 
-      // Timeout wrapper for each middleware
-      const executeWithTimeout = async (middleware, next) => {
-        if (middleware.timeout > 0) {
-          return Promise.race([
-            middleware.fn(context, next),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error(`Middleware ${middleware.name} timed out`)), middleware.timeout)
-            )
-          ]);
-        }
-        return middleware.fn(context, next);
-      };
-
-      let middleware = this.middleware[i];
+      const middleware = this.middleware[i];
       if (i === this.middleware.length) {
-        return await Promise.race([
-          final(context),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Final handler timed out')), timeout)
-          )
-        ]);
+        // Apply timeout to the final handler
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Final handler timed out')), timeout)
+        );
+        
+        return Promise.race([final(context), timeoutPromise]);
       }
 
       if (!middleware || !middleware.enabled) {
         return dispatch(i + 1);
       }
 
+      // Apply timeout to each middleware step
+      const executeWithTimeout = new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error(`Middleware ${middleware.name} timed out after ${middleware.timeout}ms`));
+        }, middleware.timeout);
+
+        Promise.resolve(middleware.fn(context, () => dispatch(i + 1)))
+          .then(result => {
+            clearTimeout(timeoutId);
+            resolve(result);
+          })
+          .catch(error => {
+            clearTimeout(timeoutId);
+            reject(error);
+          });
+      });
+
       try {
-        const result = await executeWithTimeout(middleware, () => dispatch(i + 1));
-        return result;
+        return await executeWithTimeout;
       } catch (err) {
         return this._handleError(err, context, () => dispatch(i + 1));
       }
@@ -301,7 +396,7 @@ class Messages extends Component {
   }
 
   _handleError(error, context, retryFn) {
-    const errorType = error.constructor.name || 'Error';
+    const errorType = error.constructor?.name || 'Error';
     const errorId = this._generateId();
 
     // Enhanced error context
@@ -310,7 +405,7 @@ class Messages extends Component {
       errorId,
       errorType,
       originalError: error,
-      timestamp: new Date(),
+      timestamp: Date.now(),
       retryAttempt: context.retryAttempt || 0,
       canRetry: !!retryFn
     };
@@ -319,23 +414,22 @@ class Messages extends Component {
     Logger.error(`[Messages:${errorId}] Error in ${context.type} "${context.name}"`, {
       error: error.message,
       stack: error.stack,
-      context: {
-        type: context.type,
-        name: context.name,
-        timestamp: context.timestamp,
-        retryAttempt: context.retryAttempt || 0
-      }
+      type: context.type,
+      name: context.name,
+      timestamp: context.timestamp,
+      retryAttempt: context.retryAttempt || 0
     });
 
-    const tryHandlers = async (handlers) => {
+    // Try error handlers in sequence
+    const handleWithHandlers = (handlers) => {
+      if (!handlers) return;
+
       for (const handler of handlers) {
         try {
-          const result = await handler(error, errorContext, retryFn);
-          if (result?.then) {
-            const asyncResult = await result;
-            if (asyncResult) return asyncResult;
+          const result = handler(error, errorContext, retryFn);
+          if (result !== undefined) {
+            return result;
           }
-          if (result) return result;
         } catch (handlerError) {
           Logger.error(`[Messages:${errorId}] Error handler failed`, handlerError);
         }
@@ -344,22 +438,14 @@ class Messages extends Component {
 
     // Try specific error handlers first
     if (this.errorHandlers.has(errorType)) {
-      try {
-        const result = tryHandlers(this.errorHandlers.get(errorType));
-        if (result) return result;
-      } catch (handlerError) {
-        Logger.error(`[Messages:${errorId}] Specific error handlers failed`, handlerError);
-      }
+      const result = handleWithHandlers(this.errorHandlers.get(errorType));
+      if (result !== undefined) return result;
     }
 
     // Try generic error handlers
     if (this.errorHandlers.has('Error')) {
-      try {
-        const result = tryHandlers(this.errorHandlers.get('Error'));
-        if (result) return result;
-      } catch (handlerError) {
-        Logger.error(`[Messages:${errorId}] Generic error handlers failed`, handlerError);
-      }
+      const result = handleWithHandlers(this.errorHandlers.get('Error'));
+      if (result !== undefined) return result;
     }
 
     // Default recovery strategies
@@ -380,14 +466,14 @@ class Messages extends Component {
   _shouldRetry(error, context) {
     const retryableErrors = RETRYABLE_ERRORS;
 
-    const errorType = error.constructor.name || 'Error';
+    const errorType = error.constructor?.name || 'Error';
     const isRetryableType = retryableErrors.includes(errorType) ||
-                           error.message?.includes('timeout') ||
-                           error.message?.includes('network') ||
-                           error.message?.includes('temporary');
+                           error.message?.toLowerCase().includes('timeout') ||
+                           error.message?.toLowerCase().includes('network') ||
+                           error.message?.toLowerCase().includes('temporary');
 
     const maxRetries = this.retryPolicies.get(context.name)?.maxRetries ||
-                      this.retryPolicies.get('default')?.maxRetries || 3;
+                      this.retryPolicies.get('default')?.maxRetries || DEFAULTS.MAX_RETRIES;
 
     return isRetryableType && (context.retryAttempt || 0) < maxRetries;
   }
@@ -429,7 +515,8 @@ class Messages extends Component {
         events: Array.from(processor.events),
         commands: Array.from(processor.commands),
         priority: processor.priority,
-        registeredAt: processor.registeredAt
+        registeredAt: processor.registeredAt,
+        hasFilter: !!processor.filter
       })),
       errorTypes: Array.from(this.errorHandlers.keys()),
       retryPolicies: Array.from(this.retryPolicies.entries()).map(([name, policy]) => ({

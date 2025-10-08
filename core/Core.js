@@ -23,39 +23,72 @@ class Core {
     });
   }
 
- registerComponent(name, component) {
-   if (this.componentMap.has(name)) {
-     throw new Error(`Component "${name}" already registered`);
-   }
-   this.componentMap.set(name, component);
-   this.registrationOrder.push(name);
-   component.core = this;
- }
+  registerComponent(name, component) {
+    if (this.componentMap.has(name)) {
+      throw new Error(`Component "${name}" already registered`);
+    }
+    this.componentMap.set(name, component);
+    this.registrationOrder.push(name);
+    component.core = this;
+  }
 
- getComponent(name) {
-   return this.componentMap.get(name);
- }
+  getComponent(name) {
+    return this.componentMap.get(name);
+  }
 
- async initialize(config = {}) {
-   await this.config.initialize(config);
+  async initialize(config = {}) {
+    // Initialize config component first as others may depend on it
+    await this.config.initialize(config);
 
-   const initPromises = this.registrationOrder.map(async (name) =>
-     name !== 'config' && await this.componentMap.get(name).initialize(this.config.get(`components.${name}`, {})));
+    // Initialize all other components with their specific configurations
+    for (const name of this.registrationOrder) {
+      if (name !== 'config') {
+        try {
+          const componentConfig = this.config.get(`components.${name}`, {});
+          await this.componentMap.get(name).initialize(componentConfig);
+        } catch (error) {
+          console.error(`Failed to initialize component "${name}":`, error);
+          throw error;
+        }
+      }
+    }
+  }
 
-   await Promise.all(initPromises);
- }
+  async start() {
+    // Start components in registration order
+    for (const name of this.registrationOrder) {
+      try {
+        await this.componentMap.get(name).start();
+      } catch (error) {
+        console.error(`Failed to start component "${name}":`, error);
+        throw error;
+      }
+    }
+  }
 
- async start() {
-   await Promise.all(this.registrationOrder.map(name => this.componentMap.get(name).start()));
- }
+  async stop() {
+    // Stop components in reverse registration order (cleanup dependencies properly)
+    for (const name of [...this.registrationOrder].reverse()) {
+      try {
+        await this.componentMap.get(name).stop();
+      } catch (error) {
+        console.error(`Failed to stop component "${name}":`, error);
+        // Continue stopping other components even if one fails
+      }
+    }
+  }
 
- async stop() {
-   await Promise.all([...this.registrationOrder].reverse().map(name => this.componentMap.get(name).stop()));
- }
-
- async destroy() {
-   await Promise.all([...this.registrationOrder].reverse().map(name => this.componentMap.get(name).destroy()));
- }
+  async destroy() {
+    // Destroy components in reverse registration order (cleanup dependencies properly)
+    for (const name of [...this.registrationOrder].reverse()) {
+      try {
+        await this.componentMap.get(name).destroy();
+      } catch (error) {
+        console.error(`Failed to destroy component "${name}":`, error);
+        // Continue destroying other components even if one fails
+      }
+    }
+  }
 }
 
 export default Core;

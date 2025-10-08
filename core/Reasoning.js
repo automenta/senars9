@@ -1,5 +1,6 @@
 import Component from './Component.js';
-import { Logger } from './utilities.js';
+import { Logger, ArrayUtils } from './utilities.js';
+import { DEFAULTS } from './constants.js';
 
 class Reasoning extends Component {
   constructor() {
@@ -7,7 +8,7 @@ class Reasoning extends Component {
     this.strategies = new Map();
     this.inferenceRules = new Map();
     this.reasoningHistory = [];
-    this.maxHistorySize = 1000;
+    this.maxHistorySize = DEFAULTS.MAX_HISTORY_SIZE;
   }
 
   async initialize(config = {}) {
@@ -15,7 +16,7 @@ class Reasoning extends Component {
     this.strategies.clear();
     this.inferenceRules.clear();
     this.reasoningHistory = [];
-    this.maxHistorySize = config.maxHistorySize || 1000;
+    this.maxHistorySize = config.maxHistorySize ?? DEFAULTS.MAX_HISTORY_SIZE;
 
     // Initialize default inference rules
     this._initializeDefaultInferenceRules();
@@ -36,7 +37,8 @@ class Reasoning extends Component {
   }
 
   async reason(tasks, context = {}) {
-    if (!tasks || tasks.length === 0) {
+    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+      Logger.debug('No tasks provided to reason');
       return [];
     }
 
@@ -69,6 +71,17 @@ class Reasoning extends Component {
       // Update reasoning history
       this._updateReasoningHistory(results);
 
+      // Emit reasoning completion event if messaging is available
+      if (this.core?.messages) {
+        this.core.messages.emit('reasoning.completed', {
+          inputTaskCount: tasks.length,
+          derivedTaskCount: derivedTasks.length,
+          inferenceCount: inferences.length,
+          contradictionCount: contradictions.length,
+          timestamp: results.timestamp
+        });
+      }
+
       return derivedTasks;
 
     } catch (error) {
@@ -82,9 +95,9 @@ class Reasoning extends Component {
     return {
       timestamp: Date.now(),
       strategy: baseContext.strategy || 'default',
-      depth: baseContext.depth || 1,
-      maxDepth: baseContext.maxDepth || 5,
-      confidence: baseContext.confidence || 0.8,
+      depth: baseContext.depth ?? 1,
+      maxDepth: baseContext.maxDepth ?? 5,
+      confidence: baseContext.confidence ?? 0.8,
       ...baseContext
     };
   }
@@ -95,7 +108,7 @@ class Reasoning extends Component {
       const inferences = [];
 
       for (const task of tasks) {
-        if (task.punctuation === '.' && task.term.includes(' --> ')) {
+        if (task.punctuation === '.' && task.term?.includes(' --> ')) {
           // Parse implication: A --> B
           const parts = task.term.match(/\(([^)]+)\) --> \(([^)]+)\)/);
           if (parts) {
@@ -104,7 +117,7 @@ class Reasoning extends Component {
               type: 'deduction',
               premise: task.term,
               conclusion: `(${consequent}).`,
-              confidence: task.truth?.frequency || 0.9,
+              confidence: task.truth?.frequency ?? 0.9,
               rule: 'implication'
             });
           }
@@ -121,19 +134,21 @@ class Reasoning extends Component {
 
       // Group tasks by similarity
       for (const task of tasks) {
-        if (task.punctuation === '.') {
+        if (task.punctuation === '.' && task.term) {
           const key = this._extractPatternKey(task.term);
-          if (!patterns.has(key)) {
-            patterns.set(key, []);
+          if (key) {
+            if (!patterns.has(key)) {
+              patterns.set(key, []);
+            }
+            patterns.get(key).push(task);
           }
-          patterns.get(key).push(task);
         }
       }
 
       // Generate inductive inferences for common patterns
       for (const [pattern, similarTasks] of patterns) {
         if (similarTasks.length >= 2) {
-          const avgConfidence = similarTasks.reduce((sum, t) => sum + (t.truth?.frequency || 0.5), 0) / similarTasks.length;
+          const avgConfidence = similarTasks.reduce((sum, t) => sum + (t.truth?.frequency ?? 0.5), 0) / similarTasks.length;
           inferences.push({
             type: 'induction',
             pattern,
@@ -153,7 +168,7 @@ class Reasoning extends Component {
       const inferences = [];
 
       for (const task of tasks) {
-        if (task.punctuation === '?') {
+        if (task.punctuation === '?' && task.term) {
           // This is a question - find explanatory hypotheses
           const hypotheses = this._generateHypotheses(task, tasks, context);
           inferences.push(...hypotheses);
@@ -173,7 +188,7 @@ class Reasoning extends Component {
     };
 
     for (const task of tasks) {
-      if (task.punctuation === '.') {
+      if (task.punctuation === '.' && task.term) {
         // Temporal patterns
         if (task.term.includes(' --> ') || task.term.includes(' <-> ')) {
           patterns.temporal.push(task);
@@ -204,8 +219,10 @@ class Reasoning extends Component {
 
     for (const [ruleName, ruleFunction] of this.inferenceRules) {
       try {
-        const ruleInferences = ruleFunction(tasks, context);
-        inferences.push(...ruleInferences);
+        const ruleInferences = ruleFunction(tasks, patterns, context);
+        if (Array.isArray(ruleInferences)) {
+          inferences.push(...ruleInferences);
+        }
       } catch (error) {
         Logger.warn(`Error applying inference rule ${ruleName}`, error);
       }
@@ -223,7 +240,7 @@ class Reasoning extends Component {
     for (const inference of inferences) {
       if (inference.conclusion) {
         const existing = taskMap.get(inference.conclusion);
-        if (existing && Math.abs(existing.confidence - inference.confidence) > 0.3) {
+        if (existing && Math.abs((existing.confidence ?? 0) - (inference.confidence ?? 0)) > 0.3) {
           contradictions.push({
             type: 'confidence_conflict',
             term: inference.conclusion,
@@ -243,7 +260,7 @@ class Reasoning extends Component {
 
     // Convert successful inferences to tasks
     for (const inference of inferences) {
-      if (inference.confidence >= (context.confidence || 0.8)) {
+      if (inference.confidence >= (context.confidence ?? 0.8)) {
         derivedTasks.push({
           term: inference.conclusion,
           punctuation: '.',
@@ -251,7 +268,7 @@ class Reasoning extends Component {
             frequency: inference.confidence,
             confidence: 0.8
           },
-          priority: 0.5,
+          priority: inference.priority ?? 0.5,
           timestamp: Date.now(),
           derivationPath: [`reasoning:${inference.type}`]
         });
@@ -278,6 +295,7 @@ class Reasoning extends Component {
 
   _extractPatternKey(term) {
     // Extract the core pattern from a term for grouping similar observations
+    if (!term) return '';
     return term.replace(/[()]/g, '').split(/\s+/)[0];
   }
 
@@ -285,7 +303,7 @@ class Reasoning extends Component {
     const hypotheses = [];
 
     // Simple hypothesis generation based on question patterns
-    if (questionTask.term.includes('why')) {
+    if (questionTask.term?.includes('why')) {
       // Generate explanatory hypotheses
       hypotheses.push({
         type: 'abduction',
@@ -296,6 +314,7 @@ class Reasoning extends Component {
       });
     }
 
+    // More hypothesis patterns could be added here
     return hypotheses;
   }
 
@@ -322,6 +341,7 @@ class Reasoning extends Component {
       strategies: this.strategies.size,
       inferenceRules: this.inferenceRules.size,
       historySize: this.reasoningHistory.length,
+      historyLimit: this.maxHistorySize,
       lastActivity: this.reasoningHistory.length > 0 ?
         this.reasoningHistory[this.reasoningHistory.length - 1].timestamp : null
     };

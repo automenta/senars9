@@ -3,8 +3,13 @@ import Tools from '../../core/Tools.js';
 describe('Tools', () => {
   let tools;
   let testTool;
+  let originalConsoleError;
 
   beforeEach(async () => {
+    // Store original console.error and suppress it during tests to keep output clean
+    originalConsoleError = console.error;
+    console.error = () => {};
+
     tools = new Tools();
 
     testTool = {
@@ -16,6 +21,11 @@ describe('Tools', () => {
 
     await tools.initialize();
     tools.registerTool(testTool);
+  });
+
+  afterEach(() => {
+    // Restore original console.error
+    console.error = originalConsoleError;
   });
 
   test('register tool', () => {
