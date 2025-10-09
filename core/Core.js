@@ -3,6 +3,7 @@ import Messages from './Messages.js';
 import Rules from './Rules.js';
 import Memory from './Memory.js';
 import Reasoning from './Reasoning.js';
+import LM from './lm/LM.js'; // Add LM component import
 import { Focus } from './Memory.js';
 
 class Core {
@@ -17,6 +18,7 @@ class Core {
     this.registerComponent('focus', focus);
     this.registerComponent('memory', new Memory(focus));
     this.registerComponent('reasoning', new Reasoning());
+    this.registerComponent('lm', new LM()); // Register LM component
 
     return new Proxy(this, {
       get: (target, prop) => target.componentMap.has(prop) ? target.componentMap.get(prop) : target[prop],
