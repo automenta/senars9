@@ -40,10 +40,16 @@ pub fn sort_and_dedup_commutative(
         TermType::Conjunction | TermType::Disjunction | TermType::Similarity | TermType::Equivalence
     );
     if is_commutative {
-        let original_len = components.len();
+        // Capture original order of hashes to detect any change (reorder or dedup).
+        let original_hashes: Vec<_> = components.iter().map(|c| c.hash.clone()).collect();
+
         components.sort_by(|a, b| a.name.cmp(&b.name));
         components.dedup_by(|a, b| a.hash == b.hash);
-        if components.len() < original_len {
+
+        let new_hashes: Vec<_> = components.iter().map(|c| c.hash.clone()).collect();
+
+        // If the sequence of components has changed, return the new list.
+        if new_hashes != original_hashes {
             return Some(components);
         }
     }

@@ -1,5 +1,11 @@
 //! Defines the foundational `Component` trait for all system components.
 
+pub mod analysis_engine;
+pub mod config_service;
+pub mod plan_executor;
+pub mod resource_manager;
+pub mod strategy_registry;
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

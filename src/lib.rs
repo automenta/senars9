@@ -1,9 +1,15 @@
+pub mod components;
 pub mod cycle;
 pub mod data_structures;
 pub mod memory;
 pub mod parser;
 pub mod reasoning;
+pub mod ws_server;
 
+use crate::components::{
+    analysis_engine::AnalysisEngine, config_service::ConfigService, plan_executor::PlanExecutor,
+    resource_manager::ResourceManager, strategy_registry::StrategyRegistry,
+};
 use crate::cycle::clock::Clock;
 use crate::cycle::context::CycleContext;
 use crate::cycle::focus_set_selector::FocusSetSelector;
@@ -17,10 +23,18 @@ use crate::reasoning::Reasoner;
 /// This struct owns all the core components (`Memory`, `Reasoner`, `Clock`, `FocusSetSelector`)
 /// and provides the primary public API for interacting with the system.
 pub struct System {
+    // Core components
     pub memory: Memory,
     pub reasoner: Reasoner,
     pub clock: Box<dyn Clock>,
     pub focus_set_selector: FocusSetSelector,
+
+    // Unified frameworks
+    pub analysis_engine: AnalysisEngine,
+    pub config_service: ConfigService,
+    pub plan_executor: PlanExecutor,
+    pub resource_manager: ResourceManager,
+    pub strategy_registry: StrategyRegistry,
 }
 
 impl System {
@@ -30,10 +44,17 @@ impl System {
     /// * `clock` - A boxed `Clock` trait object (e.g., `Box::new(IterativeClock::new())`).
     pub fn new(clock: Box<dyn Clock>) -> Self {
         System {
+            // Core components
             memory: Memory::new(),
             reasoner: Reasoner::new(),
             clock,
             focus_set_selector: FocusSetSelector::default(),
+            // Unified frameworks
+            analysis_engine: AnalysisEngine::new(),
+            config_service: ConfigService::new(),
+            plan_executor: PlanExecutor::new(),
+            resource_manager: ResourceManager::new(),
+            strategy_registry: StrategyRegistry::new(),
         }
     }
 

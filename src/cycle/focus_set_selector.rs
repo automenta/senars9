@@ -125,16 +125,17 @@ impl Default for FocusSetSelector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_structures::{punctuation::Punctuation, term::Term};
+    use crate::data_structures::{punctuation::Punctuation, term::Term, term_type::TermType};
 
     // Helper to create a test task with specific priority, access time, and complexity.
     fn create_test_task(priority: f32, accessed_at: u64, complexity: usize) -> Arc<Task> {
         let term = Arc::new(Term {
             name: format!("term{}", complexity),
-            complexity,
+            term_type: TermType::Atom,
+            complexity: complexity as u64,
+            subject: None,
+            predicate: None,
             components: None,
-            embedding: None,
-            created_at: 0,
             hash: format!("hash{}", complexity),
         });
         let task = Task::new(term, Punctuation::Belief, None, 0, accessed_at);

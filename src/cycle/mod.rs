@@ -2,10 +2,6 @@ pub mod clock;
 pub mod context;
 pub mod focus_set_selector;
 
-pub mod clock;
-pub mod context;
-pub mod focus_set_selector;
-
 use self::{context::CycleContext, focus_set_selector::FocusSetSelector};
 use crate::memory::Memory;
 use crate::reasoning::Reasoner;

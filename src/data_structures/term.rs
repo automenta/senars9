@@ -1,6 +1,6 @@
 use super::{term_simplification, term_type::TermType};
 use crate::parser;
-use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use serde::Deserialize;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -96,7 +96,7 @@ impl Term {
     /// specific order until the term reaches a "fixed point" where no more
     /// simplifications can be made.
     fn simplify_and_construct(
-        mut term_type: TermType,
+        term_type: TermType,
         mut components: Vec<Arc<Term>>,
     ) -> Arc<Term> {
         // Loop until no more simplifications can be applied.
@@ -104,7 +104,8 @@ impl Term {
             let mut simplified = false;
 
             // Apply rules that return a new set of components.
-            let component_rules: &[fn(TermType, Vec<Arc<Term>>) -> Option<Vec<Arc<Term>>)] = &[
+            // We let the compiler infer the type to avoid parsing issues with complex function pointers.
+            let component_rules = &[
                 term_simplification::flatten_associative,
                 term_simplification::sort_and_dedup_commutative,
             ];

@@ -10,7 +10,6 @@ use std::sync::Arc;
 ///
 /// `priority` and `accessed_at` use atomic types for efficient, lock-free updates,
 /// allowing these fields to be modified even when the Task is behind an `Arc`.
-#[derive(Clone)]
 pub struct Task {
     pub term: Arc<Term>,
     pub punctuation: Punctuation,
@@ -88,6 +87,22 @@ impl Task {
 }
 
 // Manual trait implementations due to atomic fields.
+
+impl Clone for Task {
+    fn clone(&self) -> Self {
+        Task {
+            term: self.term.clone(),
+            punctuation: self.punctuation,
+            truth: self.truth.clone(),
+            priority: AtomicU32::new(self.priority.load(Ordering::Relaxed)),
+            accessed_at: AtomicU64::new(self.accessed_at.load(Ordering::Relaxed)),
+            created_at: self.created_at,
+            occurrence_time: self.occurrence_time,
+            expiration_time: self.expiration_time,
+            derivation_path: self.derivation_path.clone(),
+        }
+    }
+}
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
