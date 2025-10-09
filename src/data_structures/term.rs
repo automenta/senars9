@@ -84,45 +84,139 @@ impl Term {
 
     /// Creates a new simplified and canonical compound term.
     /// This is the primary factory method for creating all compound terms. It applies
-    /// simplification and canonicalization rules automatically.
-    pub fn create_compound(term_type: TermType, mut components: Vec<Arc<Term>>) -> Arc<Term> {
-        // 1. Associativity (Flattening) for n-ary operators
+    /// simplification and canonicalization rules recursively until a fixed point is reached.
+    pub fn create_compound(term_type: TermType, components: Vec<Arc<Term>>) -> Arc<Term> {
+        Term::simplify_and_construct(term_type, components)
+    }
+
+    /// Internal recursive function to simplify and construct a term.
+    /// It applies one layer of simplification rules and calls itself with the
+    /// simplified parts. If no more simplifications can be applied, it constructs
+    /// and returns the final term.
+    fn simplify_and_construct(
+        term_type: TermType,
+        mut components: Vec<Arc<Term>>,
+    ) -> Arc<Term> {
+        // Rule 1: Associativity (Flattening).
         if term_type == TermType::Conjunction || term_type == TermType::Disjunction {
-            components = components.into_iter().flat_map(|comp_term| {
-                if comp_term.term_type == term_type {
-                    comp_term.components.as_ref().unwrap().clone()
-                } else {
-                    vec![comp_term]
-                }
-            }).collect();
+            if components.iter().any(|c| c.term_type == term_type) {
+                let new_components = components.into_iter().flat_map(|c| {
+                    if c.term_type == term_type { c.components.as_ref().unwrap().clone() } else { vec![c] }
+                }).collect();
+                return Term::simplify_and_construct(term_type, new_components);
+            }
         }
 
-        // 2. Commutativity (Sorting) and Idempotency (Deduplication)
-        let is_commutative = matches!(
-            term_type,
-            TermType::Conjunction | TermType::Disjunction | TermType::Similarity | TermType::Equivalence
-        );
-
+        // Rule 2: Commutativity (Sorting) and Idempotency (Deduplication).
+        let is_commutative = matches!(term_type, TermType::Conjunction | TermType::Disjunction | TermType::Similarity | TermType::Equivalence);
         if is_commutative {
+            let original_len = components.len();
             components.sort_by(|a, b| a.name.cmp(&b.name));
             components.dedup_by(|a, b| a.hash == b.hash);
+            if components.len() < original_len {
+                return Term::simplify_and_construct(term_type, components);
+            }
         }
 
-        // 3. 1-ary Reduction for Conjunction and Disjunction
-        if (term_type == TermType::Conjunction || term_type == TermType::Disjunction) && components.len() == 1 {
-            return components.remove(0);
-        }
-
-        // 4. Double Negation Reduction: (--, (--, A)) => A
-        if term_type == TermType::Negation {
-            if let Some(component_term) = components.first() {
-                if component_term.term_type == TermType::Negation {
-                    // component_term is (--, A), its component is A
-                    return component_term.components.as_ref().unwrap()[0].clone();
+        // Rule 3: Contradiction Elimination (for conjunctions).
+        // Example: (&, A, B, --A) -> (&, B).
+        if term_type == TermType::Conjunction {
+            let mut to_remove = std::collections::HashSet::new();
+            for i in 0..components.len() {
+                for j in (i + 1)..components.len() {
+                    let c1 = &components[i];
+                    let c2 = &components[j];
+                    if (c1.term_type == TermType::Negation && c1.components.as_ref().unwrap()[0].hash == c2.hash) ||
+                       (c2.term_type == TermType::Negation && c2.components.as_ref().unwrap()[0].hash == c1.hash) {
+                        to_remove.insert(i);
+                        to_remove.insert(j);
+                    }
+                }
+            }
+            if !to_remove.is_empty() {
+                let new_components = components.into_iter().enumerate()
+                    .filter(|(i, _)| !to_remove.contains(i))
+                    .map(|(_, c)| c)
+                    .collect::<Vec<_>>();
+                // Avoid creating an empty conjunction `(&,)`, as the system has no FALSE term.
+                if !new_components.is_empty() {
+                    return Term::simplify_and_construct(term_type, new_components);
                 }
             }
         }
 
+        // Rule 4: Absorption Laws.
+        // (&, A, (|, A, B)) -> A; (|, A, (&, A, B)) -> A
+        let absorbing_op = if term_type == TermType::Conjunction { Some(TermType::Disjunction) } else if term_type == TermType::Disjunction { Some(TermType::Conjunction) } else { None };
+        if let Some(op) = absorbing_op {
+            let mut absorbed_indices = std::collections::HashSet::new();
+            for i in 0..components.len() {
+                for j in 0..components.len() {
+                    if i == j { continue; }
+                    let absorber = &components[i];
+                    let maybe_absorbed = &components[j];
+                    if maybe_absorbed.term_type == op && maybe_absorbed.components.as_ref().unwrap().contains(absorber) {
+                        absorbed_indices.insert(j);
+                    }
+                }
+            }
+            if !absorbed_indices.is_empty() {
+                let new_components = components.into_iter().enumerate()
+                    .filter(|(i, _)| !absorbed_indices.contains(i))
+                    .map(|(_, c)| c)
+                    .collect();
+                return Term::simplify_and_construct(term_type, new_components);
+            }
+        }
+
+        // Rule 5: Double Negation and De Morgan's Laws.
+        if term_type == TermType::Negation {
+            let component = &components[0];
+            // Double Negation: (--, (--, A)) -> A
+            if component.term_type == TermType::Negation {
+                return component.components.as_ref().unwrap()[0].clone();
+            }
+            // De Morgan's Law: (--, (&, A, B)) -> (|, (--, A), (--, B))
+            if component.term_type == TermType::Conjunction {
+                let new_components = component.components.as_ref().unwrap().iter()
+                    .map(|c| Term::create_compound(TermType::Negation, vec![c.clone()]))
+                    .collect();
+                return Term::create_compound(TermType::Disjunction, new_components);
+            }
+            // De Morgan's Law: (--, (|, A, B)) -> (&, (--, A), (--, B))
+            if component.term_type == TermType::Disjunction {
+                let new_components = component.components.as_ref().unwrap().iter()
+                    .map(|c| Term::create_compound(TermType::Negation, vec![c.clone()]))
+                    .collect();
+                return Term::create_compound(TermType::Conjunction, new_components);
+            }
+        }
+
+        // Rule 6: Distributive Law (DISABLED due to infinite loop risk).
+        // (&, A, (|, B, C)) -> (|, (&, A, B), (&, A, C))
+        /*
+        if term_type == TermType::Conjunction {
+            if let Some((i, disj)) = components.iter().enumerate().find(|(_, c)| c.term_type == TermType::Disjunction) {
+                let mut others = components.clone();
+                others.remove(i);
+                if !others.is_empty() {
+                    let new_disj_comps = disj.components.as_ref().unwrap().iter().map(|disj_comp| {
+                        let mut new_conj_comps = others.clone();
+                        new_conj_comps.push(disj_comp.clone());
+                        Term::create_compound(TermType::Conjunction, new_conj_comps)
+                    }).collect();
+                    return Term::create_compound(TermType::Disjunction, new_disj_comps);
+                }
+            }
+        }
+        */
+
+        // Rule 7: 1-ary Reduction.
+        if (term_type == TermType::Conjunction || term_type == TermType::Disjunction) && components.len() == 1 {
+            return components.remove(0);
+        }
+
+        // Base Case: No more simplifications can be applied. Construct the final term.
         let name = Term::generate_name(&term_type, &components);
         let final_hash = Term::compute_hash(&name, &term_type, &Some(components.clone()));
 

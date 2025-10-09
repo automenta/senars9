@@ -204,3 +204,125 @@ fn test_consolidation_forgets_and_promotes() {
     assert_eq!(memory.short_term_tasks.len(), 1);
     assert!(memory.short_term_tasks.contains_key(&concept_low.term.hash));
 }
+
+// --- Advanced Boolean Reduction Tests ---
+
+#[test]
+fn test_reduction_de_morgans_negated_conjunction() {
+    let mut memory = Memory::new();
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+
+    // Build (--, (&, A, B))
+    let conj = memory.create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), b.clone()], 0);
+    let neg_conj = memory.create_or_get_compound_concept(TermType::Negation, vec![conj], 0);
+
+    // Should simplify to (|, (--, A), (--, B))
+    let neg_a = memory.create_or_get_compound_concept(TermType::Negation, vec![a.clone()], 0);
+    let neg_b = memory.create_or_get_compound_concept(TermType::Negation, vec![b.clone()], 0);
+    let expected = memory.create_or_get_compound_concept(TermType::Disjunction, vec![neg_a, neg_b], 0);
+
+    assert_eq!(neg_conj.term.name, expected.term.name);
+    assert_eq!(Arc::ptr_eq(&neg_conj, &expected), true);
+}
+
+#[test]
+fn test_reduction_de_morgans_negated_disjunction() {
+    let mut memory = Memory::new();
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+
+    // Build (--, (|, A, B))
+    let disj = memory.create_or_get_compound_concept(TermType::Disjunction, vec![a.clone(), b.clone()], 0);
+    let neg_disj = memory.create_or_get_compound_concept(TermType::Negation, vec![disj], 0);
+
+    // Should simplify to (&, (--, A), (--, B))
+    let neg_a = memory.create_or_get_compound_concept(TermType::Negation, vec![a.clone()], 0);
+    let neg_b = memory.create_or_get_compound_concept(TermType::Negation, vec![b.clone()], 0);
+    let expected = memory.create_or_get_compound_concept(TermType::Conjunction, vec![neg_a, neg_b], 0);
+
+    assert_eq!(neg_disj.term.name, expected.term.name);
+    assert_eq!(Arc::ptr_eq(&neg_disj, &expected), true);
+}
+
+#[test]
+fn test_reduction_contradiction_elimination() {
+    let mut memory = Memory::new();
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+    let neg_a = memory.create_or_get_compound_concept(TermType::Negation, vec![a.clone()], 0);
+
+    // Build (&, B, A, (--, A))
+    let term = memory.create_or_get_compound_concept(TermType::Conjunction, vec![b.clone(), a.clone(), neg_a], 0);
+
+    // Should simplify to B
+    assert_eq!(Arc::ptr_eq(&term, &b), true);
+}
+
+#[test]
+fn test_reduction_absorption_law_conj_over_disj() {
+    let mut memory = Memory::new();
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+
+    // Test (&, A, (|, A, B)) -> A
+    let disj = memory.create_or_get_compound_concept(TermType::Disjunction, vec![a.clone(), b.clone()], 0);
+    let term = memory.create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), disj], 0);
+    assert_eq!(Arc::ptr_eq(&term, &a), true);
+}
+
+#[test]
+fn test_reduction_absorption_law_disj_over_conj() {
+    let mut memory = Memory::new();
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+
+    // Test (|, A, (&, A, B)) -> A
+    let conj = memory.create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), b.clone()], 0);
+    let term = memory.create_or_get_compound_concept(TermType::Disjunction, vec![a.clone(), conj], 0);
+    assert_eq!(Arc::ptr_eq(&term, &a), true);
+}
+
+#[test]
+#[ignore] // Ignoring because the distributive law is disabled to prevent infinite loops.
+fn test_reduction_distributive_law() {
+    let mut memory = Memory::new();
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+    let c = memory.create_or_get_atom_concept("C", 0);
+
+    // Build (&, A, (|, B, C))
+    let disj = memory.create_or_get_compound_concept(TermType::Disjunction, vec![b.clone(), c.clone()], 0);
+    let term = memory.create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), disj], 0);
+
+    // Should simplify to (|, (&, A, B), (&, A, C))
+    let conj_ab = memory.create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), b.clone()], 0);
+    let conj_ac = memory.create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), c.clone()], 0);
+    let expected = memory.create_or_get_compound_concept(TermType::Disjunction, vec![conj_ab, conj_ac], 0);
+
+    assert_eq!(term.term.name, expected.term.name);
+    assert_eq!(Arc::ptr_eq(&term, &expected), true);
+}
+
+#[test]
+fn test_reduction_complex_nested_case_de_morgan_and_flatten() {
+    let mut memory = Memory::new();
+    let a = memory.create_or_get_atom_concept("A", 0);
+    let b = memory.create_or_get_atom_concept("B", 0);
+    let c = memory.create_or_get_atom_concept("C", 0);
+
+    // Build (&, A, (--, (|, B, C)))
+    let disj = memory.create_or_get_compound_concept(TermType::Disjunction, vec![b.clone(), c.clone()], 0);
+    let neg_disj = memory.create_or_get_compound_concept(TermType::Negation, vec![disj], 0);
+    let term = memory.create_or_get_compound_concept(TermType::Conjunction, vec![a.clone(), neg_disj], 0);
+
+    // Should simplify to (&, A, (--, B), (--, C))
+    // 1. De Morgan's on (--, (|, B, C)) -> (&, (--, B), (--, C))
+    // 2. Flatten with outer conjunction -> (&, A, (--, B), (--, C))
+    let neg_b = memory.create_or_get_compound_concept(TermType::Negation, vec![b.clone()], 0);
+    let neg_c = memory.create_or_get_compound_concept(TermType::Negation, vec![c.clone()], 0);
+    let expected = memory.create_or_get_compound_concept(TermType::Conjunction, vec![a, neg_b, neg_c], 0);
+
+    assert_eq!(term.term.name, expected.term.name);
+    assert_eq!(Arc::ptr_eq(&term, &expected), true);
+}
