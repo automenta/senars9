@@ -9,11 +9,9 @@ class LMConfiguration {
 
   // Provider management
   addProvider(provider) {
-    // Validate provider has required fields
     if (!provider.name) throw new Error('Provider must have a name');
     if (!provider.url) throw new Error('Provider must have a URL');
     
-    // Check for duplicate names
     if (this.providers.some(p => p.name === provider.name)) {
       throw new Error(`Provider with name "${provider.name}" already exists`);
     }
@@ -24,9 +22,7 @@ class LMConfiguration {
 
   removeProvider(name) {
     const index = this.providers.findIndex(p => p.name === name);
-    if (index !== -1) {
-      this.providers.splice(index, 1);
-    }
+    if (index !== -1) this.providers.splice(index, 1);
     return this;
   }
 
@@ -36,11 +32,9 @@ class LMConfiguration {
 
   // Model management
   addModel(model) {
-    // Validate model has required fields
     if (!model.name) throw new Error('Model must have a name');
     if (!model.provider) throw new Error('Model must have a provider');
     
-    // Check for duplicate names
     if (this.models.some(m => m.name === model.name)) {
       throw new Error(`Model with name "${model.name}" already exists`);
     }
@@ -51,9 +45,7 @@ class LMConfiguration {
 
   removeModel(name) {
     const index = this.models.findIndex(m => m.name === name);
-    if (index !== -1) {
-      this.models.splice(index, 1);
-    }
+    if (index !== -1) this.models.splice(index, 1);
     return this;
   }
 
@@ -63,17 +55,9 @@ class LMConfiguration {
 
   // Default assignments
   setDefault(type, name) {
-    if (!['embedding', 'fast', 'reasoning', 'temporal', 'counterfactual'].includes(type)) {
-      throw new Error(`Invalid default type: ${type}`);
-    }
-    
-    // Validate that the named model/provider exists
-    if (type === 'embedding' || type === 'fast' || type === 'reasoning' || 
-        type === 'temporal' || type === 'counterfactual') {
-      if (!this.getModel(name) && !this.getProvider(name)) {
-        throw new Error(`Model or Provider with name "${name}" does not exist`);
-      }
-    }
+    const validTypes = new Set(['embedding', 'fast', 'reasoning', 'temporal', 'counterfactual']);
+    if (!validTypes.has(type)) throw new Error(`Invalid default type: ${type}`);
+    if (!this.getModel(name) && !this.getProvider(name)) throw new Error(`Model or Provider with name "${name}" does not exist`);
     
     this.defaults[type] = name;
     return this;
@@ -90,7 +74,7 @@ class LMConfiguration {
   }
 
   getPreference(key, defaultValue) {
-    return this.preferences[key] !== undefined ? this.preferences[key] : defaultValue;
+    return this.preferences[key] ?? defaultValue;
   }
 
   // Serialization
@@ -117,36 +101,37 @@ class LMConfiguration {
   validate() {
     const errors = [];
 
-    // Validate providers
-    for (const provider of this.providers) {
-      if (!provider.name) errors.push('Provider missing name');
-      if (!provider.url) errors.push('Provider missing URL');
-    }
-
-    // Validate models
+    // Validate providers and models
+    this._validateCollection(this.providers, ['name', 'url'], 'Provider', errors);
+    this._validateCollection(this.models, ['name', 'provider'], 'Model', errors);
+    
+    // Validate model providers exist
     for (const model of this.models) {
-      if (!model.name) errors.push('Model missing name');
-      if (!model.provider) errors.push('Model missing provider');
-      // Check if the referenced provider exists
       if (!this.getProvider(model.provider)) {
         errors.push(`Model "${model.name}" references non-existent provider "${model.provider}"`);
       }
     }
 
     // Validate defaults
+    const validTypes = new Set(['embedding', 'fast', 'reasoning', 'temporal', 'counterfactual']);
     for (const [type, name] of Object.entries(this.defaults)) {
-      if (!['embedding', 'fast', 'reasoning', 'temporal', 'counterfactual'].includes(type)) {
+      if (!validTypes.has(type)) {
         errors.push(`Invalid default type: ${type}`);
       } else if (!this.getModel(name) && !this.getProvider(name)) {
         errors.push(`Default ${type} references non-existent model or provider "${name}"`);
       }
     }
 
-    if (errors.length > 0) {
-      throw new Error(`Configuration validation failed: ${errors.join(', ')}`);
-    }
-
+    if (errors.length > 0) throw new Error(`Configuration validation failed: ${errors.join(', ')}`);
     return true;
+  }
+
+  _validateCollection(collection, requiredFields, itemType, errors) {
+    for (const item of collection) {
+      for (const field of requiredFields) {
+        if (!item[field]) errors.push(`${itemType} missing ${field}`);
+      }
+    }
   }
 }
 
