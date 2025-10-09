@@ -1,32 +1,25 @@
 class Logger {
   static log(level, message, data = {}) {
-    const method = console[level] || console.log;
-    
     if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined) {
-      // During tests, we call the console methods for spies to work but suppress actual output
+      // In test environment, only call console if it has been mocked by test code
+      // This allows spies to capture calls without producing verbose console output
       const originalMethod = console[level] || console.log;
-      // Temporarily replace with a no-op function to suppress output
-      if (console[level]) {
-        console[level] = () => {};
+      
+      // Check if the method has been mocked by Jest (spies would do this)
+      const isMocked = originalMethod._isMockFunction || (originalMethod.mock != null);
+      
+      if (isMocked) {
+        // If it's mocked, let the mock handle the call (this preserves spy behavior)
+        return originalMethod(`[${level?.toUpperCase() || 'LOG'}]`, message, data);
       } else {
-        // If the level doesn't exist (like 'debug' when it's not defined), use console.log
-        console.log = () => {};
+        // If not mocked, don't call the console method to avoid verbose output
+        // but still execute as if the call happened for code flow purposes
+        return;
       }
-      
-      // Call the method for potential spies to capture
-      const result = method(`[${level?.toUpperCase() || 'LOG'}]`, message, data);
-      
-      // Restore the original method
-      if (console[level]) {
-        console[level] = originalMethod;
-      } else {
-        console.log = originalMethod;
-      }
-      
-      return result;
     }
     
     // Normal logging in non-test environments
+    const method = console[level] || console.log;
     const result = method(`[${level?.toUpperCase() || 'LOG'}]`, message, data);
     return result;
   }
