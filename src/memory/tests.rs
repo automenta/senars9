@@ -5,9 +5,9 @@ use crate::data_structures::{
 use std::sync::Arc;
 
 // Helper to create a new task with a given term, time, priority, and optional expiration.
-fn create_task(term: Arc<Term>, time: u64, priority: f64, expiration: Option<u64>) -> Task {
+fn create_task(term: Arc<Term>, time: u64, priority: f32, expiration: Option<u64>) -> Task {
     let mut task = Task::new(term, Punctuation::Belief, None, time, time);
-    task.priority = priority;
+    task.set_priority(priority);
     task.expiration_time = expiration;
     task
 }
@@ -203,6 +203,37 @@ fn test_consolidation_forgets_and_promotes() {
     // Low-priority task should remain in short-term memory
     assert_eq!(memory.short_term_tasks.len(), 1);
     assert!(memory.short_term_tasks.contains_key(&concept_low.term.hash));
+}
+
+#[test]
+fn test_consolidation_priority_decay() {
+    let mut memory = Memory::new();
+    let concept = memory.create_or_get_atom_concept("decay_test", 0);
+    let initial_priority = 0.5;
+    memory.add_task(create_task(concept.term.clone(), 100, initial_priority, None), 100);
+
+    let task = memory.get_task(&concept.term.hash).unwrap();
+    assert_eq!(task.get_priority(), initial_priority);
+
+    // --- Cycle 1 (time=101) ---
+    // Task was not accessed, so its priority should decay.
+    memory.consolidate(101);
+    let decayed_priority_1 = task.get_priority();
+    assert!(decayed_priority_1 < initial_priority);
+
+    // --- Cycle 2 (time=102) ---
+    // Access the task, so its priority should NOT decay in this cycle.
+    task.set_accessed_at(102);
+    memory.consolidate(102);
+    let decayed_priority_2 = task.get_priority();
+    // Priority should be the same as after the last decay.
+    assert_eq!(decayed_priority_2, decayed_priority_1);
+
+    // --- Cycle 3 (time=103) ---
+    // Do not access the task, so its priority should decay again.
+    memory.consolidate(103);
+    let decayed_priority_3 = task.get_priority();
+    assert!(decayed_priority_3 < decayed_priority_2);
 }
 
 // --- Advanced Boolean Reduction Tests ---

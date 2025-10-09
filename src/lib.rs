@@ -6,6 +6,7 @@ pub mod reasoning;
 
 use crate::cycle::clock::Clock;
 use crate::cycle::context::CycleContext;
+use crate::cycle::focus_set_selector::FocusSetSelector;
 use crate::cycle::run_single_cycle;
 use crate::memory::Memory;
 use crate::parser::parse;
@@ -13,16 +14,17 @@ use crate::reasoning::Reasoner;
 
 /// The main orchestrator for the SeNARS system.
 ///
-/// This struct owns all the core components (`Memory`, `Reasoner`, `Clock`) and
-/// provides the primary public API for interacting with the system.
+/// This struct owns all the core components (`Memory`, `Reasoner`, `Clock`, `FocusSetSelector`)
+/// and provides the primary public API for interacting with the system.
 pub struct System {
     pub memory: Memory,
     pub reasoner: Reasoner,
     pub clock: Box<dyn Clock>,
+    pub focus_set_selector: FocusSetSelector,
 }
 
 impl System {
-    /// Creates a new `System` with the given clock.
+    /// Creates a new `System` with the given clock and default components.
     ///
     /// # Arguments
     /// * `clock` - A boxed `Clock` trait object (e.g., `Box::new(IterativeClock::new())`).
@@ -31,6 +33,7 @@ impl System {
             memory: Memory::new(),
             reasoner: Reasoner::new(),
             clock,
+            focus_set_selector: FocusSetSelector::default(),
         }
     }
 
@@ -65,6 +68,11 @@ impl System {
         let context = CycleContext { current_time };
 
         // Run one full cognitive cycle with the consistent context.
-        run_single_cycle(&mut self.memory, &self.reasoner, &context);
+        run_single_cycle(
+            &mut self.memory,
+            &self.reasoner,
+            &self.focus_set_selector,
+            &context,
+        );
     }
 }

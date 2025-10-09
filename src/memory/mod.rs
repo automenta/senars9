@@ -176,7 +176,13 @@ impl Memory {
     }
 
     /// Performs a memory consolidation cycle.
+    ///
+    /// This process involves three main activities:
+    /// 1. **Forgetting**: Removing tasks that have expired.
+    /// 2. **Decaying**: Reducing the priority of tasks that haven't been accessed recently.
+    /// 3. **Promoting**: Moving high-priority tasks from short-term to long-term memory.
     pub fn consolidate(&mut self, current_time: u64) {
+        // --- 1. Forgetting ---
         let expired_task_hashes: Vec<String> = self
             .get_all_tasks_iter()
             .filter(|task| task.is_expired(current_time))
@@ -187,9 +193,25 @@ impl Memory {
             self.remove_task(&hash);
         }
 
+        // --- 2. Priority Decay ---
+        // A small, constant factor by which priority decays each cycle for inactive tasks.
+        const PRIORITY_DECAY_FACTOR: f32 = 0.001;
+
+        for task in self.get_all_tasks_iter() {
+            // Only decay priority if the task was not accessed in the current cycle.
+            if task.get_accessed_at() < current_time {
+                let current_priority = task.get_priority();
+                // Ensure priority does not fall below zero.
+                let new_priority = (current_priority - PRIORITY_DECAY_FACTOR).max(0.0);
+                task.set_priority(new_priority);
+            }
+        }
+
+        // --- 3. Promotion to Long-Term Memory ---
         let mut tasks_to_move = Vec::new();
         for (hash, task) in self.short_term_tasks.iter() {
-            if task.priority >= 0.7 {
+            // Use the getter for priority now that it's atomic.
+            if task.get_priority() >= 0.7 {
                 tasks_to_move.push(hash.clone());
             }
         }

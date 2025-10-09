@@ -1,59 +1,66 @@
 pub mod clock;
 pub mod context;
+pub mod focus_set_selector;
 
-use self::context::CycleContext;
-use crate::data_structures::task::Task;
+pub mod clock;
+pub mod context;
+pub mod focus_set_selector;
+
+use self::{context::CycleContext, focus_set_selector::FocusSetSelector};
 use crate::memory::Memory;
 use crate::reasoning::Reasoner;
-use std::sync::Arc;
-
-// Defines the number of tasks to select for the focus set in each cycle.
-const FOCUS_SET_SIZE: usize = 5;
 
 /// Runs a single, complete cognitive cycle.
 ///
 /// This is a stateless function that orchestrates the main reasoning loop.
 ///
 /// The process involves:
-/// 1. Selecting a "focus set" of high-priority tasks from memory.
-/// 2. Passing the focus set to the reasoner to derive new tasks (conclusions).
-/// 3. Adding the newly derived tasks back into memory.
-/// 4. Performing memory consolidation to manage knowledge.
+/// 1. Collecting all tasks from memory to form a candidate pool.
+/// 2. Using the `FocusSetSelector` to choose a "focus set" of tasks.
+/// 3. Updating the `accessed_at` timestamp for all tasks in the focus set.
+/// 4. Passing the focus set to the `Reasoner` to derive new tasks (conclusions).
+/// 5. Adding the newly derived tasks back into memory.
+/// 6. Performing memory consolidation to manage knowledge.
 ///
 /// # Arguments
 /// * `memory` - A mutable reference to the system's `Memory`.
 /// * `reasoner` - A reference to the system's `Reasoner`.
+/// * `selector` - A reference to the `FocusSetSelector` component.
 /// * `context` - The context object for the current cycle, containing the timestamp.
-pub fn run_single_cycle(memory: &mut Memory, reasoner: &Reasoner, context: &CycleContext) {
-    // 1. Select focus set
-    let focus_set = select_focus_set(memory);
-    if focus_set.is_empty() {
+pub fn run_single_cycle(
+    memory: &mut Memory,
+    reasoner: &Reasoner,
+    selector: &FocusSetSelector,
+    context: &CycleContext,
+) {
+    // 1. Collect all tasks from memory.
+    let all_tasks: Vec<_> = memory.get_all_tasks_iter().cloned().collect();
+    if all_tasks.is_empty() {
         return; // Nothing to do if memory is empty.
     }
 
-    // 2. Reason on the focus set to derive new knowledge
+    // 2. Use the selector to choose the focus set.
+    let focus_set = selector.select(&all_tasks, context.current_time);
+    if focus_set.is_empty() {
+        return; // No tasks met the criteria for the focus set.
+    }
+
+    // 3. Update `accessed_at` for all tasks in the focus set.
+    for task in &focus_set {
+        task.set_accessed_at(context.current_time);
+    }
+
+    // 4. Reason on the focus set to derive new knowledge.
     let derived_tasks = reasoner.reason(&focus_set, memory, context);
 
-    // 3. Add derived tasks back to memory
+    // 5. Add derived tasks back to memory.
     for task in derived_tasks {
         memory.add_task(task, context.current_time);
     }
 
-    // 4. Consolidate memory
+    // 6. Consolidate memory.
     memory.consolidate(context.current_time);
 }
-
-/// Selects a set of tasks to focus on for the current cycle.
-///
-/// This is a simplified implementation that prioritizes tasks based on their priority value.
-fn select_focus_set(memory: &Memory) -> Vec<Arc<Task>> {
-    let mut all_tasks: Vec<Arc<Task>> = memory.get_all_tasks_iter().cloned().collect();
-    // Sort tasks by priority in descending order.
-    all_tasks.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap());
-    // Take the top `FOCUS_SET_SIZE` tasks.
-    all_tasks.into_iter().take(FOCUS_SET_SIZE).collect()
-}
-
 
 #[cfg(test)]
 mod tests;
