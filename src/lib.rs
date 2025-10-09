@@ -1,6 +1,7 @@
 pub mod components;
 pub mod cycle;
 pub mod data_structures;
+pub mod events;
 pub mod memory;
 pub mod parser;
 pub mod reasoning;

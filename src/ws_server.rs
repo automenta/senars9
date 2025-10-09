@@ -2,7 +2,6 @@ use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
-use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -13,21 +12,10 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
-use crate::System;
-
-/// Represents a command sent from a client to the server.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ClientCommand {
-    pub command: String,
-    pub payload: serde_json::Value,
-}
-
-/// Represents an event sent from the server to clients.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ServerEvent {
-    pub event: String,
-    pub payload: serde_json::Value,
-}
+use crate::{
+    events::{ClientCommand, ServerEvent},
+    System,
+};
 
 /// The main WebSocket server struct.
 ///
