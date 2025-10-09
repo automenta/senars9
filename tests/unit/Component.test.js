@@ -1,4 +1,4 @@
-import Component from '../../core/Component.js';
+import Component from '../../core/base/Component.js';
 import {
   createTestComponent,
   testLifecycleTransitions,

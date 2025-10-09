@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import Rules from '../../core/Rules.js';
+import Rules from '../../core/reasoning/Rules.js';
 
 describe('Rules', () => {
   let rules;

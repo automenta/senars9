@@ -1,4 +1,4 @@
-import Tools from '../../core/Tools.js';
+import Tools from '../../core/system/Tools.js';
 
 describe('Tools', () => {
   let tools;

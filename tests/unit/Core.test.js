@@ -1,6 +1,6 @@
-import Core from '../../core/Core.js';
-import Component from '../../core/Component.js';
-import Config from '../../core/Config.js';
+import Core from '../../core/orchestration/Core.js';
+import Component from '../../core/base/Component.js';
+import Config from '../../core/config/Config.js';
 
 class TestComponent extends Component {
   constructor(name, callOrderArray) {

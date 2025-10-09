@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import Messages from '../../core/Messages.js';
+import Messages from '../../core/messaging/Messages.js';
 
 describe('Messages', () => {
   let messages;

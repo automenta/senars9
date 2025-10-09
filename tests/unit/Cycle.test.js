@@ -4,7 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import Cycle from '../../core/Cycle.js';
+import Cycle from '../../core/orchestration/Cycle.js';
 
 describe('Cycle Component', () => {
   let cycle;

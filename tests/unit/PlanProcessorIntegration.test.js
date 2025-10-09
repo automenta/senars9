@@ -1,4 +1,4 @@
-import System from '../../core/System.js';
+import System from '../../core/system/System.js';
 
 describe('PlanProcessor Integration', () => {
   test('system starts successfully with PlanProcessor component', async () => {

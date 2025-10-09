@@ -1,8 +1,8 @@
-import Component from './Component.js';
-import { Storage } from './collections.js';
-import { Retry } from './validation.js';
-import { IdGenerator, Logger } from './utilities.js';
-import { RETRYABLE_ERRORS, DEFAULTS } from './constants.js';
+import Component from '../base/Component.js';
+import { Storage } from '../base/collections.js';
+import { Retry } from '../base/validation.js';
+import { IdGenerator, Logger } from '../base/utilities.js';
+import { RETRYABLE_ERRORS, DEFAULTS } from '../base/constants.js';
 
 class Messages extends Component {
   constructor() {

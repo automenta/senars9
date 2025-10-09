@@ -1,6 +1,6 @@
-import createCore from './createCore.js';
-import { Logger } from './utilities.js';
-import { DEFAULTS } from './constants.js';
+import createCore from '../orchestration/createCore.js';
+import { Logger } from '../base/utilities.js';
+import { DEFAULTS } from '../base/constants.js';
 
 class System {
   constructor(config = {}) {

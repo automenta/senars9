@@ -1,6 +1,6 @@
-import Component from './Component.js';
-import { Validation, ErrorHandler } from './validation.js';
-import { Logger } from './utilities.js';
+import Component from '../base/Component.js';
+import { Validation, ErrorHandler } from '../base/validation.js';
+import { Logger } from '../base/utilities.js';
 
 class Plugins extends Component {
   constructor() {

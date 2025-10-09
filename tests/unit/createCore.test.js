@@ -1,6 +1,6 @@
-import createCore from '../../core/createCore.js';
-import Core from '../../core/Core.js';
-import Config from '../../core/Config.js';
+import createCore from '../../core/orchestration/createCore.js';
+import Core from '../../core/orchestration/Core.js';
+import Config from '../../core/config/Config.js';
 
 describe('createCore', () => {
   test('should return a fully initialized Core instance', async () => {

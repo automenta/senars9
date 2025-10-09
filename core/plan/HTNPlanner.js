@@ -1,7 +1,7 @@
 import Planner from './Planner.js';
-import { Storage } from '../collections.js';
-import { Logger } from '../utilities.js';
-import { DEFAULTS } from '../constants.js';
+import { Storage } from '../base/collections.js';
+import { Logger } from '../base/utilities.js';
+import { DEFAULTS } from '../base/constants.js';
 
 /**
  * HTNPlanner - Hierarchical Task Network Planning Component

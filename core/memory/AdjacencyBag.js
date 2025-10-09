@@ -1,8 +1,8 @@
-import Component from './Component.js';
-import { Storage } from './collections.js';
+import Component from '../base/Component.js';
+import { Storage } from '../base/collections.js';
 import Bag from './Bag.js';
-import { Logger } from './utilities.js';
-import { DEFAULTS } from './constants.js';
+import { Logger } from '../base/utilities.js';
+import { DEFAULTS } from '../base/constants.js';
 
 /**
  * AdjacencyBag - Priority-based graph structure implementation

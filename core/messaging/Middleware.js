@@ -1,5 +1,5 @@
-import { Validation, ErrorHandler } from './validation.js';
-import { Logger, ObjectUtils, IdGenerator } from './utilities.js';
+import { Validation, ErrorHandler } from '../base/validation.js';
+import { Logger, ObjectUtils, IdGenerator } from '../base/utilities.js';
 
 /**
  * Common middleware functions for use with Messages.js

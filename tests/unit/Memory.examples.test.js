@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import createCore from '../../core/createCore.js';
+import createCore from '../../core/orchestration/createCore.js';
 
 describe('Memory Examples', () => {
   let core;

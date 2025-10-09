@@ -1,5 +1,5 @@
-import createCore from '../../core/createCore.js';
-import Component from '../../core/Component.js';
+import createCore from '../../core/orchestration/createCore.js';
+import Component from '../../core/base/Component.js';
 
 export const createCoreWithLifecycle = async (config = {}) => {
   const core = await createCore(config);

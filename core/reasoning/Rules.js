@@ -1,8 +1,8 @@
-import Component from './Component.js';
-import { Storage, IndexManager } from './collections.js';
-import { Logger, ObjectUtils, ArrayUtils } from './utilities.js';
-import { Validation } from './validation.js';
-import { COMPLEXITY_LEVELS, MAX_PRIORITY, DEFAULTS } from './constants.js';
+import Component from '../base/Component.js';
+import { Storage, IndexManager } from '../base/collections.js';
+import { Logger, ObjectUtils, ArrayUtils } from '../base/utilities.js';
+import { Validation } from '../base/validation.js';
+import { COMPLEXITY_LEVELS, MAX_PRIORITY, DEFAULTS } from '../base/constants.js';
 
 class Rules extends Component {
   constructor() {

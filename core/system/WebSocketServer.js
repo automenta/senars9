@@ -1,7 +1,7 @@
 import { WebSocketServer as WSServer } from 'ws';
 import { createServer } from 'http';
-import Component from './Component.js';
-import { Logger } from './utilities.js';
+import Component from '../base/Component.js';
+import { Logger } from '../base/utilities.js';
 
 class WebSocketServer extends Component {
   constructor() {

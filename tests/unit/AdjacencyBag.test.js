@@ -1,4 +1,4 @@
-import AdjacencyBag from '../../core/AdjacencyBag.js';
+import AdjacencyBag from '../../core/memory/AdjacencyBag.js';
 
 describe('AdjacencyBag', () => {
   let adjacencyBag;

@@ -1,6 +1,6 @@
-import Component from './Component.js';
-import { Logger } from './utilities.js';
-import { DEFAULTS } from './constants.js';
+import Component from '../base/Component.js';
+import { Logger } from '../base/utilities.js';
+import { DEFAULTS } from '../base/constants.js';
 
 class Cycle extends Component {
   constructor() {

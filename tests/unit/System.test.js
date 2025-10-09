@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import System from '../../core/System.js';
-import Core from '../../core/Core.js';
+import System from '../../core/system/System.js';
+import Core from '../../core/orchestration/Core.js';
 
 describe('System', () => {
   let system;

@@ -1,6 +1,6 @@
-import Component from './Component.js';
-import { Logger, ArrayUtils } from './utilities.js';
-import { DEFAULTS } from './constants.js';
+import Component from '../base/Component.js';
+import { Logger, ArrayUtils } from '../base/utilities.js';
+import { DEFAULTS } from '../base/constants.js';
 import Rules from './Rules.js';
 
 class Reasoning extends Component {

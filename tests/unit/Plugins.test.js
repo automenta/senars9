@@ -4,7 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import Plugins from '../../core/Plugins.js';
+import Plugins from '../../core/system/Plugins.js';
 
 describe('Plugins Component', () => {
   let plugins;

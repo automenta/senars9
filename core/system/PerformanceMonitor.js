@@ -1,5 +1,5 @@
-import { Storage } from './collections.js';
-import { Logger } from './utilities.js';
+import { Storage } from '../base/collections.js';
+import { Logger } from '../base/utilities.js';
 
 /**
  * Performance monitoring system using Messages.js event system

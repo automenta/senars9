@@ -1,4 +1,4 @@
-import System from '../../core/System.js';
+import System from '../../core/system/System.js';
 
 describe('Cognitive Validation Tests', () => {
   let system;

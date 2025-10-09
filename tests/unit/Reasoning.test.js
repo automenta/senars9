@@ -4,7 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import Reasoning from '../../core/Reasoning.js';
+import Reasoning from '../../core/reasoning/Reasoning.js';
 
 describe('Reasoning Component', () => {
   let reasoning;

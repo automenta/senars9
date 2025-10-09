@@ -24,9 +24,9 @@ export { default as IOAdapterManager } from './lm/IOAdapterManager.js';
 export { default as LMConfiguration } from './lm/LMConfiguration.js';
 
 // Export core cognitive architecture components
-export { default as Bag } from './Bag.js';
-export { default as AdjacencyBag } from './AdjacencyBag.js';
-export { default as GraphTraversal } from './GraphTraversal.js';
+export { default as Bag } from './memory/Bag.js';
+export { default as AdjacencyBag } from './memory/AdjacencyBag.js';
+export { default as GraphTraversal } from './memory/GraphTraversal.js';
 
 // Export planning components
 export { default as HTNPlanner } from './plan/HTNPlanner.js';

@@ -1,7 +1,7 @@
-import Component from './Component.js';
-import { Storage } from './collections.js';
-import { Validation, ErrorHandler } from './validation.js';
-import { Logger } from './utilities.js';
+import Component from '../base/Component.js';
+import { Storage } from '../base/collections.js';
+import { Validation, ErrorHandler } from '../base/validation.js';
+import { Logger } from '../base/utilities.js';
 
 class Tools extends Component {
   constructor() {

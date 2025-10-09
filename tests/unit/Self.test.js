@@ -4,8 +4,8 @@
  */
 
 import { jest } from '@jest/globals';
-import Self from '../../core/Self.js';
-import Component from '../../core/Component.js';
+import Self from '../../core/system/Self.js';
+import Component from '../../core/base/Component.js';
 
 describe('Self Component', () => {
   let self;

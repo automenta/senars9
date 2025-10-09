@@ -1,7 +1,7 @@
 import AnalysisEngine from '../../core/analysis/AnalysisEngine.js';
 import DataIngestor from '../../core/analysis/DataIngestor.js';
 import ReportGenerator from '../../core/analysis/ReportGenerator.js';
-import createCore from '../../core/createCore.js';
+import createCore from '../../core/orchestration/createCore.js';
 
 describe('Analysis Components', () => {
   let core;

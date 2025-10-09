@@ -1,18 +1,18 @@
-import Config from './Config.js';
-import Messages from './Messages.js';
-import Rules from './Rules.js';
-import Memory from './Memory.js';
-import Reasoning from './Reasoning.js';
-import LM from './lm/LM.js'; // Add LM component import
-import AdjacencyBag from './AdjacencyBag.js';
-import GraphTraversal from './GraphTraversal.js';
-import HTNPlanner from './plan/HTNPlanner.js';
-import AStarPlanner from './plan/AStarPlanner.js';
-import PlanProcessor from './plan/PlanProcessor.js';
-import AnalysisEngine from './analysis/AnalysisEngine.js';
-import DataIngestor from './analysis/DataIngestor.js';
-import ReportGenerator from './analysis/ReportGenerator.js';
-import { Focus } from './Memory.js';
+import Config from '../config/Config.js';
+import Messages from '../messaging/Messages.js';
+import Rules from '../reasoning/Rules.js';
+import Memory from '../memory/Memory.js';
+import Reasoning from '../reasoning/Reasoning.js';
+import LM from '../lm/LM.js'; // Add LM component import
+import AdjacencyBag from '../memory/AdjacencyBag.js';
+import GraphTraversal from '../memory/GraphTraversal.js';
+import HTNPlanner from '../plan/HTNPlanner.js';
+import AStarPlanner from '../plan/AStarPlanner.js';
+import PlanProcessor from '../plan/PlanProcessor.js';
+import AnalysisEngine from '../analysis/AnalysisEngine.js';
+import DataIngestor from '../analysis/DataIngestor.js';
+import ReportGenerator from '../analysis/ReportGenerator.js';
+import { Focus } from '../memory/Memory.js';
 
 class Core {
   constructor() {

@@ -1,4 +1,4 @@
-import Memory from '../../core/Memory.js';
+import Memory from '../../core/memory/Memory.js';
 import {
   createTestComponent,
   testLifecycleTransitions,

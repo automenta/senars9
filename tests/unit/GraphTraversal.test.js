@@ -1,5 +1,5 @@
-import GraphTraversal from '../../core/GraphTraversal.js';
-import AdjacencyBag from '../../core/AdjacencyBag.js';
+import GraphTraversal from '../../core/memory/GraphTraversal.js';
+import AdjacencyBag from '../../core/memory/AdjacencyBag.js';
 
 describe('GraphTraversal', () => {
   let graphTraversal;
