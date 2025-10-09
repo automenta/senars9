@@ -1,4 +1,4 @@
-import { Logger } from './utilities.js';
+import { Logger, ObjectUtils } from './utilities.js';
 import { ErrorHandler } from './validation.js';
 import { STATES } from './constants.js';
 
@@ -6,11 +6,12 @@ class Component {
   constructor() {
     this.status = STATES.UNINITIALIZED;
     this.flags = { initialized: false, started: false };
+    this.config = {};
   }
 
   async initialize(config = {}) {
-    this.config = config;
-    await this._safeExecute(async () => await this._doInitialize(config), 'initialize');
+    this.config = { ...this.getDefaultConfig(), ...config };
+    await this._safeExecute(async () => await this._doInitialize(this.config), 'initialize');
     this._setState(STATES.INITIALIZED, { initialized: true });
   }
 
@@ -105,6 +106,29 @@ class Component {
       component: this.constructor.name,
       timestamp: new Date().toISOString()
     });
+  }
+
+  // Common configuration methods to reduce duplication
+  getDefaultConfig() {
+    return {};
+  }
+
+  getConfig() {
+    return { ...this.config };
+  }
+
+  updateConfig(config) {
+    if (!config) return;
+    this.config = ObjectUtils.mergeDeep(this.config, config);
+  }
+
+  // Common statistics method with base implementation
+  getStats() {
+    return {
+      status: this.status,
+      initialized: this.flags.initialized,
+      started: this.flags.started
+    };
   }
 }
 

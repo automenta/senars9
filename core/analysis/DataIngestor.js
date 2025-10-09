@@ -23,11 +23,18 @@ class DataIngestor extends Component {
     this._registerDefaultParsers();
   }
 
+  getDefaultConfig() {
+    return {
+      bottleneckTimeThreshold: this.bottleneckTimeThreshold,
+      bottleneckAvgTimeFactor: this.bottleneckAvgTimeFactor
+    };
+  }
+
   async initialize(config = {}) {
     await super.initialize(config);
     
-    this.bottleneckTimeThreshold = config.bottleneckTimeThreshold ?? this.bottleneckTimeThreshold;
-    this.bottleneckAvgTimeFactor = config.bottleneckAvgTimeFactor ?? this.bottleneckAvgTimeFactor;
+    this.bottleneckTimeThreshold = this.config.bottleneckTimeThreshold ?? this.bottleneckTimeThreshold;
+    this.bottleneckAvgTimeFactor = this.config.bottleneckAvgTimeFactor ?? this.bottleneckAvgTimeFactor;
     
     this.processingStats = {
       totalProcessed: 0,

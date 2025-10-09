@@ -23,12 +23,20 @@ class AnalysisEngine extends Component {
     };
   }
 
+  getDefaultConfig() {
+    return {
+      minConfidence: this.minConfidence,
+      similarityThreshold: this.similarityThreshold,
+      bottleneckThreshold: this.bottleneckThreshold
+    };
+  }
+
   async initialize(config = {}) {
     await super.initialize(config);
     
-    this.minConfidence = config.minConfidence ?? this.minConfidence;
-    this.similarityThreshold = config.similarityThreshold ?? this.similarityThreshold;
-    this.bottleneckThreshold = config.bottleneckThreshold ?? this.bottleneckThreshold;
+    this.minConfidence = this.config.minConfidence ?? this.minConfidence;
+    this.similarityThreshold = this.config.similarityThreshold ?? this.similarityThreshold;
+    this.bottleneckThreshold = this.config.bottleneckThreshold ?? this.bottleneckThreshold;
     
     this.metrics.clear();
     this.performanceHistory = [];

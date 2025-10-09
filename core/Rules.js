@@ -15,10 +15,17 @@ class Rules extends Component {
     this.maxHistorySize = DEFAULTS.MAX_HISTORY_SIZE;
   }
 
-  async _doInitialize() {
+  getDefaultConfig() {
+    return {
+      maxHistorySize: this.maxHistorySize
+    };
+  }
+
+  async _doInitialize(config = {}) {
     this.rules = [];
     this.indexes.clear();
     this.preFilters.clear();
+    this.maxHistorySize = this.config.maxHistorySize ?? DEFAULTS.MAX_HISTORY_SIZE;
   }
 
   add(rule) {

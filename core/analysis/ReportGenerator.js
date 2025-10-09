@@ -22,11 +22,18 @@ class ReportGenerator extends Component {
     this._registerDefaultTemplates();
   }
 
+  getDefaultConfig() {
+    return {
+      includeCharts: this.includeCharts,
+      maxRecommendations: this.maxRecommendations
+    };
+  }
+
   async initialize(config = {}) {
     await super.initialize(config);
     
-    this.includeCharts = config.includeCharts ?? this.includeCharts;
-    this.maxRecommendations = config.maxRecommendations ?? this.maxRecommendations;
+    this.includeCharts = this.config.includeCharts ?? this.includeCharts;
+    this.maxRecommendations = this.config.maxRecommendations ?? this.maxRecommendations;
     
     this.reportHistory = [];
     this.stats = {
