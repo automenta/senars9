@@ -7,6 +7,8 @@ import LM from './lm/LM.js'; // Add LM component import
 import AdjacencyBag from './AdjacencyBag.js';
 import GraphTraversal from './GraphTraversal.js';
 import HTNPlanner from './plan/HTNPlanner.js';
+import AStarPlanner from './plan/AStarPlanner.js';
+import PlanProcessor from './plan/PlanProcessor.js';
 import AnalysisEngine from './analysis/AnalysisEngine.js';
 import DataIngestor from './analysis/DataIngestor.js';
 import ReportGenerator from './analysis/ReportGenerator.js';
@@ -25,6 +27,20 @@ class Core {
     this.registerComponent('memory', new Memory(focus));
     this.registerComponent('reasoning', new Reasoning());
     this.registerComponent('lm', new LM()); // Register LM component
+    
+    // Initialize graph components
+    const adjacencyBag = new AdjacencyBag();
+    this.registerComponent('adjacencyBag', adjacencyBag);
+    this.registerComponent('graphTraversal', new GraphTraversal(adjacencyBag));
+    
+    // Initialize planning components
+    const htnPlanner = new HTNPlanner();
+    this.registerComponent('htnPlanner', htnPlanner);
+    this.registerComponent('aStarPlanner', new AStarPlanner(adjacencyBag));
+    
+    // Initialize PlanProcessor (dependencies will be set up during initialization)
+    this.registerComponent('planProcessor', new PlanProcessor(null, null));
+    
     this.registerComponent('analysis', new AnalysisEngine()); // Register AnalysisEngine component
     this.registerComponent('ingestor', new DataIngestor()); // Register DataIngestor component
     this.registerComponent('reports', new ReportGenerator()); // Register ReportGenerator component
@@ -61,6 +77,22 @@ class Core {
         console.error(`Failed to initialize component "${name}":`, error);
         throw error;
       }
+    }
+    
+    // After all components are initialized, establish cross-references
+    // This is needed for components that depend on other components
+    if (this.planProcessor) {
+      // Set up LM reference after initialization
+      this.planProcessor.lm = this.lm || null;
+      this.planProcessor.htnPlanner = this.htnPlanner || null;
+    }
+    
+    if (this.graphTraversal && this.adjacencyBag) {
+      this.graphTraversal.adjacencyBag = this.adjacencyBag;
+    }
+    
+    if (this.aStarPlanner && this.adjacencyBag) {
+      this.aStarPlanner.adjacencyBag = this.adjacencyBag;
     }
   }
 
