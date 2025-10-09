@@ -130,9 +130,71 @@ class Messages extends Component {
     this.commands.set(command, handler);
   }
 
+  /**
+   * Unified register method that can register both commands and events
+   */
+  register(name, handler, options = {}) {
+    const { type = 'command', async = false } = options;
+    
+    if (type === 'command' || type === 'cmd') {
+      this.registerCommand(name, handler);
+    } else if (type === 'event' || type === 'evt') {
+      this.on(name, handler);
+    } else if (type === 'both' || type === 'unified') {
+      // Register both command and event handlers to the same function
+      this.registerCommand(name, handler);
+      this.on(name, handler);
+    } else {
+      throw new Error(`Invalid registration type: ${type}. Use 'command', 'event', or 'both'.`);
+    }
+  }
+
+  /**
+   * Unified dispatch method that can handle both commands and events
+   */
+  dispatch(name, data, options = {}) {
+    const { type = 'auto', source = 'system' } = options;
+    
+    if (type === 'command' || type === 'cmd') {
+      return this.execute(name, data);
+    } else if (type === 'event' || type === 'evt') {
+      this.emit(name, data);
+      return Promise.resolve(true);
+    } else if (type === 'auto') {
+      // Auto-detect: if there's a command handler, execute as command, otherwise emit as event
+      if (this.commands.has(name)) {
+        return this.execute(name, data);
+      } else {
+        this.emit(name, data);
+        return Promise.resolve(true);
+      }
+    } else if (type === 'both') {
+      // Execute as command and emit as event
+      const commandResult = this.execute(name, data).catch(err => {
+        Logger.error(`Command execution failed for "${name}":`, err);
+        return null;
+      });
+      
+      this.emit(name, data);
+      
+      return Promise.all([commandResult]);
+    } else {
+      throw new Error(`Invalid dispatch type: ${type}. Use 'command', 'event', 'auto', or 'both'.`);
+    }
+  }
+
   execute(command, data) {
     if (!command) {
       throw new Error('Command name is required');
+    }
+    
+    // Check if command is circuit broken
+    if (this._isCircuitBroken(command)) {
+      const status = this.getCircuitBreakerStatus(command);
+      const error = new Error(`Command "${command}" is temporarily unavailable due to circuit breaker`);
+      error.code = 'CIRCUIT_BREAKER_ACTIVE';
+      error.retryAfter = status.timeRemaining;
+      throw error;
     }
     
     const handler = this.commands.get(command);
@@ -407,7 +469,8 @@ class Messages extends Component {
       originalError: error,
       timestamp: Date.now(),
       retryAttempt: context.retryAttempt || 0,
-      canRetry: !!retryFn
+      canRetry: !!retryFn,
+      retryCount: context.retryCount || 0
     };
 
     // Log error for debugging
@@ -420,6 +483,20 @@ class Messages extends Component {
       retryAttempt: context.retryAttempt || 0
     });
 
+    // Emit error event for other components to handle
+    this.emit('error:occurred', {
+      errorId,
+      errorType,
+      message: error.message,
+      context: {
+        type: context.type,
+        name: context.name,
+        data: context.data,
+        timestamp: context.timestamp
+      },
+      timestamp: Date.now()
+    });
+
     // Try error handlers in sequence
     const handleWithHandlers = (handlers) => {
       if (!handlers) return;
@@ -428,10 +505,17 @@ class Messages extends Component {
         try {
           const result = handler(error, errorContext, retryFn);
           if (result !== undefined) {
+            // Emit success event if handler recovered
+            this.emit('error:recovered', {
+              errorId,
+              handlerUsed: handler.name || 'anonymous',
+              timestamp: Date.now()
+            });
             return result;
           }
         } catch (handlerError) {
           Logger.error(`[Messages:${errorId}] Error handler failed`, handlerError);
+          // Don't let error handler failures prevent other handlers from running
         }
       }
     };
@@ -451,31 +535,205 @@ class Messages extends Component {
     // Default recovery strategies
     if (retryFn && this._shouldRetry(error, errorContext)) {
       Logger.warn(`[Messages:${errorId}] Attempting retry for ${context.type} "${context.name}"`);
-      return retryFn();
+      
+      // Update retry count in context
+      const updatedContext = {
+        ...context,
+        retryAttempt: (context.retryAttempt || 0) + 1,
+        retryCount: (context.retryCount || 0) + 1
+      };
+      
+      return retryFn(updatedContext);
     }
 
-    // If no recovery possible, throw the error
+    // If no recovery possible, try fallback strategies
+    const fallbackResult = this._tryFallbackStrategies(error, errorContext);
+    if (fallbackResult !== undefined) {
+      return fallbackResult;
+    }
+
+    // If no recovery is possible, create a safe error response
     const finalError = new Error(`Unhandled error in ${context.type} "${context.name}": ${error.message}`);
     finalError.originalError = error;
     finalError.errorId = errorId;
     finalError.context = errorContext;
+    
+    // Create a safe response instead of throwing in some cases
+    if (context.type === 'event') {
+      // For events, we typically don't want to throw errors that stop execution
+      Logger.warn(`[Messages:${errorId}] Event handler failed but continuing: ${context.name}`);
+      return null;
+    }
+    
     throw finalError;
+  }
+
+  /**
+   * Try various fallback strategies when normal error handling fails
+   */
+  _tryFallbackStrategies(error, errorContext) {
+    // Strategy 1: Fallback to a default command handler
+    const fallbackCommand = `${errorContext.name}:fallback`;
+    if (this.commands.has(fallbackCommand)) {
+      try {
+        return this.commands.get(fallbackCommand)(errorContext.data);
+      } catch (fallbackError) {
+        Logger.warn(`Fallback command "${fallbackCommand}" also failed`, fallbackError);
+      }
+    }
+
+    // Strategy 2: Use a default value provider
+    const defaultValueProvider = `${errorContext.name}:default`;
+    if (this.commands.has(defaultValueProvider)) {
+      try {
+        return this.commands.get(defaultValueProvider)(errorContext.data);
+      } catch (defaultError) {
+        Logger.warn(`Default provider "${defaultValueProvider}" failed`, defaultError);
+      }
+    }
+
+    // Strategy 3: Circuit breaker - temporarily disable failing handlers
+    if (this._shouldApplyCircuitBreaker(error, errorContext)) {
+      this._applyCircuitBreaker(errorContext.name);
+      return this._getCircuitBreakerResponse(errorContext);
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Determine if we should apply a circuit breaker for this error
+   */
+  _shouldApplyCircuitBreaker(error, errorContext) {
+    // Check if this error is occurring repeatedly for the same command/event
+    if (!this.errorTracking) this.errorTracking = new Map();
+    
+    const key = `${errorContext.type}:${errorContext.name}`;
+    const errorInfo = this.errorTracking.get(key) || { count: 0, lastError: null };
+    
+    const now = Date.now();
+    const errorWindow = 300000; // 5 minutes
+    
+    // Reset count if last error was outside the window
+    if (errorInfo.lastError && (now - errorInfo.lastError) > errorWindow) {
+      errorInfo.count = 1;
+    } else {
+      errorInfo.count++;
+    }
+    
+    errorInfo.lastError = now;
+    this.errorTracking.set(key, errorInfo);
+    
+    // Apply circuit breaker if too many errors in time window
+    const maxErrors = this.config.circuitBreakerMaxErrors || 5;
+    return errorInfo.count >= maxErrors;
+  }
+
+  /**
+   * Apply circuit breaker to temporarily disable a failing command/event
+   */
+  _applyCircuitBreaker(name) {
+    if (!this.circuitBreakers) this.circuitBreakers = new Map();
+    
+    const timeout = this.config.circuitBreakerTimeout || 60000; // 1 minute default
+    const timeoutId = setTimeout(() => {
+      this.circuitBreakers.delete(name);
+      Logger.info(`Circuit breaker reset for "${name}"`);
+    }, timeout);
+    
+    this.circuitBreakers.set(name, {
+      timeoutId,
+      disabledAt: Date.now(),
+      timeout
+    });
+    
+    Logger.warn(`Circuit breaker activated for "${name}", disabled for ${timeout}ms`);
+  }
+
+  /**
+   * Get a response when circuit breaker is active
+   */
+  _getCircuitBreakerResponse(errorContext) {
+    return {
+      error: 'Circuit breaker active - temporarily unavailable',
+      code: 'CIRCUIT_BREAKER_ACTIVE',
+      command: errorContext.name,
+      timestamp: Date.now(),
+      retryAfter: this.config.circuitBreakerTimeout || 60000
+    };
+  }
+
+  /**
+   * Check if a command/event is currently circuit broken
+   */
+  _isCircuitBroken(name) {
+    if (!this.circuitBreakers) return false;
+    return this.circuitBreakers.has(name);
   }
 
   // Determine if an error should trigger a retry
   _shouldRetry(error, context) {
+    // Check if this command/event is currently circuit broken
+    if (this._isCircuitBroken(context.name)) {
+      return false; // Don't retry if circuit broken
+    }
+
     const retryableErrors = RETRYABLE_ERRORS;
 
     const errorType = error.constructor?.name || 'Error';
     const isRetryableType = retryableErrors.includes(errorType) ||
                            error.message?.toLowerCase().includes('timeout') ||
                            error.message?.toLowerCase().includes('network') ||
-                           error.message?.toLowerCase().includes('temporary');
+                           error.message?.toLowerCase().includes('temporary') ||
+                           error.message?.toLowerCase().includes('retry');
 
     const maxRetries = this.retryPolicies.get(context.name)?.maxRetries ||
                       this.retryPolicies.get('default')?.maxRetries || DEFAULTS.MAX_RETRIES;
 
-    return isRetryableType && (context.retryAttempt || 0) < maxRetries;
+    // Check retry attempt count
+    const retryCount = context.retryAttempt || 0;
+    return isRetryableType && retryCount < maxRetries;
+  }
+
+  /**
+   * Register a circuit breaker reset for a specific command/event
+   */
+  resetCircuitBreaker(name) {
+    if (!this.circuitBreakers) return false;
+    
+    const breaker = this.circuitBreakers.get(name);
+    if (breaker) {
+      clearTimeout(breaker.timeoutId);
+      this.circuitBreakers.delete(name);
+      Logger.info(`Circuit breaker manually reset for "${name}"`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get circuit breaker status
+   */
+  getCircuitBreakerStatus(name) {
+    if (!this.circuitBreakers || !name) {
+      return Array.from(this.circuitBreakers?.entries() || []).map(([cmd, info]) => ({
+        command: cmd,
+        disabledAt: info.disabledAt,
+        timeRemaining: Math.max(0, info.timeout - (Date.now() - info.disabledAt))
+      }));
+    }
+    
+    const breaker = this.circuitBreakers.get(name);
+    if (!breaker) {
+      return { active: false, command: name };
+    }
+    
+    return {
+      active: true,
+      command: name,
+      disabledAt: breaker.disabledAt,
+      timeRemaining: Math.max(0, breaker.timeout - (Date.now() - breaker.disabledAt))
+    };
   }
 
   _handleProcessingError(error, context) {
@@ -498,6 +756,69 @@ class Messages extends Component {
     });
 
     return errorResult;
+  }
+
+  /**
+   * Subscribe to a message (either command or event) with a single interface
+   */
+  subscribe(name, handler, options = {}) {
+    const { type = 'auto', filter = null } = options;
+    
+    if (type === 'event' || (type === 'auto' && !this.commands.has(name))) {
+      // Subscribe as an event listener
+      this.on(name, (data) => {
+        if (filter && typeof filter === 'function') {
+          if (filter(data)) {
+            handler(data);
+          }
+        } else {
+          handler(data);
+        }
+      });
+    } else if (type === 'command' || type === 'auto') {
+      // Register as a command handler (this creates a new command that may call the original)
+      const originalHandler = this.commands.get(name);
+      if (originalHandler) {
+        // Wrap the original handler to also call our handler
+        this.commands.set(name, (data) => {
+          // Call our handler first
+          handler(data);
+          // Then call the original handler
+          return originalHandler(data);
+        });
+      } else {
+        // Register as a new command
+        this.registerCommand(name, handler);
+      }
+    }
+  }
+
+  /**
+   * Unsubscribe from messages
+   */
+  unsubscribe(name, handler, options = {}) {
+    const { type = 'auto' } = options;
+    
+    if (type === 'event' || type === 'auto') {
+      this.off(name, handler);
+    }
+    // For commands, we can't easily remove a specific handler, so we'll log a warning
+    if (type === 'command' && this.commands.get(name) === handler) {
+      Logger.warn(`Cannot safely remove command handler for "${name}". Commands can only be replaced, not removed.`);
+    }
+  }
+
+  /**
+   * Check if a message name is registered as command or event
+   */
+  hasRegistration(name, type = 'both') {
+    if (type === 'command') {
+      return this.commands.has(name);
+    } else if (type === 'event') {
+      return this.events.has(name) && this.events.get(name).length > 0;
+    } else { // 'both'
+      return this.commands.has(name) || (this.events.has(name) && this.events.get(name).length > 0);
+    }
   }
 
   // Get comprehensive system statistics
@@ -524,7 +845,13 @@ class Messages extends Component {
         maxRetries: policy.maxRetries,
         retryDelay: policy.retryDelay,
         backoffMultiplier: policy.backoffMultiplier
-      }))
+      })),
+      unified: {
+        totalRegistrations: this.commands.size + Array.from(this.events.values()).reduce((sum, handlers) => sum + handlers.length, 0),
+        commandCount: this.commands.size,
+        eventCount: this.events.size(),
+        handlerCount: Array.from(this.events.values()).reduce((sum, handlers) => sum + handlers.length, 0)
+      }
     };
   }
 

@@ -546,6 +546,287 @@ class AdjacencyBag extends Component {
     // or remove relationships based on priority across the entire graph
     // For now, we'll just make sure individual bags respect their capacity
   }
+
+  /**
+   * Remove a node and all its relationships from the graph
+   * @param {string} node - Node ID to remove
+   */
+  removeNode(node) {
+    let removedCount = 0;
+    
+    // Remove all forward relationships from this node
+    if (this.adjacencyBags.has(node)) {
+      const bag = this.adjacencyBags.get(node);
+      const allItems = bag.getAll();
+      
+      for (const item of allItems) {
+        // Remove the reverse relationship
+        if (this.reverseAdjacencyBags.has(item.key)) {
+          this.reverseAdjacencyBags.get(item.key).remove(node);
+        }
+        
+        // Remove metadata
+        const key = this._createEdgeKey(node, item.key);
+        this.nodeMetadata.delete(key);
+        removedCount++;
+      }
+      
+      this.adjacencyBags.delete(node);
+      this.stats.nodeCount--;
+    }
+    
+    // Remove all reverse relationships to this node
+    if (this.reverseAdjacencyBags.has(node)) {
+      const bag = this.reverseAdjacencyBags.get(node);
+      const allItems = bag.getAll();
+      
+      for (const item of allItems) {
+        // Remove the forward relationship
+        if (this.adjacencyBags.has(item.key)) {
+          this.adjacencyBags.get(item.key).remove(node);
+        }
+        
+        // Remove metadata
+        const key = this._createEdgeKey(item.key, node);
+        this.nodeMetadata.delete(key);
+        removedCount++;
+      }
+      
+      this.reverseAdjacencyBags.delete(node);
+      this.stats.nodeCount--;
+    }
+    
+    // Update stats
+    this.stats.edgeCount -= removedCount;
+    
+    return removedCount;
+  }
+
+  /**
+   * Get the entire neighborhood of a node (both forward and reverse)
+   * @param {string} node - Node ID
+   * @param {number} limit - Maximum number of neighbors per direction
+   * @param {number} minPriority - Minimum priority threshold
+   * @returns {Object} Object with forward and reverse neighbors
+   */
+  getFullNeighborhood(node, limit = 10, minPriority = this.priorityThreshold) {
+    const forwardNeighbors = this.getNeighbors(node, limit, minPriority);
+    const reverseNeighbors = this.getReverseNeighbors(node, limit, minPriority);
+    
+    return {
+      node,
+      forward: forwardNeighbors,
+      reverse: reverseNeighbors,
+      totalConnections: forwardNeighbors.length + reverseNeighbors.length,
+      centrality: this.getNodeCentrality(node)
+    };
+  }
+
+  /**
+   * Find nodes that match a specific metadata condition
+   * @param {Function} predicate - Function to test metadata
+   * @returns {Array} Array of matching node IDs
+   */
+  findNodesByMetadata(predicate) {
+    const matches = [];
+    
+    for (const [key, metadata] of this.nodeMetadata.entries()) {
+      if (predicate(metadata)) {
+        // Extract source and target from the edge key
+        const parts = key.split('→');
+        if (parts.length === 2) {
+          const [source, target] = parts;
+          if (!matches.includes(source)) matches.push(source);
+          if (!matches.includes(target)) matches.push(target);
+        }
+      }
+    }
+    
+    return matches;
+  }
+
+  /**
+   * Get all relationships in the graph
+   * @param {number} minPriority - Minimum priority threshold
+   * @returns {Array} Array of all relationships
+   */
+  getAllRelationships(minPriority = this.priorityThreshold) {
+    const relationships = [];
+    
+    for (const [source, bag] of this.adjacencyBags.entries()) {
+      const allItems = bag.getAll();
+      
+      for (const item of allItems) {
+        if (item.priority >= minPriority) {
+          const key = this._createEdgeKey(source, item.key);
+          const metadata = this.nodeMetadata.get(key) || {};
+          
+          relationships.push({
+            source,
+            target: item.key,
+            priority: item.priority,
+            metadata,
+            relationshipKey: key
+          });
+        }
+      }
+    }
+    
+    return relationships;
+  }
+
+  /**
+   * Calculate graph density (ratio of actual edges to possible edges)
+   * @returns {number} Graph density value
+   */
+  getGraphDensity() {
+    const nodes = this.getNodes();
+    const possibleEdges = nodes.length * (nodes.length - 1); // Directed graph
+    
+    if (possibleEdges === 0) return 0;
+    
+    return this.stats.edgeCount / possibleEdges;
+  }
+
+  /**
+   * Get the most central nodes in the graph
+   * @param {number} count - Number of nodes to return
+   * @returns {Array} Array of most central nodes with their centrality scores
+   */
+  getMostCentralNodes(count = 5) {
+    const nodes = this.getNodes();
+    const centralities = nodes.map(node => ({
+      node,
+      centrality: this.getNodeCentrality(node)
+    }));
+    
+    return centralities
+      .sort((a, b) => b.centrality - a.centrality)
+      .slice(0, count);
+  }
+
+  /**
+   * Find clusters of highly connected nodes
+   * @param {number} minClusterSize - Minimum size for a cluster
+   * @param {number} minConnectionDensity - Minimum internal connection density
+   * @returns {Array} Array of clusters
+   */
+  findClusters(minClusterSize = 3, minConnectionDensity = 0.5) {
+    const clusters = [];
+    const visited = new Set();
+    const nodes = this.getNodes();
+    
+    for (const node of nodes) {
+      if (visited.has(node)) continue;
+      
+      // Simple clustering algorithm: find closely connected nodes
+      const cluster = [node];
+      visited.add(node);
+      
+      // Find neighbors of the current node
+      const neighbors = this.getNeighbors(node, 20, this.priorityThreshold);
+      
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor.node)) {
+          // Check if the neighbor is well-connected to the current cluster
+          let connectionsToCluster = 0;
+          for (const clusterNode of cluster) {
+            if (this.getRelationshipPriority(neighbor.node, clusterNode) || 
+                this.getRelationshipPriority(clusterNode, neighbor.node)) {
+              connectionsToCluster++;
+            }
+          }
+          
+          if (connectionsToCluster > 0) {
+            cluster.push(neighbor.node);
+            visited.add(neighbor.node);
+          }
+        }
+      }
+      
+      if (cluster.length >= minClusterSize) {
+        clusters.push({
+          nodes: cluster,
+          size: cluster.length,
+          density: this._calculateClusterDensity(cluster)
+        });
+      }
+    }
+    
+    return clusters.filter(cluster => 
+      cluster.density >= minConnectionDensity
+    );
+  }
+
+  /**
+   * Calculate the density of connections within a cluster
+   * @private
+   */
+  _calculateClusterDensity(clusterNodes) {
+    if (clusterNodes.length < 2) return 0;
+    
+    let connections = 0;
+    const n = clusterNodes.length;
+    const possibleConnections = n * (n - 1); // Directed graph
+    
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (i !== j) {
+          const priority = this.getRelationshipPriority(clusterNodes[i], clusterNodes[j]);
+          if (priority !== null && priority >= this.priorityThreshold) {
+            connections++;
+          }
+        }
+      }
+    }
+    
+    return possibleConnections > 0 ? connections / possibleConnections : 0;
+  }
+
+  /**
+   * Internal method: Check capacity and evict low-priority relationships if necessary
+   */
+  _checkCapacity() {
+    // Check if we're approaching capacity limits
+    if (this.stats.edgeCount > this.capacity * 0.9) {  // 90% of capacity
+      // Apply more aggressive decay to prevent exceeding limits
+      this._decayOldRelationships(true);
+    }
+  }
+
+  /**
+   * Force decay of relationships with a more aggressive rate
+   */
+  _decayOldRelationships(force = false) {
+    // Only perform decay occasionally unless forced
+    if (!force && Math.random() > 0.1) {  // 10% chance to perform decay
+      return;
+    }
+
+    const decayRate = force ? this.decayRate * 2 : this.decayRate;
+
+    // Apply decay to all adjacency bags
+    for (const [node, bag] of this.adjacencyBags.entries()) {
+      bag.decay(decayRate);
+      
+      // Clean up any items that have been fully decayed
+      const itemsToRemove = [];
+      for (const item of bag.getAll()) {
+        if (item.priority < 0.001) {
+          itemsToRemove.push(item.key);
+        }
+      }
+      
+      for (const itemKey of itemsToRemove) {
+        this.removeRelationship(node, itemKey);
+      }
+    }
+    
+    // Apply decay to reverse adjacency bags as well
+    for (const [node, bag] of this.reverseAdjacencyBags.entries()) {
+      bag.decay(decayRate);
+    }
+  }
 }
 
 export default AdjacencyBag;
