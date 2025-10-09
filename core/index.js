@@ -33,6 +33,15 @@ export { default as Bag } from './memory/Bag.js';
 export { default as AdjacencyBag } from './memory/AdjacencyBag.js';
 export { default as GraphTraversal } from './memory/GraphTraversal.js';
 
+// Export cognitive cycle components
+export { FocusSetSelector } from './FocusSetSelector.js';
+export { Clock, IterativeClock, UnixTimeClock, HighResolutionClock } from './Clock.js';
+export { CycleContext, runSingleCycle } from './Cycle.js';
+export { Memory } from './Memory.js';
+export { Reasoner, InferenceRule, RuleEngine } from './Reasoner.js';
+export { System } from './System.js';
+export { parse, parseTerm } from './parser/Parser.js';
+
 // Export planning components
 export { default as HTNPlanner } from './plan/HTNPlanner.js';
 export { default as AStarPlanner } from './plan/AStarPlanner.js';
