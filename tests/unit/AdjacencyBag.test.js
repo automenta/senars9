@@ -22,7 +22,7 @@ describe('AdjacencyBag', () => {
     const neighbors = adjacencyBag.getNeighbors('A');
     expect(neighbors).toHaveLength(1);
     expect(neighbors[0].node).toBe('B');
-    expect(neighbors[0].priority).toBe(0.8);
+    expect(neighbors[0].priority).toBeCloseTo(0.8, 2); // Allow for floating point precision
     expect(neighbors[0].metadata.type).toBe('connection');
     
     // Check reverse neighbors

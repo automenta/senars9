@@ -12,6 +12,8 @@ import PlanProcessor from '../plan/PlanProcessor.js';
 import AnalysisEngine from '../analysis/AnalysisEngine.js';
 import DataIngestor from '../analysis/DataIngestor.js';
 import ReportGenerator from '../analysis/ReportGenerator.js';
+import BootstrapSystem from '../analysis/BootstrapSystem.js';
+import PatternDetector from '../analysis/PatternDetector.js';
 import { Focus } from '../memory/Memory.js';
 
 class Core {
@@ -44,6 +46,8 @@ class Core {
     this.registerComponent('analysis', new AnalysisEngine()); // Register AnalysisEngine component
     this.registerComponent('ingestor', new DataIngestor()); // Register DataIngestor component
     this.registerComponent('reports', new ReportGenerator()); // Register ReportGenerator component
+    this.registerComponent('bootstrap', new BootstrapSystem()); // Register BootstrapSystem component
+    this.registerComponent('patternDetector', new PatternDetector()); // Register PatternDetector component
 
     return new Proxy(this, {
       get: (target, prop) => target.componentMap.has(prop) ? target.componentMap.get(prop) : target[prop],
@@ -93,6 +97,16 @@ class Core {
     
     if (this.aStarPlanner && this.adjacencyBag) {
       this.aStarPlanner.adjacencyBag = this.adjacencyBag;
+    }
+    
+    if (this.bootstrap) {
+      // Set up dependencies for BootstrapSystem
+      this.bootstrap.setupDependencies(
+        this.lm || null,
+        this.planProcessor || null,
+        this.htnPlanner || null,
+        this.system || null  // This might be set up later if System component exists
+      );
     }
   }
 
