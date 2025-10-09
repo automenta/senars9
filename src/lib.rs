@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod components;
 pub mod cycle;
 pub mod data_structures;
