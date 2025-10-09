@@ -7,6 +7,9 @@ import LM from './lm/LM.js'; // Add LM component import
 import AdjacencyBag from './AdjacencyBag.js';
 import GraphTraversal from './GraphTraversal.js';
 import HTNPlanner from './plan/HTNPlanner.js';
+import AnalysisEngine from './analysis/AnalysisEngine.js';
+import DataIngestor from './analysis/DataIngestor.js';
+import ReportGenerator from './analysis/ReportGenerator.js';
 import { Focus } from './Memory.js';
 
 class Core {
@@ -22,6 +25,9 @@ class Core {
     this.registerComponent('memory', new Memory(focus));
     this.registerComponent('reasoning', new Reasoning());
     this.registerComponent('lm', new LM()); // Register LM component
+    this.registerComponent('analysis', new AnalysisEngine()); // Register AnalysisEngine component
+    this.registerComponent('ingestor', new DataIngestor()); // Register DataIngestor component
+    this.registerComponent('reports', new ReportGenerator()); // Register ReportGenerator component
 
     return new Proxy(this, {
       get: (target, prop) => target.componentMap.has(prop) ? target.componentMap.get(prop) : target[prop],
