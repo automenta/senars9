@@ -21,7 +21,7 @@ describe('LM Component', () => {
     lm.initialize({ defaultProvider: 'test' });
     lm.registerProvider('test', provider);
 
-    expect(lm.defaultProviderId).toBe('test');
+    expect(lm.providers.defaultProviderId).toBe('test');
     expect(lm.providers.get('test')).toEqual(provider);
   });
 
@@ -66,7 +66,7 @@ describe('LM Component', () => {
   });
 
   test('throws error if provider not found', async () => {
-    await expect(lm.generateText('prompt', {}, 'nonexistent')).rejects.toThrow('LM: Provider "nonexistent" not found or no default provider is set.');
+    await expect(lm.generateText('prompt', {}, 'nonexistent')).rejects.toThrow('Provider "nonexistent" not found or no default provider is set.');
   });
 
   test('throws error if hypothesis generation not supported', async () => {
