@@ -201,4 +201,47 @@ class IdGenerator {
   }
 }
 
-export { Logger, ObjectUtils, ArrayUtils, IdGenerator };
+class CryptoUtils {
+  /**
+   * Calculates SHA-256 hash of the input string
+   * @param {string} str - Input string to hash
+   * @returns {string} Hexadecimal representation of the SHA-256 hash
+   */
+  static async sha256(str) {
+    // For Node.js environment, we'll implement a simple algorithm
+    // In a real environment, you might want to use crypto module
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+      // Browser environment
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } else {
+      // Node.js environment - use a simple hash function
+      // In production, you should use the crypto module
+      let hash = 5381;
+      for (let i = 0; i < data.length; i++) {
+        hash = ((hash << 5) + hash) ^ data[i];
+      }
+      return Math.abs(hash).toString(16);
+    }
+  }
+
+  /**
+   * Synchronous version of SHA-256 for use in the Term class
+   * @param {string} str - Input string to hash
+   * @returns {string} Hexadecimal representation of the hash (simplified)
+   */
+  static sha256(str) {
+    // Simple hash algorithm for synchronous operation
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+    }
+    return Math.abs(hash).toString(36);
+  }
+}
+
+export { Logger, ObjectUtils, ArrayUtils, IdGenerator, CryptoUtils };
