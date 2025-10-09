@@ -14,7 +14,6 @@ export { default as ResourceManager } from './lm/ResourceManager.js';
 export { default as WorkflowEngine } from './lm/WorkflowEngine.js';
 export { default as ReasoningSystem } from './lm/ReasoningSystem.js';
 export { default as ReasoningEngine } from './lm/ReasoningEngine.js';
-export { default as NarseseConverter } from './lm/NarseseConverter.js';
 export { default as NarseseTranslator } from './lm/NarseseTranslator.js';
 export { default as JSONSerializer } from './lm/JSONSerializer.js';
 export { default as StreamingProcessor } from './lm/StreamingProcessor.js';

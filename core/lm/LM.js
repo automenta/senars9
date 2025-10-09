@@ -6,7 +6,7 @@ import MetricsTracker from './MetricsTracker.js';
 import ResourceManager from './ResourceManager.js';
 import WorkflowEngine from './WorkflowEngine.js';
 import ReasoningEngine from './ReasoningEngine.js';
-import NarseseConverter from './NarseseConverter.js';
+import NarseseTranslator from './NarseseTranslator.js';
 import JSONSerializer from './JSONSerializer.js';
 import StreamingProcessor from './StreamingProcessor.js';
 import ProtocolAdapters from './ProtocolAdapters.js';
@@ -24,7 +24,7 @@ class LM extends Component {
     this.resourceManager = new ResourceManager();
     this.workflows = new WorkflowEngine();
     this.ioAdapters = {
-      narseseConverter: new NarseseConverter(),
+      narseseConverter: new NarseseTranslator(),
       jsonSerializer: new JSONSerializer(),
       streamingProcessor: new StreamingProcessor(),
       protocolAdapters: new ProtocolAdapters()

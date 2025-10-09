@@ -1,12 +1,33 @@
 class Logger {
   static log(level, message, data = {}) {
     const method = console[level] || console.log;
-    // Call the method to allow spies to work during tests, but don't return the result in test mode
-    const result = method(`[${level?.toUpperCase() || 'LOG'}]`, message, data);
-    // Don't return the result in test mode to keep tests silent on success
+    
     if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined) {
-      return undefined;
+      // During tests, we call the console methods for spies to work but suppress actual output
+      const originalMethod = console[level] || console.log;
+      // Temporarily replace with a no-op function to suppress output
+      if (console[level]) {
+        console[level] = () => {};
+      } else {
+        // If the level doesn't exist (like 'debug' when it's not defined), use console.log
+        console.log = () => {};
+      }
+      
+      // Call the method for potential spies to capture
+      const result = method(`[${level?.toUpperCase() || 'LOG'}]`, message, data);
+      
+      // Restore the original method
+      if (console[level]) {
+        console[level] = originalMethod;
+      } else {
+        console.log = originalMethod;
+      }
+      
+      return result;
     }
+    
+    // Normal logging in non-test environments
+    const result = method(`[${level?.toUpperCase() || 'LOG'}]`, message, data);
     return result;
   }
 

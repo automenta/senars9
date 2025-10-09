@@ -4,7 +4,7 @@ import {
   ResourceManager, 
   WorkflowEngine, 
   ReasoningEngine, 
-  NarseseConverter, 
+  NarseseTranslator, 
   JSONSerializer, 
   StreamingProcessor, 
   ProtocolAdapters,
@@ -42,7 +42,7 @@ describe('Enhanced LM Component Unit Tests', () => {
       expect(lm.resourceManager).toBeInstanceOf(ResourceManager);
       expect(lm.workflows).toBeInstanceOf(WorkflowEngine);
       expect(lm.reasoningEngine).toBeInstanceOf(ReasoningEngine);
-      expect(lm.ioAdapters.narseseConverter).toBeInstanceOf(NarseseConverter);
+      expect(lm.ioAdapters.narseseConverter).toBeInstanceOf(NarseseTranslator);
       expect(lm.ioAdapters.jsonSerializer).toBeInstanceOf(JSONSerializer);
       expect(lm.ioAdapters.streamingProcessor).toBeInstanceOf(StreamingProcessor);
       expect(lm.ioAdapters.protocolAdapters).toBeInstanceOf(ProtocolAdapters);
@@ -252,11 +252,11 @@ describe('Enhanced LM Component Unit Tests', () => {
     });
   });
 
-  describe('NarseseConverter', () => {
+  describe('NarseseTranslator', () => {
     let narseseConverter;
 
     beforeEach(() => {
-      narseseConverter = new NarseseConverter();
+      narseseConverter = new NarseseTranslator();
     });
 
     test('should convert text to narsese format', () => {
@@ -426,7 +426,7 @@ describe('Enhanced LM Component Unit Tests', () => {
     beforeEach(() => {
       providerRegistry = new ProviderRegistry();
       ioAdapters = {
-        narseseConverter: new NarseseConverter()
+        narseseConverter: new NarseseTranslator()
       };
       reasoningEngine = new ReasoningEngine(providerRegistry, ioAdapters);
       
