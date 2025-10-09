@@ -1,4 +1,4 @@
-import Component from '../Component.js';
+import Planner from './Planner.js';
 import { Storage } from '../collections.js';
 import { Logger } from '../utilities.js';
 import { DEFAULTS } from '../constants.js';
@@ -9,7 +9,7 @@ import { DEFAULTS } from '../constants.js';
  * Implements HTN (Hierarchical Task Network) planning for goal decomposition
  * into executable subtasks using methods and decomposition rules.
  */
-class HTNPlanner extends Component {
+class HTNPlanner extends Planner {
   constructor() {
     super();
     
@@ -29,14 +29,10 @@ class HTNPlanner extends Component {
     this.maxPlanSteps = DEFAULTS.HTN_MAX_PLAN_STEPS || 100;
     this.timeout = DEFAULTS.HTN_TIMEOUT || 5000; // 5 seconds
     
-    // Statistics
-    this.stats = {
-      plansGenerated: 0,
-      plansExecuted: 0,
-      methodsApplied: 0,
-      backtracks: 0,
-      averagePlanLength: 0
-    };
+    // Additional HTN-specific statistics
+    this.stats.methodsApplied = 0;
+    this.stats.backtracks = 0;
+    this.stats.averagePlanLength = 0;
   }
 
   async initialize(config = {}) {
@@ -57,14 +53,12 @@ class HTNPlanner extends Component {
     this.planStack = [];
     this.currentState = {};
     
-    // Reset statistics
-    this.stats = {
-      plansGenerated: 0,
-      plansExecuted: 0,
-      methodsApplied: 0,
-      backtracks: 0,
-      averagePlanLength: 0
-    };
+    // Reset statistics using inherited base stats
+    await super.initialize(config);
+    // Add HTN-specific statistics
+    this.stats.methodsApplied = 0;
+    this.stats.backtracks = 0;
+    this.stats.averagePlanLength = 0;
     
     // Register default operators
     this._registerDefaultOperators();
@@ -143,7 +137,7 @@ class HTNPlanner extends Component {
       const plan = await this._hierarchicalPlan(taskNetwork, planningContext);
       
       if (plan) {
-        this.stats.plansGenerated++;
+        this._updateStatsOnPlanGeneration(plan.length, Date.now() - startTime);
         this.stats.averagePlanLength = (this.stats.averagePlanLength * (this.stats.plansGenerated - 1) + plan.length) / this.stats.plansGenerated;
         return plan;
       }
@@ -218,9 +212,7 @@ class HTNPlanner extends Component {
       }
     }
 
-    if (result.success) {
-      this.stats.plansExecuted++;
-    }
+    this._updateStatsOnPlanExecution(result.success);
 
     return result;
   }

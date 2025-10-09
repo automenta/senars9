@@ -1,4 +1,4 @@
-import Component from '../Component.js';
+import Planner from './Planner.js';
 import { Storage } from '../collections.js';
 import { Logger } from '../utilities.js';
 import { DEFAULTS } from '../constants.js';
@@ -9,7 +9,7 @@ import { DEFAULTS } from '../constants.js';
  * Implements the A* pathfinding algorithm for finding optimal paths in weighted graphs.
  * Unlike HTN planning, this focuses on spatial or state-space pathfinding with heuristics.
  */
-class AStarPlanner extends Component {
+class AStarPlanner extends Planner {
   constructor(adjacencyBag = null) {
     super();
     
@@ -23,14 +23,12 @@ class AStarPlanner extends Component {
     this.timeout = DEFAULTS.ASTAR_TIMEOUT || 10000; // 10 seconds default
     this.maxSteps = DEFAULTS.ASTAR_MAX_STEPS || 10000;
     
-    // Statistics
-    this.stats = {
-      pathsFound: 0,
-      pathsFailed: 0,
-      totalSearchSteps: 0,
-      averagePathLength: 0,
-      averageSearchTime: 0
-    };
+    // Additional AStar-specific statistics
+    this.stats.pathsFound = 0;
+    this.stats.pathsFailed = 0;
+    this.stats.totalSearchSteps = 0;
+    this.stats.averagePathLength = 0;
+    this.stats.averageSearchTime = 0;
     
     // Register default heuristics
     this._registerDefaultHeuristics();
@@ -43,14 +41,14 @@ class AStarPlanner extends Component {
     this.timeout = config.timeout ?? this.timeout;
     this.maxSteps = config.maxSteps ?? this.maxSteps;
     
-    // Reset statistics
-    this.stats = {
-      pathsFound: 0,
-      pathsFailed: 0,
-      totalSearchSteps: 0,
-      averagePathLength: 0,
-      averageSearchTime: 0
-    };
+    // Reset statistics using inherited base stats
+    await super.initialize(config);
+    // Add AStar-specific statistics
+    this.stats.pathsFound = 0;
+    this.stats.pathsFailed = 0;
+    this.stats.totalSearchSteps = 0;
+    this.stats.averagePathLength = 0;
+    this.stats.averageSearchTime = 0;
   }
 
   /**
@@ -112,11 +110,13 @@ class AStarPlanner extends Component {
 
     while (!openSet.isEmpty()) {
       if (Date.now() - startTime > this.timeout) {
+        this._updateStatsOnPlanExecution(false);
         this.stats.pathsFailed++;
         return null; // Timeout
       }
 
       if (steps > this.maxSteps) {
+        this._updateStatsOnPlanExecution(false);
         this.stats.pathsFailed++;
         return null; // Too many steps
       }
@@ -131,6 +131,7 @@ class AStarPlanner extends Component {
         const path = this._reconstructPath(cameFrom, currentKey);
         const endTime = Date.now();
         
+        this._updateStatsOnPlanGeneration(path.length, endTime - startTime);
         this.stats.pathsFound++;
         this.stats.averageSearchTime = 
           ((this.stats.averageSearchTime * (this.stats.pathsFound - 1)) + (endTime - startTime)) / this.stats.pathsFound;
@@ -179,6 +180,7 @@ class AStarPlanner extends Component {
       }
     }
 
+    this._updateStatsOnPlanExecution(false);
     this.stats.pathsFailed++;
     return null; // No path found
   }
