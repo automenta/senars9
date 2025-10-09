@@ -23,6 +23,9 @@ export { default as ModelSelector } from './lm/ModelSelector.js';
 export { default as IOAdapterManager } from './lm/IOAdapterManager.js';
 export { default as LMConfiguration } from './lm/LMConfiguration.js';
 
+// Export data structure components
+export { Term, TermType, Task, Punctuation, TruthValue } from './data_structures/index.js';
+
 // Export core cognitive architecture components
 export { default as Bag } from './memory/Bag.js';
 export { default as AdjacencyBag } from './memory/AdjacencyBag.js';
