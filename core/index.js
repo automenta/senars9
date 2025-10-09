@@ -22,3 +22,12 @@ export { default as ProviderRegistry } from './lm/ProviderRegistry.js';
 export { default as ModelSelector } from './lm/ModelSelector.js';
 export { default as IOAdapterManager } from './lm/IOAdapterManager.js';
 export { default as LMConfiguration } from './lm/LMConfiguration.js';
+
+// Export core cognitive architecture components
+export { default as Bag } from './Bag.js';
+export { default as AdjacencyBag } from './AdjacencyBag.js';
+export { default as GraphTraversal } from './GraphTraversal.js';
+
+// Export planning components
+export { default as HTNPlanner } from './plan/HTNPlanner.js';
+export { default as AStarPlanner } from './plan/AStarPlanner.js';

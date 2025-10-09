@@ -4,6 +4,9 @@ import Rules from './Rules.js';
 import Memory from './Memory.js';
 import Reasoning from './Reasoning.js';
 import LM from './lm/LM.js'; // Add LM component import
+import AdjacencyBag from './AdjacencyBag.js';
+import GraphTraversal from './GraphTraversal.js';
+import HTNPlanner from './plan/HTNPlanner.js';
 import { Focus } from './Memory.js';
 
 class Core {
