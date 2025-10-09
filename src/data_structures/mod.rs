@@ -2,7 +2,8 @@
 
 pub mod concept;
 pub mod punctuation;
+pub mod task;
 pub mod term;
+pub mod term_simplification;
 pub mod term_type;
 pub mod truth_value;
-pub mod task;
