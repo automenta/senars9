@@ -1,8 +1,14 @@
 use app::{agent::Agent, cycle::clock::IterativeClock, ws_server::WsServer, System};
-use std::{sync::Arc, thread, time::Duration};
+use std::{env, sync::Arc, thread, time::Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Get the cycle delay from an environment variable or use a default.
+    let cycle_delay_ms = env::var("CYCLE_DELAY_MS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10);
+
     // Create the core system and wrap it in the Agent.
     let clock = Box::new(IterativeClock::new());
     let system = System::new(clock);
@@ -14,8 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a dedicated thread for the cognitive cycle (the "heartbeat").
     thread::spawn(move || loop {
         agent_for_cycle.tick();
-        // TODO: Make the cycle rate configurable.
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(cycle_delay_ms));
     });
 
     // The main thread will run the WebSocket server.
