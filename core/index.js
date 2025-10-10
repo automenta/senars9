@@ -42,13 +42,38 @@ export { Reasoner, InferenceRule, RuleEngine } from './Reasoner.js';
 export { System } from './System.js';
 export { parse, parseTerm } from './parser/Parser.js';
 
+
+
 // Export planning components
 export { default as HTNPlanner } from './plan/HTNPlanner.js';
 export { default as AStarPlanner } from './plan/AStarPlanner.js';
 
 // Export analysis components
-export { default as AnalysisEngine } from './analysis/AnalysisEngine.js';
 export { default as DataIngestor } from './analysis/DataIngestor.js';
 export { default as ReportGenerator } from './analysis/ReportGenerator.js';
 export { default as BootstrapSystem } from './analysis/BootstrapSystem.js';
 export { default as PatternDetector } from './analysis/PatternDetector.js';
+
+// Export additional cognitive components
+export { 
+  applySyllogisticRule, 
+  SyllogisticRule, 
+  DeductiveSyllogism, 
+  Induction, 
+  Abduction 
+} from './reasoning/SyllogisticRules.js';
+export { ModusPonens } from './reasoning/ModusPonensRule.js';
+export { Analogy } from './reasoning/AnalogyRule.js';
+
+export { 
+  Component, 
+  ComponentHealth, 
+  ComponentMetrics, 
+  ComponentStatus, 
+  ComponentConfig 
+} from './components/Component.js';
+export { ConfigService } from './components/ConfigService.js';
+export { UnifiedResourceManager } from './components/UnifiedResourceManager.js';
+export { StrategyRegistry } from './components/StrategyRegistry.js';
+export { UnifiedAnalysisEngine } from './components/UnifiedAnalysisEngine.js';
+export { PlanExecutor } from './components/PlanExecutor.js';
