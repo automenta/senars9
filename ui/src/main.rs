@@ -1,4 +1,5 @@
 use eframe::egui;
+use serde::Deserialize;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -13,6 +14,7 @@ struct InputHistory {
     entries: Vec<String>,
     current_index: Option<usize>,
     max_entries: usize,
+    original_input: String, // Store the input before history navigation
 }
 
 // Log entries for the animated activity log
@@ -22,14 +24,14 @@ struct LogBuffer {
     max_entries: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 struct LogEntry {
     timestamp: std::time::SystemTime,
     message: String,
     level: LogLevel,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 enum LogLevel {
     Info,
     Warning,
@@ -43,7 +45,7 @@ struct TaskTree {
     root_tasks: Vec<TaskNode>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 struct TaskNode {
     id: String,
     narsese: String,
@@ -83,13 +85,16 @@ struct MyApp {
 }
 
 impl MyApp {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let runtime = Runtime::new().unwrap();
         
         // Create channels for updating UI from async tasks
         let (log_tx, log_rx) = mpsc::unbounded_channel::<LogEntry>();
         let (ws_event_tx, ws_event_rx) = mpsc::unbounded_channel::<WebSocketEvent>();
         
+        // Setup custom theme
+        Self::setup_custom_theme(&cc.egui_ctx);
+
         let mut app = MyApp {
             runtime: Some(runtime),
             ws_manager: Some(WebSocketManager::new()),
@@ -104,6 +109,22 @@ impl MyApp {
         app.log_buffer.max_entries = 200;
         
         app
+    }
+
+    fn setup_custom_theme(ctx: &egui::Context) {
+        let mut style = (*ctx.style()).clone();
+        style.visuals = egui::Visuals {
+            dark_mode: true,
+            override_text_color: Some(egui::Color32::from_rgb(230, 230, 230)),
+            widgets: egui::style::Widgets::default(),
+            panel_fill: egui::Color32::from_rgb(28, 28, 28),
+            faint_bg_color: egui::Color32::from_rgb(40, 40, 40),
+            extreme_bg_color: egui::Color32::from_rgb(10, 10, 10),
+            code_bg_color: egui::Color32::from_rgb(50, 50, 50),
+            hyperlink_color: egui::Color32::from_rgb(0, 150, 255),
+            ..Default::default()
+        };
+        ctx.set_style(style);
     }
     
     fn setup_local_agent(&mut self) {
@@ -138,6 +159,7 @@ impl MyApp {
             
             // Reset history navigation
             self.input_history.current_index = None;
+            self.input_history.original_input.clear();
             
             // Send to local agent if available
             if let Some(ref agent) = self.local_agent {
@@ -190,6 +212,9 @@ impl MyApp {
                 
                 match self.input_history.current_index {
                     None => {
+                        // Store the original input before navigating
+                        self.input_history.original_input = self.input_text.clone();
+
                         // Start at the most recent entry
                         self.input_history.current_index = Some(self.input_history.entries.len() - 1);
                         if let Some(idx) = self.input_history.current_index {
@@ -217,9 +242,9 @@ impl MyApp {
                             self.input_text = self.input_history.entries[new_idx].clone();
                         }
                     } else {
-                        // Clear the input if we go past the last history item
+                        // Restore the original input if we go past the last history item
                         self.input_history.current_index = None;
-                        self.input_text.clear();
+                        self.input_text = self.input_history.original_input.clone();
                     }
                 }
             }
@@ -319,16 +344,27 @@ impl MyApp {
                     ui.set_width(ui.available_width());
                     
                     for (idx, entry) in self.log_buffer.entries.iter().enumerate() {
-                        // Create a unique ID for each log entry to track animations
-                        let entry_id = egui::Id::new(("log_entry", idx));
-                        
                         // Determine color based on log level
-                        let color = match &entry.level {
+                        let mut color = match &entry.level {
                             LogLevel::Info => egui::Color32::LIGHT_GRAY,
                             LogLevel::Warning => egui::Color32::YELLOW,
                             LogLevel::Error => egui::Color32::RED,
                             LogLevel::Success => egui::Color32::GREEN,
                         };
+
+                        // Animate fade-in for new entries
+                        let age = std::time::SystemTime::now()
+                            .duration_since(entry.timestamp)
+                            .unwrap_or_default()
+                            .as_secs_f32();
+
+                        let animation_duration = 0.5; // seconds
+                        if age < animation_duration {
+                            // Easing function for a smoother animation (ease-out quad)
+                            let t = age / animation_duration;
+                            let animation_progress = 1.0 - (1.0 - t) * (1.0 - t);
+                            color = color.linear_multiply(animation_progress);
+                        }
                         
                         ui.horizontal(|ui| {
                             // Icon based on log level
@@ -345,7 +381,9 @@ impl MyApp {
                             // Timestamp
                             let timestamp_str = entry.timestamp.duration_since(std::time::UNIX_EPOCH)
                                 .unwrap_or_default().as_millis().to_string();
-                            ui.label(format!("[{}]", timestamp_str))
+                            let mut timestamp_label_color = color;
+                            timestamp_label_color = timestamp_label_color.linear_multiply(0.7);
+                            ui.colored_label(timestamp_label_color, format!("[{}]", timestamp_str))
                              .on_hover_text("Timestamp");
                             
                             // Message content
@@ -368,13 +406,20 @@ impl MyApp {
         ui.collapsing("Active Tasks", |ui| {
             ui.horizontal(|ui| {
                 if ui.button("Add Sample Task").clicked() {
+                    let task_count = self.task_tree.root_tasks.len() + 1;
                     let sample_task = TaskNode {
-                        id: format!("task_{}", self.task_tree.root_tasks.len() + 1),
-                        narsese: format!("<concept_{} --> attribute_{}>", 
-                                         self.task_tree.root_tasks.len() + 1, 
-                                         self.task_tree.root_tasks.len() + 1),
+                        id: format!("task_{}", task_count),
+                        narsese: format!("<concept_{} --> attribute_{}>", task_count, task_count),
                         priority: 0.5,
-                        children: vec![],
+                        children: vec![
+                            TaskNode {
+                                id: format!("child_{}", task_count),
+                                narsese: "<sub_concept --> sub_attribute>".to_string(),
+                                priority: 0.3,
+                                children: vec![],
+                                created_at: std::time::SystemTime::now(),
+                            }
+                        ],
                         created_at: std::time::SystemTime::now(),
                     };
                     self.task_tree.root_tasks.push(sample_task);
@@ -391,60 +436,77 @@ impl MyApp {
                     id: "sample_task_1".to_string(),
                     narsese: "<bird --> flyer>".to_string(),
                     priority: 0.8,
-                    children: vec![],
+                    children: vec![
+                        TaskNode {
+                            id: "child_1".to_string(),
+                            narsese: "<penguin --> bird>".to_string(),
+                            priority: 0.6,
+                            children: vec![],
+                            created_at: std::time::SystemTime::now(),
+                        }
+                    ],
                     created_at: std::time::SystemTime::now(),
                 };
                 self.task_tree.root_tasks.push(sample_task);
             }
             
-            // Render task tree
-            for i in 0..self.task_tree.root_tasks.len() {
-                self.render_task_node_ui(ui, i, 0);
+            // Render task tree recursively
+            let mut root_tasks = std::mem::take(&mut self.task_tree.root_tasks);
+            for task in &mut root_tasks {
+                Self::render_task_node_recursive(ui, task, 0);
             }
+            self.task_tree.root_tasks = root_tasks;
         });
     }
-    
-    fn render_task_node_ui(&mut self, ui: &mut egui::Ui, index: usize, depth: usize) {
-        if let Some(task) = self.task_tree.root_tasks.get_mut(index) {
-            let indent = "  ".repeat(depth);
-            
-            // Create a tree-like UI for the task
-            ui.push_id(index, |ui| {
-                ui.horizontal(|ui| {
-                    // Visual indicator for priority
-                    let priority_color = if task.priority > 0.7 {
-                        egui::Color32::GREEN
-                    } else if task.priority > 0.3 {
-                        egui::Color32::YELLOW
-                    } else {
-                        egui::Color32::RED
-                    };
-                    
-                    // Priority indicator dot
-                    ui.colored_label(priority_color, "●");
-                    
-                    // Task Narsese
-                    ui.label(format!("{}{}", indent, task.narsese));
-                    
-                    // Priority slider
-                    ui.add(egui::Slider::new(&mut task.priority, 0.0..=1.0)
-                           .text("Priority")
-                           .step_by(0.01)
-                           .show_value(true));
-                    
-                    // Task ID or other details
-                    ui.label(format!(" (ID: {})", task.id));
-                });
+
+    fn render_task_node_recursive(ui: &mut egui::Ui, task: &mut TaskNode, depth: usize) {
+        let indent = " ".repeat(depth * 2);
+
+        if task.children.is_empty() {
+            // Render a leaf node
+            ui.horizontal(|ui| {
+                ui.label(format!("{}└─", indent));
+
+                // Visual indicator for priority
+                let priority_color = if task.priority > 0.7 {
+                    egui::Color32::GREEN
+                } else if task.priority > 0.3 {
+                    egui::Color32::YELLOW
+                } else {
+                    egui::Color32::RED
+                };
+                ui.colored_label(priority_color, "●");
                 
-                // Render children if any
-                for (child_idx, _) in task.children.iter().enumerate() {
-                    // We can't render children directly due to borrowing issues
-                    // Instead, we'll handle tasks with a more flat structure for now
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{}  └─ Child task not implemented in this view", indent));
-                    });
-                }
+                // Task Narsese and priority slider
+                ui.label(&task.narsese);
+                ui.add(egui::Slider::new(&mut task.priority, 0.0..=1.0).show_value(false));
+                ui.label(format!("(ID: {})", task.id));
             });
+        } else {
+            // Render a branch node (with children)
+            egui::CollapsingHeader::new(format!("{}{} {}", indent, "▼", task.narsese))
+                .default_open(true)
+                .show(ui, |ui| {
+                    // Render the parent task's details inside the collapsing header
+                    ui.horizontal(|ui| {
+                        let priority_color = if task.priority > 0.7 {
+                            egui::Color32::GREEN
+                        } else if task.priority > 0.3 {
+                            egui::Color32::YELLOW
+                        } else {
+                            egui::Color32::RED
+                        };
+                        ui.colored_label(priority_color, "●");
+                        ui.label("Priority:");
+                        ui.add(egui::Slider::new(&mut task.priority, 0.0..=1.0).show_value(true));
+                        ui.label(format!("(ID: {})", task.id));
+                    });
+
+                    // Recursively render children
+                    for child in &mut task.children {
+                        Self::render_task_node_recursive(ui, child, depth + 1);
+                    }
+                });
         }
     }
     
@@ -511,6 +573,7 @@ impl MyApp {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Process any incoming messages from async tasks
+        // Process any incoming messages from async tasks
         if let Some(ref mut log_rx) = self.log_receiver {
             while let Ok(log_entry) = log_rx.try_recv() {
                 self.log_buffer.entries.push(log_entry);
@@ -522,6 +585,36 @@ impl eframe::App for MyApp {
             }
         }
         
+        // Process WebSocket events
+        if let Some(ref mut ws_rx) = self.ws_event_receiver {
+            while let Ok(ws_event) = ws_rx.try_recv() {
+                match ws_event.event.as_str() {
+                    "log" => {
+                        if let Ok(log_entry) = serde_json::from_value::<LogEntry>(ws_event.payload) {
+                            self.log_buffer.entries.push(log_entry);
+
+                            // Maintain buffer size
+                            if self.log_buffer.entries.len() > self.log_buffer.max_entries {
+                                self.log_buffer.entries.remove(0);
+                            }
+                        } else {
+                            eprintln!("Failed to deserialize log entry from WebSocket event");
+                        }
+                    }
+                    "task_tree" => {
+                        if let Ok(tasks) = serde_json::from_value::<Vec<TaskNode>>(ws_event.payload) {
+                            self.task_tree.root_tasks = tasks;
+                        } else {
+                            eprintln!("Failed to deserialize task tree from WebSocket event");
+                        }
+                    }
+                    _ => {
+                        // Handle other event types if needed
+                    }
+                }
+            }
+        }
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("SeNARS UI");
