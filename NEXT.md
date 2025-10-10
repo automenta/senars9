@@ -25,7 +25,7 @@ This document outlines the streamlined development plan for SeNARS. It focuses o
 **All tests pass.** We have a stable and performant platform comprising the core components of a cognitive architecture. The comprehensive test suite validates that all core functionality works correctly, providing a solid launchpad for advanced features.
 
 #### **Phase 2: Introspection & Bootstrapping (✅ COMPLETE)**
-**All components implemented and tested.** The core self-development loop is fully functional with sophisticated implementations:
+**All components implemented and tested.** The self-development loop is fully functional with sophisticated implementations:
 1.  **✅ WebSocketServer (1,199 lines)**: Comprehensive real-time communication system with NARS protocol, streaming, and subscription management
 2.  **✅ BootstrapAgent (656 lines)**: Advanced 4-phase bootstrap process with file watching, LM integration, and self-improvement loop (moved to agent layer)
 3.  **✅ PatternDetector (737 lines)**: Sophisticated temporal, causal, and hierarchical pattern recognition with prediction capabilities
@@ -50,6 +50,15 @@ This document outlines the streamlined development plan for SeNARS. It focuses o
 8.  **Performance Optimization**: Profile and enhance system performance for production use
 9.  **Integration Patterns**: Document and develop best practices for system integration
 
+#### **Phase 4: Architectural Refinement (✅ COMPLETE)**
+**Goal**: Properly separate core cognitive functionality from higher-level agent capabilities.
+
+**Priority 1: Architectural Separation** 🏗️
+1.  **✅ Core Focus**: Core now contains only essential cognitive functions (reasoning, memory, planning, etc.)
+2.  **✅ Agent Layer**: Bootstrap functionality moved to agent layer for self-directed development
+3.  **✅ Component Independence**: Components properly decoupled and maintain clear responsibilities
+4.  **✅ Test Stability**: All tests pass without hanging issues due to proper async handling
+
 #### **Phase 4: Architectural Refinement & Tooling (DEFERRED)**
 **Goal**: Once the system is stable, self-directed, and reasons effectively, we will implement advanced architectural patterns and AI-powered tooling.
 1.  **Architectural Elegance (`DIContainer`, `CommandBus`)**: Refine the system's architecture for improved modularity and testability.
@@ -69,6 +78,7 @@ This document outlines the streamlined development plan for SeNARS. It focuses o
 - **Phase 1 (Core Components)**: ✅ Complete with comprehensive test coverage
 - **Phase 2 (Self-Development)**: ✅ Complete with sophisticated implementations
 - **Phase 3 (Metacognition)**: ✅ Complete with comprehensive demonstrations
+- **Phase 4 (Architectural Refinement)**: ✅ Complete with proper core/agent separation
 - **All Tests Pass**: Core functionality validated and working
 - **Total Implementation**: ~3,165+ lines of advanced Phase 2 code + Phase 3 demonstrations
 
@@ -118,15 +128,16 @@ This document outlines the streamlined development plan for SeNARS. It focuses o
         *   **Dependencies**: `winston` for enhanced logging capabilities
         *   **First Steps**: Implement a simple array-based middleware pattern in `core/messaging/Middleware.js`. Add a basic logging middleware as the first use case.
 
-*   **Component**: `BootstrapSystem` (Simplified & Leveraged)
-    *   **Status**: ✅ IMPLEMENTED
+*   **Component**: `BootstrapAgent` (Simplified & Leveraged, Moved to Agent Layer)
+    *   **Status**: ✅ IMPLEMENTED in Agent Layer
     *   **Implementation Notes**:
-        *   **Responsibilities**: Read a designated plan file (e.g., `NEXT.md`) using the LM for parsing, use `PlanProcessor` to convert goals into a simple goal tree, and dispatch the highest-priority goals to the `System`. Focus initially on parsing goals from Phase 2.
+        *   **Responsibilities**: Read a designated plan file (e.g., `NEXT.md`) using the LM for parsing, use `PlanProcessor` to convert goals into actionable tasks, and dispatch them to the system. Focus on parsing goals for self-directed development.
         *   **Integration**: `PlanProcessor` (to parse), `System` (to dispatch goals), `LM` (for plan parsing), `FileSystem` tools (to read the plan), `Config` (for plan file location).
         *   **Dependencies**: `chokidar` for file system monitoring to detect plan changes automatically
-        *   **Config**: `system.bootstrap.plan_file: 'NEXT.md'`, `system.bootstrap.priority_level: 2` (process up to phase 2).
+        *   **Config**: `agent.bootstrap.plan_file: 'NEXT.md'`, `agent.bootstrap.priority_level: 2` (process up to phase 2).
         *   **Leveraged Components**: Use the existing `LM` to parse and interpret the plan file, and `PlanProcessor` to convert to actionable goals.
-        *   **First Steps**: Create `core/analysis/BootstrapSystem.js`. Implement basic file monitoring with chokidar and use LM to parse the first goal from this plan. Use PlanProcessor to convert to an actionable goal.
+        *   **Architectural Decision**: Moved from core to agent layer to maintain core focus on essential cognitive functions.
+        *   **First Steps**: Located in `agent/BootstrapAgent.js`. Implements 4-phase bootstrap process with file watching, LM integration, and self-improvement loop.
 
 ### **Phase 3: The Path to Metacognition (💧 MID-TERM PRIORITY)**
 

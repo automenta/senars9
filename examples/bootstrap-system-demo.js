@@ -64,5 +64,5 @@ async function runBootstrapDemo(config = {}) {
   }
 }
 
-// Run the demo
-runBootstrapSystemDemo().catch(console.error);
+// Demo shows architectural improvement: Core vs Agent separation
+// For actual BootstrapAgent functionality, see examples/bootstrap-agent-demo.js

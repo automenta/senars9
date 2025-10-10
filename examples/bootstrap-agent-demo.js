@@ -1,5 +1,5 @@
 import System from '../core/system/System.js';
-import BootstrapAgent from './BootstrapAgent.js';
+import BootstrapAgent from '../agent/BootstrapAgent.js';
 
 async function runBootstrapAgentDemo() {
   return runBootstrapDemo({
