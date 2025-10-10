@@ -79,6 +79,10 @@ describe('Core', () => {
     });
 
     test('start should start all components in registration order', async () => {
+      // Initialize first to avoid automatic initialization adding to callOrder during start()
+      await core.initialize({});
+      // Instead of reassigning callOrder, clear the existing array
+      callOrder.length = 0; // Clear the call order to only track start events
       await core.start();
       expect(callOrder).toEqual(['start:messages', 'start:compA', 'start:compB']);
     });

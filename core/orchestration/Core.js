@@ -218,6 +218,12 @@ class Core {
   }
 
   async start() {
+    // Check if core has been initialized - if not, initialize first
+    // This maintains backward compatibility for cases where start() is called without prior initialize()
+    if (!this.isInitialized) {
+      await this.initialize({});
+    }
+    
     // Start components in registration order
     for (const name of this.registrationOrder) {
       try {
