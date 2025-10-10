@@ -2,7 +2,7 @@ use eframe::egui;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
-use app::{agent::Agent, System, cycle::clock::IterativeClock};
+use senars_core::{agent::Agent, System, cycle::clock::IterativeClock};
 
 mod websocket;
 use websocket::{WebSocketManager, WebSocketEvent};

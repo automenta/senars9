@@ -1,6 +1,6 @@
-use app::cycle::clock::IterativeClock;
-use app::data_structures::term::Term;
-use app::System;
+use senars_core::cycle::clock::IterativeClock;
+use senars_core::data_structures::term::Term;
+use senars_core::System;
 
 #[test]
 fn test_system_end_to_end_reasoning() {
@@ -31,7 +31,7 @@ fn test_system_end_to_end_reasoning() {
     let cat_concept = system.memory.create_or_get_atom_concept("cat", 0);
     let animal_concept = system.memory.create_or_get_atom_concept("animal", 0);
     let derived_concept = system.memory.create_or_get_compound_concept(
-        app::data_structures::term_type::TermType::Inheritance,
+        senars_core::data_structures::term_type::TermType::Inheritance,
         vec![
             cat_concept,
             animal_concept,

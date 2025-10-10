@@ -1,4 +1,4 @@
-use app::{agent::Agent, cycle::clock::IterativeClock, ws_server::WsServer, System};
+use senars_core::{agent::Agent, cycle::clock::IterativeClock, ws_server::WsServer, System};
 use std::{env, sync::Arc, thread, time::Duration};
 
 #[tokio::main]
