@@ -1,12 +1,26 @@
 use eframe::egui;
+use egui_dock::{DockArea, DockState, Style, TabViewer};
+use egui_plot::{Line, Plot, PlotPoints};
+use rand::Rng;
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
-use senars_core::{agent::Agent, System, cycle::clock::IterativeClock};
+use senars_core::agent::Agent;
 
 mod websocket;
 use websocket::{WebSocketManager, WebSocketEvent};
+
+// Define the different tabs that can be docked
+enum MyTab {
+    Connection,
+    ReasonerControls,
+    Input,
+    Log,
+    TaskTree,
+    ConceptMap,
+    Statistics,
+}
 
 // Input history for REPL-like features
 #[derive(Default)]
@@ -31,12 +45,36 @@ struct LogEntry {
     level: LogLevel,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Debug)]
 enum LogLevel {
     Info,
     Warning,
     Error,
     Success,
+}
+
+// Statistics structure for animated charts
+struct Statistics {
+    cpu_usage: Vec<[f64; 2]>,
+    task_processing_rate: Vec<[f64; 2]>,
+    last_update: f64,
+}
+
+impl Default for Statistics {
+    fn default() -> Self {
+        Self {
+            cpu_usage: Vec::new(),
+            task_processing_rate: Vec::new(),
+            last_update: 0.0,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Debug)]
+enum TaskType {
+    Goal,
+    Question,
+    Quest,
 }
 
 // Task tree structure for active tasks
@@ -50,6 +88,7 @@ struct TaskNode {
     id: String,
     narsese: String,
     priority: f32,
+    task_type: TaskType,
     children: Vec<TaskNode>,
     created_at: std::time::SystemTime,
 }
@@ -72,9 +111,15 @@ struct Connection {
     // Task tree
     task_tree: TaskTree,
     
+    // Statistics
+    statistics: Statistics,
+
     // Local agent (if applicable)
     local_agent: Option<Arc<Agent>>,
     
+    // Local server process
+    local_server_process: Option<std::process::Child>,
+
     // Reasoner controls
     is_running: bool,
     cpu_throttle: f32,
@@ -96,18 +141,44 @@ impl Connection {
                 ..Default::default()
             },
             task_tree: TaskTree::default(),
+            statistics: Statistics::default(),
             local_agent: None,
+            local_server_process: None,
             is_running: false,
             cpu_throttle: 1.0,
         }
     }
 }
 
-#[derive(Default)]
+impl Default for MyApp {
+    fn default() -> Self {
+        let dock_state = DockState::new(vec![
+            MyTab::Connection,
+            MyTab::ReasonerControls,
+            MyTab::Input,
+            MyTab::Log,
+            MyTab::TaskTree,
+        ]);
+
+        Self {
+            connections: vec![Connection::new(0, "Connection 1".to_string())],
+            active_tab_index: 0,
+            next_connection_id: 1,
+            dock_state,
+            runtime: None,
+            log_sender: None,
+            log_receiver: None,
+            ws_event_sender: None,
+            ws_event_receiver: None,
+        }
+    }
+}
+
 struct MyApp {
     connections: Vec<Connection>,
-    active_tab: usize,
+    active_tab_index: usize,
     next_connection_id: usize,
+    dock_state: DockState<MyTab>,
 
     // Tokio runtime for async operations
     runtime: Option<Runtime>,
@@ -132,19 +203,98 @@ impl MyApp {
         // Setup custom theme
         Self::setup_custom_theme(&cc.egui_ctx);
 
-        let mut app = MyApp {
+        let dock_state = DockState::new(vec![
+            MyTab::Connection,
+            MyTab::ReasonerControls,
+            MyTab::Input,
+            MyTab::Log,
+            MyTab::TaskTree,
+        ]);
+
+        let app = MyApp {
             runtime: Some(runtime),
             connections: vec![Connection::new(0, "Connection 1".to_string())],
-            active_tab: 0,
+            active_tab_index: 0,
             next_connection_id: 1,
+            dock_state,
             log_sender: Some(log_tx),
             log_receiver: Some(log_rx),
             ws_event_sender: Some(ws_event_tx),
             ws_event_receiver: Some(ws_event_rx),
-            ..Default::default()
         };
         
         app
+    }
+}
+
+
+impl TabViewer for MyApp {
+    type Tab = MyTab;
+
+    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        self.title(tab)
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        self.ui(ui, tab)
+    }
+}
+
+impl MyApp {
+    fn title(&mut self, tab: &mut MyTab) -> egui::WidgetText {
+        match tab {
+            MyTab::Connection => "Connection".into(),
+            MyTab::ReasonerControls => "Reasoner Controls".into(),
+            MyTab::Input => "Input".into(),
+            MyTab::Log => "Log".into(),
+            MyTab::TaskTree => "Task Tree".into(),
+            MyTab::ConceptMap => "Concept Map".into(),
+            MyTab::Statistics => "Statistics".into(),
+        }
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut MyTab) {
+        match tab {
+            MyTab::Connection => self.render_connection_section(ui),
+            MyTab::ReasonerControls => self.render_reasoner_controls_section(ui),
+            MyTab::Input => self.render_input_section(ui),
+            MyTab::Log => self.render_log_section(ui),
+            MyTab::TaskTree => self.render_task_tree_section(ui),
+            MyTab::ConceptMap => {
+                ui.label("Concept Map (disabled due to dependency issues)");
+            }
+            MyTab::Statistics => {
+                if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
+                    let now = ui.input(|i| i.time);
+                    if now - connection.statistics.last_update > 1.0 {
+                        connection.statistics.last_update = now;
+                        let cpu_usage = &mut connection.statistics.cpu_usage;
+                        cpu_usage.push([now, rand::random::<f64>() * 100.0]);
+                        while cpu_usage.len() > 100 {
+                            cpu_usage.remove(0);
+                        }
+
+                        let task_processing_rate = &mut connection.statistics.task_processing_rate;
+                        task_processing_rate.push([now, rand::random::<f64>() * 50.0]);
+                        while task_processing_rate.len() > 100 {
+                            task_processing_rate.remove(0);
+                        }
+                    }
+
+                    Plot::new("CPU Usage")
+                        .view_aspect(2.0)
+                        .show(ui, |plot_ui| {
+                            plot_ui.line(Line::new(PlotPoints::from(connection.statistics.cpu_usage.clone())));
+                        });
+
+                    Plot::new("Task Processing Rate")
+                        .view_aspect(2.0)
+                        .show(ui, |plot_ui| {
+                            plot_ui.line(Line::new(PlotPoints::from(connection.statistics.task_processing_rate.clone())));
+                        });
+                }
+            }
+        }
     }
 
     fn setup_custom_theme(ctx: &egui::Context) {
@@ -164,16 +314,31 @@ impl MyApp {
     }
     
     fn setup_local_agent(&mut self) {
-        if let Some(connection) = self.connections.get_mut(self.active_tab) {
-            let system = System::new(Box::new(IterativeClock::new()));
-            let agent = Agent::new(system);
-            connection.local_agent = Some(Arc::new(agent));
-            self.add_log_entry("Local agent initialized".to_string(), LogLevel::Success);
+        if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
+            if connection.local_server_process.is_some() {
+                self.add_log_entry("Local server is already running".to_string(), LogLevel::Warning);
+                return;
+            }
+
+            // This path assumes the UI is run from the workspace root
+            let server_executable = "target/debug/server";
+            let child = std::process::Command::new(server_executable)
+                .spawn();
+
+            match child {
+                Ok(child) => {
+                    connection.local_server_process = Some(child);
+                    self.add_log_entry("Local server started".to_string(), LogLevel::Success);
+                }
+                Err(e) => {
+                    self.add_log_entry(format!("Failed to start local server: {}", e), LogLevel::Error);
+                }
+            }
         }
     }
     
     fn add_log_entry(&mut self, message: String, level: LogLevel) {
-        if let Some(connection) = self.connections.get_mut(self.active_tab) {
+        if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
             let entry = LogEntry {
                 timestamp: std::time::SystemTime::now(),
                 message,
@@ -193,7 +358,7 @@ impl MyApp {
         let mut log: Option<(String, LogLevel)> = None;
         let mut ws_input_to_send: Option<String> = None;
 
-        if let Some(connection) = self.connections.get_mut(self.active_tab) {
+        if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
             if connection.input_text.trim().is_empty() {
                 return;
             }
@@ -230,7 +395,7 @@ impl MyApp {
     
     fn render_input_section(&mut self, ui: &mut egui::Ui) {
         let mut send_input = false;
-        if let Some(connection) = self.connections.get_mut(self.active_tab) {
+        if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
             ui.horizontal(|ui| {
                 ui.label("Input:");
                 let response = ui.text_edit_singleline(&mut connection.input_text);
@@ -368,7 +533,7 @@ impl MyApp {
     }
     
     fn render_log_section(&mut self, ui: &mut egui::Ui) {
-        if let Some(connection) = self.connections.get_mut(self.active_tab) {
+        if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
             ui.collapsing("Activity Log", |ui| {
                 // Add log controls
                 ui.horizontal(|ui| {
@@ -454,7 +619,7 @@ impl MyApp {
     }
     
     fn render_task_tree_section(&mut self, ui: &mut egui::Ui) {
-        if let Some(connection) = self.connections.get_mut(self.active_tab) {
+        if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
             ui.collapsing("Active Tasks", |ui| {
                 ui.horizontal(|ui| {
                     if ui.button("Add Sample Task").clicked() {
@@ -463,11 +628,13 @@ impl MyApp {
                             id: format!("task_{}", task_count),
                             narsese: format!("<concept_{} --> attribute_{}>", task_count, task_count),
                             priority: 0.5,
+                            task_type: TaskType::Goal,
                             children: vec![
                                 TaskNode {
                                     id: format!("child_{}", task_count),
                                     narsese: "<sub_concept --> sub_attribute>".to_string(),
                                     priority: 0.3,
+                                    task_type: TaskType::Question,
                                     children: vec![],
                                     created_at: std::time::SystemTime::now(),
                                 }
@@ -480,6 +647,22 @@ impl MyApp {
                     if ui.button("Clear All Tasks").clicked() {
                         connection.task_tree.root_tasks.clear();
                     }
+
+                    if ui.button("Add Random Child").clicked() {
+                        if !connection.task_tree.root_tasks.is_empty() {
+                            let mut rng = rand::thread_rng();
+                            let task_index = rng.gen_range(0..connection.task_tree.root_tasks.len());
+                            let child_task = TaskNode {
+                                id: format!("child_{}", connection.task_tree.root_tasks.len() + 1),
+                                narsese: "<new_concept --> new_attribute>".to_string(),
+                                priority: rng.gen_range(0.0..1.0),
+                                task_type: TaskType::Quest,
+                                children: vec![],
+                                created_at: std::time::SystemTime::now(),
+                            };
+                            connection.task_tree.root_tasks[task_index].children.push(child_task);
+                        }
+                    }
                 });
 
                 // Add a sample task if none exists (for demonstration)
@@ -488,11 +671,13 @@ impl MyApp {
                         id: "sample_task_1".to_string(),
                         narsese: "<bird --> flyer>".to_string(),
                         priority: 0.8,
+                        task_type: TaskType::Goal,
                         children: vec![
                             TaskNode {
                                 id: "child_1".to_string(),
                                 narsese: "<penguin --> bird>".to_string(),
                                 priority: 0.6,
+                                task_type: TaskType::Quest,
                                 children: vec![],
                                 created_at: std::time::SystemTime::now(),
                             }
@@ -515,51 +700,51 @@ impl MyApp {
     fn render_task_node_recursive(ui: &mut egui::Ui, task: &mut TaskNode, depth: usize) {
         let indent = " ".repeat(depth * 2);
 
-        if task.children.is_empty() {
-            // Render a leaf node
-            ui.horizontal(|ui| {
-                ui.label(format!("{}└─", indent));
+        ui.horizontal(|ui| {
+            ui.label(format!("{}└─", indent));
 
-                // Visual indicator for priority
-                let priority_color = if task.priority > 0.7 {
-                    egui::Color32::GREEN
-                } else if task.priority > 0.3 {
-                    egui::Color32::YELLOW
-                } else {
-                    egui::Color32::RED
-                };
-                ui.colored_label(priority_color, "●");
-                
-                // Task Narsese and priority slider
-                ui.label(&task.narsese);
-                ui.add(egui::Slider::new(&mut task.priority, 0.0..=1.0).show_value(false));
-                ui.label(format!("(ID: {})", task.id));
-            });
-        } else {
-            // Render a branch node (with children)
-            egui::CollapsingHeader::new(format!("{}{} {}", indent, "▼", task.narsese))
-                .default_open(true)
-                .show(ui, |ui| {
-                    // Render the parent task's details inside the collapsing header
-                    ui.horizontal(|ui| {
-                        let priority_color = if task.priority > 0.7 {
-                            egui::Color32::GREEN
-                        } else if task.priority > 0.3 {
-                            egui::Color32::YELLOW
-                        } else {
-                            egui::Color32::RED
-                        };
-                        ui.colored_label(priority_color, "●");
-                        ui.label("Priority:");
-                        ui.add(egui::Slider::new(&mut task.priority, 0.0..=1.0).show_value(true));
-                        ui.label(format!("(ID: {})", task.id));
-                    });
+            // Visual indicator for priority
+            let priority_color = if task.priority > 0.7 {
+                egui::Color32::GREEN
+            } else if task.priority > 0.3 {
+                egui::Color32::YELLOW
+            } else {
+                egui::Color32::RED
+            };
+            ui.colored_label(priority_color, "●");
 
-                    // Recursively render children
-                    for child in &mut task.children {
-                        Self::render_task_node_recursive(ui, child, depth + 1);
-                    }
+            // Icon for task type
+            let task_icon = match task.task_type {
+                TaskType::Goal => "🎯",
+                TaskType::Question => "❓",
+                TaskType::Quest => "❔",
+            };
+            ui.label(task_icon);
+
+            // Task Narsese and priority slider
+            ui.label(&task.narsese);
+            ui.add(egui::Slider::new(&mut task.priority, 0.0..=1.0).show_value(false));
+
+            // Button to show more details
+            if ui.button("i").on_hover_text("Show Details").clicked() {
+                // This is a simplified way to show a popup.
+                // A more robust solution would manage popup state in the app struct.
+                let popup_id = ui.make_persistent_id(&task.id);
+                ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+
+                egui::popup::show_tooltip_at_pointer(ui.ctx(), popup_id, |ui| {
+                    ui.label(format!("ID: {}", task.id));
+                    ui.label(format!("Narsese: {}", task.narsese));
+                    ui.label(format!("Priority: {:.2}", task.priority));
+                    ui.label(format!("Type: {:?}", task.task_type));
+                    ui.label(format!("Created At: {:?}", task.created_at));
                 });
+            }
+        });
+
+        // Recursively render children
+        for child in &mut task.children {
+            Self::render_task_node_recursive(ui, child, depth + 1);
         }
     }
     
@@ -568,7 +753,7 @@ impl MyApp {
         let mut disconnect = false;
         let mut setup_local = false;
 
-        if let Some(connection) = self.connections.get_mut(self.active_tab) {
+        if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
             ui.collapsing("Connection", |ui| {
                 ui.horizontal(|ui| {
                     ui.label("WebSocket URL:");
@@ -623,7 +808,7 @@ impl MyApp {
             self.connect_websocket();
         }
         if disconnect {
-            if let Some(connection) = self.connections.get_mut(self.active_tab) {
+            if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
                 connection.ws_manager.disconnect();
             }
             self.add_log_entry("Disconnected from WebSocket".to_string(), LogLevel::Info);
@@ -637,7 +822,7 @@ impl MyApp {
         let mut start_stop_clicked = false;
         let mut throttle_changed = false;
 
-        if let Some(connection) = self.connections.get_mut(self.active_tab) {
+        if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
             ui.collapsing("Reasoner Controls", |ui| {
                 ui.horizontal(|ui| {
                     if ui.button(if connection.is_running { "Stop" } else { "Start" }).clicked() {
@@ -653,7 +838,7 @@ impl MyApp {
         }
 
         if start_stop_clicked {
-            if let Some(connection) = self.connections.get_mut(self.active_tab) {
+            if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
                 connection.is_running = !connection.is_running;
                 let command = if connection.is_running { "start_reasoner" } else { "stop_reasoner" };
                 let cmd = websocket::ClientCommand {
@@ -667,7 +852,7 @@ impl MyApp {
         }
 
         if throttle_changed {
-            if let Some(connection) = self.connections.get(self.active_tab) {
+            if let Some(connection) = self.connections.get(self.active_tab_index) {
                 let cmd = websocket::ClientCommand {
                     command: "set_cpu_throttle".to_string(),
                     payload: serde_json::json!(connection.cpu_throttle),
@@ -681,11 +866,21 @@ impl MyApp {
 }
 
 impl eframe::App for MyApp {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        for connection in &mut self.connections {
+            if let Some(mut child) = connection.local_server_process.take() {
+                if let Err(e) = child.kill() {
+                    eprintln!("Failed to kill server process: {}", e);
+                }
+            }
+        }
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Process any incoming messages from async tasks
         if let Some(ref mut log_rx) = self.log_receiver {
             while let Ok(log_entry) = log_rx.try_recv() {
-                if let Some(connection) = self.connections.get_mut(self.active_tab) {
+                if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
                     connection.log_buffer.entries.push(log_entry);
 
                     // Maintain buffer size
@@ -699,7 +894,7 @@ impl eframe::App for MyApp {
         // Process WebSocket events
         if let Some(ref mut ws_rx) = self.ws_event_receiver {
             while let Ok(ws_event) = ws_rx.try_recv() {
-                if let Some(connection) = self.connections.get_mut(self.active_tab) {
+                if let Some(connection) = self.connections.get_mut(self.active_tab_index) {
                     match ws_event.event.as_str() {
                         "log" => {
                             if let Ok(log_entry) = serde_json::from_value::<LogEntry>(ws_event.payload) {
@@ -732,18 +927,20 @@ impl eframe::App for MyApp {
             ui.horizontal(|ui| {
                 ui.heading("SeNARS UI");
                 
-                // Render tabs for each connection
-                for (i, connection) in self.connections.iter().enumerate() {
-                    if ui.selectable_label(self.active_tab == i, &connection.name).clicked() {
-                        self.active_tab = i;
+                // Only show tabs if there is more than one connection
+                if self.connections.len() > 1 {
+                    for (i, connection) in self.connections.iter().enumerate() {
+                        if ui.selectable_label(self.active_tab_index == i, &connection.name).clicked() {
+                            self.active_tab_index = i;
+                        }
                     }
                 }
                 
                 // Button to add a new connection
-                if ui.button("+").clicked() {
+                if ui.button("+").on_hover_text("Add New Connection").clicked() {
                     let new_id = self.next_connection_id;
                     self.connections.push(Connection::new(new_id, format!("Connection {}", new_id + 1)));
-                    self.active_tab = self.connections.len() - 1;
+                    self.active_tab_index = self.connections.len() - 1;
                     self.next_connection_id += 1;
                 }
             });
@@ -755,40 +952,16 @@ impl eframe::App for MyApp {
                 if ui.button("Add New Connection").clicked() {
                     let new_id = self.next_connection_id;
                     self.connections.push(Connection::new(new_id, format!("Connection {}", new_id + 1)));
-                    self.active_tab = self.connections.len() - 1;
+                    self.active_tab_index = self.connections.len() - 1;
                     self.next_connection_id += 1;
                 }
             });
         } else {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                // Connection section
-                self.render_connection_section(ui);
-
-                ui.separator();
-
-                // Reasoner controls
-                self.render_reasoner_controls_section(ui);
-
-                ui.separator();
-
-                // Input section
-                self.render_input_section(ui);
-
-                ui.separator();
-
-                // Log section
-                self.render_log_section(ui);
-
-                ui.separator();
-
-                // Task tree section
-                self.render_task_tree_section(ui);
-
-                ui.separator();
-
-                // Testing section
-                self.render_testing_section(ui);
-            });
+            let mut dock_state = std::mem::replace(&mut self.dock_state, DockState::new(vec![]));
+            DockArea::new(&mut dock_state)
+                .style(Style::from_egui(ctx.style().as_ref()))
+                .show(ctx, self);
+            self.dock_state = dock_state;
         }
         
         // Request repaint for animations
@@ -844,7 +1017,7 @@ impl MyApp {
 // Implementation for sending input via WebSocket
 impl MyApp {
     pub fn send_input_via_websocket(&self, input: &str) -> Result<(), String> {
-        if let Some(connection) = self.connections.get(self.active_tab) {
+        if let Some(connection) = self.connections.get(self.active_tab_index) {
             let command = websocket::ClientCommand {
                 command: "input".to_string(),
                 payload: serde_json::Value::String(input.to_string()),
@@ -857,14 +1030,14 @@ impl MyApp {
     }
     
     pub fn connect_websocket(&mut self) {
-        if let Some(connection) = self.connections.get(self.active_tab) {
+        if let Some(connection) = self.connections.get(self.active_tab_index) {
             // Clone the URL to move into the async context
             let url = connection.ws_manager.get_state().url.clone();
 
             // Clone the manager Arc to move into the async task
             let ws_manager_clone = connection.ws_manager.clone();
             let event_sender_clone = self.ws_event_sender.clone().unwrap();
-            let runtime = self.runtime.as_ref().unwrap().clone();
+            let runtime = self.runtime.as_ref().unwrap();
             let url_for_spawn = url.clone(); // Clone the URL for use in async closure
 
             // Run the connection in the runtime
