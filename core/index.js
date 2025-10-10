@@ -27,6 +27,7 @@ export { default as LMConfiguration } from './lm/LMConfiguration.js';
 export { Term, TermType } from './Term.js';
 export { Task, Punctuation, TruthValue } from './Task.js';
 export { Concept } from './Concept.js';
+export { TaskTable, SelectionCriteria, DefaultAggregationFunctions } from './TaskTable.js';
 
 // Export core cognitive architecture components
 export { default as Bag } from './memory/Bag.js';

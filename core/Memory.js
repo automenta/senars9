@@ -246,6 +246,12 @@ export class Memory {
     
     this.shortTermTasks.set(termHash, task);
 
+    // Also add the task to the associated concept's appropriate task table
+    const concept = this.conceptStorage.get(termHash);
+    if (concept) {
+      concept.addTask(task);
+    }
+
     // Delegate indexing to the IndexManager
     this.indexManager.addTask(task);
   }
