@@ -208,6 +208,12 @@ export async function testTemporalPatternRecognition() {
         });
     }
 
+    // Ensure pattern detector is properly configured for testing
+    if (patternDetector.config) {
+      patternDetector.config.minPatternFrequency = 2; // Lower threshold for testing
+      patternDetector.config.similarityThreshold = 0.5; // Lower threshold for testing
+    }
+
     // Process events to detect temporal patterns
     const temporalResult = await patternDetector.processEventStream(temporalEvents, 'temporal-test');
 

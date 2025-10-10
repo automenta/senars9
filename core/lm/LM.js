@@ -67,7 +67,13 @@ class LM extends Component {
   }
 
   _getProvider(providerId = null) {
-    return this.providers.get(providerId);
+    const id = providerId || this.providers.defaultProviderId || this.defaultProviderId;
+    if (!id || !this.providers.has(id)) {
+      // In test environments or when no providers are configured, return null
+      // to allow graceful fallbacks
+      return null;
+    }
+    return this.providers.get(id);
   }
 
   async generateText(prompt, options = {}, providerId = null) {
@@ -95,8 +101,22 @@ class LM extends Component {
     const startTime = Date.now();
     const actualProviderId = providerId || this.defaultProviderId;
     
+    // Check if provider exists
+    const provider = this._getProvider(providerId);
+    if (!provider) {
+      const error = new Error(`Provider "${actualProviderId}" not found or no default provider is set.`);
+      this.metrics.track({
+        operation,
+        providerId: actualProviderId,
+        error: error.message,
+        processingTime: Date.now() - startTime,
+        timestamp: Date.now()
+      });
+      
+      throw error;
+    }
+    
     try {
-      const provider = this._getProvider(providerId);
       const result = await operationFn(provider, args);
       
       this.metrics.track({

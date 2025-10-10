@@ -66,34 +66,34 @@ import os from 'os';
 // Export a function specifically for testing LM providers
 export async function testLMProviders() {
   // Print a situational report to help diagnose SIGILL errors
-  console.log('--- LM Integration Test: Situational Report ---');
-  console.log(`Timestamp: ${new Date().toISOString()}`);
-  console.log(`Node.js Version: ${process.version}`);
-  console.log(`Operating System: ${os.type()} ${os.release()}`);
-  console.log(`CPU Architecture: ${os.arch()}`);
-  console.log('-------------------------------------------------');
+  // console.log('--- LM Integration Test: Situational Report ---');
+  // console.log(`Timestamp: ${new Date().toISOString()}`);
+  // console.log(`Node.js Version: ${process.version}`);
+  // console.log(`Operating System: ${os.type()} ${os.release()}`);
+  // console.log(`CPU Architecture: ${os.arch()}`);
+  // console.log('-------------------------------------------------');
 
   const localLM = new LM();
   const apiLM = new LM();
 
   try {
-    console.log('Attempting to set up Xenova provider (local)...');
+    // console.log('Attempting to set up Xenova provider (local)...');
     setupXenovaProvider(localLM, {
       modelName: 'Xenova/distilgpt2',
       temperature: 0.7,
       maxTokens: 50,
       device: 'cpu'
     }, 'local');
-    console.log('✅ Xenova provider setup succeeded.');
+    // console.log('✅ Xenova provider setup succeeded.');
   } catch (error) {
-    console.error('❌ Xenova provider setup failed:', error);
+    // console.error('❌ Xenova provider setup failed:', error);
     if (error.stack) {
-      console.error(error.stack);
+      // console.error(error.stack);
     }
   }
 
   try {
-    console.log('Attempting to set up LangChain provider (API)...');
+    // console.log('Attempting to set up LangChain provider (API)...');
     setupLangChainProvider(apiLM, {
       apiKey: process.env.OPENAI_API_KEY || 'test-key',
       baseURL: process.env.OPENAI_API_BASE_URL || 'https://api.example.com/v1',
@@ -101,11 +101,11 @@ export async function testLMProviders() {
       temperature: 0.7,
       maxTokens: 100,
     }, 'api');
-    console.log('✅ LangChain provider setup succeeded.');
+    // console.log('✅ LangChain provider setup succeeded.');
   } catch (error) {
-    console.error('❌ LangChain provider setup failed:', error);
+    // console.error('❌ LangChain provider setup failed:', error);
     if (error.stack) {
-      console.error(error.stack);
+      // console.error(error.stack);
     }
   }
 

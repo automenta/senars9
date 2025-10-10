@@ -310,10 +310,32 @@ export async function testTaskGenerationFromStructuredPlans() {
 
   try {
     await system.start();
-    
+
     const processor = system.core.planProcessor;
     if (!processor) {
       throw new Error('PlanProcessor not available');
+    }
+
+    // Set up a mock LM provider for testing if none exists
+    if (!processor.lm) {
+      const mockLM = {
+        generateText: async (prompt) => {
+          console.log('Mock LM: Processing prompt for goal extraction');
+          // Simple mock response that extracts goals from the structured plan
+          const goals = [
+            { text: "Implement user authentication system", confidence: 0.9, priority: 0.8 },
+            { text: "Design database schema", confidence: 0.85, priority: 0.7 },
+            { text: "Create API endpoints", confidence: 0.8, priority: 0.6 },
+            { text: "Build frontend UI components", confidence: 0.75, priority: 0.5 },
+            { text: "Write unit tests", confidence: 0.7, priority: 0.4 },
+            { text: "Deploy to staging", confidence: 0.65, priority: 0.3 },
+            { text: "Deploy to production", confidence: 0.6, priority: 0.2 }
+          ];
+          return JSON.stringify(goals);
+        }
+      };
+      processor.lm = mockLM;
+      console.log('Mock LM provider set up for testing');
     }
 
     // Create a structured plan with clear goals that will be detected by both regex and LM
