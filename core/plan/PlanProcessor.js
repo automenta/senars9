@@ -233,7 +233,6 @@ Content to analyze:
 ${content}`;
 
       const response = await this.lm.generateText(prompt, { temperature: 0.2, maxTokens: 1024 });
-      console.log('LM Response:', response);
       const extractedGoals = this._parseJSONResponse(response);
 
       if (!Array.isArray(extractedGoals)) {
