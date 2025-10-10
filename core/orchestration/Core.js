@@ -14,6 +14,7 @@ import DataIngestor from '../analysis/DataIngestor.js';
 import ReportGenerator from '../analysis/ReportGenerator.js';
 import BootstrapSystem from '../analysis/BootstrapSystem.js';
 import PatternDetector from '../analysis/PatternDetector.js';
+import WebSocketServer from '../system/WebSocketServer.js';
 import { Focus } from '../memory/Memory.js';
 
 class Core {
@@ -48,6 +49,7 @@ class Core {
     this.registerComponent('reports', new ReportGenerator()); // Register ReportGenerator component
     this.registerComponent('bootstrap', new BootstrapSystem()); // Register BootstrapSystem component
     this.registerComponent('patternDetector', new PatternDetector()); // Register PatternDetector component
+    this.registerComponent('webSocketServer', new WebSocketServer()); // Register WebSocketServer component
 
     return new Proxy(this, {
       get: (target, prop) => target.componentMap.has(prop) ? target.componentMap.get(prop) : target[prop],
@@ -83,14 +85,21 @@ class Core {
       }
     }
     
-    // After all components are initialized, establish cross-references
-    // This is needed for components that depend on other components
+    // Establish cross-component dependencies
+    this._setupDependencies();
+  }
+  
+  /**
+   * Establish cross-component dependencies after all components are initialized
+   */
+  _setupDependencies() {
+    // PlanProcessor dependencies
     if (this.planProcessor) {
-      // Set up LM reference after initialization
       this.planProcessor.lm = this.lm || null;
       this.planProcessor.htnPlanner = this.htnPlanner || null;
     }
     
+    // Graph traversal dependencies
     if (this.graphTraversal && this.adjacencyBag) {
       this.graphTraversal.adjacencyBag = this.adjacencyBag;
     }
@@ -99,14 +108,22 @@ class Core {
       this.aStarPlanner.adjacencyBag = this.adjacencyBag;
     }
     
+    // Bootstrap system dependencies
     if (this.bootstrap) {
-      // Set up dependencies for BootstrapSystem
       this.bootstrap.setupDependencies(
         this.lm || null,
         this.planProcessor || null,
         this.htnPlanner || null,
-        this.system || null  // This might be set up later if System component exists
+        this  // Pass the core instance as the system reference
       );
+      
+      // Add the plan source for NEXT.md to BootstrapSystem
+      this.bootstrap.addPlanSource('./NEXT.md', 'file');
+    }
+    
+    // WebSocketServer reference
+    if (this.webSocketServer) {
+      this.webSocketServer.core = this;
     }
   }
 

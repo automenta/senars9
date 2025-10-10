@@ -1,6 +1,7 @@
 import Component from '../base/Component.js';
 import { Logger } from '../base/utilities.js';
 import { DEFAULTS } from '../base/constants.js';
+import chokidar from 'chokidar';
 
 /**
  * BootstrapSystem - Self-directed development system
@@ -21,6 +22,10 @@ class BootstrapSystem extends Component {
     this.htnPlanner = null; // HTN Planner for goal decomposition
     this.system = null; // Main system component for execution
     
+    // File watching
+    this.fileWatcher = null;
+    this.watchedFiles = new Set();
+    
     // Bootstrap state
     this.bootstrapPhase = 'initial'; // initial, reading, processing, active, improvement
     this.bootstrapGoals = [];
@@ -33,7 +38,8 @@ class BootstrapSystem extends Component {
     this.config = {
       maxBootstrapIterations: DEFAULTS.BOOTSTRAP_MAX_ITERATIONS || 100,
       goalConfidenceThreshold: DEFAULTS.BOOTSTRAP_GOAL_CONFIDENCE_THRESHOLD || 0.7,
-      enableSelfImprovement: DEFAULTS.BOOTSTRAP_ENABLE_SELF_IMPROVEMENT || true
+      enableSelfImprovement: DEFAULTS.BOOTSTRAP_ENABLE_SELF_IMPROVEMENT || true,
+      watchPlanFiles: DEFAULTS.BOOTSTRAP_WATCH_PLAN_FILES || true // Enable/disable file watching
     };
     
     // Statistics
@@ -59,6 +65,7 @@ class BootstrapSystem extends Component {
     this.failedGoals = [];
     this.planSources = [];
     this.isBootstrapActive = false;
+    this.watchedFiles.clear();
     
     // Reset statistics
     this.stats = {
@@ -92,6 +99,11 @@ class BootstrapSystem extends Component {
     this.isBootstrapActive = true;
     Logger.info('Starting bootstrap process');
     
+    // Start watching plan files if enabled
+    if (this.config.watchPlanFiles) {
+      this._setupFileWatching();
+    }
+    
     try {
       await this._executeBootstrapCycle();
     } catch (error) {
@@ -106,6 +118,12 @@ class BootstrapSystem extends Component {
    */
   async stop() {
     this.isBootstrapActive = false;
+    
+    // Stop file watching if active
+    if (this.fileWatcher) {
+      await this._stopFileWatching();
+    }
+    
     Logger.info('Bootstrap system stopped');
   }
 
@@ -532,6 +550,106 @@ class BootstrapSystem extends Component {
       plansProcessed: 0,
       selfImprovements: 0
     };
+  }
+  
+  /**
+   * Set up file watching for plan sources
+   */
+  _setupFileWatching() {
+    if (this.fileWatcher) {
+      // Already watching, just add new files
+      this._addFilesToWatcher();
+      return;
+    }
+    
+    try {
+      // Initialize watcher
+      this.fileWatcher = chokidar.watch([], {
+        ignored: /(^|[\/\\])\../, // ignore dotfiles
+        persistent: true,
+        ignoreInitial: true // Don't emit events for initial files
+      });
+      
+      // Add initial file paths
+      this._addFilesToWatcher();
+      
+      // Set up event handlers
+      this.fileWatcher
+        .on('change', (path) => {
+          Logger.info(`Plan file changed: ${path}`);
+          this._handleFileChange(path);
+        })
+        .on('add', (path) => {
+          Logger.info(`New plan file added: ${path}`);
+          this._handleFileChange(path);
+        })
+        .on('error', (error) => {
+          Logger.error('File watcher error', error);
+        });
+        
+      Logger.info('File watching initialized for plan files');
+    } catch (error) {
+      Logger.error('Failed to initialize file watching', error);
+    }
+  }
+  
+  /**
+   * Add current plan source files to the watcher
+   */
+  _addFilesToWatcher() {
+    if (!this.fileWatcher) return;
+    
+    // Add file paths that are of type 'file'
+    for (const planSource of this.planSources) {
+      if (planSource.type === 'file' && !this.watchedFiles.has(planSource.source)) {
+        this.fileWatcher.add(planSource.source);
+        this.watchedFiles.add(planSource.source);
+        Logger.debug(`Added file to watcher: ${planSource.source}`);
+      }
+    }
+  }
+  
+  /**
+   * Handle file change event
+   */
+  async _handleFileChange(filePath) {
+    Logger.info(`Processing updated plan file: ${filePath}`);
+    
+    // Add a small delay to ensure file is completely written
+    await this._delay(100);
+    
+    try {
+      // Process the updated file
+      if (this.planProcessor) {
+        const result = await this.planProcessor.processDocument(filePath, 'file');
+        
+        // Add extracted goals to bootstrap goals
+        this.bootstrapGoals.push(...result.goals);
+        this.stats.plansProcessed++;
+        
+        Logger.info(`Processed updated plan file: ${filePath}`, {
+          goalsExtracted: result.goals.length
+        });
+      }
+    } catch (error) {
+      Logger.error(`Error processing changed file: ${filePath}`, error);
+    }
+  }
+  
+  /**
+   * Stop file watching
+   */
+  async _stopFileWatching() {
+    if (this.fileWatcher) {
+      try {
+        await this.fileWatcher.close();
+        this.fileWatcher = null;
+        this.watchedFiles.clear();
+        Logger.info('File watching stopped');
+      } catch (error) {
+        Logger.error('Error stopping file watcher', error);
+      }
+    }
   }
 }
 
