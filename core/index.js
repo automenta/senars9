@@ -4,9 +4,7 @@ export { setupLangChainProvider, createLMWithLangChain } from './lm/LangChainSet
 export { default as XenovaProvider } from './lm/XenovaProvider.js';
 export { setupXenovaProvider, createLMWithXenova } from './lm/XenovaSetup.js';
 
-// Export enhanced LM functionality
-export { setupXenovaProvider as setupEnhancedXenovaProvider, createLMWithXenova as createEnhancedLMWithXenova } from './lm/XenovaSetup.js';
-export { setupLangChainProvider as setupEnhancedLangChainProvider, createLMWithLangChain as createEnhancedLMWithLangChain } from './lm/LangChainSetup.js';
+// Export enhanced LM functionality (same as standard for now)
 
 // Export modular LM components
 export { default as MetricsTracker } from './lm/MetricsTracker.js';
@@ -22,6 +20,7 @@ export { default as ProviderRegistry } from './lm/ProviderRegistry.js';
 export { default as ModelSelector } from './lm/ModelSelector.js';
 export { default as IOAdapterManager } from './lm/IOAdapterManager.js';
 export { default as LMConfiguration } from './lm/LMConfiguration.js';
+export { ProviderSetup } from './lm/ProviderSetup.js';
 
 // Export core NARS reasoning components
 export { Term, TermType } from './Term.js';
@@ -71,13 +70,14 @@ export {
 export { ModusPonens } from './reasoning/ModusPonensRule.js';
 export { Analogy } from './reasoning/AnalogyRule.js';
 
-export { 
-  Component, 
-  ComponentHealth, 
-  ComponentMetrics, 
-  ComponentStatus, 
-  ComponentConfig 
+export {
+  Component,
+  ComponentHealth,
+  ComponentMetrics,
+  ComponentStatus,
+  ComponentConfig
 } from './components/Component.js';
+export { ValidationUtils } from './base/ValidationUtils.js';
 export { ConfigService } from './components/ConfigService.js';
 export { UnifiedResourceManager } from './components/UnifiedResourceManager.js';
 export { StrategyRegistry } from './components/StrategyRegistry.js';

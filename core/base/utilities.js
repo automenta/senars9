@@ -60,31 +60,22 @@ class ObjectUtils {
   }
 
   static isEmpty(obj) {
-    if (!obj) return true;
-    if (Array.isArray(obj)) return obj.length === 0;
-    if (ObjectUtils.isObject(obj)) return Object.keys(obj).length === 0;
-    return false;
+    return !obj ? true :
+           Array.isArray(obj) ? obj.length === 0 :
+           ObjectUtils.isObject(obj) ? Object.keys(obj).length === 0 :
+           false;
   }
 
   static pick(obj, keys) {
-    if (!obj || !Array.isArray(keys)) return {};
-    const result = {};
-    for (const key of keys) {
-      if (key in obj) result[key] = obj[key];
-    }
-    return result;
+    return !obj || !Array.isArray(keys) ? {} :
+           Object.fromEntries(keys.filter(key => key in obj).map(key => [key, obj[key]]));
   }
 
   static omit(obj, keys) {
-    if (!obj || !Array.isArray(keys)) return obj || {};
-    const keySet = new Set(keys);
-    const result = {};
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key) && !keySet.has(key)) {
-        result[key] = obj[key];
-      }
-    }
-    return result;
+    return !obj || !Array.isArray(keys) ? obj || {} :
+           Object.fromEntries(
+             Object.entries(obj).filter(([key]) => !keys.includes(key))
+           );
   }
 
   static mapKeys(obj, keyMapper) {
@@ -139,33 +130,24 @@ class ArrayUtils {
   }
 
   static sortBy(array, keyFn, direction = 'asc') {
-    if (!Array.isArray(array)) return array || [];
-    
-    const multiplier = direction === 'desc' ? -1 : 1;
-    return [...array].sort((a, b) => {
-      const aVal = keyFn(a);
-      const bVal = keyFn(b);
-      return (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) * multiplier;
-    });
+    return !Array.isArray(array) ? array || [] :
+           [...array].sort((a, b) => {
+             const aVal = keyFn(a), bVal = keyFn(b), diff = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+             return diff * (direction === 'desc' ? -1 : 1);
+           });
   }
 
   static unique(array, keyFn) {
-    if (!Array.isArray(array)) return array || [];
-    
-    if (keyFn) {
-      const seen = new Set();
-      const result = [];
-      for (const item of array) {
-        const key = keyFn(item);
-        if (!seen.has(key)) {
-          seen.add(key);
-          result.push(item);
-        }
-      }
-      return result;
-    }
-    
-    return [...new Set(array)];
+    return !Array.isArray(array) ? array || [] :
+           keyFn ? (() => {
+             const seen = new Set(), result = [];
+             for (const item of array) {
+               const key = keyFn(item);
+               !seen.has(key) && (seen.add(key), result.push(item));
+             }
+             return result;
+           })() :
+           [...new Set(array)];
   }
 
   static compact(array) {
