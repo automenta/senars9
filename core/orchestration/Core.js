@@ -20,6 +20,7 @@ import { ContradictionAnalyzer } from '../reasoning/ContradictionAnalyzer.js';
 import { ResolutionStrategy } from '../reasoning/ResolutionStrategy.js';
 import { SystemContext } from '../components/SystemContext.js';
 import { StrategyRegistry } from '../components/StrategyRegistry.js';
+import CommonMiddleware from '../messaging/Middleware.js';
 
 class Core {
   constructor() {
@@ -139,6 +140,26 @@ class Core {
       this.bootstrap.addPlanSource('./NEXT.md', 'file');
     }
     
+    // Messages middleware and event broadcasting
+    if (this.messages) {
+      // Add logging middleware for observability
+      this.messages.use(CommonMiddleware.loggingMiddleware());
+
+      // Connect WebSocketServer to the event stream
+      if (this.webSocketServer) {
+        const eventsToBroadcast = ['task.input', 'cycle.start', 'system.started'];
+        for (const event of eventsToBroadcast) {
+          this.messages.on(event, (data) => {
+            this.webSocketServer.broadcast({
+              type: 'system-event',
+              event: event,
+              data: data,
+            });
+          });
+        }
+      }
+    }
+
     // WebSocketServer reference
     if (this.webSocketServer) {
       this.webSocketServer.core = this;

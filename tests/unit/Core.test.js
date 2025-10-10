@@ -26,6 +26,10 @@ class TestComponent extends Component {
     this.callOrder.push(`destroy:${this.name}`);
     await super.destroy();
   }
+  use(middleware) {} // Add a dummy use method to the mock
+  on(event, handler) {} // Mock the on method
+  off(event, handler) {} // Mock the off method
+  emit(event, data) {} // Mock the emit method
 }
 
 describe('Core', () => {

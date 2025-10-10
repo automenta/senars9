@@ -41,7 +41,7 @@ export { Clock, IterativeClock, UnixTimeClock, HighResolutionClock } from './Clo
 export { CycleContext, runSingleCycle } from './Cycle.js';
 export { Memory } from './Memory.js';
 export { Reasoner, InferenceRule, RuleEngine } from './Reasoner.js';
-export { System } from './System.js';
+export { default as System } from './system/System.js';
 export { parse, parseTerm } from './parser/Parser.js';
 
 

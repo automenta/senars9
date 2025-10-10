@@ -93,6 +93,13 @@ class Reasoning extends Component {
       return [];
     }
 
+    if (this.core?.messages) {
+      this.core.messages.emit('cycle.start', {
+        taskCount: tasks.length,
+        timestamp: Date.now(),
+      });
+    }
+
     const reasoningContext = this._createReasoningContext(context);
     const results = {
       derivedTasks: [],
