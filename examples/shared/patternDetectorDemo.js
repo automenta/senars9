@@ -195,18 +195,18 @@ export async function testTemporalPatternRecognition() {
       throw new Error('PatternDetector not available');
     }
 
-    // Create events with temporal patterns (repeated same events to form temporal sequence)
+    // Create a stream of events with identical type and name to ensure temporal pattern detection
+    // The algorithm requires at least 8 similar events to meet the confidence threshold (events.length/10 >= 0.7)
     const now = Date.now();
-    const temporalEvents = [
-      { type: 'system-alert', name: 'high-cpu', timestamp: now - 7, context: 'server-001' },
-      { type: 'system-alert', name: 'high-cpu', timestamp: now - 6, context: 'server-001' },
-      { type: 'system-alert', name: 'high-cpu', timestamp: now - 5, context: 'server-001' },
-      { type: 'system-alert', name: 'high-cpu', timestamp: now - 4, context: 'server-001' },
-      { type: 'system-alert', name: 'high-cpu', timestamp: now - 3, context: 'server-001' },
-      { type: 'system-alert', name: 'high-cpu', timestamp: now - 2, context: 'server-001' },
-      { type: 'system-alert', name: 'high-cpu', timestamp: now - 1, context: 'server-001' },
-      { type: 'system-alert', name: 'high-cpu', timestamp: now, context: 'server-001' }
-    ];
+    const temporalEvents = [];
+    for (let i = 0; i < 10; i++) {
+        temporalEvents.push({
+            type: 'system-alert',
+            name: 'high-cpu',
+            timestamp: now - (10 - i) * 1000, // Events spaced 1 second apart
+            context: 'server-001'
+        });
+    }
 
     // Process events to detect temporal patterns
     const temporalResult = await patternDetector.processEventStream(temporalEvents, 'temporal-test');

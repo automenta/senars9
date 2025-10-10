@@ -204,64 +204,44 @@ class PlanProcessor extends Component {
   }
 
   async _extractFromText(content, options) {
-    const goals = [];
-    
+    // Prioritize LM-based extraction and remove the brittle regex fallback.
     if (this.lm && this.config.enableLMProcessing) {
-      // Use LM as the primary extraction method instead of brittle regex
-      return await this._extractWithLM(content, goals, options);
+      return await this._extractWithLM(content, [], options);
     }
     
-    // Fallback to regex only if LM is not available
-    const uniqueGoals = new Map();
-    const actionWords = ['implement', 'create', 'build', 'develop', 'design', 'test', 'deploy', 'optimize'];
-
-    for (const pattern of this.goalPatterns) {
-      pattern.lastIndex = 0;
-
-      for (const match of content.matchAll(pattern)) {
-        const goalText = match[1].trim();
-        if (!goalText || uniqueGoals.has(goalText.toLowerCase())) continue;
-
-        let confidence = 0.7;
-        if (actionWords.some(word => goalText.toLowerCase().includes(word))) {
-          confidence = Math.min(1.0, confidence + 0.15);
-        }
-
-        const goal = {
-          text: goalText,
-          source: 'pattern_match',
-          confidence,
-          priority: 0.5,
-          timestamp: Date.now()
-        };
-
-        goals.push(goal);
-        uniqueGoals.set(goalText.toLowerCase(), goal);
-      }
-    }
-
-    return goals;
+    // If LM is disabled or not available, we return an empty array
+    // because the regex approach has been deemed too unreliable.
+    Logger.warn('LM is not available or is disabled. Text-based goal extraction will be skipped.');
+    return [];
   }
 
   async _extractWithLM(content, existingGoals, options) {
     this.stats.lmProcessings++;
 
     try {
-      // Create a more specific prompt to extract goals from structured content
-      const prompt = `You are a goal extraction expert. Extract specific, actionable goals from the following content. 
-Consider items marked as goals, objectives, tasks, action items, or plans as actionable goals.
-Return ONLY a JSON array with text, confidence (0.0-1.0), and priority (0.0-1.0) fields for each goal.
-Content: ${content}`;
+      // A more robust prompt to extract goals from structured content and handle varied phrasing
+      const prompt = `You are a highly capable goal extraction engine. Your task is to identify and extract specific, actionable goals from the provided text.
+Goals can be explicitly marked (e.g., "Goal: implement feature") or implicitly stated (e.g., "we need to build the UI").
+Action-oriented statements should be treated as goals.
 
-      const response = await this.lm.generateText(prompt, { temperature: 0.3, maxTokens: 800 });
-      const extractedGoals = this._parseJSONResponse(response) || [];
+Analyze the following content and return ONLY a JSON array of objects, where each object has:
+1. "text": The goal description.
+2. "confidence": A value from 0.0 to 1.0 indicating your confidence in this being a valid goal.
+3. "priority": A value from 0.0 to 1.0 indicating the goal's priority (higher is more important).
 
-      if (!extractedGoals || !Array.isArray(extractedGoals)) {
-        // If JSON parsing fails, try a more specific parsing approach
+Content to analyze:
+${content}`;
+
+      const response = await this.lm.generateText(prompt, { temperature: 0.2, maxTokens: 1024 });
+      console.log('LM Response:', response);
+      const extractedGoals = this._parseJSONResponse(response);
+
+      if (!Array.isArray(extractedGoals)) {
+        // If parsing fails or the response is not an array, use the fallback mechanism
+        Logger.warn('Initial JSON parsing of LM response failed. Trying fallback extraction.');
         const processedGoals = this._extractGoalsFromLMResponse(response);
-        const allGoals = [...existingGoals, ...processedGoals];
         this.stats.goalsExtracted += processedGoals.length;
-        return allGoals;
+        return [...existingGoals, ...processedGoals];
       }
 
       const processedGoals = extractedGoals.map(goal => ({
@@ -356,16 +336,30 @@ Content: ${content}`;
 
   _parseJSONResponse(response) {
     try {
-      const jsonStart = response.indexOf('[');
-      const jsonEnd = response.lastIndexOf(']') + 1;
-      if (jsonStart !== -1 && jsonEnd > jsonStart) {
-        return JSON.parse(response.substring(jsonStart, jsonEnd));
-      }
-      const cleaned = response.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(cleaned);
+        // Updated regex to find JSON block within backticks, and handle optional "json" language specifier
+        const match = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+            return JSON.parse(match[1]);
+        }
+
+        // Fallback for responses that are not in a code block but are valid JSON
+        const cleanedResponse = response.trim();
+        if (cleanedResponse.startsWith('[') && cleanedResponse.endsWith(']')) {
+            return JSON.parse(cleanedResponse);
+        }
+
+        // Final attempt for JSON that might have leading/trailing text
+        const jsonStartIndex = cleanedResponse.indexOf('[');
+        const jsonEndIndex = cleanedResponse.lastIndexOf(']');
+        if (jsonStartIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+            return JSON.parse(cleanedResponse.substring(jsonStartIndex, jsonEndIndex + 1));
+        }
+
+        Logger.warn('Could not find a valid JSON block in the LM response.');
+        return []; // Return an empty array instead of null to prevent downstream errors
     } catch (error) {
-      Logger.warn('JSON parsing failed', error);
-      return null;
+        Logger.error('JSON parsing failed with error:', error);
+        return []; // Return empty array on parsing error
     }
   }
 
