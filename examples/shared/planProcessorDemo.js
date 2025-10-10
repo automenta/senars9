@@ -5,33 +5,20 @@
 
 import System from '../../core/system/System.js';
 
-// Export the main functionality for both tests and examples to use
-export async function demonstratePlanProcessing() {
-  // Create and start the system
-  const system = new System({
-    version: '2.0.0'
-  });
+// Shared utilities for plan processing demos
+const createSystem = () => new System({ version: '2.0.0' });
 
+const withSystem = async (fn) => {
+  const system = createSystem();
   try {
     await system.start();
-    console.log('✅ System started successfully');
+    return await fn(system);
+  } finally {
+    await system.stop();
+  }
+};
 
-    // Access the plan processor component
-    const planProcessor = system.core.planProcessor;
-    if (!planProcessor) {
-      console.log('⚠️  PlanProcessor not available in this configuration');
-      return null;
-    }
-
-    console.log('\\n📋 Plan Processor Initial Stats:');
-    const initialStats = planProcessor.getStats();
-    console.log('   Documents Processed:', initialStats.documentsProcessed);
-    console.log('   Goals Extracted:', initialStats.goalsExtracted);
-    console.log('   Goals Converted:', initialStats.goalsConverted);
-
-    // 1. Create sample plan document
-    console.log('\\n📝 Creating sample plan document...');
-    const samplePlan = `# Development Plan
+const createSamplePlan = () => `# Development Plan
 
 ## Goals
 - Implement user authentication system
@@ -51,48 +38,68 @@ export async function demonstratePlanProcessing() {
 - Test authentication flow with various scenarios
 `;
 
-    // 2. Process the plan document
-    console.log('\\n🔄 Processing plan document...');
-    const processingResult = await planProcessor.processDocument(samplePlan, 'markdown');
+const logProcessingResults = (processingResult, tasks) => {
+  console.log('\\n📊 Processing Results:');
+  console.log('   Goals extracted:', processingResult.goals.length);
+  console.log('   Dependencies analyzed:', Object.keys(processingResult.dependencies).length);
 
-    console.log('\\n📊 Processing Results:');
-    console.log('   Goals extracted:', processingResult.goals.length);
-    console.log('   Dependencies analyzed:', Object.keys(processingResult.dependencies).length);
+  // Display extracted goals
+  processingResult.goals.forEach((goal, index) => {
+    console.log(`   ${index + 1}. ${goal.text} (Confidence: ${goal.confidence.toFixed(2)}, Priority: ${goal.priority.toFixed(2)})`);
+  });
 
-    // Display extracted goals
-    processingResult.goals.forEach((goal, index) => {
-      console.log(`   ${index + 1}. ${goal.text} (Confidence: ${goal.confidence.toFixed(2)}, Priority: ${goal.priority.toFixed(2)})`);
-    });
+  // Display dependencies
+  console.log('\\n🔗 Dependencies:');
+  for (const [goal, deps] of Object.entries(processingResult.dependencies)) {
+    if (deps.length > 0) {
+      console.log(`   ${goal}: depends on ${deps.length} other goals`);
+    }
+  }
 
-    // Display dependencies
-    console.log('\\n🔗 Dependencies:');
-    for (const [goal, deps] of Object.entries(processingResult.dependencies)) {
-      if (deps.length > 0) {
-        console.log(`   ${goal}: depends on ${deps.length} other goals`);
-      }
+  // Display generated tasks
+  console.log('\\n📋 Tasks Generated:', tasks.length);
+  tasks.forEach((task, index) => {
+    console.log(`   ${index + 1}. ${task.term} (Priority: ${task.priority.toFixed(2)})`);
+  });
+};
+
+// Main demonstration function
+export async function demonstratePlanProcessing() {
+  const system = createSystem();
+
+  try {
+    await system.start();
+    console.log('✅ System started successfully');
+
+    const planProcessor = system.core.planProcessor;
+    if (!planProcessor) {
+      console.log('⚠️  PlanProcessor not available in this configuration');
+      return null;
     }
 
-    // 3. Convert goals to tasks
-    console.log('\\n📋 Converting goals to tasks...');
+    console.log('\\n📋 Plan Processor Initial Stats:');
+    const initialStats = planProcessor.getStats();
+    console.log('   Documents Processed:', initialStats.documentsProcessed);
+    console.log('   Goals Extracted:', initialStats.goalsExtracted);
+    console.log('   Goals Converted:', initialStats.goalsConverted);
+
+    console.log('\\n📝 Creating sample plan document...');
+    const samplePlan = createSamplePlan();
+
+    console.log('\\n🔄 Processing plan document...');
+    const processingResult = await planProcessor.processDocument(samplePlan, 'markdown');
     const tasks = planProcessor.convertGoalsToTasks(processingResult.goals);
-    console.log('   Tasks generated:', tasks.length);
 
-    // Display generated tasks
-    tasks.forEach((task, index) => {
-      console.log(`   ${index + 1}. ${task.term} (Priority: ${task.priority.toFixed(2)})`);
-    });
+    logProcessingResults(processingResult, tasks);
 
-    // 4. Test goal prioritization
     console.log('\\n🎯 Testing goal prioritization...');
     const prioritizedGoals = [...processingResult.goals].sort((a, b) => b.priority - a.priority);
     console.log('   Goals sorted by priority');
 
-    // 5. Test goal validation
     console.log('\\n✅ Testing goal validation...');
     const validGoals = processingResult.goals.filter(goal => goal.confidence >= planProcessor.config.confidenceThreshold);
     console.log('   Valid goals after threshold filter:', validGoals.length);
 
-    // 6. Show updated stats
     console.log('\\n📈 Updated Plan Processor Stats:');
     const finalStats = planProcessor.getStats();
     console.log('   Documents Processed:', finalStats.documentsProcessed);
@@ -100,7 +107,6 @@ export async function demonstratePlanProcessing() {
     console.log('   Goals Converted:', finalStats.goalsConverted);
     console.log('   LM Processings:', finalStats.lmProcessings);
 
-    // Return results for verification
     return {
       initialStats,
       finalStats,
@@ -123,21 +129,12 @@ export async function demonstratePlanProcessing() {
   }
 }
 
-// Export a function specifically for testing plan processing functionality
+// Test function for plan processing functionality
 export async function testPlanProcessingFunctionality() {
-  const system = new System({
-    version: '2.0.0'
-  });
-
-  try {
-    await system.start();
-    
+  return await withSystem(async (system) => {
     const processor = system.core.planProcessor;
-    if (!processor) {
-      throw new Error('PlanProcessor not available');
-    }
+    if (!processor) throw new Error('PlanProcessor not available');
 
-    // Test plan processing components exist
     const componentsAvailable = {
       hasPlanProcessor: !!processor,
       hasProcessDocument: typeof processor.processDocument === 'function',
@@ -146,7 +143,6 @@ export async function testPlanProcessingFunctionality() {
       hasProcessToTasks: typeof processor.processToTasks === 'function'
     };
 
-    // Create sample plan content
     const samplePlan = `# Sample Plan
 ## Goals
 - Implement feature A
@@ -158,45 +154,26 @@ export async function testPlanProcessingFunctionality() {
 - Testing requires test environment
 `;
 
-    // Test document processing
     const result = await processor.processDocument(samplePlan, 'markdown');
-
-    // Test converting goals to tasks
     const tasks = processor.convertGoalsToTasks(result.goals);
-
-    // Test processing to tasks directly
     const directResult = await processor.processToTasks(samplePlan);
-
-    // Get stats
-    const stats = processor.getStats();
 
     return {
       componentsAvailable,
       result,
       tasks,
       directResult,
-      stats
+      stats: processor.getStats()
     };
-  } finally {
-    await system.stop();
-  }
+  });
 }
 
-// Export function for testing document parsing and goal extraction
+// Test function for document parsing and goal extraction
 export async function testDocumentParsingAndGoalExtraction() {
-  const system = new System({
-    version: '2.0.0'
-  });
-
-  try {
-    await system.start();
-    
+  return await withSystem(async (system) => {
     const processor = system.core.planProcessor;
-    if (!processor) {
-      throw new Error('PlanProcessor not available');
-    }
+    if (!processor) throw new Error('PlanProcessor not available');
 
-    // Test different document formats
     const testDocuments = {
       markdown: `# Development Goals
 - Implement login functionality
@@ -229,14 +206,8 @@ NEED TO: Test with multiple scenarios
     };
 
     const extractionResults = {};
-
-    // Process markdown
     extractionResults.markdown = await processor.processDocument(testDocuments.markdown, 'markdown');
-
-    // Process text
     extractionResults.text = await processor.processDocument(testDocuments.text, 'text');
-
-    // Process JSON
     extractionResults.json = await processor.processDocument(testDocuments.json, 'json');
 
     return {
@@ -245,26 +216,15 @@ NEED TO: Test with multiple scenarios
       textGoals: extractionResults.text.goals.length,
       jsonGoals: extractionResults.json.goals.length
     };
-  } finally {
-    await system.stop();
-  }
+  });
 }
 
-// Export function for testing goal prioritization and validation
+// Test function for goal prioritization and validation
 export async function testGoalPrioritizationAndValidation() {
-  const system = new System({
-    version: '2.0.0'
-  });
-
-  try {
-    await system.start();
-    
+  return await withSystem(async (system) => {
     const processor = system.core.planProcessor;
-    if (!processor) {
-      throw new Error('PlanProcessor not available');
-    }
+    if (!processor) throw new Error('PlanProcessor not available');
 
-    // Create plan with goals that have different confidence levels
     const planWithConfidence = `# Project Plan
 ## High Priority Goals
 - Implement core authentication system (confident: 90%)
@@ -279,48 +239,29 @@ export async function testGoalPrioritizationAndValidation() {
 - Implement experimental features (confident: 30%)
 `;
 
-    // Process the document
     const result = await processor.processDocument(planWithConfidence, 'markdown');
-
-    // Test validation against confidence threshold
     const validGoals = result.goals.filter(goal => goal.confidence >= processor.config.confidenceThreshold);
-    const allGoals = result.goals;
-
-    // Test prioritization
-    const sortedGoals = [...result.goals].sort((a, b) => b.priority - a.priority);
 
     return {
-      allGoals,
+      allGoals: result.goals,
       validGoals,
-      sortedGoals,
-      confidenceThreshold: processor.config?.confidenceThreshold || 0.7, // Use default if not available
-      goalsCount: allGoals.length,
+      sortedGoals: [...result.goals].sort((a, b) => b.priority - a.priority),
+      confidenceThreshold: processor.config?.confidenceThreshold || 0.7,
+      goalsCount: result.goals.length,
       validGoalsCount: validGoals.length
     };
-  } finally {
-    await system.stop();
-  }
+  });
 }
 
-// Export function for testing task generation from structured plans
+// Test function for task generation from structured plans
 export async function testTaskGenerationFromStructuredPlans() {
-  const system = new System({
-    version: '2.0.0'
-  });
-
-  try {
-    await system.start();
-
+  return await withSystem(async (system) => {
     const processor = system.core.planProcessor;
-    if (!processor) {
-      throw new Error('PlanProcessor not available');
-    }
+    if (!processor) throw new Error('PlanProcessor not available');
 
-    // Set up a mock LM provider for testing at the system level
-    // Replace the existing LM instance with our mock
+    // Setup mock LM for testing
     const mockLM = {
       generateText: async (prompt) => {
-        // Simple mock response that extracts goals from the structured plan
         const goals = [
           { text: "Implement user authentication system", confidence: 0.9, priority: 0.8 },
           { text: "Design database schema", confidence: 0.85, priority: 0.7 },
@@ -334,24 +275,19 @@ export async function testTaskGenerationFromStructuredPlans() {
       }
     };
 
-    // Replace the system LM with our mock
     system.core.lm = mockLM;
-    // Also update the processor reference
     processor.lm = mockLM;
 
-    // Ensure LM processing is enabled in the processor config
     if (processor.config) {
       processor.config.enableLMProcessing = true;
-      processor.config.confidenceThreshold = 0.5; // Lower threshold to ensure goals pass through
+      processor.config.confidenceThreshold = 0.5;
     }
 
-
-    // Create a structured plan with clear goals that will be detected by both regex and LM
     const structuredPlan = `# Project Plan
 
 ## Goals
 - Goal: Implement user authentication system. (confident: 90%)
-- Goal: Design database schema. (confident: 85%) 
+- Goal: Design database schema. (confident: 85%)
 - Goal: Create API endpoints. (confident: 80%)
 - Goal: Build frontend UI components. (confident: 75%)
 - Goal: Write unit tests. (confident: 70%)
@@ -360,7 +296,7 @@ export async function testTaskGenerationFromStructuredPlans() {
 
 ## Objectives
 - Must implement core features
-- Need to set up CI/CD pipeline  
+- Need to set up CI/CD pipeline
 - Should optimize performance
 - Will create documentation
 
@@ -375,33 +311,17 @@ export async function testTaskGenerationFromStructuredPlans() {
 - Phase 3 depends on Phase 2 completion.
 `;
 
-    // Process the structured plan
     const result = await processor.processDocument(structuredPlan, 'markdown');
-
-    // Convert to tasks
     const tasks = processor.convertGoalsToTasks(result.goals);
-
-    // Verify dependencies were analyzed
-    const hasDependencies = Object.keys(result.dependencies).length > 0;
-
-    // Check if tasks were properly generated - ensuring we have goals first
-    const tasksGenerated = result.goals.length > 0 && Array.isArray(tasks) && tasks.length > 0;
-
-    // Verify task structure
-    const validTasks = tasks.filter(task =>
-      task.term && task.type && task.punctuation && task.truth
-    );
 
     return {
       result,
       tasks,
-      hasDependencies,
-      tasksGenerated,
-      validTasks,
+      hasDependencies: Object.keys(result.dependencies).length > 0,
+      tasksGenerated: result.goals.length > 0 && tasks.length > 0,
+      validTasks: tasks.filter(task => task.term && task.type && task.punctuation && task.truth),
       totalGoals: result.goals.length,
       taskCount: tasks.length
     };
-  } finally {
-    await system.stop();
-  }
+  });
 }

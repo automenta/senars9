@@ -219,8 +219,28 @@ class PlanProcessor extends Component {
     this.stats.lmProcessings++;
 
     try {
-      // A more robust prompt to extract goals from structured content and handle varied phrasing
-      const prompt = `You are a highly capable goal extraction engine. Your task is to identify and extract specific, actionable goals from the provided text.
+      const response = await this.lm.generateText(this._buildExtractionPrompt(content), {
+        temperature: 0.2,
+        maxTokens: 1024
+      });
+
+      const extractedGoals = this._parseJSONResponse(response);
+
+      if (!Array.isArray(extractedGoals)) {
+        Logger.warn('Initial JSON parsing of LM response failed. Trying fallback extraction.');
+        return this._handleFallbackExtraction(response, existingGoals);
+      }
+
+      const processedGoals = this._processExtractedGoals(extractedGoals);
+      return this._mergeGoals(existingGoals, processedGoals);
+    } catch (error) {
+      Logger.error('LM extraction failed', error);
+      return existingGoals;
+    }
+  }
+
+  _buildExtractionPrompt(content) {
+    return `You are a highly capable goal extraction engine. Your task is to identify and extract specific, actionable goals from the provided text.
 Goals can be explicitly marked (e.g., "Goal: implement feature") or implicitly stated (e.g., "we need to build the UI").
 Action-oriented statements should be treated as goals.
 
@@ -231,97 +251,121 @@ Analyze the following content and return ONLY a JSON array of objects, where eac
 
 Content to analyze:
 ${content}`;
-
-      const response = await this.lm.generateText(prompt, { temperature: 0.2, maxTokens: 1024 });
-      const extractedGoals = this._parseJSONResponse(response);
-
-      if (!Array.isArray(extractedGoals)) {
-        // If parsing fails or the response is not an array, use the fallback mechanism
-        Logger.warn('Initial JSON parsing of LM response failed. Trying fallback extraction.');
-        const processedGoals = this._extractGoalsFromLMResponse(response);
-        this.stats.goalsExtracted += processedGoals.length;
-        return [...existingGoals, ...processedGoals];
-      }
-
-      const processedGoals = extractedGoals.map(goal => ({
-        text: goal.text || goal.goal || goal.content || '',
-        source: 'lm_extraction',
-        confidence: typeof goal.confidence === 'number' ? goal.confidence : 
-                   typeof goal.confidence === 'string' ? parseFloat(goal.confidence) || 0.8 : 0.8,
-        priority: typeof goal.priority === 'number' ? goal.priority : 0.5,
-        timestamp: Date.now()
-      })).filter(goal => goal.text.trim()); // Filter out empty goals
-
-      const allGoals = [...existingGoals];
-      const textSet = new Set(existingGoals.map(g => g.text.toLowerCase()));
-
-      for (const goal of processedGoals) {
-        if (!textSet.has(goal.text.toLowerCase())) {
-          allGoals.push(goal);
-          textSet.add(goal.text.toLowerCase());
-        }
-      }
-
-      this.stats.goalsExtracted += processedGoals.length;
-      return allGoals;
-    } catch (error) {
-      Logger.error('LM extraction failed', error);
-      return existingGoals;
-    }
   }
 
-  /**
-   * Alternative approach to extract goals if JSON parsing fails
-   * @private
-   */
+  _handleFallbackExtraction(response, existingGoals) {
+    const processedGoals = this._extractGoalsFromLMResponse(response);
+    this.stats.goalsExtracted += processedGoals.length;
+    return [...existingGoals, ...processedGoals];
+  }
+
+  _processExtractedGoals(extractedGoals) {
+    return extractedGoals.map(goal => ({
+      text: goal.text || goal.goal || goal.content || '',
+      source: 'lm_extraction',
+      confidence: this._normalizeConfidence(goal.confidence),
+      priority: this._normalizePriority(goal.priority),
+      timestamp: Date.now()
+    })).filter(goal => goal.text.trim());
+  }
+
+  _normalizeConfidence(confidence) {
+    if (typeof confidence === 'number') return confidence;
+    if (typeof confidence === 'string') return parseFloat(confidence) || 0.8;
+    return 0.8;
+  }
+
+  _normalizePriority(priority) {
+    return typeof priority === 'number' ? priority : 0.5;
+  }
+
+  _mergeGoals(existingGoals, newGoals) {
+    const allGoals = [...existingGoals];
+    const textSet = new Set(existingGoals.map(g => g.text.toLowerCase()));
+
+    for (const goal of newGoals) {
+      if (!textSet.has(goal.text.toLowerCase())) {
+        allGoals.push(goal);
+        textSet.add(goal.text.toLowerCase());
+      }
+    }
+
+    this.stats.goalsExtracted += newGoals.length;
+    return allGoals;
+  }
+
   _extractGoalsFromLMResponse(response) {
     const goals = [];
-    // Look for goals in the response using common patterns
-    const goalPatterns = [
+
+    // Extract using common patterns
+    goals.push(...this._extractWithPatterns(response));
+
+    // If no matches from patterns, try line-based extraction
+    if (goals.length === 0) {
+      goals.push(...this._extractFromLines(response));
+    }
+
+    return goals;
+  }
+
+  _extractWithPatterns(response) {
+    const goals = [];
+    const patterns = [
       /(?:Goal|Task|Objective):\s*(.*?)(?:\n|$)/gi,
       /-\s*(?:Goal:)?\s*(.*?)(?:\n|$)/gi,
       /(?:\d+\.\s*|\*\s*)(.*?)(?:\n|$)/gi
     ];
 
-    for (const pattern of goalPatterns) {
+    for (const pattern of patterns) {
       let match;
       while ((match = pattern.exec(response)) !== null) {
         const text = match[1].trim();
-        if (text && text.length > 3) { // Filter out very short matches
-          goals.push({
-            text,
-            source: 'lm_extraction_fallback',
-            confidence: 0.75,
-            priority: 0.5,
-            timestamp: Date.now()
-          });
-        }
-      }
-    }
-
-    // If no matches from patterns, try to extract lines that look like goals
-    if (goals.length === 0) {
-      const lines = response.split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed && (trimmed.toLowerCase().includes('implement') || 
-                       trimmed.toLowerCase().includes('create') || 
-                       trimmed.toLowerCase().includes('build') ||
-                       trimmed.toLowerCase().includes('develop') ||
-                       trimmed.startsWith('- ') ||
-                       /^\d+\./.test(trimmed))) {
-          goals.push({
-            text: trimmed.replace(/^[-\*\d\.]\s*/, '').trim(),
-            source: 'lm_extraction_line',
-            confidence: 0.6,
-            priority: 0.5,
-            timestamp: Date.now()
-          });
+        if (text && text.length > 3) {
+          goals.push(this._createGoal(text, 'lm_extraction_fallback', 0.75));
         }
       }
     }
 
     return goals;
+  }
+
+  _extractFromLines(response) {
+    const goals = [];
+    const lines = response.split('\n');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (this._isGoalLikeLine(trimmed)) {
+        goals.push(this._createGoal(
+          trimmed.replace(/^[-\*\d\.]\s*/, '').trim(),
+          'lm_extraction_line',
+          0.6
+        ));
+      }
+    }
+
+    return goals;
+  }
+
+  _isGoalLikeLine(line) {
+    return line && (
+      line.toLowerCase().includes('implement') ||
+      line.toLowerCase().includes('create') ||
+      line.toLowerCase().includes('build') ||
+      line.toLowerCase().includes('develop') ||
+      line.startsWith('- ') ||
+      /^\d+\./.test(line)
+    );
+  }
+
+  _createGoal(text, source, confidence) {
+    return {
+      text,
+      source,
+      confidence,
+      priority: 0.5,
+      timestamp: Date.now()
+    };
   }
 
   async _readDocumentFromFile(filePath) {

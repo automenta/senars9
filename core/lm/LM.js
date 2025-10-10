@@ -160,9 +160,10 @@ class LM extends Component {
     return this.modelSelector.getAvailableModels();
   }
 
-  _countTokens = text => typeof text === 'string' 
-    ? text.split(/\s+/).filter(token => token.length > 0).length 
-    : 0;
+ _countTokens = text => {
+   if (typeof text !== 'string') return 0;
+   return text.split(/\s+/).filter(token => token.length > 0).length;
+ };
 
   getMetrics() {
     return {
