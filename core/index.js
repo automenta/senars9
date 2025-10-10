@@ -53,7 +53,7 @@ export { default as AStarPlanner } from './plan/AStarPlanner.js';
 // Export analysis components
 export { default as DataIngestor } from './analysis/DataIngestor.js';
 export { default as ReportGenerator } from './analysis/ReportGenerator.js';
-export { default as BootstrapSystem } from './analysis/BootstrapSystem.js';
+
 export { default as PatternDetector } from './analysis/PatternDetector.js';
 
 // Export Phase 3 metacognition components

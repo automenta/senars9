@@ -204,7 +204,6 @@ class System {
       rules: this.core.rules?.getHealth?.() || { status: 'unknown' },
       memory: this.core.memory?.getHealth?.() || { status: 'unknown' },
       reasoning: this.core.reasoning?.getStats?.() || { status: 'unknown' },
-      bootstrap: this.core.bootstrap?.getStats?.() || { status: 'unknown' },
       webSocketServer: this.core.webSocketServer?.getStats?.() || { status: 'unknown' }
     };
 

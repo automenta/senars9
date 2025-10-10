@@ -12,7 +12,7 @@ import PlanProcessor from '../plan/PlanProcessor.js';
 import AnalysisEngine from '../analysis/AnalysisEngine.js';
 import DataIngestor from '../analysis/DataIngestor.js';
 import ReportGenerator from '../analysis/ReportGenerator.js';
-import BootstrapSystem from '../analysis/BootstrapSystem.js';
+
 import PatternDetector from '../analysis/PatternDetector.js';
 import WebSocketServer from '../system/WebSocketServer.js';
 import { Focus } from '../memory/Memory.js';
@@ -59,7 +59,7 @@ class Core {
     this.registerComponent('analysis', new AnalysisEngine()); // Register AnalysisEngine component
     this.registerComponent('ingestor', new DataIngestor()); // Register DataIngestor component
     this.registerComponent('reports', new ReportGenerator()); // Register ReportGenerator component
-    this.registerComponent('bootstrap', new BootstrapSystem()); // Register BootstrapSystem component
+
     this.registerComponent('patternDetector', new PatternDetector()); // Register PatternDetector component
     this.registerComponent('webSocketServer', new WebSocketServer()); // Register WebSocketServer component
 
@@ -127,18 +127,7 @@ class Core {
       this.aStarPlanner.adjacencyBag = this.adjacencyBag;
     }
     
-    // Bootstrap system dependencies
-    if (this.bootstrap) {
-      this.bootstrap.setupDependencies(
-        this.lm || null,
-        this.planProcessor || null,
-        this.htnPlanner || null,
-        this  // Pass the core instance as the system reference
-      );
-      
-      // Add the plan source for NEXT.md to BootstrapSystem
-      this.bootstrap.addPlanSource('./NEXT.md', 'file');
-    }
+
     
     // Messages middleware and event broadcasting
     if (this.messages) {
