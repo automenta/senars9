@@ -5,7 +5,7 @@ async function runPhase3MetacognitionDemo() {
   console.log('===================================');
   console.log('Demonstrating advanced reasoning and self-awareness capabilities');
 
-  const system = new System({ version: '2.0.0' });
+  const system = new System({});
 
   try {
     await system.start();

@@ -29,9 +29,7 @@ async function runBootstrapDemo(config = {}) {
   console.log('===============================');
 
   // Create the core system first
-  const system = new System({
-    version: finalConfig.version
-  });
+  const system = new System({});
 
   try {
     await system.start();

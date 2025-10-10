@@ -8,9 +8,7 @@ import System from '../../core/system/System.js';
 // Export the main functionality for both tests and examples to use
 export async function demonstratePlanningSystem() {
   // Create and start the system
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -130,9 +128,7 @@ export async function demonstratePlanningSystem() {
 
 // Export a function specifically for testing planning functionality
 export async function testPlanningFunctionality() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -197,9 +193,7 @@ export async function testPlanningFunctionality() {
 
 // Export function for testing task dependency resolution
 export async function testTaskDependencyResolution() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();

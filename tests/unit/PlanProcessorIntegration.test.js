@@ -2,7 +2,7 @@ import System from '../../core/system/System.js';
 
 describe('PlanProcessor Integration', () => {
   test('system starts successfully with PlanProcessor component', async () => {
-    const system = new System({ version: '2.1.0' });
+    const system = new System({});
     await system.start();
     
     // Verify PlanProcessor is available
@@ -22,7 +22,7 @@ describe('PlanProcessor Integration', () => {
   });
 
   test('PlanProcessor can process simple text', async () => {
-    const system = new System({ version: '2.1.0' });
+    const system = new System({});
     await system.start();
     
     const processor = system.core.planProcessor;

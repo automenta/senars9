@@ -9,9 +9,7 @@ import BootstrapSystem from '../../agent/BootstrapAgent.js';
 // Export the main functionality for both tests and examples to use
 export async function demonstrateBootstrapAgent() {
   // Create and start the system
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -120,9 +118,7 @@ export async function demonstrateBootstrapAgent() {
 
 // Export a function specifically for testing bootstrap agent functionality
 export async function testBootstrapAgentFunctionality() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -195,9 +191,7 @@ export async function testBootstrapAgentFunctionality() {
 
 // Export function for testing plan file monitoring and updates
 export async function testPlanFileMonitoringAndUpdates() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -272,9 +266,7 @@ export async function testPlanFileMonitoringAndUpdates() {
 
 // Export function for testing self-directed goal processing
 export async function testSelfDirectedGoalProcessing() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -337,9 +329,7 @@ export async function testSelfDirectedGoalProcessing() {
 
 // Export function for testing improvement loop iteration
 export async function testImprovementLoopIteration() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();

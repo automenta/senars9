@@ -6,7 +6,7 @@
 import System from '../../core/system/System.js';
 
 // Shared utilities for plan processing demos
-const createSystem = () => new System({ version: '2.0.0' });
+const createSystem = () => new System({});
 
 const withSystem = async (fn) => {
   const system = createSystem();

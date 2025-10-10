@@ -5,7 +5,6 @@ async function runExample() {
   
   // Create and start the system
   const system = new System({
-    version: '2.0.0',
     components: {
       analysis: {
         minConfidence: 0.5,

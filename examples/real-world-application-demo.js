@@ -5,7 +5,7 @@ async function runRealWorldApplicationDemo() {
   console.log('====================================');
   console.log('Demonstrating practical applications and use cases');
 
-  const system = new System({ version: '2.0.0' });
+  const system = new System({});
 
   try {
     await system.start();

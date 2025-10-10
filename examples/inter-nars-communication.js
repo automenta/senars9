@@ -10,9 +10,7 @@ async function runInterNARSCommunicationExample() {
   console.log('============================================');
 
   // Create and start the system
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();

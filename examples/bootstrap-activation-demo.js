@@ -10,9 +10,7 @@ async function runBootstrapDemo(config = {}) {
   console.log(`🚀 SeNARS ${finalConfig.demoName}`);
   console.log('========================================');
 
-  const system = new System({
-    version: finalConfig.version
-  });
+  const system = new System({});
 
   try {
     await system.start();

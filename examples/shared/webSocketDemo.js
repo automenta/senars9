@@ -8,9 +8,7 @@ import System from '../../core/system/System.js';
 // Export the main functionality for both tests and examples to use
 export async function demonstrateWebSocketCommunication() {
   // Create and start the system
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -92,9 +90,7 @@ export async function demonstrateWebSocketCommunication() {
 
 // Export a function that can be used specifically for testing WebSocket functionality
 export async function testWebSocketFunctionality() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();

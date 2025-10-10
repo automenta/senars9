@@ -8,9 +8,7 @@ import System from '../../core/system/System.js';
 // Export the main functionality for both tests and examples to use
 export async function demonstrateMemoryAttention() {
   // Create and start the system
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -188,9 +186,7 @@ export async function demonstrateMemoryAttention() {
 
 // Export a function specifically for testing memory attention functionality
 export async function testMemoryAttentionFunctionality() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -271,9 +267,7 @@ export async function testMemoryAttentionFunctionality() {
 
 // Export function for testing multi-focus set operations
 export async function testMultiFocusSetOperations() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -333,9 +327,7 @@ export async function testMultiFocusSetOperations() {
 
 // Export function for testing attention decay and update mechanisms
 export async function testAttentionDecayAndUpdate() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -394,9 +386,7 @@ export async function testAttentionDecayAndUpdate() {
 
 // Export function for testing cross-focus set querying
 export async function testCrossFocusSetQuerying() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();

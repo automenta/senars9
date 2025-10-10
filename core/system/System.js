@@ -40,9 +40,8 @@ class System {
       
       // Emit system start event
       if (this.core.messages) {
-        this.core.messages.emit('system.started', { 
-          timestamp: this.startTime, 
-          version: this.config.version || '2.0.0' 
+        this.core.messages.emit('system.started', {
+          timestamp: this.startTime
         });
       }
     } catch (error) {
@@ -221,7 +220,6 @@ class System {
 
     return {
       ...health,
-      version: this.config.version || '2.0.0',
       config: this.config,
       timestamp: Date.now(),
       memoryUsage: this._getMemoryUsage()

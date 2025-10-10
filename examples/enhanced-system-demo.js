@@ -4,7 +4,7 @@ async function runEnhancedSystemDemo() {
   console.log('🚀 Enhanced SeNARS System Demo');
   console.log('===============================');
 
-  const system = new System({ version: '2.0.0' });
+  const system = new System({});
 
   try {
     await system.start();

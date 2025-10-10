@@ -7,9 +7,7 @@ import System from '../../core/system/System.js';
 
 // Export the main functionality for both tests and examples to use
 export async function demonstrateCognitiveCycle() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -229,9 +227,7 @@ export async function demonstrateCognitiveCycle() {
 
 // Export a function specifically for testing cognitive cycle functionality
 export async function testCognitiveCycleFunctionality() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -312,9 +308,7 @@ export async function testCognitiveCycleFunctionality() {
 
 // Export function for testing rule-memory interaction
 export async function testRuleMemoryInteraction() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -371,9 +365,7 @@ export async function testRuleMemoryInteraction() {
 
 // Export function for testing task processing flow
 export async function testTaskProcessingFlow() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -472,9 +464,7 @@ export async function testTaskProcessingFlow() {
 
 // Export function for testing end-to-end cognitive loop
 export async function testEndToEndCognitiveLoop() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();

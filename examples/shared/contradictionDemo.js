@@ -8,9 +8,7 @@ import System from '../../core/system/System.js';
 // Export the main functionality for both tests and examples to use
 export async function demonstrateContradictionResolution() {
   // Create and start the system
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -156,9 +154,7 @@ export async function demonstrateContradictionResolution() {
 
 // Export a function specifically for testing contradiction resolution functionality
 export async function testContradictionResolutionFunctionality() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -260,9 +256,7 @@ export async function testContradictionResolutionFunctionality() {
 
 // Export function for testing direct contradiction detection
 export async function testDirectContradictionDetection() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -308,9 +302,7 @@ export async function testDirectContradictionDetection() {
 
 // Export function for testing resolution strategy selection
 export async function testResolutionStrategySelection() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -372,9 +364,7 @@ export async function testResolutionStrategySelection() {
 
 // Export function for testing belief revision workflows
 export async function testBeliefRevisionWorkflows() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();

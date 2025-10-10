@@ -8,9 +8,7 @@ import System from '../../core/system/System.js';
 // Export the main functionality for both tests and examples to use
 export async function demonstrateSystemHealthMonitoring() {
   // Create and start the system
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -160,9 +158,7 @@ export async function demonstrateSystemHealthMonitoring() {
 
 // Export a function specifically for testing system health monitoring functionality
 export async function testSystemHealthMonitoringFunctionality() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -270,9 +266,7 @@ export async function testSystemHealthMonitoringFunctionality() {
 
 // Export function for testing component health aggregation
 export async function testComponentHealthAggregation() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -332,9 +326,7 @@ export async function testComponentHealthAggregation() {
 
 // Export function for testing performance metric collection
 export async function testPerformanceMetricCollection() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
@@ -413,9 +405,7 @@ export async function testPerformanceMetricCollection() {
 
 // Export function for testing cross-component event propagation
 export async function testCrossComponentEventPropagation() {
-  const system = new System({
-    version: '2.0.0'
-  });
+  const system = new System({});
 
   try {
     await system.start();
