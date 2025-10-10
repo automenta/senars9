@@ -189,7 +189,7 @@ class PatternDetector extends Component {
   async _detectPatterns(eventType, events, matcherCollection, storage, typeLabel) {
     const patterns = [];
     
-    for (const [matcherName, matcher] of matcherCollection) {
+    for (const [matcherName, matcher] of matcherCollection.entries()) {
       try {
         const extracted = matcher.extract(events);
         patterns.push(...extracted);
@@ -243,7 +243,7 @@ class PatternDetector extends Component {
     let matches = [];
     const { matchers, label } = config;
     
-    for (const [matcherName, matcher] of matchers) {
+    for (const [matcherName, matcher] of matchers.entries()) {
       try {
         matches = matcher.match(events, pattern);
         break; // Use the first matcher that matches the pattern type

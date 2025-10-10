@@ -30,7 +30,7 @@ class PlanProcessor extends Component {
     this.config = {
       maxGoals: DEFAULTS.PLAN_PROCESSOR_MAX_GOALS || 50,
       confidenceThreshold: DEFAULTS.PLAN_PROCESSOR_CONFIDENCE_THRESHOLD || 0.7,
-      enableLMProcessing: DEFAULTS.PLAN_PROCESSOR_ENABLE_LM !== false  // Enable by default if not explicitly disabled
+      enableLMProcessing: DEFAULTS.PLAN_PROCESSOR_ENABLE_LM !== false
     };
 
     this.stats = {
@@ -84,16 +84,11 @@ class PlanProcessor extends Component {
     let content, detectedFormat = format;
 
     if (typeof document === 'string') {
-      const filePathPatterns = [/^\.\//, /^\.\.\//, /^[a-zA-Z]:/, /^\//];
-      const hasFilePathPattern = filePathPatterns.some(pattern => pattern.test(document));
-      const hasFileExtension = /\.[a-zA-Z0-9]+/.test(document);
-      const looksLikeFilePath = hasFilePathPattern && hasFileExtension && document.length > 2;
-      
-      // Additional check: if content contains newlines or markdown-like structures, it's likely content
-      const likelyContent = document.includes('\n') || document.includes('# ') || document.includes('- ') || 
-                           document.includes('* ') || document.startsWith('{') || document.startsWith('[');
+      const filePathPatterns = [/^\.\//, /^\.\.\//, /^[a-zA-Z]:/, /^\//, /\//];
+      const looksLikeFilePath = filePathPatterns.some(pattern => pattern.test(document)) &&
+                               document.includes('.') && document.length > 2;
 
-      if (looksLikeFilePath && !likelyContent) {  // Only treat as file path if not likely content
+      if (looksLikeFilePath) {
         const extension = document.substring(document.lastIndexOf('.')).toLowerCase();
         detectedFormat = detectedFormat || this.supportedFormats[extension];
         content = await this._readDocumentFromFile(document);
@@ -205,13 +200,6 @@ class PlanProcessor extends Component {
 
   async _extractFromText(content, options) {
     const goals = [];
-    
-    if (this.lm && this.config.enableLMProcessing) {
-      // Use LM as the primary extraction method instead of brittle regex
-      return await this._extractWithLM(content, goals, options);
-    }
-    
-    // Fallback to regex only if LM is not available
     const uniqueGoals = new Map();
     const actionWords = ['implement', 'create', 'build', 'develop', 'design', 'test', 'deploy', 'optimize'];
 
@@ -240,6 +228,10 @@ class PlanProcessor extends Component {
       }
     }
 
+    if (this.lm && this.config.enableLMProcessing) {
+      return await this._extractWithLM(content, goals, options);
+    }
+
     return goals;
   }
 
@@ -247,31 +239,19 @@ class PlanProcessor extends Component {
     this.stats.lmProcessings++;
 
     try {
-      // Create a more specific prompt to extract goals from structured content
-      const prompt = `You are a goal extraction expert. Extract specific, actionable goals from the following content. 
-Consider items marked as goals, objectives, tasks, action items, or plans as actionable goals.
-Return ONLY a JSON array with text, confidence (0.0-1.0), and priority (0.0-1.0) fields for each goal.
-Content: ${content}`;
+      const prompt = `Extract specific, actionable goals from: ${content}
+Return as JSON array with text, confidence, priority fields.`;
 
-      const response = await this.lm.generateText(prompt, { temperature: 0.3, maxTokens: 800 });
+      const response = await this.lm.generateText(prompt, { temperature: 0.3, maxTokens: 500 });
       const extractedGoals = this._parseJSONResponse(response) || [];
 
-      if (!extractedGoals || !Array.isArray(extractedGoals)) {
-        // If JSON parsing fails, try a more specific parsing approach
-        const processedGoals = this._extractGoalsFromLMResponse(response);
-        const allGoals = [...existingGoals, ...processedGoals];
-        this.stats.goalsExtracted += processedGoals.length;
-        return allGoals;
-      }
-
       const processedGoals = extractedGoals.map(goal => ({
-        text: goal.text || goal.goal || goal.content || '',
+        text: goal.text,
         source: 'lm_extraction',
-        confidence: typeof goal.confidence === 'number' ? goal.confidence : 
-                   typeof goal.confidence === 'string' ? parseFloat(goal.confidence) || 0.8 : 0.8,
-        priority: typeof goal.priority === 'number' ? goal.priority : 0.5,
+        confidence: goal.confidence || 0.8,
+        priority: goal.priority || 0.5,
         timestamp: Date.now()
-      })).filter(goal => goal.text.trim()); // Filter out empty goals
+      }));
 
       const allGoals = [...existingGoals];
       const textSet = new Set(existingGoals.map(g => g.text.toLowerCase()));
@@ -289,60 +269,6 @@ Content: ${content}`;
       Logger.error('LM extraction failed', error);
       return existingGoals;
     }
-  }
-
-  /**
-   * Alternative approach to extract goals if JSON parsing fails
-   * @private
-   */
-  _extractGoalsFromLMResponse(response) {
-    const goals = [];
-    // Look for goals in the response using common patterns
-    const goalPatterns = [
-      /(?:Goal|Task|Objective):\s*(.*?)(?:\n|$)/gi,
-      /-\s*(?:Goal:)?\s*(.*?)(?:\n|$)/gi,
-      /(?:\d+\.\s*|\*\s*)(.*?)(?:\n|$)/gi
-    ];
-
-    for (const pattern of goalPatterns) {
-      let match;
-      while ((match = pattern.exec(response)) !== null) {
-        const text = match[1].trim();
-        if (text && text.length > 3) { // Filter out very short matches
-          goals.push({
-            text,
-            source: 'lm_extraction_fallback',
-            confidence: 0.75,
-            priority: 0.5,
-            timestamp: Date.now()
-          });
-        }
-      }
-    }
-
-    // If no matches from patterns, try to extract lines that look like goals
-    if (goals.length === 0) {
-      const lines = response.split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed && (trimmed.toLowerCase().includes('implement') || 
-                       trimmed.toLowerCase().includes('create') || 
-                       trimmed.toLowerCase().includes('build') ||
-                       trimmed.toLowerCase().includes('develop') ||
-                       trimmed.startsWith('- ') ||
-                       /^\d+\./.test(trimmed))) {
-          goals.push({
-            text: trimmed.replace(/^[-\*\d\.]\s*/, '').trim(),
-            source: 'lm_extraction_line',
-            confidence: 0.6,
-            priority: 0.5,
-            timestamp: Date.now()
-          });
-        }
-      }
-    }
-
-    return goals;
   }
 
   async _readDocumentFromFile(filePath) {

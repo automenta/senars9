@@ -177,7 +177,7 @@ This document outlines the streamlined development plan for SeNARS. It focuses o
 
 *   **Component**: `UnitTestAnalyzer`
     *   **Status**: 🔲
-    *   **Notes**: A high-leverage tool for self-improvement. It would ingest test failure logs, use the `LM` to hypothesize the cause, and suggest code changes.
+    *   **Notes**: A high-leverage tool for self-improvement. Ingest test failure logs, coverage, and benchmarks.  Apply reasoning. Hypothesize causes (with LM). Report discoveries. Suggest code changes and development plans.
 
 *   **Component**: AI-Powered Metaprogramming Tools
     *   **Status**: 🔲

@@ -286,6 +286,7 @@ class Memory extends Component {
   getStats() {
     return {
       storageSize: this.storage.size(),
+      itemCount: this.storage.size(), // Add itemCount property that matches storageSize
       cacheSize: this.cache.size,
       cacheMaxSize: this.cache.cache.maxSize,
       focusSets: this.focus?.getFocusSetStats() || {},

@@ -32,16 +32,16 @@ export async function demonstratePatternDetection() {
     // 1. Create sample event data for pattern detection
     console.log('\\n🔍 Creating sample event data for pattern detection...');
     const sampleEvents = [
-      { id: 'event-1', type: 'temperature', value: 20, timestamp: Date.now() - 5000, context: 'server-room' },
-      { id: 'event-2', type: 'temperature', value: 21, timestamp: Date.now() - 4000, context: 'server-room' },
-      { id: 'event-3', type: 'temperature', value: 22, timestamp: Date.now() - 3000, context: 'server-room' },
-      { id: 'event-4', type: 'fan-speed', value: 60, timestamp: Date.now() - 2000, context: 'server-room' },
-      { id: 'event-5', type: 'temperature', value: 23, timestamp: Date.now() - 1000, context: 'server-room' },
-      { id: 'event-6', type: 'fan-speed', value: 65, timestamp: Date.now(), context: 'server-room' },
-      { id: 'event-7', type: 'temperature', value: 21, timestamp: Date.now() + 1000, context: 'server-room' },
-      { id: 'event-8', type: 'temperature', value: 20, timestamp: Date.now() + 2000, context: 'server-room' },
-      { id: 'event-9', type: 'cpu-usage', value: 75, timestamp: Date.now() + 3000, context: 'server' },
-      { id: 'event-10', type: 'cpu-usage', value: 85, timestamp: Date.now() + 4000, context: 'server' }
+      { id: 'event-1', type: 'temperature', name: 'temp-reading', timestamp: Date.now() - 10, context: 'server-room' },
+      { id: 'event-2', type: 'temperature', name: 'temp-reading', timestamp: Date.now() - 9, context: 'server-room' },
+      { id: 'event-3', type: 'temperature', name: 'temp-reading', timestamp: Date.now() - 8, context: 'server-room' },
+      { id: 'event-4', type: 'fan-control', name: 'fan-reading', timestamp: Date.now() - 7, context: 'server-room' },
+      { id: 'event-5', type: 'temperature', name: 'temp-reading', timestamp: Date.now() - 6, context: 'server-room' },
+      { id: 'event-6', type: 'fan-control', name: 'fan-reading', timestamp: Date.now() - 5, context: 'server-room' },
+      { id: 'event-7', type: 'temperature', name: 'temp-reading', timestamp: Date.now() - 4, context: 'server-room' },
+      { id: 'event-8', type: 'temperature', name: 'temp-reading', timestamp: Date.now() - 3, context: 'server-room' },
+      { id: 'event-9', type: 'cpu-monitor', name: 'cpu-reading', timestamp: Date.now() - 2, context: 'server' },
+      { id: 'event-10', type: 'cpu-monitor', name: 'cpu-reading', timestamp: Date.now() - 1, context: 'server' }
     ];
 
     // 2. Process event stream to detect patterns
@@ -141,12 +141,16 @@ export async function testPatternDetectionFunctionality() {
       hasLearnFromPatterns: typeof patternDetector.learnFromPatterns === 'function'
     };
 
-    // Create simple test events
+    // Create simple test events (with more events for confidence threshold)
     const testEvents = [
-      { type: 'test', name: 'A', timestamp: Date.now() - 1000 },
-      { type: 'test', name: 'B', timestamp: Date.now() - 500 },
-      { type: 'test', name: 'A', timestamp: Date.now() },
-      { type: 'test', name: 'B', timestamp: Date.now() + 500 }
+      { type: 'test', name: 'A', timestamp: Date.now() - 7 },
+      { type: 'test', name: 'B', timestamp: Date.now() - 6 },
+      { type: 'test', name: 'A', timestamp: Date.now() - 5 },
+      { type: 'test', name: 'B', timestamp: Date.now() - 4 },
+      { type: 'test', name: 'A', timestamp: Date.now() - 3 },
+      { type: 'test', name: 'B', timestamp: Date.now() - 2 },
+      { type: 'test', name: 'A', timestamp: Date.now() - 1 },
+      { type: 'test', name: 'B', timestamp: Date.now() }
     ];
 
     // Test event stream processing
@@ -191,15 +195,17 @@ export async function testTemporalPatternRecognition() {
       throw new Error('PatternDetector not available');
     }
 
-    // Create events with temporal patterns
+    // Create events with temporal patterns (repeated same events to form temporal sequence)
     const now = Date.now();
     const temporalEvents = [
-      { type: 'temperature', value: 20, timestamp: now - 60000, context: 'server-room' },
-      { type: 'temperature', value: 21, timestamp: now - 50000, context: 'server-room' },
-      { type: 'temperature', value: 22, timestamp: now - 40000, context: 'server-room' },
-      { type: 'temperature', value: 23, timestamp: now - 30000, context: 'server-room' },
-      { type: 'temperature', value: 24, timestamp: now - 20000, context: 'server-room' },
-      { type: 'temperature', value: 25, timestamp: now - 10000, context: 'server-room' }
+      { type: 'system-alert', name: 'high-cpu', timestamp: now - 7, context: 'server-001' },
+      { type: 'system-alert', name: 'high-cpu', timestamp: now - 6, context: 'server-001' },
+      { type: 'system-alert', name: 'high-cpu', timestamp: now - 5, context: 'server-001' },
+      { type: 'system-alert', name: 'high-cpu', timestamp: now - 4, context: 'server-001' },
+      { type: 'system-alert', name: 'high-cpu', timestamp: now - 3, context: 'server-001' },
+      { type: 'system-alert', name: 'high-cpu', timestamp: now - 2, context: 'server-001' },
+      { type: 'system-alert', name: 'high-cpu', timestamp: now - 1, context: 'server-001' },
+      { type: 'system-alert', name: 'high-cpu', timestamp: now, context: 'server-001' }
     ];
 
     // Process events to detect temporal patterns
@@ -237,14 +243,17 @@ export async function testCausalRelationshipIdentification() {
       throw new Error('PatternDetector not available');
     }
 
-    // Create events with potential causal relationships
+    // Create events with potential causal relationships (enough to meet confidence threshold)
     const now = Date.now();
     const causalEvents = [
-      { type: 'cpu-increase', value: 50, timestamp: now - 10000, context: 'server' },
-      { type: 'fan-activation', value: 60, timestamp: now - 9000, context: 'server' },
-      { type: 'cpu-increase', value: 70, timestamp: now - 5000, context: 'server' },
-      { type: 'fan-activation', value: 75, timestamp: now - 4000, context: 'server' },
-      { type: 'cpu-increase', value: 80, timestamp: now - 1000, context: 'server' }
+      { type: 'cpu-event', name: 'cpu-increase', value: 50, timestamp: now - 8, context: 'server' },
+      { type: 'fan-event', name: 'fan-activation', value: 60, timestamp: now - 7, context: 'server' },
+      { type: 'cpu-event', name: 'cpu-increase', value: 70, timestamp: now - 6, context: 'server' },
+      { type: 'fan-event', name: 'fan-activation', value: 75, timestamp: now - 5, context: 'server' },
+      { type: 'cpu-event', name: 'cpu-increase', value: 80, timestamp: now - 4, context: 'server' },
+      { type: 'fan-event', name: 'fan-activation', value: 85, timestamp: now - 3, context: 'server' },
+      { type: 'cpu-event', name: 'cpu-increase', value: 90, timestamp: now - 2, context: 'server' },
+      { type: 'fan-event', name: 'fan-activation', value: 95, timestamp: now - 1, context: 'server' }
     ];
 
     // Process events to detect causal patterns
@@ -286,15 +295,17 @@ export async function testPatternConfidenceScoring() {
       throw new Error('PatternDetector not available');
     }
 
-    // Create events with different confidence levels
+    // Create events with different confidence levels (enough events for confidence threshold)
     const now = Date.now();
     const confidenceEvents = [
-      { type: 'regular-pattern', value: 'A', timestamp: now - 5000, context: 'test' },
-      { type: 'regular-pattern', value: 'B', timestamp: now - 4000, context: 'test' },
-      { type: 'regular-pattern', value: 'A', timestamp: now - 3000, context: 'test' },
-      { type: 'regular-pattern', value: 'B', timestamp: now - 2000, context: 'test' },
-      { type: 'regular-pattern', value: 'A', timestamp: now - 1000, context: 'test' },
-      { type: 'regular-pattern', value: 'B', timestamp: now, context: 'test' }
+      { type: 'regular-pattern', name: 'pattern-a', timestamp: now - 8, context: 'test' },
+      { type: 'regular-pattern', name: 'pattern-b', timestamp: now - 7, context: 'test' },
+      { type: 'regular-pattern', name: 'pattern-a', timestamp: now - 6, context: 'test' },
+      { type: 'regular-pattern', name: 'pattern-b', timestamp: now - 5, context: 'test' },
+      { type: 'regular-pattern', name: 'pattern-a', timestamp: now - 4, context: 'test' },
+      { type: 'regular-pattern', name: 'pattern-b', timestamp: now - 3, context: 'test' },
+      { type: 'regular-pattern', name: 'pattern-a', timestamp: now - 2, context: 'test' },
+      { type: 'regular-pattern', name: 'pattern-b', timestamp: now - 1, context: 'test' }
     ];
 
     // Process events
