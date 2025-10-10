@@ -56,27 +56,34 @@ class NarseseTranslator extends Component {
 
   _createObj(type, matches, op) {
     const [, a, b] = matches;
-    switch (type) {
-      case 'inheritance': return { type, subject: a?.trim(), predicate: b?.trim(), operator: op };
-      case 'implication': return { type, antecedent: a?.trim(), consequent: b?.trim(), operator: op };
-      case 'equivalence': return { type, term1: a?.trim(), term2: b?.trim(), operator: op };
-      case 'product':
-      case 'extensional_intersection':
-      case 'intensional_intersection': return { type, elements: [a?.trim(), b?.trim()], operator: op };
-      default: return { type, a: a?.trim(), b: b?.trim(), operator: op };
-    }
+    const trimA = a?.trim();
+    const trimB = b?.trim();
+    
+    const objBuilders = {
+      'inheritance': () => ({ type, subject: trimA, predicate: trimB, operator: op }),
+      'implication': () => ({ type, antecedent: trimA, consequent: trimB, operator: op }),
+      'equivalence': () => ({ type, term1: trimA, term2: trimB, operator: op }),
+      'product': () => ({ type, elements: [trimA, trimB], operator: op }),
+      'extensional_intersection': () => ({ type, elements: [trimA, trimB], operator: op }),
+      'intensional_intersection': () => ({ type, elements: [trimA, trimB], operator: op })
+    };
+    
+    return objBuilders[type] ? objBuilders[type]() : { type, a: trimA, b: trimB, operator: op };
   }
 
   _formatObj(obj, op) {
-    switch (obj.type) {
-      case 'inheritance': return `<${obj.subject} ${op} ${obj.predicate}>`;
-      case 'implication': return `<${obj.antecedent} ${op} ${obj.consequent}>`;
-      case 'equivalence': return `<${obj.term1} ${op} ${obj.term2}>`;
-      case 'product':
-      case 'extensional_intersection':
-      case 'intensional_intersection': return `(${obj.elements?.join(` ${op} `)})`;
-      default: return obj.term ? (obj.punctuation ? `${obj.term}${obj.punctuation}` : obj.term) : JSON.stringify(obj);
-    }
+    const formatters = {
+      'inheritance': () => `<${obj.subject} ${op} ${obj.predicate}>`,
+      'implication': () => `<${obj.antecedent} ${op} ${obj.consequent}>`,
+      'equivalence': () => `<${obj.term1} ${op} ${obj.term2}>`,
+      'product': () => `(${obj.elements?.join(` ${op} `)})`,
+      'extensional_intersection': () => `(${obj.elements?.join(` ${op} `)})`,
+      'intensional_intersection': () => `(${obj.elements?.join(` ${op} `)})`
+    };
+    
+    return formatters[obj.type] ? formatters[obj.type]() : 
+           obj.term ? (obj.punctuation ? `${obj.term}${obj.punctuation}` : obj.term) : 
+           JSON.stringify(obj);
   }
 
   narseseToJs(narsese) {
@@ -177,31 +184,34 @@ class NarseseTranslator extends Component {
 
   _parseByOp(expr, op) {
     const parts = expr.split(op);
-    switch (op) {
-      case '*': return { type: 'product', elements: parts.map(p => p.trim()), operator: op };
-      case ' --> ': return { type: 'inheritance', subject: parts[0].trim(), predicate: parts[1].trim(), operator: '-->' };
-      case ' =/> ': return { type: 'implication', antecedent: parts[0].trim(), consequent: parts[1].trim(), operator: '=/>' };
-      case ' <=> ': return { type: 'equivalence', term1: parts[0].trim(), term2: parts[1].trim(), operator: '<=>' };
-      default: return { type: 'unknown', expression: expr, operator: op };
-    }
+    const parsers = {
+      '*': () => ({ type: 'product', elements: parts.map(p => p.trim()), operator: op }),
+      ' --> ': () => ({ type: 'inheritance', subject: parts[0].trim(), predicate: parts[1].trim(), operator: '-->' }),
+      ' =/> ': () => ({ type: 'implication', antecedent: parts[0].trim(), consequent: parts[1].trim(), operator: '=/>' }),
+      ' <=> ': () => ({ type: 'equivalence', term1: parts[0].trim(), term2: parts[1].trim(), operator: '<=>' })
+    };
+    
+    return parsers[op] ? parsers[op]() : { type: 'unknown', expression: expr, operator: op };
   }
 
   _formatCompound(obj) {
-    switch (obj.operator) {
-      case '*': return `(${obj.elements.join(' * ')})`;
-      case '|': return `(${obj.elements.join(' | ')})`;
-      case '&': return `(${obj.elements.join(' & ')})`;
-      default: return obj.value || obj.toString();
-    }
+    const compoundFormatters = {
+      '*': `(${obj.elements.join(' * ')})`,
+      '|': `(${obj.elements.join(' | ')})`,
+      '&': `(${obj.elements.join(' & ')})`
+    };
+    
+    return compoundFormatters[obj.operator] || obj.value || obj.toString();
   }
 
   _formatStatement(obj) {
-    switch (obj.operator) {
-      case '-->': return `<${obj.subject} --> ${obj.predicate}>`;
-      case '=/': return `<${obj.antecedent} =/> ${obj.consequent}>`;
-      case '<=>': return `<${obj.term1} <=> ${obj.term2}>`;
-      default: return obj.value || obj.toString();
-    }
+    const statementFormatters = {
+      '-->': `<${obj.subject} --> ${obj.predicate}>`,
+      '=/': `<${obj.antecedent} =/> ${obj.consequent}>`,
+      '<=>': `<${obj.term1} <=> ${obj.term2}>`
+    };
+    
+    return statementFormatters[obj.operator] || obj.value || obj.toString();
   }
 
   _formatSimpleTerm(obj) {

@@ -128,25 +128,20 @@ class PlanProcessor extends Component {
     this.stats.documentsProcessed++;
 
     // Process based on format
-    let goals = [];
-    switch (detectedFormat) {
-      case 'markdown':
-        goals = await this._processMarkdown(content, options);
-        break;
-      case 'json':
-        goals = await this._processJSON(content, options);
-        break;
-      case 'yaml':
-        goals = await this._processYAML(content, options);
-        break;
-      case 'text':
-      case 'javascript':
-      case 'typescript':
-        goals = await this._processText(content, options);
-        break;
-      default:
-        throw new Error(`Unsupported document format: ${detectedFormat}`);
+    const formatProcessors = {
+      'markdown': () => this._processMarkdown(content, options),
+      'json': () => this._processJSON(content, options),
+      'yaml': () => this._processYAML(content, options),
+      'text': () => this._processText(content, options),
+      'javascript': () => this._processText(content, options),
+      'typescript': () => this._processText(content, options)
+    };
+    
+    if (!formatProcessors[detectedFormat]) {
+      throw new Error(`Unsupported document format: ${detectedFormat}`);
     }
+    
+    const goals = await formatProcessors[detectedFormat]();
 
     // Filter goals based on confidence threshold
     const filteredGoals = goals.filter(goal => goal.confidence >= this.config.confidenceThreshold);

@@ -446,21 +446,18 @@ class WebSocketServer extends Component {
   _handleStreaming(clientId, message) {
     const { streamId, action, data, streamType } = message;
 
-    switch(action) {
-      case 'subscribe':
-        this._handleStreamSubscription(clientId, streamId, streamType, data);
-        break;
-      case 'unsubscribe':
-        this._handleStreamUnsubscription(clientId, streamId);
-        break;
-      case 'publish':
-        this._handleStreamPublish(clientId, streamId, data);
-        break;
-      case 'broadcast':
-        this._handleStreamBroadcast(clientId, streamType, data);
-        break;
-      default:
-        Logger.warn(`Unknown streaming action: ${action}`);
+    const actionHandlers = {
+      'subscribe': () => this._handleStreamSubscription(clientId, streamId, streamType, data),
+      'unsubscribe': () => this._handleStreamUnsubscription(clientId, streamId),
+      'publish': () => this._handleStreamPublish(clientId, streamId, data),
+      'broadcast': () => this._handleStreamBroadcast(clientId, streamType, data)
+    };
+    
+    const handler = actionHandlers[action];
+    if (handler) {
+      handler();
+    } else {
+      Logger.warn(`Unknown streaming action: ${action}`);
     }
   }
 

@@ -175,4 +175,19 @@ describe('Term', () => {
     expect(TermType.INTENSIONAL_SET).toBe('intensional_set');
     expect(TermType.ATOM).toBe('atom');
   });
+  
+  test('should handle edge cases and error conditions', () => {
+    // Test computeHash with null components
+    const hash1 = Term.computeHash('test', 'atom', null);
+    const hash2 = Term.computeHash('test', 'atom', null);
+    expect(hash1).toBe(hash2); // Same inputs should produce same hash
+    
+    // Test equals with various types
+    const term = Term.newAtom('A');
+    expect(term.equals(null)).toBe(false);
+    expect(term.equals({})).toBe(false);
+    expect(term.equals('not a term')).toBe(false);
+    expect(term.equals(Term.newAtom('B'))).toBe(false);
+    expect(term.equals(Term.newAtom('A'))).toBe(true);
+  });
 });

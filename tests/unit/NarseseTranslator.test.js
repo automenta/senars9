@@ -120,4 +120,25 @@ describe('NarseseTranslator', () => {
     expect(textBatch).toHaveLength(inputs.length);
     expect(textBatch).toEqual(inputs);
   });
+
+  test('should handle error cases', () => {
+    // Test narseseToJs with invalid input
+    expect(() => translator.narseseToJs(null)).toThrow();
+    expect(() => translator.narseseToJs(123)).toThrow();
+    expect(() => translator.narseseToJs({})).toThrow();
+    
+    // Test jsToNarsese with invalid input
+    expect(() => translator.jsToNarsese(null)).toThrow();
+    expect(() => translator.jsToNarsese('not an object')).toThrow();
+    
+    // Test validateNarsese with invalid input
+    expect(translator.validateNarsese(null)).toBe(false);
+    expect(translator.validateNarsese(123)).toBe(false);
+    
+    // Test batch methods with invalid input
+    expect(() => translator.batchNarseseToJs(null)).toThrow();
+    expect(() => translator.batchNarseseToJs('not array')).toThrow();
+    expect(() => translator.batchJsToNarsese(null)).toThrow();
+    expect(() => translator.batchJsToNarsese('not array')).toThrow();
+  });
 });

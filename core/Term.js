@@ -102,6 +102,9 @@ export class Term {
   }
 
   static simplifyComponents(termType, components) {
+    const ASSOCIATIVE_OPERATORS = [TermType.CONJUNCTION, TermType.DISJUNCTION];
+    const COMMUTATIVE_OPERATORS = [TermType.CONJUNCTION, TermType.DISJUNCTION, TermType.SIMILARITY, TermType.EQUIVALENCE];
+    
     let simplified = true;
     let currentComponents = [...components];
     
@@ -109,7 +112,7 @@ export class Term {
       simplified = false;
       
       // Apply flattening for associative operators (conjunction, disjunction)
-      if ([TermType.CONJUNCTION, TermType.DISJUNCTION].includes(termType)) {
+      if (ASSOCIATIVE_OPERATORS.includes(termType)) {
         let flattened = [];
         for (const comp of currentComponents) {
           if (comp.termType === termType && comp.components) {
@@ -123,7 +126,7 @@ export class Term {
       }
       
       // Apply sorting and deduplication for commutative operators
-      if ([TermType.CONJUNCTION, TermType.DISJUNCTION, TermType.SIMILARITY, TermType.EQUIVALENCE].includes(termType)) {
+      if (COMMUTATIVE_OPERATORS.includes(termType)) {
         // Sort lexicographically by hash to ensure canonical form
         currentComponents.sort((a, b) => a.hash.localeCompare(b.hash));
         

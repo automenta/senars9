@@ -68,20 +68,13 @@ function _extractStatementComponents(input) {
   }
   
   // Determine the punctuation type
-  let punctuation;
-  switch (punct) {
-    case '.':
-      punctuation = Punctuation.BELIEF;
-      break;
-    case '!':
-      punctuation = Punctuation.GOAL;
-      break;
-    case '?':
-      punctuation = Punctuation.QUESTION;
-      break;
-    default:
-      punctuation = Punctuation.BELIEF; // default
-  }
+  const punctuationMap = {
+    '.': Punctuation.BELIEF,
+    '!': Punctuation.GOAL,
+    '?': Punctuation.QUESTION
+  };
+  
+  let punctuation = punctuationMap[punct] || Punctuation.BELIEF; // default
   
   // Create truth value if both frequency and confidence were found
   const truthValue = (frequency !== undefined && confidence !== undefined) 
