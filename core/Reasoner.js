@@ -145,22 +145,17 @@ export class Reasoner {
    * @returns {Task[]} Array of newly derived tasks
    */
   _basicReason(focusSet, memory, context) {
-    const derivedTasks = [];
-
-    for (const task of focusSet) {
-      // Find and apply all rules relevant to the current task
-      const applicableRules = this.ruleEngine.getApplicableRules(task);
-      if (applicableRules) {
-        for (const rule of applicableRules) {
-          const newTasks = rule.apply(task, memory, context);
-          if (Array.isArray(newTasks)) {
-            derivedTasks.push(...newTasks);
-          }
-        }
-      }
-    }
-
-    return derivedTasks;
+    return focusSet
+      .map(task => {
+        const applicableRules = this.ruleEngine.getApplicableRules(task);
+        if (!applicableRules) return [];
+        
+        return applicableRules
+          .map(rule => rule.apply(task, memory, context))
+          .filter(newTasks => Array.isArray(newTasks))
+          .flat();
+      })
+      .flat();
   }
 
   /**

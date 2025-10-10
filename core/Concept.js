@@ -47,17 +47,10 @@ export class Concept {
   getMostRecentTruth() {
     if (this.truths.size === 0) return null;
     
-    let latestTime = -Infinity;
-    let latestTruth = null;
+    const latestEntry = [...this.truths.entries()]
+      .reduce((latest, [time, truth]) => time > latest[0] ? [time, truth] : latest, [-Infinity, null]);
     
-    for (const [time, truth] of this.truths) {
-      if (time > latestTime) {
-        latestTime = time;
-        latestTruth = truth;
-      }
-    }
-    
-    return latestTruth;
+    return latestEntry[1];
   }
 
   addResource(key, value) {

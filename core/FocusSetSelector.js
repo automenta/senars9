@@ -46,29 +46,14 @@ export class FocusSetSelector {
     }
 
     // 2. Calculate normalization factors for urgency and diversity
-    const maxUrgency = candidates.reduce((max, task) => {
-      const urgency = currentTime - task.getAccessedAt();
-      return Math.max(max, urgency);
-    }, 0);
-
-    const maxDiversity = candidates.reduce((max, task) => {
-      return Math.max(max, task.term.complexity);
-    }, 0);
+    const maxUrgency = Math.max(...candidates.map(task => currentTime - task.getAccessedAt()));
+    const maxDiversity = Math.max(...candidates.map(task => task.term.complexity));
 
     // 3. Calculate composite scores for all candidate tasks
     const scoredTasks = candidates.map(task => {
-      const urgency = maxUrgency > 0 
-        ? (currentTime - task.getAccessedAt()) / maxUrgency 
-        : 0;
-      
-      const diversity = maxDiversity > 0 
-        ? task.term.complexity / maxDiversity 
-        : 0;
-
-      const score = task.getPriority() + 
-                   this.urgencyWeight * urgency + 
-                   this.diversityFactor * diversity;
-
+      const urgency = maxUrgency > 0 ? (currentTime - task.getAccessedAt()) / maxUrgency : 0;
+      const diversity = maxDiversity > 0 ? task.term.complexity / maxDiversity : 0;
+      const score = task.getPriority() + this.urgencyWeight * urgency + this.diversityFactor * diversity;
       return { score, task };
     });
 

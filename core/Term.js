@@ -132,12 +132,13 @@ export class Term {
         // Sort lexicographically by hash to ensure canonical form
         currentComponents.sort((a, b) => a.hash.localeCompare(b.hash));
         
-        // Remove duplicates with a more efficient approach
-        const uniqueMap = new Map();
-        for (const comp of currentComponents) {
-          uniqueMap.set(comp.hash, comp);
-        }
-        const uniqueComponents = Array.from(uniqueMap.values());
+        // Remove duplicates efficiently using a Set based on hash
+        const seenHashes = new Set();
+        const uniqueComponents = currentComponents.filter(comp => {
+          if (seenHashes.has(comp.hash)) return false;
+          seenHashes.add(comp.hash);
+          return true;
+        });
         
         if (uniqueComponents.length !== currentComponents.length) {
           simplified = true;

@@ -347,28 +347,22 @@ export class Memory {
    * @returns {boolean} True if the task was removed, false if it didn't exist
    */
   removeTask(termHash) {
-    // Try to remove from short-term first
-    let taskToRemove = this.shortTermTasks.get(termHash);
-    if (!taskToRemove) {
-      // If not in short-term, try long-term
-      taskToRemove = this.longTermTasks.get(termHash);
-      if (taskToRemove) {
-        this.longTermTasks.delete(termHash);
-      }
-    } else {
+    // Try to remove from short-term first, otherwise long-term
+    const taskToRemove = this.shortTermTasks.get(termHash) || this.longTermTasks.get(termHash);
+    
+    if (!taskToRemove) return false;
+    
+    // Remove from the appropriate storage
+    if (this.shortTermTasks.has(termHash)) {
       this.shortTermTasks.delete(termHash);
+    } else {
+      this.longTermTasks.delete(termHash);
     }
 
-    if (taskToRemove) {
-      // Update total task count if the task was removed
-      this.totalTasks = Math.max(0, this.totalTasks - 1);
-      // Delegate the removal of the task from all indexes
-      this.indexManager.removeTask(taskToRemove);
-      return true;
-    } else {
-      // Task was not found in memory
-      return false;
-    }
+    // Update total task count and remove from indexes
+    this.totalTasks = Math.max(0, this.totalTasks - 1);
+    this.indexManager.removeTask(taskToRemove);
+    return true;
   }
 
   /**
@@ -383,45 +377,32 @@ export class Memory {
    */
   consolidate(currentTime) {
     // --- 1. Forgetting ---
-    const expiredTaskHashes = [];
     for (const [hash, task] of this.shortTermTasks) {
       if (task.isExpired(currentTime)) {
-        expiredTaskHashes.push(hash);
+        this.removeTask(hash);
       }
-    }
-    
-    for (const hash of expiredTaskHashes) {
-      this.removeTask(hash);
     }
 
     // --- 2. Priority Decay ---
     // A small, constant factor by which priority decays each cycle for inactive tasks.
     const priorityDecayFactor = 0.001;
 
-    for (const task of this.getAllTasks()) {
+    this.getAllTasks().forEach(task => {
       // Only decay priority if the task was not accessed in the current cycle.
       if (task.getAccessedAt() < currentTime) {
-        const currentPriority = task.getPriority();
-        // Ensure priority does not fall below zero.
-        const newPriority = Math.max(0.0, currentPriority - priorityDecayFactor);
+        const newPriority = Math.max(0.0, task.getPriority() - priorityDecayFactor);
         task.setPriority(newPriority);
       }
-    }
+    });
 
     // --- 3. Promotion to Long-Term Memory ---
-    const tasksToMove = [];
-    for (const [hash, task] of this.shortTermTasks) {
-      if (task.getPriority() >= 0.7) {  // Threshold for promotion
-        tasksToMove.push(hash);
-      }
-    }
+    const tasksToPromote = [...this.shortTermTasks.entries()].filter(([hash, task]) => 
+      task.getPriority() >= 0.7  // Threshold for promotion
+    );
 
-    for (const hash of tasksToMove) {
-      const task = this.shortTermTasks.get(hash);
-      if (task) {
-        this.shortTermTasks.delete(hash);
-        this.longTermTasks.set(hash, task);
-      }
+    for (const [hash, task] of tasksToPromote) {
+      this.shortTermTasks.delete(hash);
+      this.longTermTasks.set(hash, task);
     }
 
     this.consolidationCount++;
@@ -435,14 +416,9 @@ export class Memory {
    * @returns {Task[]} Array of tasks
    */
   _getTasksFromHashes(taskHashes) {
-    const results = [];
-    for (const hash of taskHashes) {
-      const task = this.getTask(hash);
-      if (task) {
-        results.push(task);
-      }
-    }
-    return results;
+    return Array.from(taskHashes)
+      .map(hash => this.getTask(hash))
+      .filter(task => task !== null);
   }
 
   /**
@@ -454,15 +430,12 @@ export class Memory {
   _ensureConceptExistsRecursive(term, currentTime) {
     // If it's a compound term, first ensure its components exist (post-order traversal).
     if (term.components && Array.isArray(term.components)) {
-      for (const component of term.components) {
-        this._ensureConceptExistsRecursive(component, currentTime);
-      }
+      term.components.forEach(component => this._ensureConceptExistsRecursive(component, currentTime));
     }
 
     // Now, handle the current term. Use hash map to insert only if it doesn't exist.
     if (!this.conceptStorage.has(term.hash)) {
-      const concept = new Concept(term, currentTime);
-      this.conceptStorage.set(term.hash, concept);
+      this.conceptStorage.set(term.hash, new Concept(term, currentTime));
     }
   }
 
