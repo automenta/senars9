@@ -163,33 +163,7 @@ class PatternDetector extends Component {
    * @private
    */
   async _detectTemporalPatterns(events) {
-    const patterns = [];
-    
-    for (const [matcherName, matcher] of this.temporalMatchers) {
-      try {
-        const extracted = matcher.extract(events);
-        patterns.push(...extracted);
-      } catch (error) {
-        Logger.error(`Temporal pattern extraction failed: ${error.message}`);
-      }
-    }
-    
-    // Filter and store significant patterns
-    const significantPatterns = patterns.filter(pattern => 
-      pattern.frequency >= this.config.minPatternFrequency
-    );
-    
-    // Store in temporal patterns storage
-    significantPatterns.forEach(pattern => {
-      const patternId = this._generatePatternId(pattern);
-      this.temporalPatterns.set(patternId, {
-        ...pattern,
-        detectedAt: Date.now(),
-        type: 'temporal'
-      });
-    });
-    
-    return significantPatterns;
+    return await this._detectPatterns('temporal', events, this.temporalMatchers, this.temporalPatterns, 'Temporal');
   }
 
   /**
@@ -197,33 +171,7 @@ class PatternDetector extends Component {
    * @private
    */
   async _detectCausalPatterns(events) {
-    const patterns = [];
-    
-    for (const [matcherName, matcher] of this.causalMatchers) {
-      try {
-        const extracted = matcher.extract(events);
-        patterns.push(...extracted);
-      } catch (error) {
-        Logger.error(`Causal pattern extraction failed: ${error.message}`);
-      }
-    }
-    
-    // Filter and store significant patterns
-    const significantPatterns = patterns.filter(pattern => 
-      pattern.frequency >= this.config.minPatternFrequency
-    );
-    
-    // Store in causal patterns storage
-    significantPatterns.forEach(pattern => {
-      const patternId = this._generatePatternId(pattern);
-      this.causalPatterns.set(patternId, {
-        ...pattern,
-        detectedAt: Date.now(),
-        type: 'causal'
-      });
-    });
-    
-    return significantPatterns;
+    return await this._detectPatterns('causal', events, this.causalMatchers, this.causalPatterns, 'Causal');
   }
 
   /**
@@ -231,14 +179,22 @@ class PatternDetector extends Component {
    * @private
    */
   async _detectHierarchicalPatterns(events) {
+    return await this._detectPatterns('hierarchical', events, this.hierarchicalMatchers, this.hierarchicalPatterns, 'Hierarchical');
+  }
+
+  /**
+   * Detect patterns of a specific type in events
+   * @private
+   */
+  async _detectPatterns(eventType, events, matcherCollection, storage, typeLabel) {
     const patterns = [];
     
-    for (const [matcherName, matcher] of this.hierarchicalMatchers) {
+    for (const [matcherName, matcher] of matcherCollection) {
       try {
         const extracted = matcher.extract(events);
         patterns.push(...extracted);
       } catch (error) {
-        Logger.error(`Hierarchical pattern extraction failed: ${error.message}`);
+        Logger.error(`${typeLabel} pattern extraction failed: ${error.message}`);
       }
     }
     
@@ -247,13 +203,13 @@ class PatternDetector extends Component {
       pattern.frequency >= this.config.minPatternFrequency
     );
     
-    // Store in hierarchical patterns storage
+    // Store in appropriate patterns storage
     significantPatterns.forEach(pattern => {
       const patternId = this._generatePatternId(pattern);
-      this.hierarchicalPatterns.set(patternId, {
+      storage.set(patternId, {
         ...pattern,
         detectedAt: Date.now(),
-        type: 'hierarchical'
+        type: eventType
       });
     });
     
@@ -272,44 +228,28 @@ class PatternDetector extends Component {
       return [];
     }
     
-    let matches = [];
+    // Define the pattern type mapping to matchers and error labels
+    const patternConfig = {
+      temporal: { matchers: this.temporalMatchers, label: 'Temporal' },
+      causal: { matchers: this.causalMatchers, label: 'Causal' },
+      hierarchical: { matchers: this.hierarchicalMatchers, label: 'Hierarchical' }
+    };
     
-    switch (patternType) {
-      case 'temporal':
-        for (const [matcherName, matcher] of this.temporalMatchers) {
-          try {
-            matches = matcher.match(events, pattern);
-            break; // Use the first matcher that matches the pattern type
-          } catch (error) {
-            Logger.error(`Temporal pattern matching failed: ${error.message}`);
-          }
-        }
-        break;
-        
-      case 'causal':
-        for (const [matcherName, matcher] of this.causalMatchers) {
-          try {
-            matches = matcher.match(events, pattern);
-            break;
-          } catch (error) {
-            Logger.error(`Causal pattern matching failed: ${error.message}`);
-          }
-        }
-        break;
-        
-      case 'hierarchical':
-        for (const [matcherName, matcher] of this.hierarchicalMatchers) {
-          try {
-            matches = matcher.match(events, pattern);
-            break;
-          } catch (error) {
-            Logger.error(`Hierarchical pattern matching failed: ${error.message}`);
-          }
-        }
-        break;
-        
-      default:
-        throw new Error(`Unknown pattern type: ${patternType}`);
+    const config = patternConfig[patternType];
+    if (!config) {
+      throw new Error(`Unknown pattern type: ${patternType}`);
+    }
+    
+    let matches = [];
+    const { matchers, label } = config;
+    
+    for (const [matcherName, matcher] of matchers) {
+      try {
+        matches = matcher.match(events, pattern);
+        break; // Use the first matcher that matches the pattern type
+      } catch (error) {
+        Logger.error(`${label} pattern matching failed: ${error.message}`);
+      }
     }
     
     this.stats.patternMatches += matches.length;
@@ -700,28 +640,21 @@ class PatternDetector extends Component {
    * Get stored patterns of a specific type
    */
   getPatterns(patternType, limit = 10) {
-    let patterns;
+    // Define the pattern type mapping to storage
+    const patternStorages = {
+      temporal: () => Array.from(this.temporalPatterns.values()),
+      causal: () => Array.from(this.causalPatterns.values()),
+      hierarchical: () => Array.from(this.hierarchicalPatterns.values()),
+      all: () => [
+        ...Array.from(this.temporalPatterns.values()),
+        ...Array.from(this.causalPatterns.values()),
+        ...Array.from(this.hierarchicalPatterns.values())
+      ]
+    };
     
-    switch (patternType) {
-      case 'temporal':
-        patterns = Array.from(this.temporalPatterns.values());
-        break;
-      case 'causal':
-        patterns = Array.from(this.causalPatterns.values());
-        break;
-      case 'hierarchical':
-        patterns = Array.from(this.hierarchicalPatterns.values());
-        break;
-      case 'all':
-        patterns = [
-          ...Array.from(this.temporalPatterns.values()),
-          ...Array.from(this.causalPatterns.values()),
-          ...Array.from(this.hierarchicalPatterns.values())
-        ];
-        break;
-      default:
-        return [];
-    }
+    // Get the patterns based on type
+    const getPatternsFunc = patternStorages[patternType] || (() => []);
+    const patterns = getPatternsFunc();
     
     return patterns
       .sort((a, b) => b.confidence - a.confidence)
@@ -781,21 +714,22 @@ class PatternDetector extends Component {
    * Clear patterns of a specific type
    */
   clearPatterns(patternType = 'all') {
-    switch (patternType) {
-      case 'temporal':
-        this.temporalPatterns.clear();
-        break;
-      case 'causal':
-        this.causalPatterns.clear();
-        break;
-      case 'hierarchical':
-        this.hierarchicalPatterns.clear();
-        break;
-      case 'all':
+    // Define the pattern type mapping to storage
+    const clearOperations = {
+      temporal: () => this.temporalPatterns.clear(),
+      causal: () => this.causalPatterns.clear(),
+      hierarchical: () => this.hierarchicalPatterns.clear(),
+      all: () => {
         this.temporalPatterns.clear();
         this.causalPatterns.clear();
         this.hierarchicalPatterns.clear();
-        break;
+      }
+    };
+    
+    // Execute the clear operation based on type
+    const operation = clearOperations[patternType];
+    if (operation) {
+      operation();
     }
   }
 }
