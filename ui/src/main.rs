@@ -1,27 +1,24 @@
-use bevy::prelude::*;
+use eframe::egui;
 
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_systems(Startup, setup)
-        .run();
+fn main() -> Result<(), eframe::Error> {
+    let options = eframe::NativeOptions {
+        initial_window_size: Some(egui::vec2(320.0, 240.0)),
+        ..Default::default()
+    };
+    eframe::run_native(
+        "SeNARS UI",
+        options,
+        Box::new(|_cc| Box::<MyApp>::default()),
+    )
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn(Camera2dBundle::default());
-    commands.spawn(
-        TextBundle::from_section(
-            "Hello, Bevy!",
-            TextStyle {
-                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                font_size: 100.0,
-                ..default()
-            },
-        )
-        .with_style(Style {
-            align_self: AlignSelf::Center,
-            justify_self: JustifySelf::Center,
-            ..default()
-        }),
-    );
+#[derive(Default)]
+struct MyApp {}
+
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Hello, egui!");
+        });
+    }
 }
