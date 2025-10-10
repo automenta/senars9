@@ -24,13 +24,13 @@ export class TruthValue {
 
   static induction(t1, t2) {
     const f = t1.frequency;
-    const c = TruthValue.weak(t1.confidence * t2.confidence) * t2.frequency;
+    const c = TruthValue.#weak(t1.confidence * t2.confidence) * t2.frequency;
     return new TruthValue(f, c);
   }
 
   static abduction(t1, t2) {
     const f = t2.frequency;
-    const c = TruthValue.weak(t1.confidence * t2.confidence) * t1.frequency;
+    const c = TruthValue.#weak(t1.confidence * t2.confidence) * t1.frequency;
     return new TruthValue(f, c);
   }
 
@@ -40,7 +40,7 @@ export class TruthValue {
     return new TruthValue(f, c);
   }
 
-  static weak(c) {
+  static #weak(c) {
     return c / (c + 1.0);
   }
 }
@@ -57,13 +57,11 @@ export class Task {
     this.expirationTime = null;
     this.derivationPath = null;
 
-    Object.defineProperty(this, 'term', { writable: false });
-    Object.defineProperty(this, 'punctuation', { writable: false });
-    Object.defineProperty(this, 'truth', { writable: false });
-    Object.defineProperty(this, 'createdAt', { writable: false });
-    Object.defineProperty(this, 'occurrenceTime', { writable: false });
-    Object.defineProperty(this, 'expirationTime', { writable: false });
-    Object.defineProperty(this, 'derivationPath', { writable: false });
+    // Make key properties immutable
+    const immutableProps = ['term', 'punctuation', 'truth', 'createdAt', 'occurrenceTime', 'expirationTime', 'derivationPath'];
+    for (const prop of immutableProps) {
+      Object.defineProperty(this, prop, { writable: false });
+    }
   }
 
   static create(term, punctuation, truth, createdAt, occurrenceTime, priority = 0.5) {
@@ -86,20 +84,12 @@ export class Task {
     this._accessedAt = newTime;
   }
 
-  isBelief() {
-    return this.punctuation === Punctuation.BELIEF;
-  }
-
-  isGoal() {
-    return this.punctuation === Punctuation.GOAL;
-  }
-
-  isQuestion() {
-    return this.punctuation === Punctuation.QUESTION;
-  }
+  isBelief() { return this.punctuation === Punctuation.BELIEF; }
+  isGoal() { return this.punctuation === Punctuation.GOAL; }
+  isQuestion() { return this.punctuation === Punctuation.QUESTION; }
 
   isExpired(currentTime) {
-    return this.expirationTime !== null ? currentTime > this.expirationTime : false;
+    return this.expirationTime !== null && currentTime > this.expirationTime;
   }
 
   setExpirationTime(expirationTime) {

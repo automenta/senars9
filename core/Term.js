@@ -80,25 +80,27 @@ export class Term {
   }
 
   static generateName(termType, components) {
+    const [first, second] = components.map(comp => comp.name);
     const names = components.map(comp => comp.name);
-    const namePatterns = {
-      [TermType.NEGATION]: `(--, ${names[0]})`,
-      [TermType.INHERITANCE]: `(${names[0]} --> ${names[1]})`,
-      [TermType.SIMILARITY]: `(${names[0]} <-> ${names[1]})`,
-      [TermType.IMPLICATION]: `(${names[0]} ==> ${names[1]})`,
-      [TermType.EQUIVALENCE]: `(${names[0]} <=> ${names[1]})`,
+    
+    const patterns = {
+      [TermType.NEGATION]: `(--, ${first})`,
+      [TermType.INHERITANCE]: `(${first} --> ${second})`,
+      [TermType.SIMILARITY]: `(${first} <-> ${second})`,
+      [TermType.IMPLICATION]: `(${first} ==> ${second})`,
+      [TermType.EQUIVALENCE]: `(${first} <=> ${second})`,
       [TermType.CONJUNCTION]: `(&, ${names.join(', ')})`,
       [TermType.DISJUNCTION]: `(|, ${names.join(', ')})`,
-      [TermType.SEQUENTIAL_CONJUNCTION]: `(&/, ${names[0]}, ${names[1]})`,
-      [TermType.OPERATION]: `(${names[0]} ^ ${names[1]})`,
+      [TermType.SEQUENTIAL_CONJUNCTION]: `(&/, ${first}, ${second})`,
+      [TermType.OPERATION]: `(${first} ^ ${second})`,
       [TermType.PRODUCT]: `(${names.join(', ')})`,
-      [TermType.INSTANCE]: `(${names[0]} {{-- ${names[1]})`,
-      [TermType.PROPERTY]: `(${names[0]} --}} ${names[1]})`,
+      [TermType.INSTANCE]: `(${first} {{-- ${second})`,
+      [TermType.PROPERTY]: `(${first} --}} ${second})`,
       [TermType.EXTENSIONAL_SET]: `{${names.join(', ')}}`,
       [TermType.INTENSIONAL_SET]: `[${names.join(', ')}]`
     };
     
-    return namePatterns[termType] || `(${termType}, ${names.join(', ')})`;
+    return patterns[termType] || `(${termType}, ${names.join(', ')})`;
   }
 
   static simplifyComponents(termType, components) {
