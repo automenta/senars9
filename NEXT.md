@@ -16,6 +16,8 @@ This document outlines the streamlined development plan for SeNARS. It focuses o
 4.  **Declarative Planning**: Define *what* needs to be done in development plans, allowing the system's planners to determine *how*.
 5.  **Leverage Existing Tools**: Where possible, use established libraries and frameworks to minimize development effort.
 6.  **Incremental Implementation**: Break complex components into smaller, testable units to enable rapid progress.
+7.  **Parameterized Abstractions**: Use structured parameter classes (like the `Answer` class) to manage complex query specifications and maintain clean APIs.
+8.  **Flexible Selection & Aggregation**: Implement modular selection criteria and truth aggregation strategies to support diverse cognitive operations.
 
 ### **The Phased Path to Autonomy**
 
@@ -52,11 +54,19 @@ This document outlines the streamlined development plan for SeNARS. It focuses o
 ### **Phase 1: Foundational Components (✅ COMPLETE)**
 *   **Core Engine**: `Term`, `Task`, `Concept`, `Cycle`, `Clock`, `System`, `Core`
 *   **Reasoning & Rules**: `Rules`, `SyllogisticRules`, `ModusPonensRule`, `AnalogyRule`, `Reasoner`
-*   **Memory & Knowledge**: `Memory`, `Bag`, `AdjacencyBag`, `GraphTraversal`
+*   **Memory & Knowledge**: `Memory`, `Bag`, `AdjacencyBag`, `GraphTraversal`, `TaskTable`, `Answer`
 *   **Planning**: `AStarPlanner`, `HTNPlanner`, `PlanProcessor`, `PlanExecutor`
 *   **Language Model (LM)**: `LM`, `LangChainProvider`, `XenovaProvider`, `LMConfiguration`, `ModelSelector`, `NarseseTranslator`
 *   **Analysis & Configuration**: `AnalysisEngine`, `DataIngor`, `ReportGenerator`, `Config`, `ConfigManager`
 *   **Testing & Validation**: Comprehensive unit/integration tests and examples.
+
+### **Enhanced Task Storage & Retrieval System (✅ IMPLEMENTED)**
+*   **TaskTable**: Abstracted storage mechanism with capacity limits and modular compression strategies (LRU eviction)
+*   **SelectionCriteria**: Flexible querying with time vs. confidence weighting, custom ranking functions, and "closest in time" functionality
+*   **Answer Class**: NARchy-inspired parameter class for managing query results and specifying selection criteria
+*   **Aggregation Functions**: Modular truth value combination strategies (average, weighted, most recent, strongest confidence)
+*   **API**: Clean, fluent interface supporting both direct criteria and Answer-based queries
+*   **Testing**: Comprehensive unit tests covering storage, retrieval, selection, aggregation, capacity management, and end-to-end functionality
 
 ### **Phase 2: Introspection & Bootstrapping (🔥 IMMEDIATE PRIORITY)**
 
