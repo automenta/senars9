@@ -1,5 +1,6 @@
 import { Term } from './Term.js';
 import { TaskTable, SelectionCriteria, DefaultAggregationFunctions } from './TaskTable.js';
+import { Answer } from './Answer.js';
 import { Punctuation } from './Task.js';
 
 export class Concept {
@@ -10,9 +11,9 @@ export class Concept {
     this.activationLevel = activationLevel;
     this.triggers = new Set();
     this.derivations = new Set();
-    this.beliefTable = new TaskTable(1000); // Default capacity of 1000 beliefs
-    this.goalTable = new TaskTable(100);   // Default capacity of 100 goals
-    this.questionTable = new TaskTable(50); // Default capacity of 50 questions
+    this.beliefTable = new TaskTable(1000);
+    this.goalTable = new TaskTable(100);
+    this.questionTable = new TaskTable(50);
     this.resources = new Map();
   }
 
@@ -50,17 +51,22 @@ export class Concept {
   }
 
   _getTableForPunctuation(punctuation) {
-    switch (punctuation) {
-      case Punctuation.BELIEF: return this.beliefTable;
-      case Punctuation.GOAL: return this.goalTable;
-      case Punctuation.QUESTION: return this.questionTable;
-      default: throw new Error(`Unknown punctuation: ${punctuation}`);
-    }
+    const tableMap = { [Punctuation.BELIEF]: this.beliefTable, [Punctuation.GOAL]: this.goalTable, [Punctuation.QUESTION]: this.questionTable };
+    const table = tableMap[punctuation];
+    if (!table) throw new Error(`Unknown punctuation: ${punctuation}`);
+    return table;
   }
 
   tasks(punctuation = Punctuation.BELIEF, time = Infinity, selectionCriteria = null, limit = 1) {
     const table = this._getTableForPunctuation(punctuation);
     return table.queryTasks(punctuation, time, selectionCriteria, limit);
+  }
+
+  answer(answerSpec) {
+    if (!(answerSpec instanceof Answer)) throw new Error('answerSpec must be an instance of Answer class');
+    const criteria = answerSpec.getSelectionCriteria();
+    const table = this._getTableForPunctuation(answerSpec.punctuation);
+    return table.queryTasks(answerSpec.punctuation, Infinity, criteria, answerSpec.maxResults);
   }
 
   static truth(tasks, aggregationFunction = DefaultAggregationFunctions.weighted) {
@@ -69,6 +75,11 @@ export class Concept {
 
   truth(punctuation = Punctuation.BELIEF, time = Infinity, selectionCriteria = null, limit = 1, aggregationFunction = DefaultAggregationFunctions.weighted) {
     const tasks = this.tasks(punctuation, time, selectionCriteria, limit);
+    return Concept.truth(tasks, aggregationFunction);
+  }
+  
+  truthFromAnswer(answerSpec, aggregationFunction = DefaultAggregationFunctions.weighted) {
+    const tasks = this.answer(answerSpec);
     return Concept.truth(tasks, aggregationFunction);
   }
 

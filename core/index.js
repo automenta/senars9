@@ -28,6 +28,7 @@ export { Term, TermType } from './Term.js';
 export { Task, Punctuation, TruthValue } from './Task.js';
 export { Concept } from './Concept.js';
 export { TaskTable, SelectionCriteria, DefaultAggregationFunctions } from './TaskTable.js';
+export { Answer } from './Answer.js';
 
 // Export core cognitive architecture components
 export { default as Bag } from './memory/Bag.js';
