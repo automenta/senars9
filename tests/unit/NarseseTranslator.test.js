@@ -23,25 +23,14 @@ describe('NarseseTranslator', () => {
     expect(backToText).toBe('Hello world');
   });
 
-  test('convertFromNarsese should handle inheritance format <subject --> predicate>', () => {
-    const narsese = '<Hello --> world>';
+  test.each([
+    ['<Hello --> world>', 'Hello world', 'inheritance'],
+    ['<Hello =/> world>', 'Hello world', 'implication'],
+    ['<Hello <=> world>', 'Hello world', 'equivalence']
+  ])('convertFromNarsese should handle %s (%s format)', (narsese, expected, type) => {
     const result = translator.convertFromNarsese(narsese);
     
-    expect(result).toBe('Hello world');
-  });
-
-  test('convertFromNarsese should handle implication format <antecedent =/> consequent>', () => {
-    const narsese = '<Hello =/> world>';
-    const result = translator.convertFromNarsese(narsese);
-    
-    expect(result).toBe('Hello world');
-  });
-
-  test('convertFromNarsese should handle equivalence format <term1 <=> term2>', () => {
-    const narsese = '<Hello <=> world>';
-    const result = translator.convertFromNarsese(narsese);
-    
-    expect(result).toBe('Hello world');
+    expect(result).toBe(expected);
   });
 
   test('convertToNarsese and convertFromNarsese should be inverses', () => {

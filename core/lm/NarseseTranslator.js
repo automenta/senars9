@@ -45,13 +45,13 @@ class NarseseTranslator extends Component {
       intIntersection: { pattern: /\\(([^)]+)&([^)]+)\\)/, op: '&', type: 'intensional_intersection' }
     };
 
-    for (const [name, meta] of Object.entries(patterns)) {
+    Object.entries(patterns).forEach(([name, meta]) => 
       this.macros.set(name, {
         pattern: meta.pattern,
         toJs: (m) => this._createObj(meta.type, m, meta.op),
         toNarsese: (obj) => this._formatObj(obj, meta.op)
-      });
-    }
+      })
+    );
   }
 
   _createObj(type, matches, op) {
@@ -326,51 +326,31 @@ class NarseseTranslator extends Component {
       // Attempt to parse as Narsese and extract original text parts
       // For the specific test case: <Hello --> world> should return "Hello world"
       
-      // Check if it's in the form <subject --> predicate> and extract the parts
-      const inheritanceMatch = narsese.match(/^<([^>]+)-->([^>]+)>$/);
-      if (inheritanceMatch) {
-        const subject = inheritanceMatch[1].trim();
-        const predicate = inheritanceMatch[2].trim();
-        // For the simple case of "Hello world" converting to <Hello --> world>
-        // we should return the original which was likely "Hello world"
-        return `${subject} ${predicate}`;
-      }
+      // First try direct regex matches for common Narsese patterns
+      const patterns = [
+        [/^<([^>]+)-->([^>]+)>$/, (m) => `${m[1].trim()} ${m[2].trim()}`],
+        [/^<([^>]+)=\/>([^>]+)>$/, (m) => `${m[1].trim()} ${m[2].trim()}`],
+        [/^<([^>]+)<=>([^>]+)>$/, (m) => `${m[1].trim()} ${m[2].trim()}`]
+      ];
       
-      // Also check other common Narsese patterns
-      const implicationMatch = narsese.match(/^<([^>]+)=\/>([^>]+)>$/);
-      if (implicationMatch) {
-        return `${implicationMatch[1].trim()} ${implicationMatch[2].trim()}`;
-      }
-      
-      const equivalenceMatch = narsese.match(/^<([^>]+)<=>([^>]+)>$/);
-      if (equivalenceMatch) {
-        return `${equivalenceMatch[1].trim()} ${equivalenceMatch[2].trim()}`;
+      for (const [pattern, formatter] of patterns) {
+        const match = narsese.match(pattern);
+        if (match) return formatter(match);
       }
       
       // For the fallback case where the result is a JS object
       const result = this.narseseToJs(narsese);
       
       // Try to extract the most appropriate text representation
-      if (result.subject && result.predicate) {
-        return `${result.subject} ${result.predicate}`;
-      } else if (result.term1 && result.term2) {
-        return `${result.term1} ${result.term2}`;
-      } else if (result.antecedent && result.consequent) {
-        return `${result.antecedent} ${result.consequent}`;
-      } else if (result.elements && Array.isArray(result.elements)) {
-        return result.elements.join(' ');
-      } else if (result.value) {
-        return result.value;
-      } else {
-        return narsese; // Return original if no meaningful extraction
-      }
+      return result.subject && result.predicate ? `${result.subject} ${result.predicate}` :
+             result.term1 && result.term2 ? `${result.term1} ${result.term2}` :
+             result.antecedent && result.consequent ? `${result.antecedent} ${result.consequent}` :
+             result.elements && Array.isArray(result.elements) ? result.elements.join(' ') :
+             result.value || narsese; // Return original if no meaningful extraction
     } catch (error) {
       // Fallback for placeholder format or invalid Narsese
       const placeholderMatch = narsese.match(/^\[Placeholder Narsese conversion for: (.+)\]$/);
-      if (placeholderMatch) {
-        return placeholderMatch[1];
-      }
-      return narsese;
+      return placeholderMatch ? placeholderMatch[1] : narsese;
     }
   }
 

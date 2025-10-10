@@ -41,32 +41,30 @@ describe('Term', () => {
     expect(inheritanceTerm.hash).toBeDefined();
   });
 
-  test('createCompound should create various term types', () => {
+  test.each([
+    [TermType.CONJUNCTION, '(&, ', 'conjunction'],
+    [TermType.DISJUNCTION, '(|, ', 'disjunction'],
+    [TermType.IMPLICATION, '(A ==> B)', 'implication'],
+    [TermType.EQUIVALENCE, '<=>', 'equivalence']
+  ])('createCompound should create %s terms', (termType, expectedPattern, typeName) => {
     const atomA = Term.newAtom('A');
     const atomB = Term.newAtom('B');
     
-    // Test different compound types
-    const conjunctionTerm = Term.createCompound(TermType.CONJUNCTION, [atomA, atomB]);
-    expect(conjunctionTerm.termType).toBe(TermType.CONJUNCTION);
-    expect(conjunctionTerm.name).toContain('(&,'); // Components might be sorted by hash
-    expect(conjunctionTerm.name).toContain('A');
-    expect(conjunctionTerm.name).toContain('B');
+    const compoundTerm = Term.createCompound(termType, [atomA, atomB]);
     
-    const disjunctionTerm = Term.createCompound(TermType.DISJUNCTION, [atomA, atomB]);
-    expect(disjunctionTerm.termType).toBe(TermType.DISJUNCTION);
-    expect(disjunctionTerm.name).toContain('(|,'); // Components might be sorted by hash
-    expect(disjunctionTerm.name).toContain('A');
-    expect(disjunctionTerm.name).toContain('B');
+    expect(compoundTerm.termType).toBe(termType);
     
-    const implicationTerm = Term.createCompound(TermType.IMPLICATION, [atomA, atomB]);
-    expect(implicationTerm.name).toBe('(A ==> B)');
-    expect(implicationTerm.termType).toBe(TermType.IMPLICATION);
-    
-    const equivalenceTerm = Term.createCompound(TermType.EQUIVALENCE, [atomA, atomB]);
-    expect(equivalenceTerm.termType).toBe(TermType.EQUIVALENCE);
-    expect(equivalenceTerm.name).toContain('<=>'); // Commutative, so order may vary
-    expect(equivalenceTerm.name).toContain('A');
-    expect(equivalenceTerm.name).toContain('B');
+    if (typeName === 'implication') {
+      expect(compoundTerm.name).toBe(expectedPattern);
+    } else if (typeName === 'equivalence') {
+      expect(compoundTerm.name).toContain(expectedPattern);
+      expect(compoundTerm.name).toContain('A');
+      expect(compoundTerm.name).toContain('B');
+    } else {
+      expect(compoundTerm.name).toContain(expectedPattern);
+      expect(compoundTerm.name).toContain('A');
+      expect(compoundTerm.name).toContain('B');
+    }
   });
 
   test('createCompound should handle complex nesting', () => {

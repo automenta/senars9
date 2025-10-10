@@ -81,39 +81,24 @@ export class Term {
 
   static generateName(termType, components) {
     const names = components.map(comp => comp.name);
+    const namePatterns = {
+      [TermType.NEGATION]: `(--, ${names[0]})`,
+      [TermType.INHERITANCE]: `(${names[0]} --> ${names[1]})`,
+      [TermType.SIMILARITY]: `(${names[0]} <-> ${names[1]})`,
+      [TermType.IMPLICATION]: `(${names[0]} ==> ${names[1]})`,
+      [TermType.EQUIVALENCE]: `(${names[0]} <=> ${names[1]})`,
+      [TermType.CONJUNCTION]: `(&, ${names.join(', ')})`,
+      [TermType.DISJUNCTION]: `(|, ${names.join(', ')})`,
+      [TermType.SEQUENTIAL_CONJUNCTION]: `(&/, ${names[0]}, ${names[1]})`,
+      [TermType.OPERATION]: `(${names[0]} ^ ${names[1]})`,
+      [TermType.PRODUCT]: `(${names.join(', ')})`,
+      [TermType.INSTANCE]: `(${names[0]} {{-- ${names[1]})`,
+      [TermType.PROPERTY]: `(${names[0]} --}} ${names[1]})`,
+      [TermType.EXTENSIONAL_SET]: `{${names.join(', ')}}`,
+      [TermType.INTENSIONAL_SET]: `[${names.join(', ')}]`
+    };
     
-    switch (termType) {
-      case TermType.NEGATION:
-        return `(--, ${names[0]})`;
-      case TermType.INHERITANCE:
-        return `(${names[0]} --> ${names[1]})`;
-      case TermType.SIMILARITY:
-        return `(${names[0]} <-> ${names[1]})`;
-      case TermType.IMPLICATION:
-        return `(${names[0]} ==> ${names[1]})`;
-      case TermType.EQUIVALENCE:
-        return `(${names[0]} <=> ${names[1]})`;
-      case TermType.CONJUNCTION:
-        return `(&, ${names.join(', ')})`;
-      case TermType.DISJUNCTION:
-        return `(|, ${names.join(', ')})`;
-      case TermType.SEQUENTIAL_CONJUNCTION:
-        return `(&/, ${names[0]}, ${names[1]})`;
-      case TermType.OPERATION:
-        return `(${names[0]} ^ ${names[1]})`;
-      case TermType.PRODUCT:
-        return `(${names.join(', ')})`;
-      case TermType.INSTANCE:
-        return `(${names[0]} {{-- ${names[1]})`;
-      case TermType.PROPERTY:
-        return `(${names[0]} --}} ${names[1]})`;
-      case TermType.EXTENSIONAL_SET:
-        return `{${names.join(', ')}}`;
-      case TermType.INTENSIONAL_SET:
-        return `[${names.join(', ')}]`;
-      default:
-        return `(${termType}, ${names.join(', ')})`;
-    }
+    return namePatterns[termType] || `(${termType}, ${names.join(', ')})`;
   }
 
   static simplifyComponents(termType, components) {
