@@ -16,11 +16,16 @@ import BootstrapSystem from '../analysis/BootstrapSystem.js';
 import PatternDetector from '../analysis/PatternDetector.js';
 import WebSocketServer from '../system/WebSocketServer.js';
 import { Focus } from '../memory/Memory.js';
+import { ContradictionAnalyzer } from '../reasoning/ContradictionAnalyzer.js';
+import { ResolutionStrategy } from '../reasoning/ResolutionStrategy.js';
+import { SystemContext } from '../components/SystemContext.js';
+import { StrategyRegistry } from '../components/StrategyRegistry.js';
 
 class Core {
   constructor() {
     this.componentMap = new Map();
     this.registrationOrder = [];
+    this.isInitialized = false;
 
     this.registerComponent('config', new Config());
     this.registerComponent('messages', new Messages());
@@ -43,6 +48,12 @@ class Core {
     
     // Initialize PlanProcessor (dependencies will be set up during initialization)
     this.registerComponent('planProcessor', new PlanProcessor(null, null));
+    
+    // Register Phase 3 metacognition components
+    this.registerComponent('strategyRegistry', new StrategyRegistry());
+    this.registerComponent('systemContext', new SystemContext(null)); // Initialize with null, will set in _setupDependencies
+    this.registerComponent('contradictionAnalyzer', new ContradictionAnalyzer());
+    this.registerComponent('resolutionStrategy', new ResolutionStrategy());
     
     this.registerComponent('analysis', new AnalysisEngine()); // Register AnalysisEngine component
     this.registerComponent('ingestor', new DataIngestor()); // Register DataIngestor component
@@ -87,6 +98,13 @@ class Core {
     
     // Establish cross-component dependencies
     this._setupDependencies();
+    
+    // Initialize any new components that may have been added but not initialized
+    // This handles components that are added in constructor but need special initialization
+    await this._initializeNewComponents();
+    
+    // Mark core as initialized
+    this.isInitialized = true;
   }
   
   /**
@@ -124,6 +142,78 @@ class Core {
     // WebSocketServer reference
     if (this.webSocketServer) {
       this.webSocketServer.core = this;
+    }
+    
+    // Set up SystemContext with reference to core
+    if (this.systemContext) {
+      this.systemContext.system = this;
+    }
+    
+    // Set up reasoning to use strategy registry and system context (if they exist)
+    if (this.reasoning && this.strategyRegistry && this.systemContext) {
+      // Update the reasoning component to use the strategy registry and system context
+      this.reasoning.strategyRegistry = this.strategyRegistry;
+      this.reasoning.systemContext = this.systemContext;
+    }
+    
+    // Set up contradiction analyzer to use system context
+    if (this.contradictionAnalyzer && this.systemContext) {
+      // The contradiction analyzer can access memory and other components through system context
+    }
+    
+    // Set up resolution strategy to use system context
+    if (this.resolutionStrategy && this.systemContext) {
+      // The resolution strategy can access other components through system context
+    }
+    
+    // Register strategies after dependencies are set up to avoid circular references during initialization
+    if (this.strategyRegistry && this.reasoning) {
+      // Register default reasoning strategies
+      this.strategyRegistry.registerStrategy('basic_reasoning', {
+        execute: (tasks, context) => this.reasoning.reason(tasks, context)
+      }, {
+        description: 'Basic reasoning using inference rules',
+        type: 'reasoning',
+        group: 'default'
+      });
+      
+      // Register contradiction resolution strategies if available
+      if (this.resolutionStrategy) {
+        for (const strategyName of this.resolutionStrategy.getAvailableStrategies()) {
+          const strategy = {
+            execute: (contradiction, sysContext) => this.resolutionStrategy.resolveContradiction(contradiction, strategyName, sysContext)
+          };
+          
+          this.strategyRegistry.registerStrategy(`resolution_${strategyName}`, strategy, {
+            description: `Contradiction resolution using ${strategyName} strategy`,
+            type: 'contradiction_resolution',
+            group: 'resolution'
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Initialize components that were added but may not have been initialized yet
+   * This method can be called after all dependencies are set up
+   */
+  async _initializeNewComponents() {
+    // Initialize Phase 3 components with appropriate configuration
+    if (this.strategyRegistry && !this.strategyRegistry.isInitialized) {
+      await this.strategyRegistry.initialize(this.config?.get('components.strategyRegistry', {}) || {});
+    }
+    
+    if (this.systemContext && !this.systemContext.isInitialized) {
+      await this.systemContext.initialize(this.config?.get('components.systemContext', {}) || {});
+    }
+    
+    if (this.contradictionAnalyzer && !this.contradictionAnalyzer.isInitialized) {
+      await this.contradictionAnalyzer.initialize(this.config?.get('components.contradictionAnalyzer', {}) || {});
+    }
+    
+    if (this.resolutionStrategy && !this.resolutionStrategy.isInitialized) {
+      await this.resolutionStrategy.initialize(this.config?.get('components.resolutionStrategy', {}) || {});
     }
   }
 

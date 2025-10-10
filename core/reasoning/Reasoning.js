@@ -102,6 +102,28 @@ class Reasoning extends Component {
     };
 
     try {
+      // Check if we should use strategy registry, but avoid infinite recursion
+      // If the context indicates we're already in a strategy execution, skip strategy selection
+      if (this.strategyRegistry && this.systemContext && !context._inStrategyExecution) {
+        try {
+          // Attempt to select and execute a reasoning strategy
+          const strategyName = await this._selectReasoningStrategy(tasks, reasoningContext);
+          if (strategyName && this.strategyRegistry.getStrategy(strategyName)) {
+            // Add flag to prevent infinite recursion if the strategy calls reason() again
+            const strategyContext = {
+              ...reasoningContext,
+              _inStrategyExecution: true
+            };
+            
+            const strategyResult = await this.strategyRegistry.executeStrategy(strategyName, tasks, strategyContext);
+            return strategyResult;
+          }
+        } catch (strategyError) {
+          Logger.warn(`Strategy-based reasoning failed, falling back to default: ${strategyError.message}`);
+        }
+      }
+
+      // Default reasoning process (if strategy registry not available, in recursion, or strategy failed)
       // Phase 1: Pattern Recognition and Analysis
       const patterns = this._analyzePatterns(tasks, reasoningContext);
 
@@ -495,6 +517,21 @@ class Reasoning extends Component {
     return hypotheses;
   }
 
+  async _selectReasoningStrategy(tasks, context) {
+    // For now, return the default strategy name
+    // In a more advanced implementation, this could analyze the incoming tasks
+    // and context to select the most appropriate reasoning strategy
+    
+    // Basic strategy selection logic based on task characteristics
+    if (tasks && Array.isArray(tasks) && tasks.length > 0) {
+      // Example: If tasks involve contradictions, we might select a contradiction-focused strategy
+      // For now, just return the default reasoning strategy
+      return 'basic_reasoning';
+    }
+    
+    return 'basic_reasoning';
+  }
+  
   _updateReasoningHistory(results) {
     this.reasoningHistory.push({
       timestamp: results.timestamp,

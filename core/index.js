@@ -54,6 +54,10 @@ export { default as ReportGenerator } from './analysis/ReportGenerator.js';
 export { default as BootstrapSystem } from './analysis/BootstrapSystem.js';
 export { default as PatternDetector } from './analysis/PatternDetector.js';
 
+// Export Phase 3 metacognition components
+export { ContradictionAnalyzer } from './reasoning/ContradictionAnalyzer.js';
+export { ResolutionStrategy } from './reasoning/ResolutionStrategy.js';
+
 // Export additional cognitive components
 export { 
   applySyllogisticRule, 
@@ -75,5 +79,6 @@ export {
 export { ConfigService } from './components/ConfigService.js';
 export { UnifiedResourceManager } from './components/UnifiedResourceManager.js';
 export { StrategyRegistry } from './components/StrategyRegistry.js';
+export { SystemContext } from './components/SystemContext.js';
 export { UnifiedAnalysisEngine } from './components/UnifiedAnalysisEngine.js';
 export { PlanExecutor } from './components/PlanExecutor.js';
