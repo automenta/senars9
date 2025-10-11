@@ -114,7 +114,7 @@ describe('Individual Component Runtime Error Tests', () => {
   });
 
   it('ReasonerControlPanel handles null stats gracefully', () => {
-    const { default: ReasonerControlPanel } = require('./components/ReasonerControlPanel');
+    const { default: ReasonerControlPanel } = require('./ReasonerControlPanel');
     const { render } = require('@testing-library/react');
 
     render(<ReasonerControlPanel stats={null} />);
@@ -124,7 +124,7 @@ describe('Individual Component Runtime Error Tests', () => {
   });
 
   it('LogList handles empty logs gracefully', () => {
-    const { default: LogList } = require('./components/LogList');
+    const { default: LogList } = require('./LogList');
     const { render } = require('@testing-library/react');
 
     render(<LogList logs={[]} />);
@@ -134,7 +134,7 @@ describe('Individual Component Runtime Error Tests', () => {
   });
 
   it('TasksTree handles empty tasks gracefully', () => {
-    const { default: TasksTree } = require('./components/TasksTree');
+    const { default: TasksTree } = require('./TasksTree');
     const { render } = require('@testing-library/react');
 
     render(<TasksTree tasks={[]} />);
@@ -144,7 +144,7 @@ describe('Individual Component Runtime Error Tests', () => {
   });
 
   it('InputField renders without errors', () => {
-    const { default: InputField } = require('./components/InputField');
+    const { default: InputField } = require('./InputField');
     const { render } = require('@testing-library/react');
 
     render(<InputField onSend={() => {}} />);
