@@ -246,7 +246,31 @@ body {
   display: flex;
   flex-direction: column;
   padding: 0;
+  margin: 0;
   background-color: var(--background-primary);
+  overflow: hidden;
+}
+
+/* FlexLayout React specific styles to ensure full space usage */
+.flexlayout__layout {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.flexlayout__tabset {
+  width: 100%;
+  height: 100%;
+}
+
+.flexlayout__tabset_inner {
+  width: 100%;
+  height: 100%;
+}
+
+.flexlayout__row,
+.flexlayout__split {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .app-title {
