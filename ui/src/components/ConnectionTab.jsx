@@ -8,10 +8,12 @@ import TasksTree from './TasksTree';
 import ConceptMap from './ConceptMap';
 import SortableItem from './SortableItem';
 import useWebSocket from '../core/WebSocketManager';
-import { PANEL_CONFIG, MESSAGE_TYPES, THEME, LAYOUT } from '../constants';
+import { PANEL_CONFIG, MESSAGE_TYPES, THEME } from '../constants';
+import Panel from './Panel';
 
 const ConnectionTab = ({ name, url }) => {
-  const { isConnected, messages, sendMessage } = useWebSocket(url);
+  const { isConnected, messages, error, sendMessage } = useWebSocket(url);
+  const [activeId, setActiveId] = useState(null);
 
   const [panels, setPanels] = useState([
     PANEL_CONFIG.topPanel,
@@ -23,8 +25,13 @@ const ConnectionTab = ({ name, url }) => {
     sendMessage({ type: 'command', data: command });
   };
 
+  const handleDragStart = (event) => {
+    setActiveId(event.active.id);
+  };
+
   const handleDragEnd = (event) => {
     const { active, over } = event;
+    setActiveId(null);
     if (active.id !== over.id) {
       setPanels(prev => {
         const oldIndex = prev.findIndex(item => item.id === active.id);
@@ -43,45 +50,29 @@ const ConnectionTab = ({ name, url }) => {
     switch (panel.id) {
       case 'topPanel':
         return (
-          <div className="panel top-section">
-            <div className="panel-header">
-              <span>{panel.name}</span>
-            </div>
-            <div className="panel-content">
-              <ReasonerControlPanel stats={reasonerStats} />
-              <InputField onSend={handleSendMessage} />
-            </div>
-          </div>
+          <Panel title={panel.name}>
+            <ReasonerControlPanel stats={reasonerStats} />
+            <InputField onSend={handleSendMessage} />
+          </Panel>
         );
       case 'conceptMapPanel':
         return (
-          <div className="panel concept-map-section">
-            <div className="panel-header">
-              <span>{panel.name}</span>
-            </div>
-            <div className="panel-content concept-map-content">
-              <ConceptMap concepts={filteredConceptMessages} />
-            </div>
-          </div>
+          <Panel title={panel.name}>
+            <ConceptMap concepts={filteredConceptMessages} />
+          </Panel>
         );
       case 'bottomPanel':
         return (
-          <div className="bottom-section">
-            <div className="panel log-section">
-              <div className="panel-header">
-                <span>Log</span>
-              </div>
-              <div className="panel-content log-content">
+          <div style={{ display: 'flex', gap: THEME.spacing.md, height: '100%' }}>
+            <div style={{ flex: 1 }}>
+              <Panel title="Log">
                 <LogList logs={filteredLogMessages} />
-              </div>
+              </Panel>
             </div>
-            <div className="panel tasks-section">
-              <div className="panel-header">
-                <span>Tasks</span>
-              </div>
-              <div className="panel-content tasks-content">
+            <div style={{ flex: 1 }}>
+              <Panel title="Tasks">
                 <TasksTree tasks={filteredTaskMessages} />
-              </div>
+              </Panel>
             </div>
           </div>
         );
@@ -90,16 +81,38 @@ const ConnectionTab = ({ name, url }) => {
     }
   };
 
+  const connectionStatusStyles = {
+    padding: THEME.spacing.sm,
+    marginBottom: THEME.spacing.md,
+    borderRadius: THEME.borderRadius,
+    color: THEME.colors.white,
+    fontWeight: THEME.fontWeight.bold,
+    backgroundColor: isConnected ? THEME.colors.success : THEME.colors.danger,
+  };
+
+  const errorStyles = {
+    padding: THEME.spacing.sm,
+    marginBottom: THEME.spacing.md,
+    borderRadius: THEME.borderRadius,
+    color: THEME.colors.white,
+    backgroundColor: THEME.colors.danger,
+  };
+
   return (
     <div className="connection-tab">
-      <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-        <div>
-          <strong>Connection:</strong> {name} ({url}) - Status: {isConnected ? 'Connected' : 'Disconnected'}
-        </div>
+      <div style={connectionStatusStyles}>
+        <strong>Connection:</strong> {name} ({url}) - Status: {isConnected ? 'Connected' : 'Disconnected'}
       </div>
+
+      {error && (
+        <div style={errorStyles}>
+          <strong>Error:</strong> {error.message}
+        </div>
+      )}
 
       <DndContext
         collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
         <SortableContext
@@ -108,7 +121,7 @@ const ConnectionTab = ({ name, url }) => {
         >
           <div className="main-layout">
             {panels.map(panel => (
-              <SortableItem key={panel.id} id={panel.id}>
+              <SortableItem key={panel.id} id={panel.id} activeId={activeId}>
                 {renderPanel(panel)}
               </SortableItem>
             ))}

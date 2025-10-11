@@ -288,12 +288,9 @@ const TasksTree = ({ tasks }) => {
 
   return (
     <div className="tasks-tree" style={{
-      height: '200px',
-      border: '1px solid #ccc',
-      borderRadius: '4px',
-      backgroundColor: '#f8f9fa',
-      overflow: 'hidden',
-      position: 'relative'
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       <div style={{
         padding: '5px 10px',
@@ -307,7 +304,7 @@ const TasksTree = ({ tasks }) => {
 
       <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         <div style={{
-          height: 'calc(200px - 30px)', // Subtract header height
+          flex: 1,
           overflowY: 'auto',
           padding: '8px',
           position: 'relative'

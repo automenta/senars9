@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { forceSimulation, forceLink, forceManyBody, forceCenter } from 'd3-force';
-import { useGraphics } from './GraphicsEngine';
+import GraphicsEngine, { useGraphics } from './GraphicsEngine';
 
-const ConceptMap = ({ concepts }) => {
+const ConceptMapContent = ({ concepts }) => {
   const { scene } = useGraphics();
   const graphObjects = useRef(new Map()); // To keep track of Three.js objects
   const simulation = useRef();
@@ -134,6 +134,7 @@ const ConceptMap = ({ concepts }) => {
         return;
       }
       
+      if(!simulation.current) return;
       simulation.current.alpha(0.1); // Maintain some movement
       simulation.current.tick();
       
@@ -223,7 +224,6 @@ const ConceptMap = ({ concepts }) => {
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      position: 'relative'
     }}>
       <div style={{
         display: 'flex',
@@ -322,5 +322,11 @@ const ConceptMap = ({ concepts }) => {
     </div>
   );
 };
+
+const ConceptMap = ({ concepts }) => (
+  <GraphicsEngine>
+    <ConceptMapContent concepts={concepts} />
+  </GraphicsEngine>
+);
 
 export default ConceptMap;

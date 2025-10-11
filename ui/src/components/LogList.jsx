@@ -58,13 +58,9 @@ const LogList = ({ logs }) => {
 
   return (
     <div className="log-list" style={{
-      height: '200px',
+      height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      border: '1px solid #ccc',
-      borderRadius: '4px',
-      backgroundColor: '#f8f9fa',
-      position: 'relative'
     }}>
       <div style={{
         display: 'flex',

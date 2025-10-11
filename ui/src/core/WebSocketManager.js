@@ -5,6 +5,7 @@ export const useWebSocket = (url) => {
   const [ws, setWs] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState([]);
+  const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected'); // disconnected, connecting, connected, reconnecting
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
@@ -17,6 +18,7 @@ export const useWebSocket = (url) => {
       return; // Don't connect if already connecting or connected
     }
 
+    setError(null);
     setConnectionStatus('connecting');
     console.log('Attempting to connect to:', currentUrlRef.current);
 
@@ -26,6 +28,7 @@ export const useWebSocket = (url) => {
       console.log('Connected to WebSocket server:', currentUrlRef.current);
       setIsConnected(true);
       setConnectionStatus('connected');
+      setError(null);
       setWs(websocket);
       reconnectAttemptsRef.current = 0; // Reset attempts on successful connection
     };
@@ -46,8 +49,12 @@ export const useWebSocket = (url) => {
       }
     };
 
-    websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    websocket.onerror = (errorEvent) => {
+      console.error('WebSocket error:', errorEvent);
+      setError({
+        message: 'Connection failed. Check the server URL and ensure the server is running.',
+        timestamp: new Date().toISOString()
+      });
       setConnectionStatus('disconnected');
     };
 
@@ -88,6 +95,7 @@ export const useWebSocket = (url) => {
     if (ws) {
       ws.close(1000, "Manual disconnect");
     }
+    setError(null);
     setConnectionStatus('disconnected');
     setIsConnected(false);
   }, [ws]);
@@ -134,6 +142,7 @@ export const useWebSocket = (url) => {
     isConnected,
     connectionStatus,
     messages,
+    error,
     sendMessage,
     reconnect,
     disconnect,

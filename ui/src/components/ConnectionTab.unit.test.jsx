@@ -60,7 +60,7 @@ describe('ConnectionTab Component - Runtime Error Tests', () => {
     
     // Test drag end functionality (if applicable)
     // Check that the required elements are present
-    expect(container.querySelector('.connection-status')).toBeInTheDocument();
+    expect(screen.getByText(/Connection:/)).toBeInTheDocument();
   });
 
   it('handles different panel layouts without errors', () => {
