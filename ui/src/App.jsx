@@ -50,6 +50,8 @@ const App = () => {
           onAddTask={handleAddTask}
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
+          reasonerStats={reasonerStats}
+          onCommand={handleSendRawMessage}
         />
       </div>
       <StatusBar onSend={handleSendRawMessage} stats={reasonerStats} />
