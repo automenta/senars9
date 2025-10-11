@@ -1,47 +1,39 @@
-# SeNARS - Semantic Non-axiomatic Reasoning System
+# SeNARS - Semantic Non-axiomatic Reasoning System - Neuro-Symbolic Cognitive Architecture
 
-SeNARS is a neuro-symbolic cognitive architecture designed for general-purpose intelligent systems. This repository contains a Rust implementation of the SeNARS specification.
+### Achieve More with Less
 
-## Project Overview
+- **Unified communication**: Single Messages system handling both events and commands
+- **Component-based architecture**: All major functionality as Components with standardized interfaces
+- **Self-optimization**: System uses its own facilities for self-management ("dogfooding")
 
-This project aims to build a robust and performant implementation of SeNARS, leveraging Rust's safety and performance features. The architecture is component-based, allowing for modularity and extensibility.
+## Key Innovations
 
-### Key Documents
+### 1. Metaprogramming-Driven Design
+- **Proxy-based component access**: Direct property access to registered components
+- **Dynamic method resolution**: Runtime discovery of component capabilities
+- **Self-modifying behavior**: System adapts based on rule evaluation
 
-*   **[SPECIFICATION.md](SPECIFICATION.md)**: The complete language-agnostic specification, including core data structures and terminology.
-*   **[ARCHITECTURE.md](ARCHITECTURE.md)**: A detailed overview of the system architecture, components, and their interactions.
-*   **[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)**: Guidelines for development, testing, and deployment.
+### 2. Winnowing-Based Rule Evaluation
+- **Pre-filtering**: Eliminate irrelevant rules before execution
+- **Priority-based selection**: Execute high-priority strategies first
+- **Performance optimization**: Minimize computational overhead
 
-### Code Guidelines
+### 3. Unified Communication Architecture
+- **Single Messages system**: Handles both events and commands
+- **Middleware pipeline**: Preprocessing and postprocessing capabilities
+- **Type-safe interfaces**: Structured communication patterns
 
-The project adheres to the following principles:
-- **Elegant**: Clean, beautiful solutions.
-- **Consolidated**: Minimized concepts, maximized utility.
-- **Consistent**: Uniform patterns throughout the codebase.
-- **Organized**: Clear structure and logical arrangement.
-- **Deeply deduplicated**: DRY principle applied rigorously.
-- **Abstract**: High-level interfaces with flexible implementations.
-- **Modularized**: Independent, composable components.
-- **Parameterized**: Configurable behavior.
-- **Terse syntax**: Concise, expressive code.
-- **Professional**: Production-ready, maintainable code.
+### 4. Multi-Modal Intelligence Integration
+- **Advanced LLM Integration**: Support for multiple providers with fallback mechanisms
+- **Tool Execution Framework**: Comprehensive automation capabilities
+- **Embedding Processing**: Vector generation and similarity search
+- **Hypothesis Generation**: Creative problem-solving support
 
-## Getting Started
+## Documentation
 
-To get started with the SeNARS implementation, you will need to have Rust and Cargo installed.
+- **[SPECIFICATION.md](./SPECIFICATION.md)**: The complete language-agnostic technical specification.
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)**: Developer-focused information, including setup, workflow, and coding standards.
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd senars-rust
+## License
 
-# Build the project
-cargo build
-
-# Run tests
-cargo test
-```
-
-## Contributing
-
-Contributions are welcome. Please refer to the [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for details on the development workflow and coding standards.
+AGPL-3.0-or-later - See LICENSE file for details.
