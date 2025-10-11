@@ -7,7 +7,16 @@ import './App.css';
 import './Layout.css';
 
 const App = () => {
-  const { messages, sendMessage } = useWebSocket(`ws://localhost:${CONNECTION_DEFAULTS.defaultPort}`);
+  // Create WebSocket URL dynamically based on the page's protocol and host
+  // Extract server port from URL parameters if specified, otherwise use default
+  const urlParams = new URLSearchParams(window.location.search);
+  const serverPort = urlParams.get('serverPort') || CONNECTION_DEFAULTS.defaultPort;
+  
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsHost = window.location.hostname; // Use hostname without port
+  const wsUrl = `${wsProtocol}//${wsHost}:${serverPort}`;
+  
+  const { messages, sendMessage } = useWebSocket(wsUrl);
 
   const filteredLogMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.log);
   const filteredTaskMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.task);

@@ -12,8 +12,8 @@ class SenarsServer {
 
   start() {
     return new Promise((resolve, reject) => {
-      this.httpServer.listen(this.port, () => {
-        console.log(`SeNARS server listening on port ${this.port}`);
+      this.httpServer.listen(this.port, '0.0.0.0', () => {
+        console.log(`SeNARS server listening on port ${this.port} (0.0.0.0)`);
         resolve();
       });
 
