@@ -8,6 +8,7 @@ import { renderWithErrorDetection } from '../test-utils';
 vi.mock('../core/WebSocketManager', () => ({
   default: vi.fn(() => ({
     isConnected: true,
+    connectionStatus: 'connected',
     messages: [],
     sendMessage: vi.fn(),
     reconnect: vi.fn(),

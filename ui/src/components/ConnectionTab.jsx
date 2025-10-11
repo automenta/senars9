@@ -12,7 +12,7 @@ import { PANEL_CONFIG, MESSAGE_TYPES, THEME } from '../constants';
 import Panel from './Panel';
 
 const ConnectionTab = ({ name, url }) => {
-  const { isConnected, messages, error, sendMessage } = useWebSocket(url);
+  const { isConnected, connectionStatus, messages, error, sendMessage } = useWebSocket(url);
   const [activeId, setActiveId] = useState(null);
 
   const [panels, setPanels] = useState([
@@ -23,6 +23,10 @@ const ConnectionTab = ({ name, url }) => {
 
   const handleSendMessage = (command) => {
     sendMessage({ type: 'command', data: command });
+  };
+
+  const handleCommand = (command, payload) => {
+    sendMessage({ type: 'control', command, payload });
   };
 
   const handleDragStart = (event) => {
@@ -51,7 +55,7 @@ const ConnectionTab = ({ name, url }) => {
       case 'topPanel':
         return (
           <Panel title={panel.name}>
-            <ReasonerControlPanel stats={reasonerStats} />
+            <ReasonerControlPanel stats={reasonerStats} onCommand={handleCommand} />
             <InputField onSend={handleSendMessage} />
           </Panel>
         );
@@ -81,13 +85,39 @@ const ConnectionTab = ({ name, url }) => {
     }
   };
 
-  const connectionStatusStyles = {
-    padding: THEME.spacing.sm,
-    marginBottom: THEME.spacing.md,
-    borderRadius: THEME.borderRadius,
-    color: THEME.colors.white,
-    fontWeight: THEME.fontWeight.bold,
-    backgroundColor: isConnected ? THEME.colors.success : THEME.colors.danger,
+  const getStatusStyles = () => {
+    const baseStyles = {
+      padding: THEME.spacing.sm,
+      marginBottom: THEME.spacing.md,
+      borderRadius: THEME.borderRadius,
+      color: THEME.colors.white,
+      fontWeight: THEME.fontWeight.bold,
+    };
+
+    switch (connectionStatus) {
+      case 'connected':
+        return { ...baseStyles, backgroundColor: THEME.colors.success };
+      case 'connecting':
+      case 'reconnecting':
+        return { ...baseStyles, backgroundColor: THEME.colors.warning };
+      case 'disconnected':
+      default:
+        return { ...baseStyles, backgroundColor: THEME.colors.danger };
+    }
+  };
+
+  const getStatusText = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return 'Connected';
+      case 'connecting':
+        return 'Connecting...';
+      case 'reconnecting':
+        return 'Reconnecting...';
+      case 'disconnected':
+      default:
+        return 'Disconnected';
+    }
   };
 
   const errorStyles = {
@@ -100,8 +130,8 @@ const ConnectionTab = ({ name, url }) => {
 
   return (
     <div className="connection-tab">
-      <div style={connectionStatusStyles}>
-        <strong>Connection:</strong> {name} ({url}) - Status: {isConnected ? 'Connected' : 'Disconnected'}
+      <div style={getStatusStyles()}>
+        <strong>Connection:</strong> {name} ({url}) - Status: {getStatusText()}
       </div>
 
       {error && (

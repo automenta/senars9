@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "NODE_NO_WARNINGS=1 NODE_OPTIONS=--experimental-vm-modules npx jest",
+    "test:core": "NODE_NO_WARNINGS=1 NODE_OPTIONS=--experimental-vm-modules npx jest",
     "test:all": "npm run test:core && npm run test:ui",
     "test:ui": "npm run --prefix ui test:run",
     "ui": "npm run --prefix ui dev",
