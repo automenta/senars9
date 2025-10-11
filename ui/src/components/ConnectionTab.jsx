@@ -1,36 +1,22 @@
 import React, { useState } from 'react';
 import { DndContext, closestCenter } from '@dnd-kit/core';
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import ReasonerControlPanel from './ReasonerControlPanel';
 import InputField from './InputField';
 import LogList from './LogList';
 import TasksTree from './TasksTree';
 import ConceptMap from './ConceptMap';
+import SortableItem from './SortableItem';
 import useWebSocket from '../core/WebSocketManager';
-
-const SortableItem = ({ id, children }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {children}
-    </div>
-  );
-};
+import { PANEL_CONFIG, MESSAGE_TYPES, THEME, LAYOUT } from '../constants';
 
 const ConnectionTab = ({ name, url }) => {
   const { isConnected, messages, sendMessage } = useWebSocket(url);
 
   const [panels, setPanels] = useState([
-    { id: 'topPanel', name: 'Control & Input' },
-    { id: 'conceptMapPanel', name: 'Concept Map' },
-    { id: 'bottomPanel', name: 'Log & Tasks' },
+    PANEL_CONFIG.topPanel,
+    PANEL_CONFIG.conceptMapPanel,
+    PANEL_CONFIG.bottomPanel,
   ]);
 
   const handleSendMessage = (command) => {
@@ -40,48 +26,28 @@ const ConnectionTab = ({ name, url }) => {
   const handleDragEnd = (event) => {
     const { active, over } = event;
     if (active.id !== over.id) {
-      setPanels((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
+      setPanels(prev => {
+        const oldIndex = prev.findIndex(item => item.id === active.id);
+        const newIndex = prev.findIndex(item => item.id === over.id);
+        return arrayMove(prev, oldIndex, newIndex);
       });
     }
   };
 
-  const filteredLogMessages = messages.filter((msg) => msg.type === 'log');
-  const filteredTaskMessages = messages.filter((msg) => msg.type === 'task');
-  const filteredConceptMessages = messages.filter((msg) => msg.type === 'concept');
-  const reasonerStats = messages.find((msg) => msg.type === 'reasoner_stats')?.data || null;
+  const filteredLogMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.log);
+  const filteredTaskMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.task);
+  const filteredConceptMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.concept);
+  const reasonerStats = messages.find(msg => msg.type === MESSAGE_TYPES.reasonerStats)?.data || null;
 
   const renderPanel = (panel) => {
     switch (panel.id) {
       case 'topPanel':
         return (
-          <div className="top-section" style={{
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: '200px',
-            maxHeight: '300px',
-            overflow: 'auto',
-            marginBottom: '10px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            backgroundColor: 'white'
-          }}>
-            <div className="panel-header" style={{
-              backgroundColor: '#e9ecef',
-              padding: '5px 10px',
-              borderTopLeftRadius: '4px',
-              borderTopRightRadius: '4px',
-              fontWeight: 'bold',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              cursor: 'move'
-            }}>
+          <div className="panel top-section">
+            <div className="panel-header">
               <span>{panel.name}</span>
             </div>
-            <div style={{ padding: '10px' }}>
+            <div className="panel-content">
               <ReasonerControlPanel stats={reasonerStats} />
               <InputField onSend={handleSendMessage} />
             </div>
@@ -89,83 +55,31 @@ const ConnectionTab = ({ name, url }) => {
         );
       case 'conceptMapPanel':
         return (
-          <div className="concept-map-section" style={{
-            flex: 1,
-            minHeight: '0',
-            marginBottom: '10px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            overflow: 'hidden',
-            backgroundColor: 'white'
-          }}>
-            <div className="panel-header" style={{
-              backgroundColor: '#e9ecef',
-              padding: '5px 10px',
-              borderTopLeftRadius: '4px',
-              borderTopRightRadius: '4px',
-              fontWeight: 'bold',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              cursor: 'move'
-            }}>
+          <div className="panel concept-map-section">
+            <div className="panel-header">
               <span>{panel.name}</span>
             </div>
-            <div style={{ height: 'calc(100% - 30px)', padding: '10px' }}>
+            <div className="panel-content concept-map-content">
               <ConceptMap concepts={filteredConceptMessages} />
             </div>
           </div>
         );
       case 'bottomPanel':
         return (
-          <div className="bottom-section" style={{
-            display: 'flex',
-            gap: '10px',
-            maxHeight: '300px',
-            minHeight: '200px'
-          }}>
-            <div className="log-section" style={{
-              flex: 1,
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              backgroundColor: 'white'
-            }}>
-              <div className="panel-header" style={{
-                backgroundColor: '#e9ecef',
-                padding: '5px 10px',
-                borderTopLeftRadius: '4px',
-                fontWeight: 'bold',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                cursor: 'move'
-              }}>
+          <div className="bottom-section">
+            <div className="panel log-section">
+              <div className="panel-header">
                 <span>Log</span>
               </div>
-              <div style={{ height: 'calc(100% - 30px)', padding: '10px' }}>
+              <div className="panel-content log-content">
                 <LogList logs={filteredLogMessages} />
               </div>
             </div>
-            <div className="tasks-section" style={{
-              flex: 1,
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              backgroundColor: 'white'
-            }}>
-              <div className="panel-header" style={{
-                backgroundColor: '#e9ecef',
-                padding: '5px 10px',
-                borderTopRightRadius: '4px',
-                fontWeight: 'bold',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
+            <div className="panel tasks-section">
+              <div className="panel-header">
                 <span>Tasks</span>
               </div>
-              <div style={{ height: 'calc(100% - 30px)', padding: '10px' }}>
+              <div className="panel-content tasks-content">
                 <TasksTree tasks={filteredTaskMessages} />
               </div>
             </div>
@@ -177,20 +91,8 @@ const ConnectionTab = ({ name, url }) => {
   };
 
   return (
-    <div className="connection-tab" style={{
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: '#f8f9fa'
-    }}>
-      <div className="connection-status" style={{
-        padding: '8px 10px',
-        backgroundColor: isConnected ? '#d4edda' : '#f8d7da',
-        color: isConnected ? '#155724' : '#721c24',
-        border: '1px solid',
-        borderRadius: '4px',
-        marginBottom: '10px'
-      }}>
+    <div className="connection-tab">
+      <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
         <div>
           <strong>Connection:</strong> {name} ({url}) - Status: {isConnected ? 'Connected' : 'Disconnected'}
         </div>
@@ -204,12 +106,7 @@ const ConnectionTab = ({ name, url }) => {
           items={panels}
           strategy={verticalListSortingStrategy}
         >
-          <div className="main-layout" style={{
-            display: 'flex',
-            flexDirection: 'column',
-            flex: 1,
-            overflow: 'hidden'
-          }}>
+          <div className="main-layout">
             {panels.map(panel => (
               <SortableItem key={panel.id} id={panel.id}>
                 {renderPanel(panel)}

@@ -19,9 +19,47 @@ body {
   position: relative;
   height: 100%;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+}
+
+.connection-status {
+  padding: 8px 10px;
+  border: 1px solid;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  transition: all 0.2s ease;
+}
+
+.connection-status.connected {
+  background-color: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
+.connection-status.disconnected {
+  background-color: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb;
+}
+
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
 }
 
 /* Panel styles for MDI layout */
+.panel {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
 .panel-header {
   display: flex;
   justify-content: space-between;
@@ -41,6 +79,38 @@ body {
   height: calc(100% - 30px);
 }
 
+.panel.top-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.panel.concept-map-section {
+  flex: 1;
+  min-height: 0;
+}
+
+.panel.log-section,
+.panel.tasks-section {
+  flex: 1;
+  overflow: hidden;
+}
+
+.bottom-section {
+  display: flex;
+  gap: 10px;
+  max-height: 300px;
+  min-height: 200px;
+}
+
+.concept-map-content,
+.log-content,
+.tasks-content {
+  height: calc(100% - 30px);
+}
+
 /* Force graph container */
 .react-force-graph {
   width: 100%;
@@ -51,6 +121,59 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Input field styles */
+.input-field {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.input-form {
+  flex: 1;
+}
+
+.input-text {
+  width: 100%;
+  padding: 8px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  transition: border-color 0.2s ease;
+}
+
+.input-text:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.send-button {
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+}
+
+.send-button:hover {
+  background-color: #0056b3;
+}
+
+.history-indicator {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
 }
 
 /* Custom styles for various components */
@@ -92,10 +215,110 @@ body {
   background: #7a7a7a;
 }
 
+/* App layout styles */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  background-color: #f0f2f5;
+}
+
+.app-title {
+  text-align: center;
+  margin: 0 0 20px 0;
+  color: #2c3e50;
+  font-size: 24px;
+  font-weight: normal;
+}
+
+/* Tab styles */
+.tabs {
+  display: flex;
+  margin-bottom: 10px;
+  border-bottom: 2px solid #ccc;
+}
+
+.tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  background-color: #f8f9fa;
+  color: #333;
+  border: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  margin-right: 2px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.tab.active {
+  background-color: #007bff;
+  color: white;
+  border-bottom: none;
+}
+
+.tab:hover:not(.active) {
+  background-color: #e9ecef;
+}
+
+.tab-close {
+  margin-left: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.tab-close:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.add-connection-btn {
+  padding: 10px 15px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+}
+
+.add-connection-btn:hover {
+  background-color: #218838;
+}
+
+.tab-content {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 10px;
+  overflow: auto;
+  background-color: white;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .app {
     padding: 5px;
+  }
+
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
+    margin-bottom: 2px;
   }
 
   .bottom-section {
