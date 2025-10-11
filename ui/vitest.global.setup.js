@@ -13,27 +13,56 @@ export async function setup() {
 
   const serverPath = path.resolve(__dirname, './server.js');
 
-  serverProcess = spawn('node', [serverPath], {
-    stdio: 'pipe', // Use pipe to capture output
-    detached: true, // Detach to manage its lifecycle independently
-  });
+  try {
+    // Check if server is already running on port 8080
+    const net = await import('net');
+    const testPort = new Promise((resolve) => {
+      const tester = net
+        .createServer()
+        .once('error', (err) => {
+          if (err.code === 'EADDRINUSE') {
+            console.log('Port 8080 already in use, assuming server is running');
+            resolve(false); // Already in use
+          } else {
+            resolve(true); // Not in use
+          }
+        })
+        .once('listening', () => {
+          tester.close();
+          resolve(true); // Port is available
+        })
+        .listen(8080, 'localhost');
+    });
 
-  // Expose the server process to the teardown function
-  globalThis.__SERVER_PROCESS__ = serverProcess;
+    if (await testPort) {
+      // Port is available, start the server
+      serverProcess = spawn('node', [serverPath], {
+        stdio: 'pipe', // Use pipe to capture output
+        detached: true, // Detach to manage its lifecycle independently
+      });
 
-  serverProcess.stdout.on('data', (data) => {
-    console.log(`[Server STDOUT]: ${data}`);
-  });
+      // Expose the server process to the teardown function
+      globalThis.__SERVER_PROCESS__ = serverProcess;
 
-  serverProcess.stderr.on('data', (data) => {
-    console.error(`[Server STDERR]: ${data}`);
-  });
+      serverProcess.stdout.on('data', (data) => {
+        console.log(`[Server STDOUT]: ${data}`);
+      });
 
-  // Give the server a moment to start up.
-  // A more robust solution would be to wait for a specific log message.
-  await new Promise(resolve => setTimeout(resolve, 3000));
+      serverProcess.stderr.on('data', (data) => {
+        console.error(`[Server STDERR]: ${data}`);
+      });
 
-  console.log('Integrated server should be running.');
+      // Give the server a moment to start up
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      console.log('Integrated server started.');
+    } else {
+      console.log('Integrated server already running.');
+      globalThis.__SERVER_PROCESS__ = null;
+    }
+  } catch (error) {
+    console.log('Error checking port or starting server:', error.message);
+  }
 }
 
 export async function teardown() {

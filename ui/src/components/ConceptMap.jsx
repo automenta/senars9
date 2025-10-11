@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { forceSimulation, forceLink, forceManyBody, forceCenter } from 'd3-force';
 import { useGraphics } from './GraphicsEngine';
@@ -7,18 +7,56 @@ const ConceptMap = ({ concepts }) => {
   const { scene } = useGraphics();
   const graphObjects = useRef(new Map()); // To keep track of Three.js objects
   const simulation = useRef();
+  const [isPaused, setIsPaused] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [selectedNode, setSelectedNode] = useState(null);
+
+  // Process different types of entities
+  const processEntities = (concepts) => {
+    if (!concepts || concepts.length === 0) return { nodes: [], links: [] };
+
+    const nodes = [];
+    const links = [];
+    
+    // Create nodes for different entity types
+    concepts.forEach((item, i) => {
+      if (item.type === 'concept') {
+        nodes.push({
+          id: item.data?.id || `concept-${i}`,
+          type: 'concept',
+          name: item.data?.name || item.data?.id || `Concept-${i}`,
+          priority: item.data?.priority || 0.5,
+          color: 0x007bff, // Blue
+          ...item.data
+        });
+      }
+      else if (item.type === 'task') {
+        nodes.push({
+          id: item.data?.id || `task-${i}`,
+          type: 'task',
+          name: item.data?.content || `Task-${i}`,
+          priority: item.data?.priority || 0.5,
+          color: 0x28a745, // Green
+          ...item.data
+        });
+      }
+      else if (item.type === 'link') {
+        links.push({
+          source: item.data?.source || `link-source-${i}`,
+          target: item.data?.target || `link-target-${i}`,
+          type: item.data?.linkType || 'relation',
+          strength: item.data?.strength || 0.5
+        });
+      }
+    });
+
+    return { nodes, links };
+  };
 
   useEffect(() => {
     if (!scene || !concepts) return;
 
-    // --- Data Preparation ---
-    const nodes = concepts.map((c, i) => ({ id: c.data?.id || `concept-${i}`, ...c.data }));
-
-    // Simple link logic: connect each node to the next one for visualization
-    const links = [];
-    for (let i = 0; i < nodes.length - 1; i++) {
-        links.push({ source: nodes[i].id, target: nodes[i+1].id });
-    }
+    const { nodes, links } = processEntities(concepts);
 
     // --- Cleanup from previous render ---
     graphObjects.current.forEach((obj, id) => {
@@ -30,48 +68,92 @@ const ConceptMap = ({ concepts }) => {
     if(simulation.current) simulation.current.stop();
 
     // --- Create Three.js objects ---
-    // Create nodes (spheres)
+    // Create nodes with different geometries based on type
     nodes.forEach(node => {
-      const geometry = new THREE.SphereGeometry(1, 16, 16);
-      const material = new THREE.MeshBasicMaterial({ color: Math.random() * 0xffffff });
-      const sphere = new THREE.Mesh(geometry, material);
-      sphere.userData = node; // Attach data
-      scene.add(sphere);
-      graphObjects.current.set(node.id, sphere);
+      let geometry, material;
+      
+      // Different shapes for different types
+      switch(node.type) {
+        case 'task':
+          geometry = new THREE.ConeGeometry(0.8, 1.5, 8);
+          break;
+        case 'concept':
+        default:
+          geometry = new THREE.SphereGeometry(1, 16, 16);
+      }
+      
+      const priorityFactor = Math.max(0.3, Math.min(1, node.priority || 0.5));
+      const baseColor = node.color || 0xcccccc;
+      
+      material = new THREE.MeshPhongMaterial({ 
+        color: baseColor,
+        emissive: new THREE.Color(baseColor).multiplyScalar(0.2),
+        shininess: 50,
+        transparent: true,
+        opacity: Math.min(0.9, 0.3 + priorityFactor * 0.7)
+      });
+      
+      const mesh = new THREE.Mesh(geometry, material);
+      
+      // Add pulsing animation based on priority
+      const originalScale = mesh.scale.clone();
+      mesh.userData = { 
+        node, 
+        originalScale,
+        animationOffset: Math.random() * Math.PI * 2 // Random phase for animation
+      };
+      
+      scene.add(mesh);
+      graphObjects.current.set(node.id, mesh);
     });
 
-    // Create links (lines)
+    // Create links
     links.forEach(link => {
-        const material = new THREE.LineBasicMaterial({ color: 0xcccccc });
-        const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-        const line = new THREE.Line(geometry, material);
-        line.userData = link; // Attach data
-        scene.add(line);
-        graphObjects.current.set(`${link.source}-${link.target}`, line);
+      const material = new THREE.LineBasicMaterial({ 
+        color: 0x888888,
+        transparent: true,
+        opacity: 0.4 + (link.strength || 0.5) * 0.4
+      });
+      const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      const line = new THREE.Line(geometry, material);
+      line.userData = link;
+      scene.add(line);
+      graphObjects.current.set(`${link.source}-${link.target}`, line);
     });
-
 
     // --- D3 Force Simulation ---
     simulation.current = forceSimulation(nodes)
-      .force("link", forceLink(links).id(d => d.id).distance(10))
-      .force("charge", forceManyBody().strength(-50))
+      .force("link", forceLink(links).id(d => d.id).distance(15).strength(0.5))
+      .force("charge", forceManyBody().strength(-100))
       .force("center", forceCenter(0, 0));
 
     // --- Animation Tick ---
-    simulation.current.on("tick", () => {
+    const animate = () => {
+      if (isPaused) {
+        requestAnimationFrame(animate);
+        return;
+      }
+      
+      simulation.current.alpha(0.1); // Maintain some movement
+      simulation.current.tick();
+      
       // Update node positions
       nodes.forEach(node => {
         const nodeMesh = graphObjects.current.get(node.id);
         if (nodeMesh) {
+          // Animate scale based on priority and time
+          const time = Date.now() * 0.001;
+          const pulse = Math.sin(time + nodeMesh.userData.animationOffset) * 0.1 + 1;
           nodeMesh.position.set(node.x, node.y, 0);
+          nodeMesh.scale.copy(nodeMesh.userData.originalScale).multiplyScalar(pulse);
         }
       });
 
       // Update link positions
       links.forEach(link => {
-        const lineMesh = graphObjects.current.get(`${link.source.id}-${link.target.id}`);
-        const sourceNode = graphObjects.current.get(link.source.id);
-        const targetNode = graphObjects.current.get(link.target.id);
+        const lineMesh = graphObjects.current.get(`${link.source}-${link.target}`);
+        const sourceNode = graphObjects.current.get(link.source);
+        const targetNode = graphObjects.current.get(link.target);
 
         if (lineMesh && sourceNode && targetNode) {
           const positions = lineMesh.geometry.attributes.position;
@@ -80,7 +162,10 @@ const ConceptMap = ({ concepts }) => {
           positions.needsUpdate = true;
         }
       });
-    });
+      
+      requestAnimationFrame(animate);
+    };
+    animate();
 
     // --- Cleanup function ---
     return () => {
@@ -89,11 +174,153 @@ const ConceptMap = ({ concepts }) => {
         graphObjects.current.clear();
     };
 
-  }, [concepts, scene]);
+  }, [concepts, scene, isPaused]);
 
+  // Add mouse controls for zoom
+  useEffect(() => {
+    const handleWheel = (event) => {
+      event.preventDefault();
+      const delta = event.deltaY > 0 ? 0.9 : 1.1;
+      setZoomLevel(prev => Math.max(0.1, Math.min(3, prev * delta)));
+    };
 
-  // The GraphicsEngine handles the rendering, so this component just manages objects.
-  return null;
+    const container = document.querySelector('.concept-map-container');
+    if (container) {
+      container.addEventListener('wheel', handleWheel, { passive: false });
+      return () => container.removeEventListener('wheel', handleWheel);
+    }
+  }, []);
+
+  // Add lighting to the scene
+  useEffect(() => {
+    if (!scene) return;
+
+    // Add ambient light
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    scene.add(ambientLight);
+
+    // Add directional light
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+
+    // Add point light for additional glow
+    const pointLight = new THREE.PointLight(0xffffff, 0.6, 100);
+    pointLight.position.set(0, 0, 20);
+    scene.add(pointLight);
+  }, [scene]);
+
+  const togglePause = () => {
+    setIsPaused(!isPaused);
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
+  };
+
+  return (
+    <div className="concept-map-container" style={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      position: 'relative'
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '5px 10px',
+        backgroundColor: '#e9ecef',
+        borderBottom: '1px solid #ccc',
+        fontSize: '12px',
+        zIndex: 10
+      }}>
+        <div style={{ fontWeight: 'bold', color: '#333' }}>
+          Concept Map
+        </div>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <button
+            onClick={togglePause}
+            style={{
+              padding: '2px 8px',
+              fontSize: '12px',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              backgroundColor: isPaused ? '#28a745' : '#6c757d',
+              color: 'white'
+            }}
+          >
+            {isPaused ? '▶️ Resume' : '⏸️ Pause'}
+          </button>
+          <button
+            onClick={resetZoom}
+            style={{
+              padding: '2px 8px',
+              fontSize: '12px',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              backgroundColor: '#007bff',
+              color: 'white'
+            }}
+          >
+            🔍 Reset Zoom
+          </button>
+        </div>
+      </div>
+      
+      {/* Legend */}
+      <div style={{
+        position: 'absolute',
+        bottom: '10px',
+        right: '10px',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        padding: '8px',
+        borderRadius: '4px',
+        fontSize: '11px',
+        zIndex: 10
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+          <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#007bff', marginRight: '6px' }}></div>
+          <span>Concepts</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ width: '12px', height: '12px', backgroundColor: '#28a745', marginRight: '6px' }}></div>
+          <span>Tasks</span>
+        </div>
+      </div>
+      
+      {/* The 3D scene is managed by the GraphicsEngine, so we just return a container */}
+      <div style={{ 
+        flex: 1, 
+        cursor: 'grab',
+        transform: `scale(${zoomLevel})`,
+        transformOrigin: 'center center',
+        transition: 'transform 0.2s ease'
+      }}>
+        {selectedNode && (
+          <div style={{
+            position: 'absolute',
+            top: '50px',
+            left: '10px',
+            backgroundColor: 'white',
+            padding: '10px',
+            borderRadius: '4px',
+            border: '1px solid #ccc',
+            zIndex: 20,
+            maxWidth: '250px',
+            fontSize: '12px'
+          }}>
+            <h4 style={{ margin: '0 0 5px 0', color: '#333' }}>{selectedNode.name}</h4>
+            <div><strong>Type:</strong> {selectedNode.type}</div>
+            <div><strong>Priority:</strong> {(selectedNode.priority || 0).toFixed(2)}</div>
+            {selectedNode.content && <div><strong>Content:</strong> {selectedNode.content}</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default ConceptMap;

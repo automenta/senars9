@@ -14,6 +14,8 @@ const SortableTaskItem = ({ task, index, onPriorityChange }) => {
     isDragging,
   } = useSortable({ id: task.id || index });
 
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -32,48 +34,85 @@ const SortableTaskItem = ({ task, index, onPriorityChange }) => {
     if (type?.toLowerCase().includes('derived')) return '✨';
     if (type?.toLowerCase().includes('goal')) return '🎯';
     if (type?.toLowerCase().includes('question')) return '❓';
+    if (type?.toLowerCase().includes('operation')) return '⚙️';
+    if (type?.toLowerCase().includes('inference')) return '💭';
     return '📋';
+  };
+
+  const handleTaskClick = (e) => {
+    e.stopPropagation();
+    setIsExpanded(!isExpanded);
   };
 
   return (
     <div
       ref={setNodeRef}
-      className="list-item-enter"
+      className="task-item"
       style={{
         ...style,
-        padding: '8px',
-        margin: '4px 0',
-        backgroundColor: '#e9ecef',
+        padding: '6px 8px',
+        margin: '2px 0',
+        backgroundColor: isExpanded ? '#e7f1ff' : '#f8f9fa',
         borderRadius: '4px',
         display: 'flex',
         alignItems: 'center',
-        fontSize: '14px',
-        border: '1px solid #ced4da',
-        cursor: 'grab'
+        fontSize: '12px',
+        border: `1px solid ${isExpanded ? '#0d6efd' : '#ced4da'}`,
+        cursor: 'grab',
+        transition: 'all 0.2s ease',
+        minHeight: '36px'
       }}
       {...attributes}
       {...listeners}
+      onClick={handleTaskClick}
     >
-      <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-        <span style={{ marginRight: '8px', fontSize: '16px' }}>
-          {getTaskTypeIcon(task.data?.type)}
-        </span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 'bold' }}>
-            {task.data?.id || `Task ${index + 1}`}
-          </div>
-          <div style={{ fontSize: '12px', color: '#666' }}>
-            {task.data?.content || 'Task content...'}
-          </div>
+      {/* Task type icon */}
+      <span style={{ 
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        backgroundColor: `${getTaskPriorityColor(task.data?.priority || 0.5)}20`, // Lighter background
+        marginRight: '8px',
+        fontSize: '12px',
+        color: getTaskPriorityColor(task.data?.priority || 0.5)
+      }}>
+        {getTaskTypeIcon(task.data?.type)}
+      </span>
+
+      {/* Task content - one line as specified */}
+      <div style={{ 
+        flex: 1, 
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }}>
+        <div style={{ 
+          fontWeight: '500', 
+          color: '#333',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
+          {task.data?.content || task.data?.id || `Task ${index + 1}`}
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {/* Priority display and controls */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '6px',
+        minWidth: '120px',
+        justifyContent: 'flex-end'
+      }}>
         <span
           style={{
             fontWeight: 'bold',
             color: getTaskPriorityColor(task.data?.priority || 0.5),
-            minWidth: '40px',
+            fontSize: '11px',
+            minWidth: '30px',
             textAlign: 'right'
           }}
         >
@@ -89,48 +128,124 @@ const SortableTaskItem = ({ task, index, onPriorityChange }) => {
           value={task.data?.priority || 0.5}
           onChange={(e) => onPriorityChange(task, parseFloat(e.target.value))}
           style={{
-            width: '60px',
-            cursor: 'ew-resize'
+            width: '40px',
+            cursor: 'ew-resize',
+            height: '16px'
           }}
+          title="Drag to reprioritize"
         />
 
         {/* Popup button for progressive disclosure */}
-        <details style={{ display: 'inline-block' }}>
-          <summary style={{
-            display: 'inline-block',
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+          style={{
             padding: '2px 6px',
-            backgroundColor: '#6c757d',
+            backgroundColor: isExpanded ? '#0d6efd' : '#6c757d',
             color: 'white',
+            border: 'none',
             borderRadius: '3px',
             cursor: 'pointer',
             fontSize: '12px'
-          }}>
-            ⋯
-          </summary>
-          <div style={{
-            position: 'absolute',
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            padding: '8px',
-            zIndex: 10,
-            width: '200px',
-            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-          }}>
-            <div><strong>Task Details:</strong></div>
-            <div>ID: {task.data?.id || 'N/A'}</div>
-            <div>Status: {task.data?.status || 'Unknown'}</div>
-            <div>Created: {task.data?.created || 'N/A'}</div>
-            <div>Priority: {(task.data?.priority || 0).toFixed(2)}</div>
-          </div>
-        </details>
+          }}
+        >
+          ⋯
+        </button>
       </div>
+
+      {/* Expanded details view */}
+      {isExpanded && (
+        <div style={{
+          position: 'absolute',
+          left: '0',
+          right: '0',
+          top: '100%',
+          backgroundColor: 'white',
+          border: '1px solid #0d6efd',
+          borderRadius: '4px',
+          padding: '10px',
+          zIndex: 20,
+          marginTop: '2px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+          fontSize: '11px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h4 style={{ margin: 0, color: '#0d6efd' }}>Task Details</h4>
+            <button
+              onClick={() => setIsExpanded(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '14px',
+                cursor: 'pointer',
+                color: '#6c757d'
+              }}
+            >
+              ×
+            </button>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div><strong>ID:</strong> {task.data?.id || 'N/A'}</div>
+            <div><strong>Type:</strong> {task.data?.type || 'N/A'}</div>
+            <div><strong>Status:</strong> {task.data?.status || 'N/A'}</div>
+            <div><strong>Priority:</strong> {(task.data?.priority || 0).toFixed(3)}</div>
+            <div><strong>Created:</strong> {task.data?.created || 'N/A'}</div>
+            <div><strong>Content:</strong> {task.data?.content || 'N/A'}</div>
+          </div>
+          
+          <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+            <button
+              style={{
+                padding: '4px 8px',
+                fontSize: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                backgroundColor: '#e9ecef'
+              }}
+              onClick={() => console.log('Execute task:', task.data?.id)}
+            >
+              ▶️ Execute
+            </button>
+            <button
+              style={{
+                padding: '4px 8px',
+                fontSize: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                backgroundColor: '#e9ecef'
+              }}
+              onClick={() => console.log('Delete task:', task.data?.id)}
+            >
+              🗑️ Delete
+            </button>
+            <button
+              style={{
+                padding: '4px 8px',
+                fontSize: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                backgroundColor: '#e9ecef'
+              }}
+              onClick={() => onPriorityChange(task, Math.min(1, (task.data?.priority || 0) + 0.1))}
+            >
+              ⬆️ Up Priority
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 const TasksTree = ({ tasks }) => {
   const [sortedTasks, setSortedTasks] = useState(tasks || []);
+  const [expandedTask, setExpandedTask] = useState(null);
 
   useEffect(() => {
     // Sort tasks by priority in descending order (highest first)
@@ -177,7 +292,8 @@ const TasksTree = ({ tasks }) => {
       border: '1px solid #ccc',
       borderRadius: '4px',
       backgroundColor: '#f8f9fa',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      position: 'relative'
     }}>
       <div style={{
         padding: '5px 10px',
@@ -193,22 +309,35 @@ const TasksTree = ({ tasks }) => {
         <div style={{
           height: 'calc(200px - 30px)', // Subtract header height
           overflowY: 'auto',
-          padding: '10px'
+          padding: '8px',
+          position: 'relative'
         }}>
           <SortableContext items={sortedTasks.map(t => t.id || sortedTasks.indexOf(t))} strategy={verticalListSortingStrategy}>
             {sortedTasks && sortedTasks.length > 0 ? (
               sortedTasks.map((task, index) => (
-                <SortableTaskItem
-                  key={task.id || index}
-                  task={task}
-                  index={index}
-                  onPriorityChange={handlePriorityChange}
-                />
+                <div key={`${task.id || index}-container`} style={{ position: 'relative' }}>
+                  <SortableTaskItem
+                    task={task}
+                    index={index}
+                    onPriorityChange={handlePriorityChange}
+                  />
+                </div>
               ))
             ) : (
-              <p style={{ color: '#999', fontStyle: 'italic', margin: '50px 0', textAlign: 'center' }}>
-                No tasks yet...
-              </p>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center', 
+                justifyContent: 'center',
+                height: '100%',
+                color: '#999', 
+                fontStyle: 'italic',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '24px', marginBottom: '10px' }}>📋</div>
+                <div>No active tasks</div>
+                <div style={{ fontSize: '10px', marginTop: '5px' }}>Tasks will appear here as they are created</div>
+              </div>
             )}
           </SortableContext>
         </div>

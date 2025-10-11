@@ -5,6 +5,7 @@ const LogList = ({ logs }) => {
   const [isPaused, setIsPaused] = useState(false);
   const containerRef = useRef(null);
   const fixedBufferSize = 100; // Fixed buffer size for continuous operation
+  const [expandedLog, setExpandedLog] = useState(null);
 
   useEffect(() => {
     if (!isPaused) {
@@ -43,8 +44,16 @@ const LogList = ({ logs }) => {
       if (message.toLowerCase().includes('task')) return '📋';
       if (message.toLowerCase().includes('concept')) return '🧠';
       if (message.toLowerCase().includes('cycle')) return '🔄';
+      if (message.toLowerCase().includes('goal')) return '🎯';
+      if (message.toLowerCase().includes('question')) return '❓';
+      if (message.toLowerCase().includes('inference')) return '💭';
+      if (message.toLowerCase().includes('operation')) return '⚙️';
     }
     return '🔹'; // Default icon
+  };
+
+  const handleLogClick = (log, index) => {
+    setExpandedLog(expandedLog === index ? null : index);
   };
 
   return (
@@ -54,7 +63,8 @@ const LogList = ({ logs }) => {
       flexDirection: 'column',
       border: '1px solid #ccc',
       borderRadius: '4px',
-      backgroundColor: '#f8f9fa'
+      backgroundColor: '#f8f9fa',
+      position: 'relative'
     }}>
       <div style={{
         display: 'flex',
@@ -77,10 +87,12 @@ const LogList = ({ logs }) => {
               fontSize: '12px',
               border: 'none',
               borderRadius: '2px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              backgroundColor: isPaused ? '#28a745' : '#6c757d',
+              color: 'white'
             }}
           >
-            {isPaused ? '▶️' : '⏸️'}
+            {isPaused ? '▶️ Resume' : '⏸️ Pause'}
           </button>
           <button
             onClick={clearLogs}
@@ -89,7 +101,9 @@ const LogList = ({ logs }) => {
               fontSize: '12px',
               border: 'none',
               borderRadius: '2px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              backgroundColor: '#dc3545',
+              color: 'white'
             }}
           >
             🗑️ Clear
@@ -102,13 +116,19 @@ const LogList = ({ logs }) => {
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '10px',
+          padding: '5px',
           fontFamily: 'monospace',
-          fontSize: '13px'
+          fontSize: '12px',
+          backgroundColor: '#ffffff'
         }}
       >
         {displayLogs && displayLogs.length > 0 ? (
-          <ul style={{ margin: 0, padding: 0, listStyleType: 'none' }}>
+          <ul style={{ 
+            margin: 0, 
+            padding: 0, 
+            listStyleType: 'none',
+            animation: 'fadeIn 0.3s ease-in-out'
+          }}>
             {displayLogs.map((log, index) => {
               const message = typeof log.data === 'string' ? log.data : JSON.stringify(log.data);
               const icon = getLogIcon(message);
@@ -116,50 +136,161 @@ const LogList = ({ logs }) => {
 
               return (
                 <li
-                  key={index}
-                  className="list-item-enter"
+                  key={`${log.timestamp || index}-${message.substring(0, 10)}`}
+                  className="log-item"
                   style={{
-                    padding: '4px 0',
-                    borderBottom: '1px solid #eee',
+                    padding: '6px 8px',
+                    margin: '3px 0',
+                    borderRadius: '4px',
+                    backgroundColor: expandedLog === index ? '#f1f3f5' : 'transparent',
+                    borderLeft: `3px solid ${color}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
                     display: 'flex',
                     alignItems: 'flex-start'
                   }}
+                  onClick={() => handleLogClick(log, index)}
                 >
-                  <span style={{
-                    display: 'inline-block',
-                    minWidth: '20px',
-                    color: color
+                  <span style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    backgroundColor: `${color}20`, // Lighter shade
+                    marginRight: '8px',
+                    fontSize: '12px'
                   }}>
                     {icon}
                   </span>
-                  <span style={{
-                    color: color,
-                    marginLeft: '5px',
-                    flex: 1
-                  }}>
-                    <span style={{ color: '#666', fontSize: '11px', marginRight: '8px' }}>
-                      [{new Date().toLocaleTimeString()}]
-                    </span>
-                    {message}
-                  </span>
+                  
+                  <div style={{ flex: 1 }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      marginBottom: '2px'
+                    }}>
+                      <span style={{ 
+                        color: color,
+                        fontWeight: 'bold',
+                        fontSize: '11px',
+                        marginRight: '6px'
+                      }}>
+                        {log.type || 'LOG'}
+                      </span>
+                      <span style={{ 
+                        color: '#666', 
+                        fontSize: '10px',
+                        marginRight: '8px',
+                        minWidth: '70px'
+                      }}>
+                        [{new Date(log.timestamp || Date.now()).toLocaleTimeString()}]
+                      </span>
+                      <span style={{ 
+                        color: getLogLevelColor(log.level), 
+                        fontSize: '11px',
+                        fontStyle: 'italic'
+                      }}>
+                        {log.level || 'info'}
+                      </span>
+                    </div>
+                    
+                    <div style={{ 
+                      color: '#333',
+                      lineHeight: '1.4',
+                      wordBreak: 'break-word'
+                    }}>
+                      {message.length > 100 && expandedLog !== index 
+                        ? `${message.substring(0, 100)}...` 
+                        : message}
+                    </div>
+                  </div>
 
-                  {/* Inline widget for progressive disclosure */}
-                  {message.length > 50 && (
-                    <details style={{ marginLeft: '10px', fontSize: '11px' }}>
-                      <summary>Details</summary>
-                      <div style={{ marginTop: '5px', padding: '5px', backgroundColor: '#fff', borderRadius: '3px' }}>
-                        Full message: {JSON.stringify(log)}
+                  {/* Additional info or action button when expanded */}
+                  {expandedLog === index && (
+                    <div style={{ 
+                      marginTop: '8px', 
+                      paddingTop: '8px', 
+                      borderTop: '1px dashed #ccc',
+                      fontSize: '11px',
+                      color: '#666'
+                    }}>
+                      <div><strong>Full details:</strong></div>
+                      <div style={{ 
+                        marginTop: '4px', 
+                        padding: '4px', 
+                        backgroundColor: '#f8f9fa', 
+                        borderRadius: '3px',
+                        fontFamily: 'monospace',
+                        fontSize: '10px',
+                        maxHeight: '100px',
+                        overflowY: 'auto'
+                      }}>
+                        {JSON.stringify(log, null, 2)}
                       </div>
-                    </details>
+                      
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '8px', 
+                        marginTop: '6px',
+                        flexWrap: 'wrap'
+                      }}>
+                        <button 
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: '10px',
+                            border: '1px solid #ccc',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            backgroundColor: '#e9ecef'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(message);
+                          }}
+                        >
+                          📋 Copy
+                        </button>
+                        <button 
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: '10px',
+                            border: '1px solid #ccc',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            backgroundColor: '#e9ecef'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // In a real implementation, this could filter logs by type
+                            console.log('Filter by type:', log.type);
+                          }}
+                        >
+                          🔍 Filter
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p style={{ color: '#999', fontStyle: 'italic', margin: 0, textAlign: 'center', marginTop: '50px' }}>
-            No log messages yet...
-          </p>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center',
+            height: '100%',
+            color: '#999', 
+            fontStyle: 'italic',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '24px', marginBottom: '10px' }}>📋</div>
+            <div>No log messages yet...</div>
+            <div style={{ fontSize: '10px', marginTop: '5px' }}>Connect to a server to see activity logs</div>
+          </div>
         )}
       </div>
     </div>
