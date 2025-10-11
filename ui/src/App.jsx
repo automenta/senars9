@@ -1,30 +1,41 @@
 import React from 'react';
 import DockingLayout from './components/DockingLayout';
 import StatusBar from './components/StatusBar';
-import useWebSocket from './core/WebSocketManager';
+import useCrdtWebSocket from './core/crdtWebSocket';
 import { MESSAGE_TYPES, CONNECTION_DEFAULTS } from './constants';
 import './App.css';
 import './Layout.css';
 
 const App = () => {
-  // Create WebSocket URL dynamically based on the page's protocol and host
-  // Extract server port from URL parameters if specified, otherwise use default
+  // Create WebSocket URL dynamically
   const urlParams = new URLSearchParams(window.location.search);
   const serverPort = urlParams.get('serverPort') || CONNECTION_DEFAULTS.defaultPort;
-  
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsHost = window.location.hostname; // Use hostname without port
+  const wsHost = window.location.hostname;
   const wsUrl = `${wsProtocol}//${wsHost}:${serverPort}`;
-  
-  const { messages, sendMessage } = useWebSocket(wsUrl);
 
+  const { messages, tasks, sendCrdtMessage, sendRawMessage } = useCrdtWebSocket(wsUrl);
+
+  // Filter messages for different panels (logs, concepts, etc.)
   const filteredLogMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.log);
-  const filteredTaskMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.task);
   const filteredConceptMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.concept);
   const reasonerStats = messages.find(msg => msg.type === MESSAGE_TYPES.reasonerStats)?.data || null;
 
-  const handleSendMessage = (command) => {
-    sendMessage({ type: 'command', data: command });
+  // Handlers for Task CRUD operations
+  const handleAddTask = (task) => {
+    sendCrdtMessage('task-create', task);
+  };
+
+  const handleUpdateTask = (task) => {
+    sendCrdtMessage('task-update-priority', task);
+  };
+
+  const handleDeleteTask = (task) => {
+    sendCrdtMessage('task-delete', task);
+  };
+
+  const handleSendRawMessage = (command) => {
+    sendRawMessage({ type: 'command', data: command });
   };
 
   return (
@@ -32,11 +43,14 @@ const App = () => {
       <div className="docking-layout-container">
         <DockingLayout
           logs={filteredLogMessages}
-          tasks={filteredTaskMessages}
+          tasks={tasks} // Pass the CRDT tasks to the layout
           concepts={filteredConceptMessages}
+          onAddTask={handleAddTask}
+          onUpdateTask={handleUpdateTask}
+          onDeleteTask={handleDeleteTask}
         />
       </div>
-      <StatusBar onSend={handleSendMessage} stats={reasonerStats} />
+      <StatusBar onSend={handleSendRawMessage} stats={reasonerStats} />
     </div>
   );
 };

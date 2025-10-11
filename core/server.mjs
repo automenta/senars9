@@ -1,13 +1,16 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
+import { randomUUID } from 'crypto';
+import TwoPhaseSet from '../ui/src/utils/crdt.js';
 
-// Simple WebSocket server for SeNARS
+// WebSocket server for SeNARS with CRDT-based "Bagregate"
 class SenarsServer {
   constructor(port = 8080) {
     this.port = port;
     this.httpServer = new Server();
     this.wss = new WebSocketServer({ server: this.httpServer });
     this.clients = new Set();
+    this.bagregate = new TwoPhaseSet(); // The CRDT Bagregate for tasks/activity
   }
 
   start() {
@@ -26,30 +29,14 @@ class SenarsServer {
         console.log('New client connected');
         this.clients.add(ws);
 
-        // Send initial connection confirmation
+        // Send the initial state of the Bagregate to the new client
         ws.send(JSON.stringify({
-          type: 'connection',
-          data: { status: 'connected', timestamp: Date.now() }
+          type: 'bagregate-init',
+          payload: this.bagregate.toJSON(),
         }));
 
         ws.on('message', (message) => {
-          try {
-            const parsedMessage = JSON.parse(message);
-            console.log('Received message:', parsedMessage);
-
-            // Echo the message back to the client (for testing)
-            // In a real implementation, this would process the command
-            ws.send(JSON.stringify({
-              type: 'echo',
-              data: parsedMessage
-            }));
-          } catch (error) {
-            console.error('Error parsing message:', error);
-            ws.send(JSON.stringify({
-              type: 'error',
-              data: { message: 'Invalid message format' }
-            }));
-          }
+          this.handleMessage(message);
         });
 
         ws.on('close', () => {
@@ -65,15 +52,57 @@ class SenarsServer {
     });
   }
 
+  handleMessage(message) {
+    try {
+      const { type, payload } = JSON.parse(message);
+      console.log('Received command:', type, payload);
+
+      switch (type) {
+        case 'task-create': {
+          const newTask = { id: randomUUID(), ...payload };
+          this.bagregate.add(newTask);
+          this.broadcastBagregateUpdate();
+          break;
+        }
+
+        case 'task-delete': {
+          const taskId = payload.id;
+          const taskToRemove = this.bagregate.values.find(task => task.id === taskId);
+          if (taskToRemove) {
+            this.bagregate.remove(taskToRemove);
+            this.broadcastBagregateUpdate();
+          }
+          break;
+        }
+
+        case 'task-update-priority': {
+          const { id, priority } = payload;
+          const taskToUpdate = this.bagregate.values.find(task => task.id === id);
+          if (taskToUpdate) {
+            // CRDT 'update' is a remove and an add
+            this.bagregate.remove(taskToUpdate);
+            const updatedTask = { ...taskToUpdate, priority };
+            this.bagregate.add(updatedTask);
+            this.broadcastBagregateUpdate();
+          }
+          break;
+        }
+
+        default:
+          console.warn(`Unknown message type: ${type}`);
+      }
+    } catch (error) {
+      console.error('Error processing message:', error);
+    }
+  }
+
   stop() {
-    // Close all client connections
     this.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.close();
       }
     });
 
-    // Close the server
     return new Promise((resolve) => {
       this.httpServer.close(() => {
         console.log('SeNARS server closed');
@@ -83,12 +112,19 @@ class SenarsServer {
   }
 
   broadcast(message) {
-    // Send message to all connected clients
     this.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(message);
       }
     });
+  }
+
+  broadcastBagregateUpdate() {
+    const message = JSON.stringify({
+      type: 'bagregate-update',
+      payload: this.bagregate.toJSON(),
+    });
+    this.broadcast(message);
   }
 }
 

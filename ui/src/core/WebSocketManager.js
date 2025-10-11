@@ -5,6 +5,7 @@ export const useWebSocket = (url) => {
   const [ws, setWs] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState([]);
+  const [lastMessage, setLastMessage] = useState(null); // Add state for the last message
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected'); // disconnected, connecting, connected, reconnecting
   const reconnectTimeoutRef = useRef(null);
@@ -59,6 +60,7 @@ export const useWebSocket = (url) => {
     };
 
     websocket.onmessage = (event) => {
+      setLastMessage(event); // Store the raw event for CRDT hook
       try {
         const data = JSON.parse(event.data);
         setMessages(prev => [...prev, data]);
@@ -142,6 +144,7 @@ export const useWebSocket = (url) => {
     isConnected,
     connectionStatus,
     messages,
+    lastMessage,
     error,
     sendMessage,
     reconnect,

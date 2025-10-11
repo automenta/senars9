@@ -2,7 +2,7 @@ import React from 'react';
 import { Model, Layout } from 'flexlayout-react';
 import 'flexlayout-react/style/light.css';
 import ConceptMap from './ConceptMap';
-import TasksTree from './TasksTree';
+import TasksPanel from './TasksPanel';
 import LogList from './LogList';
 
 const json = {
@@ -19,7 +19,7 @@ const json = {
           {
             type: 'tab',
             name: 'Tasks',
-            component: 'tasks-tree',
+            component: 'tasks-panel',
           },
         ],
       },
@@ -57,14 +57,21 @@ const json = {
 
 const model = Model.fromJson(json);
 
-const DockingLayout = ({ logs, tasks, concepts }) => {
+const DockingLayout = ({ logs, tasks, concepts, onAddTask, onUpdateTask, onDeleteTask }) => {
   const factory = (node) => {
     const component = node.getComponent();
     if (component === 'concept-map') {
       return <ConceptMap concepts={concepts} />;
     }
-    if (component === 'tasks-tree') {
-      return <TasksTree tasks={tasks} />;
+    if (component === 'tasks-panel') {
+      return (
+        <TasksPanel
+          tasks={tasks}
+          onAddTask={onAddTask}
+          onUpdateTask={onUpdateTask}
+          onDeleteTask={onDeleteTask}
+        />
+      );
     }
     if (component === 'log-list') {
         return <LogList logs={logs} />;

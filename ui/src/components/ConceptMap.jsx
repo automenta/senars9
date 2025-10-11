@@ -313,9 +313,11 @@ const ConceptMapContent = ({ concepts }) => {
             fontSize: '12px'
           }}>
             <h4 style={{ margin: '0 0 5px 0', color: '#333' }}>{selectedNode.name}</h4>
+            <div><strong>ID:</strong> {selectedNode.id}</div>
             <div><strong>Type:</strong> {selectedNode.type}</div>
             <div><strong>Priority:</strong> {(selectedNode.priority || 0).toFixed(2)}</div>
             {selectedNode.content && <div><strong>Content:</strong> {selectedNode.content}</div>}
+            {/* Add other concept details here as they become available */}
           </div>
         )}
       </div>

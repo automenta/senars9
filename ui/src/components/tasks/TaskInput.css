@@ -1,0 +1,25 @@
+.task-input-form {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.task-input {
+  flex-grow: 1;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.task-submit-button {
+  padding: 0.5rem 1rem;
+  margin-left: 0.5rem;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.task-submit-button:hover {
+  background-color: #0056b3;
+}
