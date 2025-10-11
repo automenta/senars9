@@ -11,6 +11,7 @@ class SenarsServer {
     this.wss = new WebSocketServer({ server: this.httpServer });
     this.clients = new Set();
     this.bagregate = new TwoPhaseSet(); // The CRDT Bagregate for tasks/activity
+    this.mockDataInterval = null;
   }
 
   start() {
@@ -49,6 +50,17 @@ class SenarsServer {
           this.clients.delete(ws);
         });
       });
+
+      this.mockDataInterval = setInterval(() => {
+        this.broadcast(JSON.stringify({
+            type: 'concept',
+            payload: { id: randomUUID(), content: `Concept ${Date.now()}` }
+        }));
+        this.broadcast(JSON.stringify({
+            type: 'reasoner_stats',
+            payload: { cycles: Math.floor(Math.random() * 1000) }
+        }));
+      }, 5000);
     });
   }
 
@@ -88,6 +100,15 @@ class SenarsServer {
           break;
         }
 
+        case 'command': {
+          console.log('Received command:', payload);
+          this.broadcast(JSON.stringify({
+            type: 'log',
+            payload: { message: `Command received: ${payload.data}` }
+          }));
+          break;
+        }
+
         default:
           console.warn(`Unknown message type: ${type}`);
       }
@@ -97,6 +118,10 @@ class SenarsServer {
   }
 
   stop() {
+    if (this.mockDataInterval) {
+        clearInterval(this.mockDataInterval);
+    }
+
     this.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.close();

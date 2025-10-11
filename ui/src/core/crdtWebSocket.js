@@ -3,20 +3,44 @@ import useWebSocket from './WebSocketManager';
 import TwoPhaseSet from '../utils/crdt';
 
 const useCrdtWebSocket = (url) => {
-  const { isConnected, connectionStatus, error, messages, sendMessage: wsSendMessage, lastMessage } = useWebSocket(url);
+  const { isConnected, connectionStatus, error, sendMessage: wsSendMessage, lastMessage } = useWebSocket(url);
   const [bagregate, setBagregate] = useState(new TwoPhaseSet());
+  const [logs, setLogs] = useState([]);
+  const [concepts, setConcepts] = useState([]);
+  const [reasonerStats, setReasonerStats] = useState(null);
 
   useEffect(() => {
     if (lastMessage) {
       try {
         const { type, payload } = JSON.parse(lastMessage.data);
 
-        if (type === 'bagregate-init' || type === 'bagregate-update') {
-          const newBagregate = TwoPhaseSet.fromJSON(payload);
-          setBagregate(newBagregate);
+        switch (type) {
+            case 'bagregate-init':
+            case 'bagregate-update': {
+                const newBagregate = TwoPhaseSet.fromJSON(payload);
+                setBagregate(newBagregate);
+                break;
+            }
+            case 'log': {
+                setLogs(prev => [...prev, payload]);
+                break;
+            }
+            case 'concept': {
+                setConcepts(prev => {
+                    if (prev.find(c => c.id === payload.id)) {
+                        return prev;
+                    }
+                    return [...prev, payload]
+                });
+                break;
+            }
+            case 'reasoner_stats': {
+                setReasonerStats(payload);
+                break;
+            }
         }
       } catch (e) {
-        console.error('Error processing CRDT message:', e);
+        console.error('Error processing message:', e);
       }
     }
   }, [lastMessage]);
@@ -31,10 +55,12 @@ const useCrdtWebSocket = (url) => {
     isConnected,
     connectionStatus,
     error,
-    messages, // Pass through the original messages array
     tasks,
+    logs,
+    concepts,
+    reasonerStats,
     sendCrdtMessage,
-    sendRawMessage: wsSendMessage, // Expose the raw send message for other uses
+    sendRawMessage: wsSendMessage,
   };
 };
 

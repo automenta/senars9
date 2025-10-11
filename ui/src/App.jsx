@@ -2,7 +2,7 @@ import React from 'react';
 import DockingLayout from './components/DockingLayout';
 import StatusBar from './components/StatusBar';
 import useCrdtWebSocket from './core/crdtWebSocket';
-import { MESSAGE_TYPES, CONNECTION_DEFAULTS } from './constants';
+import { CONNECTION_DEFAULTS } from './constants';
 import './App.css';
 import './Layout.css';
 
@@ -14,12 +14,14 @@ const App = () => {
   const wsHost = window.location.hostname;
   const wsUrl = `${wsProtocol}//${wsHost}:${serverPort}`;
 
-  const { messages, tasks, sendCrdtMessage, sendRawMessage } = useCrdtWebSocket(wsUrl);
-
-  // Filter messages for different panels (logs, concepts, etc.)
-  const filteredLogMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.log);
-  const filteredConceptMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.concept);
-  const reasonerStats = messages.find(msg => msg.type === MESSAGE_TYPES.reasonerStats)?.data || null;
+  const {
+    tasks,
+    logs,
+    concepts,
+    reasonerStats,
+    sendCrdtMessage,
+    sendRawMessage,
+  } = useCrdtWebSocket(wsUrl);
 
   // Handlers for Task CRUD operations
   const handleAddTask = (task) => {
@@ -35,16 +37,16 @@ const App = () => {
   };
 
   const handleSendRawMessage = (command) => {
-    sendRawMessage({ type: 'command', data: command });
+    sendRawMessage({ type: 'command', payload: { data: command } });
   };
 
   return (
     <div className="main-container" data-testid="app-container">
       <div className="docking-layout-container">
         <DockingLayout
-          logs={filteredLogMessages}
-          tasks={tasks} // Pass the CRDT tasks to the layout
-          concepts={filteredConceptMessages}
+          logs={logs}
+          tasks={tasks}
+          concepts={concepts}
           onAddTask={handleAddTask}
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
