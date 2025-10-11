@@ -41,8 +41,6 @@ const App = () => {
 
   return (
     <div className="app" data-testid="app-container">
-      <h1 className="app-title">SeNARS UI</h1>
-
       {connectionTabs.length > 1 && (
         <div className="tabs">
           {connectionTabs.map(tab => (

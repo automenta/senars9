@@ -27,7 +27,6 @@ describe('App Component - Runtime Error Tests', () => {
     const { expectNoErrors } = renderWithErrorDetection(<App />);
 
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
-    expect(screen.getByText('SeNARS UI')).toBeInTheDocument();
     expectNoErrors();
   });
 

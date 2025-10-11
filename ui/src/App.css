@@ -1,3 +1,28 @@
+:root {
+  --background-primary: #1a1a1a;
+  --background-secondary: #2a2a2a;
+  --panel-background: #2a2a2a;
+  --panel-header-background: #3a3a3a;
+  --border-color: #444444;
+  --text-primary: #e0e0e0;
+  --text-secondary: #888888;
+  --accent-color: #00aaff;
+  --accent-color-hover: #33bbff;
+  --accent-color-shadow: rgba(0, 170, 255, 0.25);
+  --button-secondary-background: #28a745;
+  --button-secondary-hover: #218838;
+  --success-bg: rgba(21, 87, 36, 0.3);
+  --success-text: #d4edda;
+  --success-border: #155724;
+  --error-bg: rgba(114, 28, 36, 0.3);
+  --error-text: #f8d7da;
+  --error-border: #721c24;
+  --scrollbar-track: #2a2a2a;
+  --scrollbar-thumb: #555555;
+  --scrollbar-thumb-hover: #777777;
+  --font-family: 'Fira Code', monospace;
+}
+
 /* Base styles */
 * {
   box-sizing: border-box;
@@ -6,9 +31,7 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -21,7 +44,7 @@ body {
   width: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #f8f9fa;
+  background-color: var(--background-secondary);
 }
 
 .connection-status {
@@ -33,15 +56,15 @@ body {
 }
 
 .connection-status.connected {
-  background-color: #d4edda;
-  color: #155724;
-  border-color: #c3e6cb;
+  background-color: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
 }
 
 .connection-status.disconnected {
-  background-color: #f8d7da;
-  color: #721c24;
-  border-color: #f5c6cb;
+  background-color: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
 }
 
 .main-layout {
@@ -53,9 +76,9 @@ body {
 
 /* Panel styles for MDI layout */
 .panel {
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  background-color: white;
+  background-color: var(--panel-background);
   margin-bottom: 10px;
   overflow: hidden;
 }
@@ -65,7 +88,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 5px 10px;
-  background-color: #e9ecef;
+  background-color: var(--panel-header-background);
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
   font-weight: bold;
@@ -143,36 +166,37 @@ body {
   width: 100%;
   padding: 8px;
   font-size: 16px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   transition: border-color 0.2s ease;
 }
 
 .input-text:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-color-shadow);
 }
 
 .send-button {
   padding: 8px 16px;
-  background-color: #007bff;
+  background-color: var(--accent-color);
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.1s ease;
   font-size: 14px;
 }
 
 .send-button:hover {
-  background-color: #0056b3;
+  background-color: var(--accent-color-hover);
+  transform: translateY(-2px);
 }
 
 .history-indicator {
   margin-top: 5px;
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -186,12 +210,12 @@ body {
 .task-item {
   padding: 8px;
   margin: 4px 0;
-  background-color: #e9ecef;
+  background-color: var(--panel-header-background);
   border-radius: 4px;
   display: flex;
   align-items: center;
   font-size: 14px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--border-color);
   cursor: grab;
 }
 
@@ -202,35 +226,33 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #b1b1b1;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #7a7a7a;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* App layout styles */
 .app {
   height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: column;
-  padding: 10px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  background-color: #f0f2f5;
+  padding: 0;
+  background-color: var(--background-primary);
 }
 
 .app-title {
   text-align: center;
   margin: 0 0 20px 0;
-  color: #2c3e50;
+  color: var(--text-primary);
   font-size: 24px;
   font-weight: normal;
 }
@@ -239,16 +261,16 @@ body {
 .tabs {
   display: flex;
   margin-bottom: 10px;
-  border-bottom: 2px solid #ccc;
+  border-bottom: 2px solid var(--border-color);
 }
 
 .tab {
   padding: 10px 20px;
   cursor: pointer;
-  background-color: #f8f9fa;
-  color: #333;
-  border: 1px solid #ccc;
-  border-bottom: 1px solid #ccc;
+  background-color: var(--background-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
   margin-right: 2px;
@@ -257,13 +279,14 @@ body {
 }
 
 .tab.active {
-  background-color: #007bff;
+  background-color: var(--accent-color);
   color: white;
   border-bottom: none;
 }
 
 .tab:hover:not(.active) {
-  background-color: #e9ecef;
+  background-color: var(--panel-header-background);
+  transform: translateY(-2px);
 }
 
 .tab-close {
@@ -282,7 +305,7 @@ body {
 
 .add-connection-btn {
   padding: 10px 15px;
-  background-color: #28a745;
+  background-color: var(--button-secondary-background);
   color: white;
   border: none;
   border-radius: 4px;
@@ -293,22 +316,22 @@ body {
 }
 
 .add-connection-btn:hover {
-  background-color: #218838;
+  background-color: var(--button-secondary-hover);
 }
 
 .tab-content {
   flex: 1;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 10px;
   overflow: auto;
-  background-color: white;
+  background-color: var(--background-secondary);
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
   .app {
-    padding: 5px;
+    padding: 0;
   }
 
   .tabs {
