@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import ConnectionTab from './ConnectionTab';
 import GraphicsEngine from './GraphicsEngine';
+import { renderWithErrorDetection } from '../test-utils';
 
 // Mock WebSocketManager to simulate a successful connection
 vi.mock('../core/WebSocketManager', () => ({
@@ -16,26 +17,16 @@ vi.mock('../core/WebSocketManager', () => ({
 }));
 
 describe('ConnectionTab Component - Integration Test', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('renders and shows connected status', async () => {
-    // Render the component with props for the default integrated server
-    render(
+  it('renders and shows connected status', () => {
+    const { expectNoErrors } = renderWithErrorDetection(
       <GraphicsEngine>
         <ConnectionTab name="Test Connection" url="ws://localhost:8080" />
       </GraphicsEngine>
     );
 
-    // The component should show "Connected" status since we mocked it
-    const connectedStatus = screen.getByText(/Status: Connected/i);
-
-    // Assert that the connected status is visible
-    expect(connectedStatus).toBeInTheDocument();
-
-    // Also verify the connection name and URL are displayed
+    expect(screen.getByText(/Status: Connected/i)).toBeInTheDocument();
     expect(screen.getByText(/Test Connection/)).toBeInTheDocument();
     expect(screen.getByText(/ws:\/\/localhost:8080/)).toBeInTheDocument();
+    expectNoErrors();
   });
 });

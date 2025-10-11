@@ -1,101 +1,58 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App';
-
-// Mock console.error to detect errors during tests
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
+import { renderWithErrorDetection, createWebSocketMock } from './test-utils';
 
 describe('App Component - Runtime Error Tests', () => {
-  let consoleErrorSpy, consoleWarnSpy;
+  let spies;
 
   beforeEach(() => {
-    // Spy on console methods to capture any errors or warnings
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    spies = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    // Restore original console methods
-    consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
+    spies.mockRestore();
   });
 
-  it('renders without fatal console errors', async () => {
-    // Render the app
-    const { container } = render(<App />);
-    
-    // Wait for any potential async operations
-    await waitFor(() => {
-      expect(container).toBeInTheDocument();
-    });
-    
-    // Check that no errors were logged to console during rendering
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
-    expect(consoleWarnSpy).not.toHaveBeenCalled();
-    
-    // Verify the app container is in the document
+  it('renders without fatal console errors', () => {
+    const { container, expectNoErrors } = renderWithErrorDetection(<App />);
+
+    expect(container).toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expectNoErrors();
   });
 
-  it('renders connection tabs without runtime errors', async () => {
-    render(<App />);
-    
-    // Wait for potential async operations
-    await waitFor(() => {
-      expect(screen.getByTestId('app-container')).toBeInTheDocument();
-    });
-    
-    // Verify no console errors occurred
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
-    
-    // Check for the default title
+  it('renders connection tabs without runtime errors', () => {
+    const { expectNoErrors } = renderWithErrorDetection(<App />);
+
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
     expect(screen.getByText('SeNARS UI')).toBeInTheDocument();
+    expectNoErrors();
   });
 
-  it('handles WebSocket connection errors gracefully', async () => {
-    // Mock WebSocket constructor to simulate connection errors
+  it('handles WebSocket connection errors gracefully', () => {
     const originalWebSocket = global.WebSocket;
-    global.WebSocket = vi.fn(() => ({
-      onopen: null,
-      onclose: null,
-      onmessage: null,
-      onerror: null,
-      close: vi.fn(),
-      send: vi.fn(),
-      readyState: 0
-    }));
+    global.WebSocket = vi.fn(() => createWebSocketMock({ readyState: 0 }));
 
-    try {
-      render(<App />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('app-container')).toBeInTheDocument();
-      });
-      
-      // Check that no errors were logged during rendering
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
-    } finally {
-      // Restore original WebSocket
-      global.WebSocket = originalWebSocket;
-    }
+    const { expectNoErrors } = renderWithErrorDetection(<App />);
+
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expectNoErrors();
+
+    global.WebSocket = originalWebSocket;
   });
 
-  it('handles component prop updates without errors', async () => {
-    const { rerender } = render(<App />);
-    
+  it('handles component prop updates without errors', () => {
+    const { rerender, expectNoErrors } = renderWithErrorDetection(<App />);
+
     // Rerender multiple times to ensure stability
     for (let i = 0; i < 5; i++) {
       rerender(<App />);
     }
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('app-container')).toBeInTheDocument();
-    });
-    
-    // Check that no errors were logged
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expectNoErrors();
   });
 });
 
@@ -103,46 +60,49 @@ import ReasonerControlPanel from './components/ReasonerControlPanel';
 import LogList from './components/LogList';
 import TasksTree from './components/TasksTree';
 import InputField from './components/InputField';
+import { createMockStats, createMockLogs, createMockTasks } from './test-utils';
 
 // Test individual components
 describe('Individual Component Runtime Error Tests', () => {
-  let consoleErrorSpy, consoleWarnSpy;
+  let spies;
 
   beforeEach(() => {
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    spies = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
+    spies.mockRestore();
   });
 
   it('ReasonerControlPanel handles null stats gracefully', () => {
-    render(<ReasonerControlPanel stats={null} />);
+    const { expectNoErrors } = renderWithErrorDetection(
+      <ReasonerControlPanel stats={null} />
+    );
 
-    // Verify no errors were logged
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expectNoErrors();
   });
 
   it('LogList handles empty logs gracefully', () => {
-    render(<LogList logs={[]} />);
+    const { expectNoErrors } = renderWithErrorDetection(
+      <LogList logs={[]} />
+    );
 
-    // Verify no errors were logged
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expectNoErrors();
   });
 
   it('TasksTree handles empty tasks gracefully', () => {
-    render(<TasksTree tasks={[]} />);
+    const { expectNoErrors } = renderWithErrorDetection(
+      <TasksTree tasks={[]} />
+    );
 
-    // Verify no errors were logged
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expectNoErrors();
   });
 
   it('InputField renders without errors', () => {
-    render(<InputField onSend={() => {}} />);
+    const { expectNoErrors } = renderWithErrorDetection(
+      <InputField onSend={() => {}} />
+    );
 
-    // Verify no errors were logged
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expectNoErrors();
   });
 });

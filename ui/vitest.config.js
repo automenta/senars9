@@ -7,10 +7,22 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.jsx'],
-    globalSetup: './vitest.global.setup.js',
     include: ['**/*.test.{js,jsx,ts,tsx}'],
     css: true,
-    testTimeout: 5000, // Reduced timeout for debugging infinite loops
-    fileParallelism: false,
+    testTimeout: 3000,
+    fileParallelism: true,
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: false,
+        useAtomics: true
+      }
+    },
+    environmentOptions: {
+      jsdom: {
+        pretendToBeVisual: true,
+        resources: 'usable'
+      }
+    }
   },
 })
