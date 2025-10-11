@@ -4,7 +4,6 @@ import 'flexlayout-react/style/light.css';
 import ConceptMap from './ConceptMap';
 import TasksPanel from './TasksPanel';
 import LogList from './LogList';
-import ReasonerControlPanel from './ReasonerControlPanel';
 
 const json = {
   global: {},
@@ -37,11 +36,6 @@ const json = {
                         name: 'Concept Map',
                         component: 'concept-map',
                     },
-                    {
-                        type: 'tab',
-                        name: 'Reasoner Control',
-                        component: 'reasoner-control',
-                    },
                 ],
             },
             {
@@ -70,8 +64,6 @@ const DockingLayout = ({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
-  reasonerStats,
-  onCommand,
 }) => {
   const factory = (node) => {
     const component = node.getComponent();
@@ -90,9 +82,6 @@ const DockingLayout = ({
     }
     if (component === 'log-list') {
         return <LogList logs={logs} />;
-    }
-    if (component === 'reasoner-control') {
-      return <ReasonerControlPanel stats={reasonerStats} onCommand={onCommand} />;
     }
   };
 

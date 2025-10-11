@@ -1,6 +1,6 @@
 import React from 'react';
 import DockingLayout from './components/DockingLayout';
-import StatusBar from './components/StatusBar';
+import UnifiedMenuBar from './components/UnifiedMenuBar';
 import useCrdtWebSocket from './core/crdtWebSocket';
 import { CONNECTION_DEFAULTS } from './constants';
 import './App.css';
@@ -50,11 +50,13 @@ const App = () => {
           onAddTask={handleAddTask}
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
-          reasonerStats={reasonerStats}
-          onCommand={handleSendRawMessage}
         />
       </div>
-      <StatusBar onSend={handleSendRawMessage} stats={reasonerStats} />
+      <UnifiedMenuBar
+        stats={reasonerStats}
+        onCommand={handleSendRawMessage}
+        onAddTask={handleAddTask}
+      />
     </div>
   );
 };
