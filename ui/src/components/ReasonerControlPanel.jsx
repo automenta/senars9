@@ -1,32 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useState } from 'react';
+
+// Using simple inline SVG icons for buttons
+const PlayIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>;
+const StopIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>;
+const ResetIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>;
+
 
 const ReasonerControlPanel = ({ stats }) => {
-  const [cpuThrottle, setCpuThrottle] = useState(100); // Default to 100%
-  const [chartData, setChartData] = useState([]);
-
-  // Simulate updating chart data for visualization
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (stats) {
-        const now = new Date().toLocaleTimeString();
-        const newPoint = {
-          time: now,
-          concepts: stats.concepts || 0,
-          tasks: stats.tasks || 0,
-          cycles: stats.cycles || 0
-        };
-
-        setChartData(prev => {
-          // Keep only last 20 data points
-          const updated = [...prev, newPoint];
-          return updated.slice(-20);
-        });
-      }
-    }, 1000); // Update every second
-
-    return () => clearInterval(interval);
-  }, [stats]);
+  const [cpuThrottle, setCpuThrottle] = useState(100);
 
   const handleCpuThrottleChange = (e) => {
     setCpuThrottle(parseInt(e.target.value));
@@ -38,128 +19,85 @@ const ReasonerControlPanel = ({ stats }) => {
     console.log(`Sending command: ${command}`);
   };
 
+  const buttonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '4px',
+    border: '1px solid #ccc',
+    borderRadius: '3px',
+    cursor: 'pointer',
+    backgroundColor: '#f0f0f0',
+    margin: '0 2px',
+    minWidth: '24px'
+  };
+
+  const statStyle = {
+    margin: '0 8px',
+    fontSize: '12px',
+    display: 'flex',
+    alignItems: 'center'
+  };
+
   return (
     <div className="reasoner-control-panel" style={{
-      border: '1px solid #ccc',
-      borderRadius: '4px',
-      padding: '10px',
+      display: 'flex',
+      alignItems: 'center',
+      padding: '4px 8px',
       backgroundColor: '#f8f9fa',
-      marginBottom: '10px'
+      width: '100%',
+      boxSizing: 'border-box'
     }}>
-      <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>Reasoner Control</h3>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Control:
-            </label>
-            <div style={{ display: 'flex', gap: '5px' }}>
-              <button
-                onClick={() => handleControlCommand('start')}
-                style={{
-                  padding: '5px 10px',
-                  backgroundColor: '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Start
-              </button>
-              <button
-                onClick={() => handleControlCommand('stop')}
-                style={{
-                  padding: '5px 10px',
-                  backgroundColor: '#dc3545',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Stop
-              </button>
-              <button
-                onClick={() => handleControlCommand('reset')}
-                style={{
-                  padding: '5px 10px',
-                  backgroundColor: '#ffc107',
-                  color: 'black',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              CPU Throttle: {cpuThrottle}%
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="100"
-              value={cpuThrottle}
-              onChange={handleCpuThrottleChange}
-              style={{ width: '100%' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666' }}>
-              <span>1%</span>
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Status:
-            <span style={{
-              marginLeft: '10px',
-              padding: '2px 8px',
-              backgroundColor: stats?.running ? '#d4edda' : '#f8d7da',
-              color: stats?.running ? '#155724' : '#721c24',
-              borderRadius: '12px',
-              fontSize: '12px'
-            }}>
-              {stats?.running ? 'Running' : 'Stopped'}
-            </span>
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '10px' }}>
-            <div style={{ padding: '8px', backgroundColor: '#e9ecef', borderRadius: '4px', textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#007bff' }}>{stats?.concepts || 0}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>Concepts</div>
-            </div>
-            <div style={{ padding: '8px', backgroundColor: '#e9ecef', borderRadius: '4px', textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#28a745' }}>{stats?.tasks || 0}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>Tasks</div>
-            </div>
-            <div style={{ padding: '8px', backgroundColor: '#e9ecef', borderRadius: '4px', textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#ffc107' }}>{stats?.cycles || 0}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>Cycles</div>
-            </div>
-          </div>
-        </div>
+      {/* Control Buttons */}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => handleControlCommand('start')} style={{...buttonStyle, color: '#28a745'}} title="Start"><PlayIcon /></button>
+        <button onClick={() => handleControlCommand('stop')} style={{...buttonStyle, color: '#dc3545'}} title="Stop"><StopIcon /></button>
+        <button onClick={() => handleControlCommand('reset')} style={{...buttonStyle, color: '#ffc107'}} title="Reset"><ResetIcon /></button>
       </div>
 
-      {/* Animated chart for metrics */}
-      <div style={{ marginTop: '15px', height: '120px' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="time" hide />
-            <YAxis width={30} />
-            <Tooltip />
-            <Line type="monotone" dataKey="concepts" stroke="#007bff" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="tasks" stroke="#28a745" strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
+      {/* Spacer */}
+      <div style={{ width: '1px', backgroundColor: '#ccc', height: '20px', margin: '0 10px' }}></div>
+
+      {/* Status */}
+      <div style={statStyle}>
+        <strong>Status:</strong>
+        <span style={{
+          marginLeft: '5px',
+          padding: '2px 8px',
+          backgroundColor: stats?.running ? '#d4edda' : '#f8d7da',
+          color: stats?.running ? '#155724' : '#721c24',
+          borderRadius: '12px',
+          fontSize: '11px'
+        }}>
+          {stats?.running ? 'Running' : 'Stopped'}
+        </span>
+      </div>
+
+      {/* Spacer */}
+      <div style={{ flexGrow: 1 }}></div>
+
+      {/* Stats */}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={statStyle}><strong>Concepts:</strong> <span style={{marginLeft: '4px', color: '#007bff'}}>{stats?.concepts || 0}</span></div>
+        <div style={statStyle}><strong>Tasks:</strong> <span style={{marginLeft: '4px', color: '#28a745'}}>{stats?.tasks || 0}</span></div>
+        <div style={statStyle}><strong>Cycles:</strong> <span style={{marginLeft: '4px', color: '#ffc107'}}>{stats?.cycles || 0}</span></div>
+      </div>
+
+      {/* Spacer */}
+      <div style={{ flexGrow: 1 }}></div>
+
+      {/* CPU Throttle */}
+      <div style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+        <label style={{ marginRight: '5px' }}>CPU Throttle:</label>
+        <input
+          type="range"
+          min="1"
+          max="100"
+          value={cpuThrottle}
+          onChange={handleCpuThrottleChange}
+          style={{ width: '80px', margin: '0 5px' }}
+        />
+        <span>{cpuThrottle}%</span>
       </div>
     </div>
   );

@@ -26,6 +26,7 @@
     "chokidar": "^3.6.0",
     "esm": "^3.2.25",
     "express": "^5.1.0",
+    "flexlayout-react": "^0.8.17",
     "langchain": "^0.3.0",
     "ws": "^8.18.3"
   },

@@ -6,6 +6,6 @@ import ReasonerControlPanel from './ReasonerControlPanel';
 describe('ReasonerControlPanel', () => {
   it('renders correctly', () => {
     render(<ReasonerControlPanel stats={{}} />);
-    expect(screen.getByText('Reasoner Control')).toBeInTheDocument();
+    expect(screen.getByText('Status:')).toBeInTheDocument();
   });
 });
