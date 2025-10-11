@@ -26,6 +26,22 @@ afterEach(() => {
   cleanup();
 });
 
+// Mock WebSocket to prevent connection attempts in tests
+const mockWebSocket = {
+  send: vi.fn(),
+  close: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  onopen: null,
+  onclose: null,
+  onmessage: null,
+  onerror: null,
+  readyState: 1, // OPEN
+};
+
+// Mock WebSocket constructor
+global.WebSocket = vi.fn(() => mockWebSocket);
+
 // Mock console.error to catch errors that might be fatal in browser
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
@@ -33,6 +49,8 @@ const originalConsoleWarn = console.warn;
 afterEach(() => {
   console.error = originalConsoleError;
   console.warn = originalConsoleWarn;
+  // Reset WebSocket mock
+  global.WebSocket.mockClear();
 });
 
 // Fail tests if there are console errors
@@ -52,3 +70,20 @@ globalThis.console.warn = (...args) => {
     // throw new Error(`Console warning detected: ${args.join(' ')}`);
   }
 };
+
+// Mock container queries for charts that need width/height
+Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+  value: function() {
+    return {
+      width: 800,
+      height: 600,
+      top: 0,
+      left: 0,
+      bottom: 600,
+      right: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    };
+  }
+});

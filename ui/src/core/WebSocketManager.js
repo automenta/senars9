@@ -8,6 +8,7 @@ export const useWebSocket = (url) => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected'); // disconnected, connecting, connected, reconnecting
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
+  const currentUrlRef = useRef(url);
   const maxReconnectAttempts = 10;
   const reconnectInterval = 3000; // 3 seconds
 
@@ -17,12 +18,12 @@ export const useWebSocket = (url) => {
     }
 
     setConnectionStatus('connecting');
-    console.log('Attempting to connect to:', url);
+    console.log('Attempting to connect to:', currentUrlRef.current);
 
-    const websocket = new WebSocket(url);
+    const websocket = new WebSocket(currentUrlRef.current);
 
     websocket.onopen = () => {
-      console.log('Connected to WebSocket server:', url);
+      console.log('Connected to WebSocket server:', currentUrlRef.current);
       setIsConnected(true);
       setConnectionStatus('connected');
       setWs(websocket);
@@ -62,7 +63,7 @@ export const useWebSocket = (url) => {
     };
 
     return websocket;
-  }, [url, connectionStatus]);
+  }, [connectionStatus]);
 
   const sendMessage = useCallback((message) => {
     if (ws && isConnected) {
@@ -99,7 +100,19 @@ export const useWebSocket = (url) => {
   }, [connect, disconnect]);
 
   useEffect(() => {
-    connect();
+    // Update current URL ref when URL prop changes
+    currentUrlRef.current = url;
+
+    // If we're already connected and URL changed, disconnect and reconnect
+    if (isConnected && ws) {
+      disconnect();
+      setTimeout(() => {
+        connect();
+      }, 100);
+    } else if (connectionStatus === 'disconnected') {
+      // Only connect if we're not already trying to connect
+      connect();
+    }
 
     // Clean up on unmount
     return () => {
@@ -108,7 +121,7 @@ export const useWebSocket = (url) => {
       }
       disconnect();
     };
-  }, [connect, disconnect]);
+  }, [url]); // Only depend on URL changes
 
   // Clear messages periodically to prevent memory issues
   useEffect(() => {

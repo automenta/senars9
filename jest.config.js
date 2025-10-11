@@ -5,7 +5,8 @@ export default {
   transform: {},
   testPathIgnorePatterns: [
     '/tests/experimental/',
-    '/tests/experimental2/'
+    '/tests/experimental2/',
+    '/ui/'
   ],
   testMatch: ['**/*.test.js', '**/*.spec.js']
 };

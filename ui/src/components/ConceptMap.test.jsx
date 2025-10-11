@@ -19,18 +19,15 @@ describe('ConceptMap Component - Integration Test', () => {
     // The most important thing to verify is that rendering the component
     // does not throw any exceptions, which would be caught by vitest.
 
-    // As a secondary check, we can look for the <canvas> element that
-    // the GraphicsEngine (three.js) should have created and appended to the DOM.
-    // We wait for it to ensure any async setup in GraphicsEngine has completed.
-    const canvasElement = await new Promise(resolve => {
-      setTimeout(() => {
-        const canvas = container.querySelector('canvas');
-        resolve(canvas);
-      }, 1000); // Give it a second for three.js to initialize
-    });
+    // Since GraphicsEngine is mocked in vitest.setup.jsx, we should look for the mock element
+    // instead of a real canvas element
+    const mockGraphicsEngine = container.querySelector('[data-testid="mock-graphics-engine"]');
 
-    // Assert that the canvas element was found in the document
-    expect(canvasElement).not.toBeNull();
-    expect(canvasElement).toBeInTheDocument();
+    // The mock should be present since GraphicsEngine is mocked
+    expect(mockGraphicsEngine).toBeInTheDocument();
+
+    // Verify the component renders without throwing exceptions by checking
+    // that the container has the expected structure
+    expect(container.firstChild).toBeInTheDocument();
   });
 });

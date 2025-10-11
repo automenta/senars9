@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import App from '../App.jsx';
+import App from './App.jsx';
 
 // Mock the WebSocketManager to avoid connection issues
 vi.mock('../core/WebSocketManager', () => ({

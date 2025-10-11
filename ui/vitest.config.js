@@ -10,7 +10,7 @@ export default defineConfig({
     globalSetup: './vitest.global.setup.js',
     include: ['**/*.test.{js,jsx,ts,tsx}'],
     css: true,
-    testTimeout: 10000, // Increase timeout for async tests
+    testTimeout: 5000, // Reduced timeout for debugging infinite loops
     fileParallelism: false,
   },
 })

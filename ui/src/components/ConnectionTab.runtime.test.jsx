@@ -43,24 +43,28 @@ describe('ConnectionTab Runtime Error Tests', () => {
   });
 
   it('handles WebSocket messages without errors', () => {
-    const { useWebSocket } = require('../core/WebSocketManager');
-    useWebSocket.mockReturnValue({
-      isConnected: true,
-      messages: [
-        { type: 'log', data: 'Test log message', timestamp: Date.now() },
-        { type: 'task', data: { id: 'task1', content: 'Test task', priority: 0.8 } },
-        { type: 'concept', data: { id: 'concept1', name: 'Test concept', priority: 0.5 } }
-      ],
-      sendMessage: vi.fn(),
-      reconnect: vi.fn(),
-      disconnect: vi.fn(),
-      reconnectAttempts: 0
-    });
+    // Mock the useWebSocket hook to return test data
+    vi.doMock('../core/WebSocketManager', () => ({
+      default: vi.fn(() => ({
+        isConnected: true,
+        messages: [
+          { type: 'log', data: 'Test log message', timestamp: Date.now() },
+          { type: 'task', data: { id: 'task1', content: 'Test task', priority: 0.8 } },
+          { type: 'concept', data: { id: 'concept1', name: 'Test concept', priority: 0.5 } }
+        ],
+        sendMessage: vi.fn(),
+        reconnect: vi.fn(),
+        disconnect: vi.fn(),
+        reconnectAttempts: 0
+      }))
+    }));
+
+    const ConnectionTabMocked = require('./ConnectionTab.jsx').default;
 
     render(
-      <ConnectionTab 
-        name="Test Connection" 
-        url="ws://localhost:8080" 
+      <ConnectionTabMocked
+        name="Test Connection"
+        url="ws://localhost:8080"
       />
     );
 
@@ -69,20 +73,24 @@ describe('ConnectionTab Runtime Error Tests', () => {
   });
 
   it('handles disconnection state without errors', () => {
-    const { useWebSocket } = require('../core/WebSocketManager');
-    useWebSocket.mockReturnValue({
-      isConnected: false,
-      messages: [],
-      sendMessage: vi.fn(),
-      reconnect: vi.fn(),
-      disconnect: vi.fn(),
-      reconnectAttempts: 0
-    });
+    // Mock the useWebSocket hook to return disconnected state
+    vi.doMock('../core/WebSocketManager', () => ({
+      default: vi.fn(() => ({
+        isConnected: false,
+        messages: [],
+        sendMessage: vi.fn(),
+        reconnect: vi.fn(),
+        disconnect: vi.fn(),
+        reconnectAttempts: 0
+      }))
+    }));
+
+    const ConnectionTabMocked = require('./ConnectionTab.jsx').default;
 
     render(
-      <ConnectionTab 
-        name="Test Connection" 
-        url="ws://localhost:8080" 
+      <ConnectionTabMocked
+        name="Test Connection"
+        url="ws://localhost:8080"
       />
     );
 
