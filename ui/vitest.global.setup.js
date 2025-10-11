@@ -43,14 +43,12 @@ export async function teardown() {
 
   if (serverToKill) {
     // Use a platform-agnostic way to kill the detached process
-    try {
-      // For Unix-like systems (Linux, macOS)
-      process.kill(-serverToKill.pid);
-      console.log(`Sent kill signal to server process group ${serverToKill.pid}`);
-    } catch (e) {
-      // For Windows
+    if (process.platform === "win32") {
       spawn("taskkill", ["/pid", serverToKill.pid, '/f', '/t']);
       console.log(`Sent taskkill to server process ${serverToKill.pid}`);
+    } else {
+      process.kill(-serverToKill.pid);
+      console.log(`Sent kill signal to server process group ${serverToKill.pid}`);
     }
   }
 

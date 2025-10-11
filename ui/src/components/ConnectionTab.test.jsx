@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import ConnectionTab from './components/ConnectionTab';
+import ConnectionTab from './ConnectionTab';
+import GraphicsEngine from './GraphicsEngine';
 
 // This integration test verifies that the ConnectionTab component
 // can render and establish a connection to the live server.
@@ -8,7 +9,11 @@ import ConnectionTab from './components/ConnectionTab';
 describe('ConnectionTab Component - Integration Test', () => {
   it('renders and connects to the WebSocket server', async () => {
     // Render the component with props for the default integrated server
-    render(<ConnectionTab name="Test Connection" url="ws://localhost:8080" />);
+    render(
+      <GraphicsEngine>
+        <ConnectionTab name="Test Connection" url="ws://localhost:8080" />
+      </GraphicsEngine>
+    );
 
     // The component should initially show a "Disconnected" status or similar,
     // then update asynchronously once the WebSocket connection is established.

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import ConnectionTab from './components/ConnectionTab';
+import ConnectionTab from './ConnectionTab';
+import GraphicsEngine from './GraphicsEngine';
 
 // This integration test verifies that the TasksTree component, within a ConnectionTab,
 // correctly receives and displays task messages from the live server.
@@ -8,7 +9,11 @@ import ConnectionTab from './components/ConnectionTab';
 describe('TasksTree Component - Integration Test', () => {
   it('receives and displays tasks from the WebSocket server', async () => {
     // Render the parent component that manages the WebSocket connection
-    render(<ConnectionTab name="Test Connection" url="ws://localhost:8080" />);
+    render(
+      <GraphicsEngine>
+        <ConnectionTab name="Test Connection" url="ws://localhost:8080" />
+      </GraphicsEngine>
+    );
 
     // The server sends mock tasks with content like "Process sensory input".
     // We will wait for an element that contains this text.

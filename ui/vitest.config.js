@@ -6,10 +6,11 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    setupFiles: ['./vitest.setup.js'],
+    setupFiles: ['./vitest.setup.jsx'],
     globalSetup: './vitest.global.setup.js',
     include: ['**/*.test.{js,jsx,ts,tsx}'],
     css: true,
     testTimeout: 10000, // Increase timeout for async tests
+    fileParallelism: false,
   },
 })

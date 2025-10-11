@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 // Mock ResizeObserver for Recharts
@@ -7,6 +7,18 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
+}));
+
+// Mock GraphicsEngine to prevent WebGL errors in JSDOM
+vi.mock('./src/components/GraphicsEngine', () => ({
+  useGraphics: () => ({
+    scene: {
+      add: vi.fn(),
+      remove: vi.fn(),
+    },
+    camera: {},
+  }),
+  default: ({ children }) => <div data-testid="mock-graphics-engine">{children}</div>,
 }));
 
 // Clean up after each test

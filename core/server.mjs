@@ -1,14 +1,12 @@
-import ws from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
-
-const WebSocket = ws;
 
 // Simple WebSocket server for SeNARS
 class SenarsServer {
   constructor(port = 8080) {
     this.port = port;
     this.httpServer = new Server();
-    this.wss = new WebSocket.Server({ server: this.httpServer });
+    this.wss = new WebSocketServer({ server: this.httpServer });
     this.clients = new Set();
   }
 
@@ -94,6 +92,8 @@ class SenarsServer {
   }
 }
 
+export default SenarsServer;
+
 // If running this file directly, start the server
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const port = process.argv[2] ? parseInt(process.argv[2]) : 8080;
@@ -120,6 +120,4 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     await server.stop();
     process.exit(0);
   });
-} else {
-  export default SenarsServer;
 }
