@@ -243,7 +243,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange }) => {
   );
 };
 
-const TasksTree = ({ tasks }) => {
+const TasksTree = ({ tasks = [] }) => {
   const [sortedTasks, setSortedTasks] = useState(tasks || []);
   const [expandedTask, setExpandedTask] = useState(null);
 

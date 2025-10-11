@@ -22,6 +22,7 @@
     "aframe": "^1.7.1",
     "d3-force": "^3.0.0",
     "force-graph": "^1.51.0",
+    "flexlayout-react": "^0.8.17",
     "react": "^19.1.1",
     "react-d3-force-graph": "^1.0.8",
     "react-dom": "^19.1.1",

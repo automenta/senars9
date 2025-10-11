@@ -1,85 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import ConnectionTab from './components/ConnectionTab';
-import { CONNECTION_DEFAULTS } from './constants';
+import React from 'react';
+import DockingLayout from './components/DockingLayout';
+import StatusBar from './components/StatusBar';
+import useWebSocket from './core/WebSocketManager';
+import { MESSAGE_TYPES, CONNECTION_DEFAULTS } from './constants';
 import './App.css';
+import './Layout.css';
 
 const App = () => {
-  const [connectionTabs, setConnectionTabs] = useState([]);
-  const [activeTab, setActiveTab] = useState(0);
+  const { messages, sendMessage } = useWebSocket(`ws://localhost:${CONNECTION_DEFAULTS.defaultPort}`);
 
-  useEffect(() => {
-    const defaultTab = {
-      id: 0,
-      name: 'Local (Integrated)',
-      url: `ws://localhost:${CONNECTION_DEFAULTS.defaultPort}`
-    };
-    setConnectionTabs([defaultTab]);
-  }, []);
+  const filteredLogMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.log);
+  const filteredTaskMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.task);
+  const filteredConceptMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.concept);
+  const reasonerStats = messages.find(msg => msg.type === MESSAGE_TYPES.reasonerStats)?.data || null;
 
-  const addConnectionTab = (name, url) => {
-    const newTab = {
-      id: connectionTabs.length,
-      name,
-      url
-    };
-    setConnectionTabs(prev => [...prev, newTab]);
-    setActiveTab(newTab.id);
+  const handleSendMessage = (command) => {
+    sendMessage({ type: 'command', data: command });
   };
-
-  const removeConnectionTab = (id) => {
-    if (connectionTabs.length <= 1) return;
-
-    const updatedTabs = connectionTabs.filter(tab => tab.id !== id);
-    setConnectionTabs(updatedTabs);
-
-    if (id === activeTab) {
-      setActiveTab(updatedTabs[0]?.id || 0);
-    }
-  };
-
-  const currentTab = connectionTabs.find(tab => tab.id === activeTab);
 
   return (
-    <div className="app" data-testid="app-container">
-      {connectionTabs.length > 1 && (
-        <div className="tabs">
-          {connectionTabs.map(tab => (
-            <div
-              key={tab.id}
-              className={`tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.name}
-              <span
-                className="tab-close"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeConnectionTab(tab.id);
-                }}
-              >
-                ×
-              </span>
-            </div>
-          ))}
-          <button
-            className="add-connection-btn"
-            onClick={() => addConnectionTab(`Connection ${connectionTabs.length + 1}`, `ws://localhost:${CONNECTION_DEFAULTS.fallbackPort}`)}
-          >
-            Add Connection
-          </button>
-        </div>
-      )}
-
-      <div className="tab-content">
-        {currentTab && (
-          <ConnectionTab
-            name={currentTab.name}
-            url={currentTab.url}
-          />
-        )}
+    <div className="main-container" data-testid="app-container">
+      <div className="docking-layout-container">
+        <DockingLayout
+          logs={filteredLogMessages}
+          tasks={filteredTaskMessages}
+          concepts={filteredConceptMessages}
+        />
       </div>
+      <StatusBar onSend={handleSendMessage} stats={reasonerStats} />
     </div>
   );
-}
+};
 
-export default App
+export default App;

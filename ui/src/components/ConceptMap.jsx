@@ -323,7 +323,7 @@ const ConceptMapContent = ({ concepts }) => {
   );
 };
 
-const ConceptMap = ({ concepts }) => (
+const ConceptMap = ({ concepts = [] }) => (
   <GraphicsEngine>
     <ConceptMapContent concepts={concepts} />
   </GraphicsEngine>

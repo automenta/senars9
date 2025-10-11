@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const LogList = ({ logs }) => {
+const LogList = ({ logs = [] }) => {
   const [displayLogs, setDisplayLogs] = useState([]);
   const [isPaused, setIsPaused] = useState(false);
   const containerRef = useRef(null);

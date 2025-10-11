@@ -1,0 +1,10 @@
+.main-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.docking-layout-container {
+  flex: 1;
+  position: relative;
+}
