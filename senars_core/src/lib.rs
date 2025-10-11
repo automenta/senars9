@@ -26,10 +26,7 @@ use crate::reasoning::Reasoner;
 /// and provides the primary public API for interacting with the system.
 pub struct System {
     // Core components
-    pub memory: Memory,
-    pub reasoner: Reasoner,
-    pub clock: Box<dyn Clock>,
-    pub focus_set_selector: FocusSetSelector,
+    pub runtime: Runtime,
 
     // Unified frameworks
     pub analysis_engine: AnalysisEngine,
@@ -47,10 +44,7 @@ impl System {
     pub fn new(clock: Box<dyn Clock>) -> Self {
         System {
             // Core components
-            memory: Memory::new(),
-            reasoner: Reasoner::new(),
-            clock,
-            focus_set_selector: FocusSetSelector::default(),
+            runtime: Runtime::new(clock),
             // Unified frameworks
             analysis_engine: AnalysisEngine::new(),
             config_service: ConfigService::new(),
@@ -68,6 +62,40 @@ impl System {
     /// # Arguments
     /// * `narsese_input` - The Narsese string to parse (e.g., "(cat --> mammal).").
     pub fn input(&mut self, narsese_input: &str) {
+        self.runtime.input(narsese_input);
+    }
+
+    /// Runs a single cognitive cycle.
+    ///
+    /// This method is the "heartbeat" of the system. It advances the clock,
+    /// gets the current time, and then executes one full reasoning cycle.
+    pub fn tick(&mut self) {
+        self.runtime.tick();
+    }
+}
+
+/// The `Runtime` struct owns the core components that are actively used during
+/// the cognitive cycle.
+pub struct Runtime {
+    pub memory: Memory,
+    pub reasoner: Reasoner,
+    pub clock: Box<dyn Clock>,
+    pub focus_set_selector: FocusSetSelector,
+}
+
+impl Runtime {
+    /// Creates a new `Runtime` with the given clock and default components.
+    pub fn new(clock: Box<dyn Clock>) -> Self {
+        Self {
+            memory: Memory::new(),
+            reasoner: Reasoner::new(),
+            clock,
+            focus_set_selector: FocusSetSelector::default(),
+        }
+    }
+
+    /// Parses a Narsese string and adds the resulting task to memory.
+    pub fn input(&mut self, narsese_input: &str) {
         let current_time = self.clock.get_time();
         match parse(narsese_input, current_time) {
             Ok(task) => self.memory.add_task(task, current_time),
@@ -79,9 +107,6 @@ impl System {
     }
 
     /// Runs a single cognitive cycle.
-    ///
-    /// This method is the "heartbeat" of the system. It advances the clock,
-    /// gets the current time, and then executes one full reasoning cycle.
     pub fn tick(&mut self) {
         // First, advance the clock's state.
         self.clock.tick();

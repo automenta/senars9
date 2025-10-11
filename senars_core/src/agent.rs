@@ -45,7 +45,7 @@ impl Agent {
 
         // Broadcast the event
         let event = Event::CycleCompleted {
-            cycle: system.clock.get_time(),
+            cycle: system.runtime.clock.get_time(),
         };
         // It's okay if sending fails because there are no subscribers yet.
         let _ = self.event_tx.send(event);
