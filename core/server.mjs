@@ -2,7 +2,7 @@ import { WebSocketServer } from 'ws';
 import { Server } from 'http';
 import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
-import { setupWSConnection } from 'y-websocket/bin/utils.js';
+import { setupWSConnection } from '@y/websocket-server/utils';
 import { initialTasks, initialConcepts, initialLogs } from '../ui/src/example-data.js';
 
 const doc = new Y.Doc();

@@ -23,15 +23,6 @@ afterEach(() => {
   cleanup();
 });
 
-// Lightweight WebSocket mock - only when needed
-global.WebSocket = vi.fn(() => ({
-  send: vi.fn(),
-  close: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  readyState: 1,
-}));
-
 // Simplified DOM rect mock for performance
 Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
   value: () => ({

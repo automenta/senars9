@@ -1,28 +1,35 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import TasksPanel from './TasksPanel';
-import * as Y from 'yjs';
+import DockingLayout from './DockingLayout';
+
+// Helper to create mock tasks with a .get() method
+const createMockTask = (data) => ({
+  get: (key) => data[key],
+  toJSON: () => data,
+});
 
 // Mock the useCrdtWebSocket hook
 vi.mock('../core/crdtWebSocket', () => ({
   default: vi.fn(() => {
-    const ydoc = new Y.Doc();
-    const yTasks = ydoc.getArray('tasks');
     const tasks = [
-      { id: 'task1', content: 'Process sensory input', priority: 0.8 },
-      { id: 'task2', content: 'Update memory patterns', priority: 0.6 }
+      createMockTask({ id: 'task1', content: 'Process sensory input', priority: 0.8 }),
+      createMockTask({ id: 'task2', content: 'Update memory patterns', priority: 0.6 })
     ];
-    tasks.forEach(task => yTasks.push([new Y.Map(Object.entries(task))]));
 
     return {
-      tasks: yTasks.toArray(),
+      tasks: tasks,
     };
   })
 }));
 
 describe('TasksPanel Component - Integration Test', () => {
   it('displays tasks from the CRDT hook', () => {
-    render(<TasksPanel />);
+    const tasks = [
+      createMockTask({ id: 'task1', content: 'Process sensory input', priority: 0.8 }),
+      createMockTask({ id: 'task2', content: 'Update memory patterns', priority: 0.6 })
+    ];
+
+    render(<DockingLayout tasks={tasks} />);
 
     // The component should display the mock task content
     const taskContent1 = screen.getByText(/Process sensory input/i);
