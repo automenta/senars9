@@ -69,7 +69,7 @@ const ConnectionTab = ({ name, url }) => {
       case 'conceptMapPanel':
         return (
           <Panel title={panel.name}>
-            <ConceptMap concepts={concepts} />
+            <ConceptMap concepts={concepts} tasks={tasks} />
           </Panel>
         );
       case 'bottomPanel':

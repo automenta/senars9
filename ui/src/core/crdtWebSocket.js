@@ -86,9 +86,10 @@ const useCrdtWebSocket = (url) => {
     concepts,
     reasonerStats,
     sendRawMessage: (message) => {
-      if (provider) {
-        // This is a placeholder for sending raw messages.
-        // The actual implementation would depend on the server's message format.
+      if (provider && provider.ws) {
+        // Properly encode and send message to WebSocket
+        const encodedMessage = JSON.stringify(message);
+        provider.ws.send(encodedMessage);
       }
     },
     handleAddTask,

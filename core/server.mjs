@@ -10,6 +10,9 @@ const yTasks = doc.getArray('tasks');
 const yConcepts = doc.getArray('concepts');
 const yLogs = doc.getArray('logs');
 
+// Initialize awareness for sharing real-time stats
+const awareness = new Y.Awareness(doc);
+
 class SenarsServer {
   constructor(port = 8080) {
     this.port = port;
@@ -30,12 +33,30 @@ class SenarsServer {
   }
 
   startMockData() {
+    // Set initial awareness state with cycle stats
+    awareness.setLocalStateField('reasonerStats', {
+      isRunning: false,
+      isPaused: true,  // Start paused by default
+      cycles: 0,
+      tasks: initialTasks.length,
+      concepts: initialConcepts.length,
+      timestamp: Date.now()
+    });
+
     this.mockDataInterval = setInterval(() => {
       const concept = { type: 'concept', data: { id: randomUUID(), content: `Dynamic Concept ${Date.now()}` } };
       yConcepts.push([new Y.Map(Object.entries(concept))]);
 
-      // Note: reasoner_stats are handled by awareness in the new setup,
-      // so we won't broadcast them this way anymore.
+      // Update awareness with current stats
+      const currentState = awareness.getLocalState()?.reasonerStats || {};
+      awareness.setLocalStateField('reasonerStats', {
+        ...currentState,
+        isRunning: false,  // Default to not running
+        isPaused: true,    // Default to paused
+        concepts: yConcepts.length,
+        tasks: yTasks.length,
+        timestamp: Date.now()
+      });
     }, 5000);
   }
 
@@ -54,8 +75,8 @@ class SenarsServer {
       });
 
       this.wss.on('connection', (ws, req) => {
-        setupWSConnection(ws, req, { doc });
-        console.log('New client connected and attached to Y.Doc');
+        setupWSConnection(ws, req, { doc, awareness });
+        console.log('New client connected and attached to Y.Doc with awareness');
       });
 
       this.startMockData();

@@ -68,7 +68,7 @@ const DockingLayout = ({
   const factory = (node) => {
     const component = node.getComponent();
     if (component === 'concept-map') {
-      return <ConceptMap concepts={concepts} />;
+      return <ConceptMap concepts={concepts} tasks={tasks} />;
     }
     if (component === 'tasks-panel') {
       return (

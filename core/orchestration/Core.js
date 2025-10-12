@@ -21,6 +21,7 @@ import { ResolutionStrategy } from '../reasoning/ResolutionStrategy.js';
 import { SystemContext } from '../components/SystemContext.js';
 import { StrategyRegistry } from '../components/StrategyRegistry.js';
 import CommonMiddleware from '../messaging/Middleware.js';
+import Cycle from './Cycle.js';
 
 class Core {
   constructor() {
@@ -62,6 +63,7 @@ class Core {
 
     this.registerComponent('patternDetector', new PatternDetector()); // Register PatternDetector component
     this.registerComponent('webSocketServer', new WebSocketServer()); // Register WebSocketServer component
+    this.registerComponent('cycle', new Cycle()); // Register Cycle component
 
     return new Proxy(this, {
       get: (target, prop) => target.componentMap.has(prop) ? target.componentMap.get(prop) : target[prop],
@@ -146,6 +148,15 @@ class Core {
             });
           });
         }
+        
+        // Listen for cycle stats events and broadcast them
+        this.messages.on('cycle.stats', (data) => {
+          this.webSocketServer.broadcast({
+            type: 'cycle_stats',
+            data: data,
+            timestamp: Date.now()
+          });
+        });
       }
     }
 

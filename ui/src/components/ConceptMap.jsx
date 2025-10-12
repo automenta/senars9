@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { forceSimulation, forceLink, forceManyBody, forceCenter } from 'd3-force';
 import GraphicsEngine, { useGraphics } from './GraphicsEngine';
 
-const ConceptMapContent = ({ concepts }) => {
+const ConceptMapContent = ({ concepts, tasks = [] }) => {
   const { scene } = useGraphics();
   const graphObjects = useRef(new Map()); // To keep track of Three.js objects
   const simulation = useRef();
@@ -56,8 +56,18 @@ const ConceptMapContent = ({ concepts }) => {
     
     // Create nodes for different entity types and extract relationships from tasks
     concepts.forEach((item, i) => {
-      const itemType = item.get('type');
-      const itemData = item.get('data');
+      // Handle both Yjs Map format and JSON format
+      let itemType, itemData;
+      
+      if (item.get && typeof item.get === 'function') {
+        // Yjs Map format
+        itemType = item.get('type');
+        itemData = item.get('data');
+      } else {
+        // JSON format from Yjs conversion
+        itemType = item.type || 'task'; // Default to task for tasks array
+        itemData = item;
+      }
       
       if (itemType === 'concept') {
         const nodeId = itemData?.id || `concept-${i}`;
@@ -65,7 +75,7 @@ const ConceptMapContent = ({ concepts }) => {
           nodes.push({
             id: nodeId,
             type: 'concept',
-            name: itemData?.name || itemData?.id || `Concept-${i}`,
+            name: itemData?.name || itemData?.content || itemData?.id || `Concept-${i}`,
             priority: itemData?.priority || 0.5,
             color: 0x007bff, // Blue
             ...itemData
@@ -133,10 +143,71 @@ const ConceptMapContent = ({ concepts }) => {
     return { nodes, links };
   };
 
-  useEffect(() => {
-    if (!scene || !concepts) return;
+  // Function to get color based on priority and type
+  const getColorForNode = (node) => {
+    // Define a color scale based on priority
+    const priority = node.priority || 0.5;
+    const type = node.type || 'concept';
+    
+    // Use different color schemes based on type
+    switch (type) {
+      case 'task':
+        // For tasks, use green-based colors with priority affecting intensity
+        // Low priority tasks: darker green, high priority: brighter green
+        const taskIntensity = 0.3 + priority * 0.7; // Scale from 0.3 to 1.0
+        return new THREE.Color(0.0, taskIntensity, 0.0); // RGB values from 0-1
+      case 'concept':
+        // For concepts, use blue-based colors with priority affecting intensity
+        const conceptIntensity = 0.3 + priority * 0.7;
+        return new THREE.Color(0.0, 0.0, conceptIntensity);
+      case 'concept-individual':
+        // For individual concepts from tasks, use purple-based colors
+        const conceptIndividualIntensity = 0.3 + priority * 0.7;
+        return new THREE.Color(conceptIndividualIntensity * 0.6, 0.0, conceptIndividualIntensity);
+      default:
+        // Fallback color based on priority
+        return new THREE.Color(priority, priority * 0.7, 1 - priority);
+    }
+  };
 
-    const { nodes, links } = processEntities(concepts);
+  useEffect(() => {
+    if (!scene) return;
+
+    // Combine concepts and tasks for processing
+    const allEntities = [
+      ...(concepts || []),
+      ...tasks.map(task => ({ type: 'task', ...task }))
+    ];
+
+    const { nodes, links } = processEntities(allEntities);
+
+    // Calculate aggregate priority for concept nodes based on connected task priorities
+    const conceptPriorities = new Map(); // Map from concept id to sum of connected task priorities
+    
+    // Sum the priorities of tasks connected to each concept
+    links.forEach(link => {
+      if (link.type === 'task-contains') {
+        const taskNode = nodes.find(n => n.id === link.source);
+        if (taskNode && taskNode.type === 'task') {
+          const taskPriority = taskNode.priority || 0.5;
+          
+          // Add to target concept
+          if (!conceptPriorities.has(link.target)) {
+            conceptPriorities.set(link.target, 0);
+          }
+          conceptPriorities.set(link.target, conceptPriorities.get(link.target) + taskPriority);
+        }
+      }
+    });
+    
+    // Normalize concept priorities based on their connections
+    nodes.forEach(node => {
+      if (node.type === 'concept-individual' && conceptPriorities.has(node.id)) {
+        // Set the priority to the sum of connected task priorities, capped at 1.0
+        const aggregatePriority = Math.min(1.0, conceptPriorities.get(node.id));
+        node.priority = aggregatePriority;
+      }
+    });
 
     // --- Cleanup from previous render ---
     graphObjects.current.forEach((obj, id) => {
@@ -165,12 +236,12 @@ const ConceptMapContent = ({ concepts }) => {
           geometry = new THREE.SphereGeometry(1, 16, 16);
       }
       
+      const color = getColorForNode(node);
       const priorityFactor = Math.max(0.3, Math.min(1, node.priority || 0.5));
-      const baseColor = node.color || 0xcccccc;
       
       material = new THREE.MeshPhongMaterial({ 
-        color: baseColor,
-        emissive: new THREE.Color(baseColor).multiplyScalar(0.2),
+        color: color,
+        emissive: new THREE.Color(color.r * 0.2, color.g * 0.2, color.b * 0.2),
         shininess: 50,
         transparent: true,
         opacity: Math.min(0.9, 0.3 + priorityFactor * 0.7)
@@ -372,9 +443,17 @@ const ConceptMapContent = ({ concepts }) => {
           <div style={{ width: '12px', height: '12px', backgroundColor: '#28a745', marginRight: '6px' }}></div>
           <span>Tasks</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
           <div style={{ width: '12px', height: '12px', backgroundColor: '#6610f2', marginRight: '6px' }}></div>
           <span>Individual Concepts</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+          <div style={{ width: '12px', height: '12px', backgroundColor: '#ff6b6b', borderRadius: '50%', marginRight: '6px' }}></div>
+          <span>High Priority</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ width: '12px', height: '12px', backgroundColor: '#aaa', borderRadius: '50%', marginRight: '6px' }}></div>
+          <span>Low Priority</span>
         </div>
       </div>
       
@@ -412,9 +491,9 @@ const ConceptMapContent = ({ concepts }) => {
   );
 };
 
-const ConceptMap = ({ concepts = [] }) => (
+const ConceptMap = ({ concepts = [], tasks = [] }) => (
   <GraphicsEngine>
-    <ConceptMapContent concepts={concepts} />
+    <ConceptMapContent concepts={concepts} tasks={tasks} />
   </GraphicsEngine>
 );
 
