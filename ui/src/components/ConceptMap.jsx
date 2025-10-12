@@ -20,32 +20,34 @@ const ConceptMapContent = ({ concepts }) => {
     
     // Create nodes for different entity types
     concepts.forEach((item, i) => {
-      if (item.type === 'concept') {
+      const itemType = item.get('type');
+      const itemData = item.get('data');
+      if (itemType === 'concept') {
         nodes.push({
-          id: item.data?.id || `concept-${i}`,
+          id: itemData?.id || `concept-${i}`,
           type: 'concept',
-          name: item.data?.name || item.data?.id || `Concept-${i}`,
-          priority: item.data?.priority || 0.5,
+          name: itemData?.name || itemData?.id || `Concept-${i}`,
+          priority: itemData?.priority || 0.5,
           color: 0x007bff, // Blue
-          ...item.data
+          ...itemData
         });
       }
-      else if (item.type === 'task') {
+      else if (itemType === 'task') {
         nodes.push({
-          id: item.data?.id || `task-${i}`,
+          id: itemData?.id || `task-${i}`,
           type: 'task',
-          name: item.data?.content || `Task-${i}`,
-          priority: item.data?.priority || 0.5,
+          name: itemData?.content || `Task-${i}`,
+          priority: itemData?.priority || 0.5,
           color: 0x28a745, // Green
-          ...item.data
+          ...itemData
         });
       }
-      else if (item.type === 'link') {
+      else if (itemType === 'link') {
         links.push({
-          source: item.data?.source || `link-source-${i}`,
-          target: item.data?.target || `link-target-${i}`,
-          type: item.data?.linkType || 'relation',
-          strength: item.data?.strength || 0.5
+          source: itemData?.source || `link-source-${i}`,
+          target: itemData?.target || `link-target-${i}`,
+          type: itemData?.linkType || 'relation',
+          strength: itemData?.strength || 0.5
         });
       }
     });

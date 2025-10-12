@@ -126,13 +126,14 @@ const LogList = ({ logs = [] }) => {
             animation: 'fadeIn 0.3s ease-in-out'
           }}>
             {displayLogs.map((log, index) => {
-              const message = typeof log.data === 'string' ? log.data : JSON.stringify(log.data);
+              const logData = log.get('data');
+              const message = typeof logData === 'string' ? logData : JSON.stringify(logData);
               const icon = getLogIcon(message);
-              const color = getLogLevelColor(log.level || message);
+              const color = getLogLevelColor(log.get('level') || message);
 
               return (
                 <li
-                  key={`${log.timestamp || index}-${message.substring(0, 10)}`}
+                  key={`${log.get('timestamp') || index}-${message.substring(0, 10)}`}
                   className="log-item"
                   style={{
                     padding: '6px 8px',
@@ -173,7 +174,7 @@ const LogList = ({ logs = [] }) => {
                         fontSize: '11px',
                         marginRight: '6px'
                       }}>
-                        {log.type || 'LOG'}
+                        {log.get('type') || 'LOG'}
                       </span>
                       <span style={{ 
                         color: '#666', 
@@ -181,14 +182,14 @@ const LogList = ({ logs = [] }) => {
                         marginRight: '8px',
                         minWidth: '70px'
                       }}>
-                        [{new Date(log.timestamp || Date.now()).toLocaleTimeString()}]
+                        [{new Date(log.get('timestamp') || Date.now()).toLocaleTimeString()}]
                       </span>
                       <span style={{ 
-                        color: getLogLevelColor(log.level), 
+                        color: getLogLevelColor(log.get('level')),
                         fontSize: '11px',
                         fontStyle: 'italic'
                       }}>
-                        {log.level || 'info'}
+                        {log.get('level') || 'info'}
                       </span>
                     </div>
                     
@@ -223,7 +224,7 @@ const LogList = ({ logs = [] }) => {
                         maxHeight: '100px',
                         overflowY: 'auto'
                       }}>
-                        {JSON.stringify(log, null, 2)}
+                        {JSON.stringify(log.toJSON(), null, 2)}
                       </div>
                       
                       <div style={{ 
@@ -260,7 +261,7 @@ const LogList = ({ logs = [] }) => {
                           onClick={(e) => {
                             e.stopPropagation();
                             // In a real implementation, this could filter logs by type
-                            console.log('Filter by type:', log.type);
+                            console.log('Filter by type:', log.get('type'));
                           }}
                         >
                           🔍 Filter

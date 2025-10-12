@@ -57,7 +57,7 @@ describe('App Component - Runtime Error Tests', () => {
 
 import ReasonerControlPanel from './components/ReasonerControlPanel';
 import LogList from './components/LogList';
-import TasksTree from './components/TasksTree';
+import TasksPanel from './components/TasksPanel';
 import InputField from './components/InputField';
 import { createMockStats, createMockLogs, createMockTasks } from './test-utils';
 
@@ -89,9 +89,9 @@ describe('Individual Component Runtime Error Tests', () => {
     expectNoErrors();
   });
 
-  it('TasksTree handles empty tasks gracefully', () => {
+  it('TasksPanel handles empty tasks gracefully', () => {
     const { expectNoErrors } = renderWithErrorDetection(
-      <TasksTree tasks={[]} />
+      <TasksPanel tasks={[]} />
     );
 
     expectNoErrors();

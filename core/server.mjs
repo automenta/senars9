@@ -1,39 +1,41 @@
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
 import { Server } from 'http';
 import { randomUUID } from 'crypto';
-import TwoPhaseSet from '../ui/src/utils/crdt.js';
+import * as Y from 'yjs';
+import { setupWSConnection } from 'y-websocket/bin/utils.js';
 import { initialTasks, initialConcepts, initialLogs } from '../ui/src/example-data.js';
+
+const doc = new Y.Doc();
+const yTasks = doc.getArray('tasks');
+const yConcepts = doc.getArray('concepts');
+const yLogs = doc.getArray('logs');
 
 class SenarsServer {
   constructor(port = 8080) {
     this.port = port;
-    this.httpServer = new Server();
+    this.httpServer = new Server((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('okay');
+    });
     this.wss = new WebSocketServer({ server: this.httpServer });
-    this.clients = new Set();
-    this.bagregate = new TwoPhaseSet();
-    this.concepts = [];
-    this.logs = [];
     this.mockDataInterval = null;
   }
 
   loadInitialData() {
-    console.log('Loading initial data...');
-    initialTasks.forEach(task => this.bagregate.add(task));
-    this.concepts = [...initialConcepts];
-    this.logs = [...initialLogs];
+    console.log('Loading initial data into Y.Doc...');
+    initialTasks.forEach(task => yTasks.push([new Y.Map(Object.entries(task))]));
+    initialConcepts.forEach(concept => yConcepts.push([new Y.Map(Object.entries(concept))]));
+    initialLogs.forEach(log => yLogs.push([new Y.Map(Object.entries(log))]));
     console.log('Initial data loaded.');
   }
 
   startMockData() {
     this.mockDataInterval = setInterval(() => {
-      this.broadcast(JSON.stringify({
-        type: 'concept',
-        payload: { id: randomUUID(), content: `Dynamic Concept ${Date.now()}` }
-      }));
-      this.broadcast(JSON.stringify({
-        type: 'reasoner_stats',
-        payload: { cycles: Math.floor(Math.random() * 1000) }
-      }));
+      const concept = { type: 'concept', data: { id: randomUUID(), content: `Dynamic Concept ${Date.now()}` } };
+      yConcepts.push([new Y.Map(Object.entries(concept))]);
+
+      // Note: reasoner_stats are handled by awareness in the new setup,
+      // so we won't broadcast them this way anymore.
     }, 5000);
   }
 
@@ -51,96 +53,13 @@ class SenarsServer {
         reject(err);
       });
 
-      this.wss.on('connection', (ws) => {
-        this.handleNewConnection(ws);
+      this.wss.on('connection', (ws, req) => {
+        setupWSConnection(ws, req, { doc });
+        console.log('New client connected and attached to Y.Doc');
       });
 
       this.startMockData();
     });
-  }
-
-  handleNewConnection(ws) {
-    console.log('New client connected');
-    this.clients.add(ws);
-
-    // Send the initial state to the new client
-    ws.send(JSON.stringify({ type: 'bagregate-init', payload: this.bagregate.toJSON() }));
-    ws.send(JSON.stringify({ type: 'concepts-init', payload: this.concepts }));
-    ws.send(JSON.stringify({ type: 'logs-init', payload: this.logs }));
-
-
-    ws.on('message', (message) => {
-      this.handleMessage(message);
-    });
-
-    ws.on('close', () => {
-      console.log('Client disconnected');
-      this.clients.delete(ws);
-    });
-
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-      this.clients.delete(ws);
-    });
-  }
-
-  handleMessage(message) {
-    try {
-      const { type, payload } = JSON.parse(message);
-      console.log('Received message:', type, payload);
-
-      switch (type) {
-        case 'task-create':
-          this.handleTaskCreate(payload);
-          break;
-        case 'task-delete':
-          this.handleTaskDelete(payload);
-          break;
-        case 'task-update-priority':
-          this.handleTaskUpdatePriority(payload);
-          break;
-        case 'command':
-          this.handleCommand(payload);
-          break;
-        default:
-          console.warn(`Unknown message type: ${type}`);
-      }
-    } catch (error) {
-      console.error('Error processing message:', error);
-    }
-  }
-
-  handleTaskCreate(payload) {
-    const newTask = { id: randomUUID(), ...payload };
-    this.bagregate.add(newTask);
-    this.broadcastBagregateUpdate();
-  }
-
-  handleTaskDelete(payload) {
-    const taskId = payload.id;
-    const taskToRemove = this.bagregate.values.find(task => task.id === taskId);
-    if (taskToRemove) {
-      this.bagregate.remove(taskToRemove);
-      this.broadcastBagregateUpdate();
-    }
-  }
-
-  handleTaskUpdatePriority(payload) {
-    const { id, priority } = payload;
-    const taskToUpdate = this.bagregate.values.find(task => task.id === id);
-    if (taskToUpdate) {
-      this.bagregate.remove(taskToUpdate);
-      const updatedTask = { ...taskToUpdate, priority };
-      this.bagregate.add(updatedTask);
-      this.broadcastBagregateUpdate();
-    }
-  }
-
-  handleCommand(payload) {
-    console.log('Received command:', payload);
-    const newLog = { id: randomUUID(), message: `Command received: ${payload.data}` };
-    this.logs.push(newLog);
-    this.broadcast(JSON.stringify({ type: 'log', payload: newLog }));
   }
 
   stop() {
@@ -148,34 +67,12 @@ class SenarsServer {
       clearInterval(this.mockDataInterval);
     }
 
-    this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.close();
-      }
-    });
-
     return new Promise((resolve) => {
       this.httpServer.close(() => {
         console.log('SeNARS server closed');
         resolve();
       });
     });
-  }
-
-  broadcast(message) {
-    this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    });
-  }
-
-  broadcastBagregateUpdate() {
-    const message = JSON.stringify({
-      type: 'bagregate-update',
-      payload: this.bagregate.toJSON(),
-    });
-    this.broadcast(message);
   }
 }
 

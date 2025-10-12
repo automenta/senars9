@@ -158,7 +158,9 @@ const UnifiedMenuBar = ({ stats, connectionStatus, onCommand, onAddTask }) => {
         <input
           type="text"
           value={inputValue}
-          onChange={(e) => setInputValue(e.g. /cmd start)..."
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Enter a command or task (e.g. /cmd start)..."
           style={{ flex: 1 }}
         />
         <button type="submit">Send</button>

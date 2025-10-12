@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Import all the components to test them directly
 import ConnectionTab from './ConnectionTab.jsx';
 import LogList from './LogList.jsx';
-import TasksTree from './TasksTree.jsx';
+import TasksPanel from './TasksPanel.jsx';
 import InputField from './InputField.jsx';
 import ReasonerControlPanel from './ReasonerControlPanel.jsx';
 import ConceptMap from './ConceptMap.jsx';
@@ -48,14 +48,14 @@ describe('UI Components - No Runtime Errors', () => {
     unmount();
   });
 
-  it('renders TasksTree with various task types without errors', () => {
+  it('renders TasksPanel with various task types without errors', () => {
     const sampleTasks = [
       { id: 'task1', data: { id: 'task1', content: 'Input task', priority: 0.8, type: 'input' } },
       { id: 'task2', data: { id: 'task2', content: 'Goal task', priority: 0.9, type: 'goal' } },
       { id: 'task3', data: { id: 'task3', content: 'Question task', priority: 0.6, type: 'question' } }
     ];
     
-    const { unmount } = render(<TasksTree tasks={sampleTasks} />);
+    const { unmount } = render(<TasksPanel tasks={sampleTasks} />);
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -63,8 +63,8 @@ describe('UI Components - No Runtime Errors', () => {
     unmount();
   });
 
-  it('renders TasksTree with empty tasks without errors', () => {
-    const { unmount } = render(<TasksTree tasks={[]} />);
+  it('renders TasksPanel with empty tasks without errors', () => {
+    const { unmount } = render(<TasksPanel tasks={[]} />);
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();

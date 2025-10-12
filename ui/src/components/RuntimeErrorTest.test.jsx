@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Import components directly
 import LogList from './LogList.jsx';
-import TasksTree from './TasksTree.jsx';
+import TasksPanel from './TasksPanel.jsx';
 import InputField from './InputField.jsx';
 import ReasonerControlPanel from './ReasonerControlPanel.jsx';
 
@@ -24,8 +24,8 @@ describe('Component Runtime Error Tests', () => {
     expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
-  it('TasksTree handles empty tasks without errors', () => {
-    render(<TasksTree tasks={[]} />);
+  it('TasksPanel handles empty tasks without errors', () => {
+    render(<TasksPanel tasks={[]} />);
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
