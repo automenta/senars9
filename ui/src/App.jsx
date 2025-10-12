@@ -19,22 +19,11 @@ const App = () => {
     logs,
     concepts,
     reasonerStats,
-    sendCrdtMessage,
     sendRawMessage,
+    handleAddTask,
+    handleUpdateTask,
+    handleDeleteTask,
   } = useCrdtWebSocket(wsUrl);
-
-  // Handlers for Task CRUD operations
-  const handleAddTask = (task) => {
-    sendCrdtMessage('task-create', task);
-  };
-
-  const handleUpdateTask = (task) => {
-    sendCrdtMessage('task-update-priority', task);
-  };
-
-  const handleDeleteTask = (task) => {
-    sendCrdtMessage('task-delete', task);
-  };
 
   const handleSendRawMessage = (command) => {
     sendRawMessage({ type: 'command', payload: { data: command } });

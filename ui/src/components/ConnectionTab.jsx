@@ -4,15 +4,27 @@ import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-ki
 import ReasonerControlPanel from './ReasonerControlPanel';
 import InputField from './InputField';
 import LogList from './LogList';
-import TasksTree from './TasksTree';
+import TasksPanel from './TasksPanel';
 import ConceptMap from './ConceptMap';
 import SortableItem from './SortableItem';
-import useWebSocket from '../core/WebSocketManager';
-import { PANEL_CONFIG, MESSAGE_TYPES, THEME } from '../constants';
+import useCrdtWebSocket from '../core/crdtWebSocket';
+import { PANEL_CONFIG, THEME } from '../constants';
 import Panel from './Panel';
 
 const ConnectionTab = ({ name, url }) => {
-  const { isConnected, connectionStatus, messages, error, sendMessage } = useWebSocket(url);
+  const {
+    isConnected,
+    connectionStatus,
+    error,
+    tasks,
+    logs,
+    concepts,
+    reasonerStats,
+    sendRawMessage,
+    handleAddTask,
+    handleUpdateTask,
+    handleDeleteTask,
+  } = useCrdtWebSocket(url);
   const [activeId, setActiveId] = useState(null);
 
   const [panels, setPanels] = useState([
@@ -22,11 +34,11 @@ const ConnectionTab = ({ name, url }) => {
   ]);
 
   const handleSendMessage = (command) => {
-    sendMessage({ type: 'command', data: command });
+    sendRawMessage({ type: 'command', payload: { data: command } });
   };
 
   const handleCommand = (command, payload) => {
-    sendMessage({ type: 'control', command, payload });
+    sendRawMessage({ type: 'control', command, payload });
   };
 
   const handleDragStart = (event) => {
@@ -45,11 +57,6 @@ const ConnectionTab = ({ name, url }) => {
     }
   };
 
-  const filteredLogMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.log);
-  const filteredTaskMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.task);
-  const filteredConceptMessages = messages.filter(msg => msg.type === MESSAGE_TYPES.concept);
-  const reasonerStats = messages.find(msg => msg.type === MESSAGE_TYPES.reasonerStats)?.data || null;
-
   const renderPanel = (panel) => {
     switch (panel.id) {
       case 'topPanel':
@@ -62,7 +69,7 @@ const ConnectionTab = ({ name, url }) => {
       case 'conceptMapPanel':
         return (
           <Panel title={panel.name}>
-            <ConceptMap concepts={filteredConceptMessages} />
+            <ConceptMap concepts={concepts} />
           </Panel>
         );
       case 'bottomPanel':
@@ -70,12 +77,16 @@ const ConnectionTab = ({ name, url }) => {
           <div style={{ display: 'flex', gap: THEME.spacing.md, height: '100%' }}>
             <div style={{ flex: 1 }}>
               <Panel title="Log">
-                <LogList logs={filteredLogMessages} />
+                <LogList logs={logs} />
               </Panel>
             </div>
             <div style={{ flex: 1 }}>
               <Panel title="Tasks">
-                <TasksTree tasks={filteredTaskMessages} />
+                <TasksPanel
+                  tasks={tasks}
+                  onUpdateTask={handleUpdateTask}
+                  onDeleteTask={handleDeleteTask}
+                />
               </Panel>
             </div>
           </div>

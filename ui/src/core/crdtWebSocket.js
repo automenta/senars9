@@ -49,6 +49,18 @@ const useCrdtWebSocket = (url) => {
     wsSendMessage(JSON.stringify({ type, payload }));
   }, [wsSendMessage]);
 
+  const handleAddTask = useCallback((task) => {
+    sendCrdtMessage('task-create', task);
+  }, [sendCrdtMessage]);
+
+  const handleUpdateTask = useCallback((task) => {
+    sendCrdtMessage('task-update-priority', task);
+  }, [sendCrdtMessage]);
+
+  const handleDeleteTask = useCallback((task) => {
+    sendCrdtMessage('task-delete', task);
+  }, [sendCrdtMessage]);
+
   const tasks = useMemo(() => bagregate.values.sort((a, b) => b.priority - a.priority), [bagregate]);
 
   return {
@@ -59,8 +71,10 @@ const useCrdtWebSocket = (url) => {
     logs,
     concepts,
     reasonerStats,
-    sendCrdtMessage,
     sendRawMessage: wsSendMessage,
+    handleAddTask,
+    handleUpdateTask,
+    handleDeleteTask,
   };
 };
 
