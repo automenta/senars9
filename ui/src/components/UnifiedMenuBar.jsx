@@ -44,7 +44,7 @@ const UnifiedMenuBar = ({ stats, connectionStatus, onCommand, onAddTask }) => {
       if (inputValue.startsWith('/cmd')) {
         onCommand(inputValue.slice(5));
       } else {
-        onAddTask({ text: inputValue, priority: 0.5 });
+        onAddTask({ content: inputValue, priority: 0.5 });
       }
       if (inputValue !== history[0]) {
         const newHistory = [inputValue, ...history];
@@ -87,11 +87,11 @@ const UnifiedMenuBar = ({ stats, connectionStatus, onCommand, onAddTask }) => {
 
   const getConnectionStatusStyle = () => {
     switch (connectionStatus) {
-      case 'Connected':
+      case 'connected':
         return { backgroundColor: '#d4edda', color: '#155724' };
-      case 'Disconnected':
+      case 'disconnected':
         return { backgroundColor: '#f8d7da', color: '#721c24' };
-      case 'Connecting':
+      case 'connecting':
         return { backgroundColor: '#fff3cd', color: '#856404' };
       default:
         return { backgroundColor: '#e2e3e5', color: '#383d41' };
@@ -135,7 +135,7 @@ const UnifiedMenuBar = ({ stats, connectionStatus, onCommand, onAddTask }) => {
         <button onClick={() => onCommand('reset')} style={styles.button('black', '#ffc107')}>Reset</button>
       </div>
        <div style={styles.statusBadge}>
-        {connectionStatus}
+        {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
       </div>
       <div>
         <label>CPU: {cpuThrottle}%</label>

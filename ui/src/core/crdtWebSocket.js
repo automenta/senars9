@@ -1,79 +1,96 @@
-import { useEffect, useCallback, useMemo, useReducer } from 'react';
-import useWebSocket from './WebSocketManager';
-import TwoPhaseSet from '../utils/crdt';
-
-const initialState = {
-  bagregate: new TwoPhaseSet(),
-  logs: [],
-  concepts: [],
-  reasonerStats: null,
-};
-
-function crdtReducer(state, action) {
-  switch (action.type) {
-    case 'bagregate-init':
-    case 'bagregate-update':
-      return { ...state, bagregate: TwoPhaseSet.fromJSON(action.payload) };
-    case 'concepts-init':
-        return { ...state, concepts: action.payload };
-    case 'logs-init':
-        return { ...state, logs: action.payload };
-    case 'log':
-      return { ...state, logs: [...state.logs, action.payload] };
-    case 'concept':
-      if (state.concepts.find(c => c.id === action.payload.id)) {
-        return state; // Avoid duplicates
-      }
-      return { ...state, concepts: [...state.concepts, action.payload] };
-    case 'reasoner_stats':
-      return { ...state, reasonerStats: action.payload };
-    default:
-      return state;
-  }
-}
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
 
 const useCrdtWebSocket = (url) => {
-  const { isConnected, connectionStatus, error, sendMessage: wsSendMessage, lastMessage } = useWebSocket(url);
-  const [state, dispatch] = useReducer(crdtReducer, initialState);
+  const [ydoc] = useState(() => new Y.Doc());
+  const [provider, setProvider] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [tasks, setTasks] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [concepts, setConcepts] = useState([]);
+  const [reasonerStats, setReasonerStats] = useState(null);
 
   useEffect(() => {
-    if (lastMessage) {
-      try {
-        const { type, payload } = JSON.parse(lastMessage.data);
-        dispatch({ type, payload });
-      } catch (e) {
-        console.error('Error processing message:', e);
-      }
-    }
-  }, [lastMessage]);
+    if (!url) return;
 
-  const sendCrdtMessage = useCallback((type, payload) => {
-    wsSendMessage(JSON.stringify({ type, payload }));
-  }, [wsSendMessage]);
+    const wsProvider = new WebsocketProvider(url, 'senars', ydoc);
+    setProvider(wsProvider);
+
+    wsProvider.on('status', (event) => {
+      setConnectionStatus(event.status);
+    });
+
+    const yTasks = ydoc.getArray('tasks');
+    const yLogs = ydoc.getArray('logs');
+    const yConcepts = ydoc.getArray('concepts');
+
+    const observeTasks = () => setTasks(yTasks.toArray().map(task => task instanceof Y.Map ? task.toJSON() : task));
+    const observeLogs = () => setLogs(yLogs.toArray());
+    const observeConcepts = () => setConcepts(yConcepts.toArray());
+
+    yTasks.observe(observeTasks);
+    yLogs.observe(observeLogs);
+    yConcepts.observe(observeConcepts);
+
+    wsProvider.awareness.on('change', () => {
+      const stats = Array.from(wsProvider.awareness.getStates().values()).find(state => state.reasonerStats)?.reasonerStats;
+      if (stats) {
+        setReasonerStats(stats);
+      }
+    });
+
+    return () => {
+      wsProvider.disconnect();
+    };
+  }, [url, ydoc]);
 
   const handleAddTask = useCallback((task) => {
-    sendCrdtMessage('task-create', task);
-  }, [sendCrdtMessage]);
+    const yTasks = ydoc.getArray('tasks');
+    const taskMap = new Y.Map();
+    Object.entries(task).forEach(([key, value]) => {
+      taskMap.set(key, value);
+    });
+    yTasks.push([taskMap]);
+  }, [ydoc]);
 
-  const handleUpdateTask = useCallback((task) => {
-    sendCrdtMessage('task-update-priority', task);
-  }, [sendCrdtMessage]);
+  const handleUpdateTask = useCallback((updatedTask) => {
+    const yTasks = ydoc.getArray('tasks');
+    const taskIndex = yTasks.toArray().findIndex(task => task.get('id') === updatedTask.id);
+    if (taskIndex !== -1) {
+      const taskMap = yTasks.get(taskIndex);
+      for (const key in updatedTask) {
+        if (key !== 'id') {
+          taskMap.set(key, updatedTask[key]);
+        }
+      }
+    }
+  }, [ydoc]);
 
-  const handleDeleteTask = useCallback((task) => {
-    sendCrdtMessage('task-delete', task);
-  }, [sendCrdtMessage]);
+  const handleDeleteTask = useCallback((taskToDelete) => {
+    const yTasks = ydoc.getArray('tasks');
+    const taskIndex = yTasks.toArray().findIndex(task => task.get('id') === taskToDelete.id);
+    if (taskIndex !== -1) {
+      yTasks.delete(taskIndex, 1);
+    }
+  }, [ydoc]);
 
-  const tasks = useMemo(() => state.bagregate.values.sort((a, b) => b.priority - a.priority), [state.bagregate]);
+  const sortedTasks = useMemo(() => tasks.sort((a, b) => (b.priority || 0) - (a.priority || 0)), [tasks]);
 
   return {
-    isConnected,
+    isConnected: connectionStatus === 'connected',
     connectionStatus,
-    error,
-    tasks,
-    logs: state.logs,
-    concepts: state.concepts,
-    reasonerStats: state.reasonerStats,
-    sendRawMessage: wsSendMessage,
+    error: null,
+    tasks: sortedTasks,
+    logs,
+    concepts,
+    reasonerStats,
+    sendRawMessage: (message) => {
+      if (provider) {
+        // This is a placeholder for sending raw messages.
+        // The actual implementation would depend on the server's message format.
+      }
+    },
     handleAddTask,
     handleUpdateTask,
     handleDeleteTask,

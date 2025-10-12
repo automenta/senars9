@@ -61,13 +61,20 @@ export const useWebSocket = (url) => {
 
     websocket.onmessage = (event) => {
       setLastMessage(event); // Store the raw event for CRDT hook
-      try {
-        const data = JSON.parse(event.data);
-        setMessages(prev => [...prev, data]);
-      } catch (e) {
-        console.error('Error parsing message:', e);
-        // Add the raw message anyway, marked as error
-        setMessages(prev => [...prev, { type: 'error', data: event.data, error: e.message }]);
+      if (event.data instanceof Blob) {
+        // For binary data, do not parse as JSON
+        // The CRDT hook will handle this
+        // We can optionally add it to the messages log with a specific type
+        setMessages(prev => [...prev, { type: 'binary', data: event.data }]);
+      } else {
+        try {
+          const data = JSON.parse(event.data);
+          setMessages(prev => [...prev, data]);
+        } catch (e) {
+          console.error('Error parsing message:', e);
+          // Add the raw message anyway, marked as error
+          setMessages(prev => [...prev, { type: 'error', data: event.data, error: e.message }]);
+        }
       }
     };
 
