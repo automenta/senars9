@@ -346,6 +346,9 @@ class WebSocketServer extends Component {
           const stream = this.taskStreams.get(message.taskId);
           stream.participants.delete(clientId);
         }
+      } else if (message.type === 'command') {
+        // Handle system commands
+        this._handleCommand(clientId, message);
       } else {
         // Emit custom message event
         this.emit('message', {
@@ -357,6 +360,78 @@ class WebSocketServer extends Component {
       }
     } catch (error) {
       Logger.error(`Error parsing message from client ${clientId}`, error);
+    }
+  }
+
+  _handleCommand(clientId, message) {
+    const { command, data } = message;
+    
+    if (!this.core?.messages) {
+      Logger.error('Core messages component not available');
+      return;
+    }
+    
+    // Map UI commands to internal command names
+    const commandMap = {
+      'start': 'cycle.start',
+      'stop': 'cycle.stop',
+      'pause': 'cycle.pause',
+      'resume': 'cycle.resume',
+      'step': 'cycle.step',
+      'reset': 'cycle.reset',
+      'throttle': 'cycle.throttle'
+    };
+    
+    const internalCommand = commandMap[command];
+    
+    if (internalCommand) {
+      try {
+        if (internalCommand === 'cycle.throttle' && data) {
+          // Handle throttle command specifically if needed
+          if (this.core.cycle) {
+            // For now, we'll just log the throttling request
+            Logger.debug(`Throttle request: ${data.value}%`);
+          }
+        } else if (internalCommand === 'cycle.reset') {
+          // Handle reset command - reset the cycle count
+          if (this.core.cycle) {
+            this.core.cycle.cycleCount = 0;
+            // Broadcast updated stats
+            this.core.messages.emit('cycle.stats', {
+              cycles: this.core.cycle.cycleCount,
+              timestamp: Date.now()
+            });
+          }
+        } else {
+          // Execute the mapped command
+          this.core.messages.execute(internalCommand, data);
+        }
+        
+        // Send success response
+        this.sendToClient(clientId, {
+          type: 'command_response',
+          command: command,
+          status: 'success',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        Logger.error(`Error executing command ${internalCommand}:`, error);
+        this.sendToClient(clientId, {
+          type: 'command_response',
+          command: command,
+          status: 'error',
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } else {
+      Logger.warn(`Unknown command: ${command}`);
+      this.sendToClient(clientId, {
+        type: 'command_response',
+        command: command,
+        status: 'unknown',
+        timestamp: new Date().toISOString()
+      });
     }
   }
 

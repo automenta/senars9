@@ -6,13 +6,26 @@ class Cycle extends Component {
   constructor() {
     super();
     this.isRunning = false;
+    this.isPaused = true; // Start in paused state by default
     this.cycleTimer = null;
     this.cycleIntervalMs = DEFAULTS.CYCLE_INTERVAL;
+    this.cycleCount = 0; // Track the number of cycles executed
   }
 
   async initialize(config = {}) {
     await super.initialize(config);
     this.cycleIntervalMs = config.cycleIntervalMs ?? this.cycleIntervalMs;
+    
+    // Register commands for cycle control
+    if (this.core && this.core.messages) {
+      this.core.messages.registerCommand('cycle.start', () => this.start());
+      this.core.messages.registerCommand('cycle.stop', () => this.stop());
+      this.core.messages.registerCommand('cycle.pause', () => this.pause());
+      this.core.messages.registerCommand('cycle.resume', () => this.resume());
+      this.core.messages.registerCommand('cycle.step', () => this.step());
+      this.core.messages.registerCommand('cycle.reset', () => this.reset());
+      this.core.messages.registerCommand('cycle.getStatus', () => this.getDetailedStats());
+    }
   }
 
   async start() {
@@ -22,6 +35,7 @@ class Cycle extends Component {
     }
 
     this.isRunning = true;
+    this.isPaused = false;
     this.cycleTimer = setInterval(() => this._runCycle(), this.cycleIntervalMs);
 
     Logger.debug(`Cycle started with interval: ${this.cycleIntervalMs}ms`);
@@ -35,6 +49,7 @@ class Cycle extends Component {
     }
 
     this.isRunning = false;
+    this.isPaused = true;
     if (this.cycleTimer) {
       clearInterval(this.cycleTimer);
       this.cycleTimer = null;
@@ -44,7 +59,43 @@ class Cycle extends Component {
     await super.stop();
   }
 
+  async pause() {
+    if (!this.isRunning || this.isPaused) {
+      Logger.warn('Cycle is already paused or not running');
+      return;
+    }
+
+    this.isPaused = true;
+    Logger.debug('Cycle paused');
+  }
+
+  async resume() {
+    if (!this.isRunning || !this.isPaused) {
+      Logger.warn('Cycle is not paused or not running');
+      return;
+    }
+
+    this.isPaused = false;
+    Logger.debug('Cycle resumed');
+  }
+
+  async step() {
+    // Run a single cycle even if paused
+    await this._runCycle();
+    Logger.debug('Single cycle executed (step)');
+  }
+
+  async reset() {
+    this.cycleCount = 0;
+    Logger.debug('Cycle count reset to 0');
+  }
+
   async _runCycle() {
+    // Only run the cycle if not paused (except when called via step command)
+    if (this.isPaused && this.isRunning) {
+      return;
+    }
+
     if (!this.core) {
       Logger.error('Core not available in Cycle component');
       return;
@@ -73,6 +124,17 @@ class Cycle extends Component {
       // Consolidate knowledge if memory component is available
       if (this.core.memory) {
         await this.core.memory.consolidateKnowledge();
+      }
+
+      // Increment cycle count
+      this.cycleCount++;
+      
+      // Broadcast cycle stats if messaging is available
+      if (this.core.messages) {
+        this.core.messages.emit('cycle.stats', {
+          cycles: this.cycleCount,
+          timestamp: Date.now()
+        });
       }
     } catch (error) {
       Logger.error('Error in cycle execution', error);
@@ -115,8 +177,21 @@ class Cycle extends Component {
   getStats() {
     return {
       isRunning: this.isRunning,
+      isPaused: this.isPaused,
       interval: this.cycleIntervalMs,
-      timerActive: this.cycleTimer !== null
+      timerActive: this.cycleTimer !== null,
+      cycles: this.cycleCount
+    };
+  }
+
+  getDetailedStats() {
+    return {
+      isRunning: this.isRunning,
+      isPaused: this.isPaused,
+      interval: this.cycleIntervalMs,
+      timerActive: this.cycleTimer !== null,
+      cycles: this.cycleCount,
+      timestamp: Date.now()
     };
   }
 }

@@ -74,6 +74,7 @@ const ReasonerControlPanel = ({ stats, onCommand }) => {
             <div style={styles.buttonContainer}>
               <button onClick={() => onCommand('start')} style={styles.button('white', '#28a745')}>Start</button>
               <button onClick={() => onCommand('stop')} style={styles.button('white', '#dc3545')}>Stop</button>
+              <button onClick={() => onCommand('step')} style={styles.button('white', '#17a2b8')}>Step</button>
               <button onClick={() => onCommand('reset')} style={styles.button('black', '#ffc107')}>Reset</button>
             </div>
           </div>
@@ -90,7 +91,10 @@ const ReasonerControlPanel = ({ stats, onCommand }) => {
         <div>
           <label style={styles.label}>
             Status:
-            <span style={styles.statusBadge}>{stats?.running ? 'Running' : 'Stopped'}</span>
+            <span style={styles.statusBadge}>
+              {stats?.running && !stats?.paused ? 'Running' : 
+               stats?.paused ? 'Paused' : 'Stopped'}
+            </span>
           </label>
           <div style={styles.statsGrid}>
             <div style={styles.statBox}>

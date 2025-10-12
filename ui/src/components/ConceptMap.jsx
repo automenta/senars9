@@ -11,36 +11,114 @@ const ConceptMapContent = ({ concepts }) => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [selectedNode, setSelectedNode] = useState(null);
 
-  // Process different types of entities
+  // Process different types of entities and extract relationships
+  // Helper function to extract concepts from NARS-style task content
+  const extractConceptsFromTask = (content) => {
+    if (!content) return [];
+    
+    // Pattern to match various NARS formats like:
+    // (a --> b), <a --> b>, (a & b) --> c, etc.
+    // This regex looks for content in parentheses or angle brackets
+    const patterns = [
+      /\(([^)]*)-->([^)]*)\)/g,  // (a --> b)
+      /<([^>]*)-->([^>]*)>/g,    // <a --> b>
+    ];
+    
+    const concepts = [];
+    for (const pattern of patterns) {
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        // Extract subject and predicate, split on operators like &, |, etc.
+        const subject = match[1].trim();
+        const predicate = match[2].trim();
+        
+        // Further split on logical operators to get individual terms
+        subject.split(/[&|]/).map(c => c.trim()).forEach(c => {
+          if (c && !concepts.includes(c)) concepts.push(c);
+        });
+        predicate.split(/[&|]/).map(c => c.trim()).forEach(c => {
+          if (c && !concepts.includes(c)) concepts.push(c);
+        });
+      }
+    }
+    
+    return concepts;
+  };
+  
+  // Process different types of entities and extract relationships
   const processEntities = (concepts) => {
     if (!concepts || concepts.length === 0) return { nodes: [], links: [] };
 
     const nodes = [];
     const links = [];
+    const existingNodes = new Map(); // To avoid duplicate nodes
+    const processedTasks = new Set(); // To avoid duplicate processing
     
-    // Create nodes for different entity types
+    // Create nodes for different entity types and extract relationships from tasks
     concepts.forEach((item, i) => {
       const itemType = item.get('type');
       const itemData = item.get('data');
+      
       if (itemType === 'concept') {
-        nodes.push({
-          id: itemData?.id || `concept-${i}`,
-          type: 'concept',
-          name: itemData?.name || itemData?.id || `Concept-${i}`,
-          priority: itemData?.priority || 0.5,
-          color: 0x007bff, // Blue
-          ...itemData
-        });
+        const nodeId = itemData?.id || `concept-${i}`;
+        if (!existingNodes.has(nodeId)) {
+          nodes.push({
+            id: nodeId,
+            type: 'concept',
+            name: itemData?.name || itemData?.id || `Concept-${i}`,
+            priority: itemData?.priority || 0.5,
+            color: 0x007bff, // Blue
+            ...itemData
+          });
+          existingNodes.set(nodeId, nodes.length - 1);
+        }
       }
       else if (itemType === 'task') {
-        nodes.push({
-          id: itemData?.id || `task-${i}`,
-          type: 'task',
-          name: itemData?.content || `Task-${i}`,
-          priority: itemData?.priority || 0.5,
-          color: 0x28a745, // Green
-          ...itemData
-        });
+        const taskId = itemData?.id || `task-${i}`;
+        if (!existingNodes.has(taskId)) {
+          nodes.push({
+            id: taskId,
+            type: 'task',
+            name: itemData?.content || `Task-${i}`,
+            priority: itemData?.priority || 0.5,
+            color: 0x28a745, // Green
+            ...itemData
+          });
+          existingNodes.set(taskId, nodes.length - 1);
+        }
+        
+        // Extract concept relationships from task content
+        // Parse tasks like "(a --> b)." to create relationships
+        if (itemData?.content && !processedTasks.has(taskId)) {
+          processedTasks.add(taskId);
+          
+          // Extract concepts from the task content using our helper
+          const extractedConcepts = extractConceptsFromTask(itemData.content);
+          
+          // Create concept nodes for each extracted concept
+          extractedConcepts.forEach(concept => {
+            if (concept && !existingNodes.has(concept)) {
+              nodes.push({
+                id: concept,
+                type: 'concept-individual',
+                name: concept,
+                priority: (itemData?.priority || 0.3) + 0.1, // Slightly higher priority
+                color: 0x6610f2, // Purple
+              });
+              existingNodes.set(concept, nodes.length - 1);
+            }
+            
+            // Create links between the task and its concepts
+            if (concept && existingNodes.has(concept)) {
+              links.push({
+                source: taskId,
+                target: concept,
+                type: 'task-contains',
+                strength: itemData?.priority || 0.5
+              });
+            }
+          });
+        }
       }
       else if (itemType === 'link') {
         links.push({
@@ -78,6 +156,9 @@ const ConceptMapContent = ({ concepts }) => {
       switch(node.type) {
         case 'task':
           geometry = new THREE.ConeGeometry(0.8, 1.5, 8);
+          break;
+        case 'concept-individual':
+          geometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
           break;
         case 'concept':
         default:
@@ -287,9 +368,13 @@ const ConceptMapContent = ({ concepts }) => {
           <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#007bff', marginRight: '6px' }}></div>
           <span>Concepts</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
           <div style={{ width: '12px', height: '12px', backgroundColor: '#28a745', marginRight: '6px' }}></div>
           <span>Tasks</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ width: '12px', height: '12px', backgroundColor: '#6610f2', marginRight: '6px' }}></div>
+          <span>Individual Concepts</span>
         </div>
       </div>
       
