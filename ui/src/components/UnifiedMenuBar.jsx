@@ -9,7 +9,7 @@ const NARSESE_SUGGESTIONS = [...new Set([
   '.', '!', '?'
 ])];
 
-const UnifiedMenuBar = ({ stats, onCommand, onAddTask }) => {
+const UnifiedMenuBar = ({ stats, connectionStatus, onCommand, onAddTask }) => {
   const [inputValue, setInputValue] = useState('');
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -85,6 +85,19 @@ const UnifiedMenuBar = ({ stats, onCommand, onAddTask }) => {
     }
   };
 
+  const getConnectionStatusStyle = () => {
+    switch (connectionStatus) {
+      case 'Connected':
+        return { backgroundColor: '#d4edda', color: '#155724' };
+      case 'Disconnected':
+        return { backgroundColor: '#f8d7da', color: '#721c24' };
+      case 'Connecting':
+        return { backgroundColor: '#fff3cd', color: '#856404' };
+      default:
+        return { backgroundColor: '#e2e3e5', color: '#383d41' };
+    }
+  };
+
   const styles = {
     container: {
       display: 'flex',
@@ -105,10 +118,9 @@ const UnifiedMenuBar = ({ stats, onCommand, onAddTask }) => {
     statusBadge: {
       marginLeft: '10px',
       padding: '2px 8px',
-      backgroundColor: stats?.running ? '#d4edda' : '#f8d7da',
-      color: stats?.running ? '#155724' : '#721c24',
       borderRadius: '12px',
       fontSize: '12px',
+      ...getConnectionStatusStyle(),
     },
     statsContainer: { display: 'flex', gap: '10px', marginRight: '10px' },
     chartContainer: { width: '200px', height: '40px' },
@@ -121,6 +133,9 @@ const UnifiedMenuBar = ({ stats, onCommand, onAddTask }) => {
         <button onClick={() => onCommand('start')} style={styles.button('white', '#28a745')}>Start</button>
         <button onClick={() => onCommand('stop')} style={styles.button('white', '#dc3545')}>Stop</button>
         <button onClick={() => onCommand('reset')} style={styles.button('black', '#ffc107')}>Reset</button>
+      </div>
+       <div style={styles.statusBadge}>
+        {connectionStatus}
       </div>
       <div>
         <label>CPU: {cpuThrottle}%</label>
@@ -143,9 +158,7 @@ const UnifiedMenuBar = ({ stats, onCommand, onAddTask }) => {
         <input
           type="text"
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Enter task or command (e.g. /cmd start)..."
+          onChange={(e) => setInputValue(e.g. /cmd start)..."
           style={{ flex: 1 }}
         />
         <button type="submit">Send</button>

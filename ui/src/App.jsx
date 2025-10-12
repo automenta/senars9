@@ -19,6 +19,7 @@ const App = () => {
     logs,
     concepts,
     reasonerStats,
+    connectionStatus,
     sendRawMessage,
     handleAddTask,
     handleUpdateTask,
@@ -43,6 +44,7 @@ const App = () => {
       </div>
       <UnifiedMenuBar
         stats={reasonerStats}
+        connectionStatus={connectionStatus}
         onCommand={handleSendRawMessage}
         onAddTask={handleAddTask}
       />

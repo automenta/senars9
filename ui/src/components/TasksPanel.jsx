@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DndContext, closestCorners } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -74,12 +74,12 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
         width: '24px',
         height: '24px',
         borderRadius: '50%',
-        backgroundColor: `${getTaskPriorityColor(task.data?.priority || 0.5)}20`, // Lighter background
+        backgroundColor: `${getTaskPriorityColor(task.priority || 0.5)}20`, // Lighter background
         marginRight: '8px',
         fontSize: '12px',
-        color: getTaskPriorityColor(task.data?.priority || 0.5)
+        color: getTaskPriorityColor(task.priority || 0.5)
       }}>
-        {getTaskTypeIcon(task.data?.type)}
+        {getTaskTypeIcon(task.type)}
       </span>
 
       {/* Task content - one line as specified */}
@@ -95,7 +95,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
           overflow: 'hidden',
           textOverflow: 'ellipsis'
         }}>
-          {task.data?.content || task.data?.id || `Task ${index + 1}`}
+          {task.content || task.id || `Task ${index + 1}`}
         </div>
       </div>
 
@@ -110,13 +110,13 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
         <span
           style={{
             fontWeight: 'bold',
-            color: getTaskPriorityColor(task.data?.priority || 0.5),
+            color: getTaskPriorityColor(task.priority || 0.5),
             fontSize: '11px',
             minWidth: '30px',
             textAlign: 'right'
           }}
         >
-          {(task.data?.priority || 0).toFixed(2)}
+          {(task.priority || 0).toFixed(2)}
         </span>
 
         {/* Priority slider for quick reprioritization */}
@@ -125,7 +125,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
           min="0"
           max="1"
           step="0.01"
-          value={task.data?.priority || 0.5}
+          value={task.priority || 0.5}
           onChange={(e) => onPriorityChange(task, parseFloat(e.target.value))}
           style={{
             width: '40px',
@@ -188,12 +188,12 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div><strong>ID:</strong> {task.data?.id || 'N/A'}</div>
-            <div><strong>Type:</strong> {task.data?.type || 'N/A'}</div>
-            <div><strong>Status:</strong> {task.data?.status || 'N/A'}</div>
-            <div><strong>Priority:</strong> {(task.data?.priority || 0).toFixed(3)}</div>
-            <div><strong>Created:</strong> {task.data?.created || 'N/A'}</div>
-            <div><strong>Content:</strong> {task.data?.content || 'N/A'}</div>
+            <div><strong>ID:</strong> {task.id || 'N/A'}</div>
+            <div><strong>Type:</strong> {task.type || 'N/A'}</div>
+            <div><strong>Status:</strong> {task.status || 'N/A'}</div>
+            <div><strong>Priority:</strong> {(task.priority || 0).toFixed(3)}</div>
+            <div><strong>Created:</strong> {task.created || 'N/A'}</div>
+            <div><strong>Content:</strong> {task.content || 'N/A'}</div>
           </div>
 
           <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
@@ -206,7 +206,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
                 cursor: 'pointer',
                 backgroundColor: '#e9ecef'
               }}
-              onClick={() => console.log('Execute task:', task.data?.id)}
+              onClick={() => console.log('Execute task:', task.id)}
             >
               ▶️ Execute
             </button>
@@ -232,7 +232,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
                 cursor: 'pointer',
                 backgroundColor: '#e9ecef'
               }}
-              onClick={() => onPriorityChange(task, Math.min(1, (task.data?.priority || 0) + 0.1))}
+              onClick={() => onPriorityChange(task, Math.min(1, (task.priority || 0) + 0.1))}
             >
               ⬆️ Up Priority
             </button>
@@ -244,25 +244,19 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
 };
 
 const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask }) => {
-  const [sortedTasks, setSortedTasks] = useState(tasks || []);
-  const [expandedTask, setExpandedTask] = useState(null);
+  // The tasks prop is already sorted by the useCrdtWebSocket hook.
+  // We keep a local state only to handle the drag-and-drop reordering visually.
+  const [displayTasks, setDisplayTasks] = useState(tasks || []);
 
-  useEffect(() => {
-    // Sort tasks by priority in descending order (highest first)
-    const sorted = [...(tasks || [])].sort((a, b) =>
-      (b.data?.priority || 0) - (a.data?.priority || 0)
-    );
-    setSortedTasks(sorted);
+  React.useEffect(() => {
+    setDisplayTasks(tasks || []);
   }, [tasks]);
 
   const handlePriorityChange = (task, newPriority) => {
     if (onUpdateTask) {
       const updatedTask = {
         ...task,
-        data: {
-          ...task.data,
-          priority: newPriority,
-        },
+        priority: newPriority,
       };
       onUpdateTask(updatedTask);
     }
@@ -272,12 +266,15 @@ const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask }) => {
     const { active, over } = event;
 
     if (active.id !== over.id) {
-      const oldIndex = sortedTasks.findIndex(task => task.id === active.id);
-      const newIndex = sortedTasks.findIndex(task => task.id === over.id);
+      const oldIndex = displayTasks.findIndex(task => task.id === active.id);
+      const newIndex = displayTasks.findIndex(task => task.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        const newTasks = arrayMove(sortedTasks, oldIndex, newIndex);
-        setSortedTasks(newTasks);
+        const newTasks = arrayMove(displayTasks, oldIndex, newIndex);
+        setDisplayTasks(newTasks);
+        // Note: This only reorders the visual list. The actual priority-based order
+        // will be restored on the next update from the server.
+        // For a more persistent reordering, you would need to adjust priorities here.
       }
     }
   };
@@ -295,7 +292,7 @@ const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask }) => {
         fontSize: '12px',
         fontWeight: 'bold'
       }}>
-        Active Tasks ({sortedTasks.length})
+        Active Tasks ({displayTasks.length})
       </div>
 
       <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
@@ -305,9 +302,9 @@ const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask }) => {
           padding: '8px',
           position: 'relative'
         }}>
-          <SortableContext items={sortedTasks.map(t => t.id || sortedTasks.indexOf(t))} strategy={verticalListSortingStrategy}>
-            {sortedTasks && sortedTasks.length > 0 ? (
-              sortedTasks.map((task, index) => (
+          <SortableContext items={displayTasks.map(t => t.id || displayTasks.indexOf(t))} strategy={verticalListSortingStrategy}>
+            {displayTasks && displayTasks.length > 0 ? (
+              displayTasks.map((task, index) => (
                 <div key={`${task.id || index}-container`} style={{ position: 'relative' }}>
                   <SortableTaskItem
                     task={task}

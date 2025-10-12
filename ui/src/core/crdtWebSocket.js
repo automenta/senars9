@@ -1,44 +1,46 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useReducer } from 'react';
 import useWebSocket from './WebSocketManager';
 import TwoPhaseSet from '../utils/crdt';
 
+const initialState = {
+  bagregate: new TwoPhaseSet(),
+  logs: [],
+  concepts: [],
+  reasonerStats: null,
+};
+
+function crdtReducer(state, action) {
+  switch (action.type) {
+    case 'bagregate-init':
+    case 'bagregate-update':
+      return { ...state, bagregate: TwoPhaseSet.fromJSON(action.payload) };
+    case 'concepts-init':
+        return { ...state, concepts: action.payload };
+    case 'logs-init':
+        return { ...state, logs: action.payload };
+    case 'log':
+      return { ...state, logs: [...state.logs, action.payload] };
+    case 'concept':
+      if (state.concepts.find(c => c.id === action.payload.id)) {
+        return state; // Avoid duplicates
+      }
+      return { ...state, concepts: [...state.concepts, action.payload] };
+    case 'reasoner_stats':
+      return { ...state, reasonerStats: action.payload };
+    default:
+      return state;
+  }
+}
+
 const useCrdtWebSocket = (url) => {
   const { isConnected, connectionStatus, error, sendMessage: wsSendMessage, lastMessage } = useWebSocket(url);
-  const [bagregate, setBagregate] = useState(new TwoPhaseSet());
-  const [logs, setLogs] = useState([]);
-  const [concepts, setConcepts] = useState([]);
-  const [reasonerStats, setReasonerStats] = useState(null);
+  const [state, dispatch] = useReducer(crdtReducer, initialState);
 
   useEffect(() => {
     if (lastMessage) {
       try {
         const { type, payload } = JSON.parse(lastMessage.data);
-
-        switch (type) {
-            case 'bagregate-init':
-            case 'bagregate-update': {
-                const newBagregate = TwoPhaseSet.fromJSON(payload);
-                setBagregate(newBagregate);
-                break;
-            }
-            case 'log': {
-                setLogs(prev => [...prev, payload]);
-                break;
-            }
-            case 'concept': {
-                setConcepts(prev => {
-                    if (prev.find(c => c.id === payload.id)) {
-                        return prev;
-                    }
-                    return [...prev, payload]
-                });
-                break;
-            }
-            case 'reasoner_stats': {
-                setReasonerStats(payload);
-                break;
-            }
-        }
+        dispatch({ type, payload });
       } catch (e) {
         console.error('Error processing message:', e);
       }
@@ -61,16 +63,16 @@ const useCrdtWebSocket = (url) => {
     sendCrdtMessage('task-delete', task);
   }, [sendCrdtMessage]);
 
-  const tasks = useMemo(() => bagregate.values.sort((a, b) => b.priority - a.priority), [bagregate]);
+  const tasks = useMemo(() => state.bagregate.values.sort((a, b) => b.priority - a.priority), [state.bagregate]);
 
   return {
     isConnected,
     connectionStatus,
     error,
     tasks,
-    logs,
-    concepts,
-    reasonerStats,
+    logs: state.logs,
+    concepts: state.concepts,
+    reasonerStats: state.reasonerStats,
     sendRawMessage: wsSendMessage,
     handleAddTask,
     handleUpdateTask,
