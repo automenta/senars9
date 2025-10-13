@@ -4,22 +4,29 @@ import { vi, beforeEach } from 'vitest';
 import App from './App';
 import '@testing-library/jest-dom';
 
-// Mock the crdtWebSocket hook to simulate a successful connection
-vi.mock('./core/crdtWebSocket', () => ({
-  default: (url) => ({
-    isConnected: true,
-    connectionStatus: 'connected',
-    tasks: [],
-    logs: [],
-    concepts: [],
-    reasonerStats: { running: true, concepts: 0, tasks: 0, cycles: 0 },
-    sendRawMessage: vi.fn(),
-    sendMessage: vi.fn(),
-    handleAddTask: vi.fn(),
-    handleUpdateTask: vi.fn(),
-    handleDeleteTask: vi.fn(),
-  })
-}));
+// Fully mock the crdtWebSocket hook
+const mockDisconnect = vi.fn();
+
+vi.mock('./core/crdtWebSocket', async () => {
+  const actual = await vi.importActual('./core/crdtWebSocket');
+  return {
+    default: (url) => ({
+      isConnected: true,
+      connectionStatus: 'connected',
+      tasks: [],
+      logs: [],
+      concepts: [],
+      reasonerStats: { running: true, concepts: 0, tasks: 0, cycles: 0 },
+      sendRawMessage: vi.fn(),
+      sendMessage: vi.fn(),
+      handleAddTask: vi.fn(),
+      handleUpdateTask: vi.fn(),
+      handleDeleteTask: vi.fn(),
+      // Mock the cleanup function to prevent hanging
+      disconnect: mockDisconnect,
+    })
+  };
+});
 
 // Mock the CommandService
 vi.mock('./services/CommandService', () => ({
@@ -34,15 +41,18 @@ describe('End-to-end test with a real server connection', () => {
     vi.clearAllMocks();
   });
 
-  it('should wait for connection, add a task, and see it in the tasks panel', async () => {
-    render(<App />);
+  afterAll(() => {
+    // Ensure cleanup after tests
+    mockDisconnect();
+  });
 
-    // Wait for the WebSocket connection to be established by looking for the "Connected" status indicator.
-    // Since we're mocking, we should check for connection status text
+  it('should wait for connection, add a task, and see it in the tasks panel', async () => {
+    const { unmount } = render(<App />);
+
+    // Wait for the app container to be present
     await waitFor(() => {
-      // Look for elements that would be present when the app is connected
       expect(screen.getByTestId('app-container')).toBeInTheDocument();
-    }, { timeout: 2000 }); // Shorter timeout since we're mocking
+    }, { timeout: 1000 });
 
     // Find the input field and the send button in the ReasonerControlPanel
     const taskInput = screen.getByPlaceholderText('Enter a command or task (e.g. /cmd start)...');
@@ -60,5 +70,8 @@ describe('End-to-end test with a real server connection', () => {
 
     // After clicking, expect the input to be cleared
     expect(taskInput.value).toBe('');
-  }, 5000); // Set a more reasonable timeout for the mocked test
+    
+    // Unmount to trigger cleanup
+    unmount();
+  }, 3000); // Set a reasonable timeout
 });

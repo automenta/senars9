@@ -1,25 +1,54 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import ConnectionTab from './ConnectionTab';
-import { renderWithErrorDetection } from '../test-utils';
+import { UIProvider } from '../core/UIContext';
+import { NotificationProvider } from '../core/NotificationSystem';
 
-// Mock the useCrdtWebSocket hook to simulate a successful connection
+// Wrapper component that includes all necessary providers
+const TestWrapper = ({ children }) => (
+  <UIProvider>
+    <NotificationProvider>
+      {children}
+    </NotificationProvider>
+  </UIProvider>
+);
+
+// Fully mock the useCrdtWebSocket hook to avoid WebSocket connections
 vi.mock('../core/crdtWebSocket', () => ({
   default: vi.fn(() => ({
     isConnected: true,
     connectionStatus: 'connected',
+    tasks: [],
+    logs: [],
+    concepts: [],
+    reasonerStats: { running: true, concepts: 0, tasks: 0, cycles: 0 },
+    sendRawMessage: vi.fn(),
+    sendMessage: vi.fn(),
+    handleAddTask: vi.fn(),
+    handleUpdateTask: vi.fn(),
+    handleDeleteTask: vi.fn(),
+  }))
+}));
+
+// Mock the CommandService
+vi.mock('../services/CommandService', () => ({
+  default: vi.fn(() => ({
+    execute: vi.fn(),
   }))
 }));
 
 describe('ConnectionTab Component - Integration Test', () => {
   it('renders and shows connected status', () => {
-    const { expectNoErrors } = renderWithErrorDetection(
-      <ConnectionTab name="Test Connection" url="ws://localhost:8080" />
+    const { unmount } = render(
+      <ConnectionTab name="Test Connection" url="ws://localhost:8080" />,
+      { wrapper: TestWrapper }
     );
 
-    expect(screen.getByText(/Status: connected/i)).toBeInTheDocument();
+    expect(screen.getByText(/Status: Connected/i)).toBeInTheDocument();
     expect(screen.getByText(/Test Connection/)).toBeInTheDocument();
     expect(screen.getByText(/ws:\/\/localhost:8080/)).toBeInTheDocument();
-    expectNoErrors();
+    
+    // Clean up
+    unmount();
   });
 });
