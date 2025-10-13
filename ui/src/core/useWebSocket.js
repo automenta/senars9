@@ -60,6 +60,16 @@ const useWebSocket = (url) => {
                 logs: logs || prev.logs || [],
                 reasonerStats: stats || prev.reasonerStats
               }));
+            } else if (message.type === 'concepts_update' && message.payload) {
+              setData(prev => ({
+                ...prev,
+                concepts: message.payload || []
+              }));
+            } else if (message.type === 'top_tasks_update' && message.payload) {
+              setData(prev => ({
+                ...prev,
+                memoryTasks: message.payload || []
+              }));
             }
           } catch (parseError) {
             console.error('Error parsing WebSocket message:', parseError);
@@ -121,6 +131,10 @@ const useWebSocket = (url) => {
     sendMessage('get_concepts');
   }, [sendMessage]);
 
+  const requestTopTasks = useCallback(() => {
+    sendMessage('get_top_tasks');
+  }, [sendMessage]);
+
   const requestState = useCallback(() => {
     sendRawMessage({ type: 'request_state' });
   }, [sendRawMessage]);
@@ -134,6 +148,7 @@ const useWebSocket = (url) => {
     tasks: sortedTasks,
     logs: data.logs || [],
     concepts: data.concepts || [],
+    memoryTasks: data.memoryTasks || [], // Top tasks from Memory
     reasonerStats: data.reasonerStats || null,
     sendRawMessage,
     sendMessage,
@@ -141,6 +156,7 @@ const useWebSocket = (url) => {
     handleUpdateTask,
     handleDeleteTask,
     requestConcepts,
+    requestTopTasks,
     requestState,
   };
 };

@@ -23,6 +23,7 @@ const App = () => {
     tasks,
     logs,
     concepts,
+    memoryTasks,
     reasonerStats,
     connectionStatus,
     sendRawMessage,
@@ -30,6 +31,7 @@ const App = () => {
     handleUpdateTask,
     handleDeleteTask,
     requestConcepts,
+    requestTopTasks,
     requestState,
   } = useWebSocket(wsUrl);
 
@@ -51,6 +53,7 @@ const App = () => {
     if (['start', 'step', 'add_task'].includes(command)) {
       setTimeout(() => {
         requestConcepts();
+        requestTopTasks(); // Also request top tasks from Memory
       }, 500); // Small delay to allow server processing
     }
   };
@@ -73,14 +76,15 @@ const App = () => {
     }, 300);
   };
 
-  // Request initial concepts when component mounts
+  // Request initial concepts and top tasks when component mounts
   useEffect(() => {
     if (connectionStatus === 'connected') {
       setTimeout(() => {
         requestConcepts();
+        requestTopTasks();
       }, 200);
     }
-  }, [connectionStatus, requestConcepts]);
+  }, [connectionStatus, requestConcepts, requestTopTasks]);
 
   return (
     <UIProvider>
@@ -91,6 +95,7 @@ const App = () => {
               logs={logs}
               tasks={tasks}
               concepts={concepts}
+              memoryTasks={memoryTasks}
               reasonerStats={reasonerStats}
               connectionStatus={connectionStatus}
               onUpdateTask={handleUpdateTaskWithConcepts}

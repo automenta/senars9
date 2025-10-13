@@ -4,12 +4,13 @@ import { forceSimulation, forceLink, forceManyBody, forceCenter } from 'd3-force
 import GraphicsEngine, { useGraphics } from './GraphicsEngine';
 
 const ConceptMapContent = ({ concepts, tasks = [] }) => {
-  const { scene } = useGraphics();
+  const { scene, camera } = useGraphics();
   const graphObjects = useRef(new Map()); // To keep track of Three.js objects
   const simulation = useRef();
   const [isPaused, setIsPaused] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [selectedNode, setSelectedNode] = useState(null);
+  const cameraRef = useRef();
 
   // Process different types of entities and extract relationships
   // Helper function to extract concepts from NARS-style task content
@@ -383,9 +384,10 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
 
     // --- D3 Force Simulation ---
     simulation.current = forceSimulation(nodes)
-      .force("link", forceLink(links).id(d => d.id).distance(15).strength(0.5))
-      .force("charge", forceManyBody().strength(-100))
-      .force("center", forceCenter(0, 0));
+      .force("link", forceLink(links).id(d => d.id).distance(50).strength(0.1))
+      .force("charge", forceManyBody().strength(-30))
+      .force("center", forceCenter(0, 0).strength(0.05))
+      .alphaDecay(0.02); // Slower decay for more stability
 
     // --- Animation Tick ---
     const animate = () => {
@@ -393,10 +395,13 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
         requestAnimationFrame(animate);
         return;
       }
-      
+
       if(!simulation.current) return;
-      simulation.current.alpha(0.1); // Maintain some movement
-      simulation.current.tick();
+
+      // Only tick if simulation hasn't settled
+      if (simulation.current.alpha() > 0.01) {
+        simulation.current.tick();
+      }
       
       // Update node positions
       nodes.forEach(node => {
@@ -439,10 +444,14 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
 
   // Add mouse controls for zoom
   useEffect(() => {
+    if (!camera) return;
+
     const handleWheel = (event) => {
       event.preventDefault();
-      const delta = event.deltaY > 0 ? 0.9 : 1.1;
-      setZoomLevel(prev => Math.max(0.1, Math.min(3, prev * delta)));
+      const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+      const newZ = Math.max(10, Math.min(200, camera.position.z * zoomFactor));
+      camera.position.z = newZ;
+      setZoomLevel(newZ / 50); // Update zoom level for UI feedback
     };
 
     const container = document.querySelector('.concept-map-container');
@@ -450,7 +459,7 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
       container.addEventListener('wheel', handleWheel, { passive: false });
       return () => container.removeEventListener('wheel', handleWheel);
     }
-  }, []);
+  }, [camera]);
 
   // Add lighting to the scene
   useEffect(() => {
@@ -476,7 +485,10 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
   };
 
   const resetZoom = () => {
-    setZoomLevel(1);
+    if (camera) {
+      camera.position.z = 50;
+      setZoomLevel(1);
+    }
   };
 
   return (
@@ -484,8 +496,13 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
+      position: 'relative',
     }}>
       <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -535,11 +552,12 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
         position: 'absolute',
         bottom: '10px',
         right: '10px',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
         padding: '8px',
         borderRadius: '4px',
         fontSize: '11px',
-        zIndex: 10
+        zIndex: 10,
+        border: '1px solid #ddd'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
           <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#007bff', marginRight: '6px' }}></div>
@@ -560,12 +578,9 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
       </div>
       
       {/* The 3D scene is managed by the GraphicsEngine, so we just return a container */}
-      <div style={{ 
-        flex: 1, 
-        cursor: 'grab',
-        transform: `scale(${zoomLevel})`,
-        transformOrigin: 'center center',
-        transition: 'transform 0.2s ease'
+      <div style={{
+        flex: 1,
+        cursor: 'grab'
       }}>
         {selectedNode && (
           <div style={{
