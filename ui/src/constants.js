@@ -34,10 +34,33 @@ export const LAYOUT = {
   scrollbarWidth: '8px'
 };
 
+export const CONNECTION_STATUS = {
+  DISCONNECTED: 'disconnected',
+  CONNECTING: 'connecting',
+  CONNECTED: 'connected',
+  RECONNECTING: 'reconnecting',
+  ERROR: 'error'
+};
+
 export const CONNECTION_DEFAULTS = {
   defaultPort: 8080,
   fallbackPort: 8081,
-  maxHistorySize: 50
+  maxHistorySize: 50,
+  maxReconnectAttempts: 10,
+  reconnectInterval: 3000,
+  messageRetention: 500,
+  maxMessages: 1000,
+  autoRequestState: true,
+  enableMessageHistory: true
+};
+
+export const DEFAULT_WS_CONFIG = {
+  maxReconnectAttempts: 10,
+  reconnectInterval: 3000,
+  messageRetention: 500,
+  maxMessages: 1000,
+  autoRequestState: true,
+  enableMessageHistory: true
 };
 
 export const PANEL_CONFIG = {
@@ -47,6 +70,16 @@ export const PANEL_CONFIG = {
 };
 
 export const MESSAGE_TYPES = {
+  // Control messages
+  CONTROL: 'control',
+  REQUEST_STATE: 'request_state',
+
+  // State updates
+  STATE_UPDATE: 'state_update',
+  CONCEPTS_UPDATE: 'concepts_update',
+  TOP_TASKS_UPDATE: 'top_tasks_update',
+
+  // Legacy types (for backward compatibility)
   log: 'log',
   task: 'task',
   concept: 'concept',

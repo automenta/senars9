@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import useCrdtWebSocket from './crdtWebSocket';
 import { useNotification } from './NotificationSystem';
-import { CONNECTION_STATUS } from '../utils/webSocketUtils';
+import { CONNECTION_STATUS } from '../constants';
 
 export const useEnhancedCrdtWebSocket = (url) => {
   const { addNotification } = useNotification();

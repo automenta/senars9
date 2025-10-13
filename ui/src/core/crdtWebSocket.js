@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
+import { sortTasksByPriority, WebSocketTaskManager } from '../utils/webSocketUtils';
 
 const useCrdtWebSocket = (url) => {
   const [ydoc] = useState(() => new Y.Doc());
@@ -23,13 +24,12 @@ const useCrdtWebSocket = (url) => {
     const yLogs = ydoc.getArray('logs');
     const yConcepts = ydoc.getArray('concepts');
 
-    const observers = {
-      tasks: () => setTasks(yTasks.toArray().map(task => task instanceof Y.Map ? task.toJSON() : task)),
-      logs: () => setLogs(yLogs.toArray()),
-      concepts: () => setConcepts(yConcepts.toArray())
-    };
-
-    Object.entries(observers).forEach(([key, observer]) => ydoc.getArray(key).observe(observer));
+    // Set up Yjs observers
+    yTasks.observe(() => setTasks(yTasks.toArray().map(task =>
+      task instanceof Y.Map ? task.toJSON() : task
+    )));
+    yLogs.observe(() => setLogs(yLogs.toArray()));
+    yConcepts.observe(() => setConcepts(yConcepts.toArray()));
 
     wsProvider.awareness.on('change', () => {
       setReasonerStats(Array.from(wsProvider.awareness.getStates().values())
@@ -39,22 +39,21 @@ const useCrdtWebSocket = (url) => {
     return () => wsProvider.disconnect();
   }, [url, ydoc]);
 
-  useEffect(() => {
-    if (connectionStatus === 'connected' && provider?.ws?.readyState === WebSocket.OPEN) {
-      [{ content: '(a-->b).', priority: 0.9 }, { content: '(b-->c).', priority: 0.8 }]
-        .forEach(task => sendMessage('add_task', task));
-    }
-  }, [connectionStatus, provider, sendMessage]);
-
   const sendMessage = useCallback((command, payload = {}) => {
-    provider?.ws?.readyState === WebSocket.OPEN && provider.ws.send(JSON.stringify({
-      type: 'control',
-      command,
-      payload
-    }));
+    if (provider?.ws?.readyState === WebSocket.OPEN) {
+      provider.ws.send(JSON.stringify({ type: 'control', command, payload }));
+    }
   }, [provider]);
 
-  const sortedTasks = useMemo(() => [...tasks].sort((a, b) => (b.priority || 0) - (a.priority || 0)), [tasks]);
+  const taskManager = useMemo(() =>
+    new WebSocketTaskManager({ sendMessage, sortTasksByPriority }),
+    [sendMessage]
+  );
+
+  const sortedTasks = useMemo(() =>
+    taskManager.getSortedTasks(tasks),
+    [tasks, taskManager]
+  );
 
   return {
     isConnected: connectionStatus === 'connected',
@@ -64,11 +63,12 @@ const useCrdtWebSocket = (url) => {
     logs,
     concepts,
     reasonerStats,
-    sendRawMessage: message => provider?.ws?.readyState === WebSocket.OPEN && provider.ws.send(JSON.stringify(message)),
+    sendRawMessage: message => provider?.ws?.readyState === WebSocket.OPEN &&
+      provider.ws.send(JSON.stringify(message)),
     sendMessage,
-    handleAddTask: task => sendMessage('add_task', task),
-    handleUpdateTask: task => sendMessage('update_task', task),
-    handleDeleteTask: task => sendMessage('delete_task', { id: task.id }),
+    handleAddTask: task => taskManager.handleAddTask(task),
+    handleUpdateTask: task => taskManager.handleUpdateTask(task),
+    handleDeleteTask: task => taskManager.handleDeleteTask(task),
   };
 };
 

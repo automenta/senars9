@@ -2,48 +2,14 @@ import {
   CONNECTION_STATUS,
   DEFAULT_WS_CONFIG,
   isValidWebSocketUrl,
-  createConnectionManager
+  createConnectionManager,
+  createStateUpdater
 } from './webSocketUtils';
 
-/**
- * Simple browser-compatible event emitter
- */
-class BrowserEventEmitter {
-  constructor() {
-    this.events = {};
-  }
-
-  on(event, listener) {
-    if (!this.events[event]) {
-      this.events[event] = [];
-    }
-    this.events[event].push(listener);
-    return this;
-  }
-
-  emit(event, ...args) {
-    if (this.events[event]) {
-      this.events[event].forEach(listener => listener(...args));
-    }
-    return this;
-  }
-
-  removeAllListeners() {
-    this.events = {};
-  }
-}
-
-/**
- * Shared WebSocket connection manager for both backend and frontend
- * Provides consistent connection handling, reconnection logic, and event management
- */
-class WebSocketConnectionManager extends BrowserEventEmitter {
+// Base connection class with common WebSocket functionality
+class BaseWebSocketConnection {
   constructor(url, config = {}) {
-    super();
-
-    if (!isValidWebSocketUrl(url)) {
-      throw new Error(`Invalid WebSocket URL: ${url}`);
-    }
+    if (!isValidWebSocketUrl(url)) throw new Error(`Invalid WebSocket URL: ${url}`);
 
     this.url = url;
     this.config = { ...DEFAULT_WS_CONFIG, ...config };
@@ -52,32 +18,24 @@ class WebSocketConnectionManager extends BrowserEventEmitter {
     this.reconnectAttempts = 0;
     this.reconnectTimeoutId = null;
 
-    // Use the shared connection manager
     this.connectionManager = createConnectionManager();
-    this.connectionManager.subscribe((status) => {
-      this.emit('statusChange', status);
-    });
+    this.connectionManager.subscribe(status => this.onStatusChange(status));
   }
 
-  /**
-   * Establishes WebSocket connection with automatic reconnection
-   */
+  onStatusChange(status) {
+    // Override in subclasses for custom status handling
+  }
+
   async connect() {
-    if (this.isConnected || this.connectionManager.status === CONNECTION_STATUS.CONNECTING) {
-      return;
-    }
+    if (this.isConnected || this.connectionManager.status === CONNECTION_STATUS.CONNECTING) return;
 
     this.connectionManager.setStatus(CONNECTION_STATUS.CONNECTING);
 
     try {
-      // Use native WebSocket in browser, 'ws' in Node.js
-      let WebSocketClass;
-      if (typeof window !== 'undefined') {
-        WebSocketClass = WebSocket;
-      } else {
-        const wsModule = await import('ws');
-        WebSocketClass = wsModule.default;
-      }
+      const WebSocketClass = typeof window !== 'undefined'
+        ? WebSocket
+        : (await import('ws')).default;
+
       this.ws = new WebSocketClass(this.url);
 
       this.ws.onopen = () => {
@@ -85,88 +43,66 @@ class WebSocketConnectionManager extends BrowserEventEmitter {
         this.reconnectAttempts = 0;
         this.connectionManager.setStatus(CONNECTION_STATUS.CONNECTED);
         this.connectionManager.resetReconnectAttempts();
-        this.emit('connect');
-        this.emit('open');
+        this.onConnect('open');
       };
 
-      this.ws.onmessage = (data) => {
-        this.emit('message', data);
-      };
+      this.ws.onmessage = data => this.onMessage(data);
 
-      this.ws.onclose = (event) => {
+      this.ws.onclose = event => {
         this.isConnected = false;
         this.connectionManager.setStatus(CONNECTION_STATUS.DISCONNECTED);
-        this.emit('disconnect');
-        this.emit('close', event);
+        this.onDisconnect('close', event);
 
-        // Attempt reconnection if not manually closed
         if (!event.wasClean && this.reconnectAttempts < this.config.maxReconnectAttempts) {
           this.scheduleReconnect();
         }
       };
 
-      this.ws.onerror = (error) => {
+      this.ws.onerror = error => {
         this.isConnected = false;
         this.connectionManager.setStatus(CONNECTION_STATUS.ERROR);
-        this.emit('error', error);
+        this.onError(error);
       };
 
     } catch (error) {
       this.connectionManager.setStatus(CONNECTION_STATUS.ERROR);
-      this.emit('error', error);
+      this.onError(error);
     }
   }
 
-  /**
-   * Schedules a reconnection attempt
-   */
   scheduleReconnect() {
     this.reconnectAttempts++;
     this.connectionManager.setStatus(CONNECTION_STATUS.RECONNECTING);
     this.connectionManager.incrementReconnectAttempts();
 
-    this.reconnectTimeoutId = setTimeout(() => {
-      this.connect();
-    }, this.config.reconnectInterval);
+    this.reconnectTimeoutId = setTimeout(() => this.connect(), this.config.reconnectInterval);
   }
 
-  /**
-   * Safely sends a message through the WebSocket
-   */
   send(message) {
     if (this.isConnected && this.ws) {
       try {
         this.ws.send(JSON.stringify(message));
         return true;
       } catch (error) {
-        this.emit('error', error);
+        this.onError(error);
         return false;
       }
     }
-    this.emit('error', new Error('WebSocket not connected'));
+    this.onError(new Error('WebSocket not connected'));
     return false;
   }
 
-  /**
-   * Manually disconnects from WebSocket
-   */
   disconnect() {
     if (this.reconnectTimeoutId) {
       clearTimeout(this.reconnectTimeoutId);
       this.reconnectTimeoutId = null;
     }
 
-    if (this.ws) {
-      this.ws.close(1000, 'Manual disconnect');
-    }
-
+    if (this.ws) this.ws.close(1000, 'Manual disconnect');
     this.isConnected = false;
     this.connectionManager.setStatus(CONNECTION_STATUS.DISCONNECTED);
   }
 
-  /**
-   * Gets current connection status
-   */
   getStatus() {
     return {
       isConnected: this.isConnected,
@@ -176,14 +112,86 @@ class WebSocketConnectionManager extends BrowserEventEmitter {
     };
   }
 
-  /**
-   * Destroys the connection manager and cleans up resources
-   */
   destroy() {
     this.disconnect();
-    this.events = {};
     this.connectionManager = null;
+  }
+
+  // Hook methods for subclasses to override
+  onConnect(event) {}
+  onMessage(data) {}
+  onDisconnect(event, closeEvent) {}
+  onError(error) {}
+}
+
+// Unified event emitter for both environments
+class EventEmitter {
+  constructor() {
+    this.events = {};
+  }
+
+  on(event, listener) {
+    (this.events[event] ||= []).push(listener);
+    return this;
+  }
+
+  emit(event, ...args) {
+    this.events[event]?.forEach(listener => listener(...args));
+    return this;
+  }
+
+  removeAllListeners() {
+    this.events = {};
   }
 }
 
+// Unified WebSocket manager for browser and Node.js
+class WebSocketManager extends BaseWebSocketConnection {
+  constructor(url, config = {}) {
+    super(url, config);
+    this.events = {};
+  }
+
+  onStatusChange(status) {
+    this.emit('statusChange', status);
+  }
+
+  onConnect(event) {
+    this.emit('connect', event);
+  }
+
+  onMessage(data) {
+    this.emit('message', data);
+  }
+
+  onDisconnect(event, closeEvent) {
+    this.emit('disconnect', event, closeEvent);
+  }
+
+  onError(error) {
+    this.emit('error', error);
+  }
+
+  on(event, listener) {
+    (this.events[event] ||= []).push(listener);
+    return this;
+  }
+
+  emit(event, ...args) {
+    this.events[event]?.forEach(listener => listener(...args));
+    return this;
+  }
+
+  removeAllListeners() {
+    this.events = {};
+  }
+
+  destroy() {
+    this.removeAllListeners();
+    super.destroy();
+  }
+}
+
+// Export with both names for compatibility
+const WebSocketConnectionManager = WebSocketManager;
 export default WebSocketConnectionManager;

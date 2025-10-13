@@ -9,17 +9,20 @@ const InputField = ({ onSend }) => {
   const { inputValue, setInputValue, history, handleSubmit, handleArrowNavigation } = useInputWithHistory();
 
   const handleKeyDown = (e) => {
-    e.key === 'ArrowUp' || e.key === 'ArrowDown'
-      ? handleArrowNavigation(e)
-      : e.key === 'Tab' && (() => {
-          e.preventDefault();
-          const parts = inputValue.split(/(\s+)/);
-          const lastPart = parts[parts.length - 1];
-          if (lastPart.trim()) {
-            const match = [...NARSESE_SUGGESTIONS].find(s => s.startsWith(lastPart));
-            match && (parts[parts.length - 1] = match, setInputValue(parts.join('')));
-          }
-        })();
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      handleArrowNavigation(e);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      const parts = inputValue.split(/(\s+)/);
+      const lastPart = parts[parts.length - 1];
+      if (lastPart.trim()) {
+        const match = [...NARSESE_SUGGESTIONS].find(s => s.startsWith(lastPart));
+        if (match) {
+          parts[parts.length - 1] = match;
+          setInputValue(parts.join(''));
+        }
+      }
+    }
   };
 
   return (

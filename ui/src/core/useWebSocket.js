@@ -2,11 +2,8 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import WebSocketConnectionManager from '../utils/WebSocketConnectionManager';
 import {
   createWebSocketConfig,
-  parseWebSocketMessage,
-  createTask,
-  sortTasksByPriority,
-  manageMessageHistory,
-  MESSAGE_TYPES
+  MESSAGE_TYPES,
+  BaseWebSocketHook
 } from '../utils/webSocketUtils';
 
 const useWebSocket = (url, config = {}) => {
@@ -32,22 +29,26 @@ const useWebSocket = (url, config = {}) => {
       if (!wsManagerRef.current) {
         wsManagerRef.current = new WebSocketConnectionManager(currentUrlRef.current, configRef.current);
 
-        // Set up event listeners
-        wsManagerRef.current.on('message', handleMessage);
-        wsManagerRef.current.on('error', (error) => {
-          setError({ message: error.message, timestamp: new Date().toISOString() });
-        });
-        wsManagerRef.current.on('connect', () => {
-          setError(null);
-          // Request initial state when connected
-          if (autoRequestState) {
-            setTimeout(() => {
-              sendRawMessage({ type: MESSAGE_TYPES.REQUEST_STATE });
-            }, 100);
+        const baseHook = new BaseWebSocketHook({
+          setData,
+          setError,
+          setLastMessage,
+          setMessages,
+          sendMessage,
+          sendRawMessage,
+          config: {
+            enableMessageHistory,
+            maxMessages,
+            messageRetention,
+            autoRequestState
           }
         });
 
-        // Connect to WebSocket
+        wsManagerRef.current
+          .on('message', event => baseHook.handleMessage(event))
+          .on('error', error => baseHook.handleError(error))
+          .on('connect', () => baseHook.handleConnect());
+
         await wsManagerRef.current.connect();
       }
     };
@@ -62,153 +63,75 @@ const useWebSocket = (url, config = {}) => {
     };
   }, []);
 
-  // Handle incoming WebSocket messages
-  const handleMessage = useCallback(async (event) => {
-    setLastMessage(event);
-
-    if (enableMessageHistory) {
-      try {
-        const message = await parseWebSocketMessage(event);
-        setMessages(prev => [...prev, message]);
-      } catch (parseError) {
-        setMessages(prev => [...prev, {
-          type: 'error',
-          data: event.data,
-          error: parseError.message
-        }]);
-      }
-    }
-
-    // Handle state synchronization
-    try {
-      const message = await parseWebSocketMessage(event);
-      handleServerMessage(message);
-    } catch (parseError) {
-      console.error('Error parsing WebSocket message:', parseError);
-    }
-  }, [enableMessageHistory]);
-
-  const handleServerMessage = useCallback((message) => {
-    if (message.type === MESSAGE_TYPES.STATE_UPDATE && message.payload) {
-      const { tasks, concepts, logs, stats } = message.payload;
-      setData(prev => ({
-        ...prev,
-        tasks: tasks || prev.tasks || [],
-        concepts: concepts || prev.concepts || [],
-        logs: logs || prev.logs || [],
-        reasonerStats: stats || prev.reasonerStats
-      }));
-    } else if (message.type === MESSAGE_TYPES.CONCEPTS_UPDATE && message.payload) {
-      setData(prev => ({
-        ...prev,
-        concepts: message.payload || []
-      }));
-    } else if (message.type === MESSAGE_TYPES.TOP_TASKS_UPDATE && message.payload) {
-      setData(prev => ({
-        ...prev,
-        memoryTasks: message.payload || []
-      }));
-    }
-  }, []);
-
   const sendRawMessage = useCallback((message) => {
-    if (wsManagerRef.current) {
-      return wsManagerRef.current.send(message);
-    }
-    return false;
+    return wsManagerRef.current?.send(message) || false;
   }, []);
 
   const sendMessage = useCallback((command, payload = {}) => {
     return sendRawMessage({ type: MESSAGE_TYPES.CONTROL, command, payload });
   }, [sendRawMessage]);
 
-  const handleAddTask = useCallback((task) => {
-    // Optimistically add task to local state for immediate UI feedback
-    const newTask = createTask(task);
+  const baseHook = useMemo(() =>
+    new BaseWebSocketHook({
+      setData,
+      setError,
+      setLastMessage,
+      setMessages,
+      sendMessage,
+      sendRawMessage,
+      config: {
+        enableMessageHistory,
+        maxMessages,
+        messageRetention,
+        autoRequestState
+      }
+    }),
+    [setData, setError, setLastMessage, setMessages, sendMessage, sendRawMessage, enableMessageHistory, maxMessages, messageRetention, autoRequestState]
+  );
 
-    setData(prev => ({
-      ...prev,
-      tasks: [...(prev.tasks || []), newTask]
-    }));
+  const taskHandlers = useMemo(() => baseHook.getTaskHandlers(), [baseHook]);
 
-    // Send to server
-    sendMessage('add_task', newTask);
-  }, [sendMessage]);
-
-  const handleUpdateTask = useCallback((task) => {
-    setData(prev => ({
-      ...prev,
-      tasks: (prev.tasks || []).map(t =>
-        t.id === task.id ? { ...t, ...task, lastModified: Date.now() } : t
-      )
-    }));
-    sendMessage('update_task', task);
-  }, [sendMessage]);
-
-  const handleDeleteTask = useCallback((task) => {
-    setData(prev => ({
-      ...prev,
-      tasks: (prev.tasks || []).filter(t => t.id !== task.id)
-    }));
-    sendMessage('delete_task', { id: task.id });
-  }, [sendMessage]);
-
-  const requestConcepts = useCallback(() => {
-    sendMessage('get_concepts');
-  }, [sendMessage]);
-
-  const requestTopTasks = useCallback(() => {
-    sendMessage('get_top_tasks');
-  }, [sendMessage]);
-
-  const requestState = useCallback(() => {
-    sendRawMessage({ type: 'request_state' });
-  }, [sendRawMessage]);
+  const requestConcepts = useCallback(() => sendMessage('get_concepts'), [sendMessage]);
+  const requestTopTasks = useCallback(() => sendMessage('get_top_tasks'), [sendMessage]);
+  const requestState = useCallback(() => sendRawMessage({ type: 'request_state' }), [sendRawMessage]);
 
   const disconnect = useCallback(() => {
-    if (wsManagerRef.current) {
-      wsManagerRef.current.disconnect();
-      setError(null);
-    }
+    wsManagerRef.current?.disconnect();
+    setError(null);
   }, []);
 
   const reconnect = useCallback(() => {
-    if (wsManagerRef.current) {
-      wsManagerRef.current.disconnect();
-      setTimeout(() => wsManagerRef.current.connect(), 1000);
-    }
+    wsManagerRef.current?.disconnect();
+    setTimeout(() => wsManagerRef.current?.connect(), 1000);
   }, []);
 
   // Handle URL changes
   useEffect(() => {
     currentUrlRef.current = url;
-
     if (wsManagerRef.current) {
       wsManagerRef.current.disconnect();
-      setTimeout(() => wsManagerRef.current.connect(), 100);
+      setTimeout(() => wsManagerRef.current?.connect(), 100);
     }
-  }, [url, autoRequestState, sendRawMessage]);
+  }, [url]);
 
   // Manage message history retention
   useEffect(() => {
     if (enableMessageHistory) {
-      setMessages(prev => manageMessageHistory(prev, maxMessages, messageRetention));
+      setMessages(prev => baseHook.manageMessageHistory(prev));
     }
-  }, [messages, maxMessages, messageRetention, enableMessageHistory]);
+  }, [messages, baseHook, enableMessageHistory]);
 
-  const sortedTasks = useMemo(() =>
-    sortTasksByPriority(data.tasks || []),
-    [data.tasks]
-  );
+   const sortedTasks = useMemo(() =>
+     baseHook.getSortedTasks(data.tasks || []),
+     [data.tasks, baseHook]
+   );
 
-  // Get connection status from manager
-  const connectionStatus = wsManagerRef.current?.getStatus().status || 'disconnected';
-  const isConnected = wsManagerRef.current?.getStatus().isConnected || false;
-  const reconnectAttempts = wsManagerRef.current?.getStatus().reconnectAttempts || 0;
+  const status = wsManagerRef.current?.getStatus();
+  const connectionStatus = status?.status || 'disconnected';
 
   return {
     // Connection state
-    isConnected,
+    isConnected: status?.isConnected || false,
     connectionStatus,
     error: error || (connectionStatus === 'error' ? 'WebSocket connection error' : null),
 
@@ -220,15 +143,15 @@ const useWebSocket = (url, config = {}) => {
     tasks: sortedTasks,
     logs: data.logs || [],
     concepts: data.concepts || [],
-    memoryTasks: data.memoryTasks || [], // Top tasks from Memory
+    memoryTasks: data.memoryTasks || [],
     reasonerStats: data.reasonerStats || null,
 
     // Actions
     sendRawMessage,
     sendMessage,
-    handleAddTask,
-    handleUpdateTask,
-    handleDeleteTask,
+    handleAddTask: taskHandlers.handleAddTask,
+    handleUpdateTask: taskHandlers.handleUpdateTask,
+    handleDeleteTask: taskHandlers.handleDeleteTask,
     requestConcepts,
     requestTopTasks,
     requestState,
@@ -236,7 +159,7 @@ const useWebSocket = (url, config = {}) => {
     disconnect,
 
     // Status
-    reconnectAttempts
+    reconnectAttempts: status?.reconnectAttempts || 0
   };
 };
 

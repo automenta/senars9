@@ -1,16 +1,9 @@
-/**
- * Custom hooks for common UI patterns
- */
-
 import { useState, useCallback } from 'react';
 import { CONNECTION_DEFAULTS } from '../constants';
 
-/**
- * Hook for managing command/input history with up/down navigation
- */
 export const useCommandHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize) => {
   const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1); // -1 means not in history
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   const addToHistory = useCallback((command) => {
     if (command && command !== history[0]) {
@@ -29,7 +22,7 @@ export const useCommandHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize) 
     } else if (direction === 'down') {
       if (historyIndex <= 0) {
         newIndex = -1;
-        return null; // Return to empty input
+        return null;
       }
       newIndex = historyIndex - 1;
     }
@@ -51,16 +44,13 @@ export const useCommandHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize) 
   };
 };
 
-/**
- * Hook for managing controlled input state with history
- */
 export const useInputWithHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize) => {
   const [inputValue, setInputValue] = useState('');
-  const { 
-    history, 
-    addToHistory, 
-    navigateHistory, 
-    resetHistoryNavigation 
+  const {
+    history,
+    addToHistory,
+    navigateHistory,
+    resetHistoryNavigation
   } = useCommandHistory(maxSize);
 
   const handleSubmit = useCallback((onSubmit) => {
@@ -91,7 +81,7 @@ export const useInputWithHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize
     setInputValue,
     history,
     handleSubmit,
-    handleArrowNavigation,  // Separate from tab handling
+    handleArrowNavigation,
     addToHistory
   };
 };
