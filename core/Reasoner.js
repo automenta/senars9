@@ -73,6 +73,9 @@ export class Reasoner {
 
     // Default strategy name
     this.defaultStrategy = 'basic_reasoning';
+    
+    // Configure overlap checking (enabled by default as per requirements)
+    this.overlapCheckingEnabled = true;
 
     // Initialize default rules
     this._initializeRules();
@@ -145,17 +148,52 @@ export class Reasoner {
    * @returns {Task[]} Array of newly derived tasks
    */
   _basicReason(focusSet, memory, context) {
-    return focusSet
-      .map(task => {
-        const applicableRules = this.ruleEngine.getApplicableRules(task);
-        if (!applicableRules) return [];
+    const allNewTasks = [];
+    
+    for (const originalTask of focusSet) {
+      const applicableRules = this.ruleEngine.getApplicableRules(originalTask);
+      if (!applicableRules) continue;
 
-        return applicableRules
-          .map(rule => rule.apply(task, memory, context))
-          .filter(newTasks => Array.isArray(newTasks))
-          .flat();
-      })
-      .flat();
+      for (const rule of applicableRules) {
+        try {
+          const newTasks = rule.apply(originalTask, memory, context);
+          
+          if (Array.isArray(newTasks)) {
+            // Apply overlap checking if enabled
+            if (this.overlapCheckingEnabled) {
+              // Filter out tasks that would overlap with the original task that generated them
+              const filteredTasks = newTasks.filter(derivedTask => {
+                // Check if derived task overlaps with the original task that generated it
+                // This prevents cyclic reasoning by avoiding derivations where evidence overlaps
+                return !this._hasOverlap(derivedTask, originalTask);
+              });
+              
+              allNewTasks.push(...filteredTasks);
+            } else {
+              // If overlap checking is disabled, add all tasks
+              allNewTasks.push(...newTasks);
+            }
+          }
+        } catch (error) {
+          Logger.error(`Error applying rule: ${error.message}`);
+        }
+      }
+    }
+    
+    return allNewTasks;
+  }
+
+  /** 
+   * Check if two tasks have overlapping evidence stamps
+   * @param {Task} taskA - First task to check
+   * @param {Task} taskB - Second task to check
+   * @returns {boolean} - True if tasks have overlapping stamps, false otherwise
+   */
+  _hasOverlap(taskA, taskB) {
+    if (!taskA || !taskB || !taskA.stamp || !taskB.stamp) {
+      return false;
+    }
+    return taskA.stamp.overlaps(taskB.stamp);
   }
 
   /**
@@ -212,5 +250,21 @@ export class Reasoner {
    */
   addRule(rule) {
     this.ruleEngine.register(rule);
+  }
+  
+  /**
+   * Enable or disable overlap checking
+   * @param {boolean} enabled - Whether to enable overlap checking
+   */
+  setOverlapChecking(enabled) {
+    this.overlapCheckingEnabled = enabled;
+  }
+  
+  /**
+   * Check if overlap checking is enabled
+   * @returns {boolean} - True if overlap checking is enabled
+   */
+  isOverlapCheckingEnabled() {
+    return this.overlapCheckingEnabled;
   }
 }

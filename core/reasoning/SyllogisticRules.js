@@ -63,8 +63,10 @@ export function applySyllogisticRule(
         // Calculate the new truth value
         const newTruth = calculateNewTruth(truth1, truth2);
 
-        // Create the new derived task
-        const newTask = new Task(
+        // Create the new derived task with stamps from both parent tasks
+        // This properly merges the evidence chains to enable overlap detection
+        const newTask = Task.createDerived(
+          [premise1, premise2], // Both parent tasks for proper stamp merging
           newTerm,
           Punctuation.BELIEF, // Default to belief for derived facts
           newTruth,
