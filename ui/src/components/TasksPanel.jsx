@@ -2,13 +2,18 @@ import React, { useState } from 'react';
 import { DndContext, closestCorners } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { getItemIcon } from '../utils/common';
 import {
   createTaskItemStyle,
   createPriorityIndicatorStyle,
   createTaskContentStyle,
   createTaskControlsStyle,
   createTaskDetailsStyle,
-  createButtonGroupStyle
+  createButtonGroupStyle,
+  createListContainerStyle,
+  createScrollableContainerStyle,
+  createPanelHeaderStyle,
+  createEmptyState
 } from '../utils/componentPatterns';
 
 const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
