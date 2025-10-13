@@ -13,41 +13,139 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
 
   // Process different types of entities and extract relationships
   // Helper function to extract concepts from NARS-style task content
+  // This function properly handles n-ary terms like (a,b,c) or (&,x,y,z)
   const extractConceptsFromTask = (content) => {
     if (!content) return [];
     
-    // Pattern to match various NARS formats like:
-    // (a --> b), <a --> b>, (a & b) --> c, etc.
-    // This regex looks for content in parentheses or angle brackets
-    const patterns = [
-      /\(([^)]*)-->([^)]*)\)/g,  // (a --> b)
-      /<([^>]*)-->([^>]*)>/g,    // <a --> b>
-    ];
-    
     const concepts = [];
-    for (const pattern of patterns) {
-      let match;
-      while ((match = pattern.exec(content)) !== null) {
-        // Extract subject and predicate, split on operators like &, |, etc.
-        const subject = match[1].trim();
-        const predicate = match[2].trim();
+    const conceptSet = new Set(); // For efficient duplicate checking
+    
+    // This function parses NARS-style expressions recursively to extract atomic concepts
+    const parseExpression = (expr) => {
+      expr = expr.trim();
+      
+      // Handle parentheses which may contain compound terms
+      if (expr.startsWith('(') && expr.endsWith(')')) {
+        let inner = expr.substring(1, expr.length - 1).trim();
         
-        // Further split on logical operators to get individual terms
-        subject.split(/[&|]/).map(c => c.trim()).forEach(c => {
-          if (c && !concepts.includes(c)) concepts.push(c);
-        });
-        predicate.split(/[&|]/).map(c => c.trim()).forEach(c => {
-          if (c && !concepts.includes(c)) concepts.push(c);
-        });
+        // Check for compound operators like -->, &, |, ==> etc.
+        if (inner.includes(' --> ')) {
+          // Binary inheritance: (A --> B)
+          const parts = inner.split(' --> ');
+          parts.forEach(part => parseExpression(part.trim()));
+        } else if (inner.includes(' ==> ')) {
+          // Implication: (A ==> B)
+          const parts = inner.split(' ==> ');
+          parts.forEach(part => parseExpression(part.trim()));
+        } else if (inner.includes(' <=> ')) {
+          // Equivalence: (A <=> B)
+          const parts = inner.split(' <=> ');
+          parts.forEach(part => parseExpression(part.trim()));
+        } else if (inner.includes(' <-> ')) {
+          // Similarity: (A <-> B)
+          const parts = inner.split(' <-> ');
+          parts.forEach(part => parseExpression(part.trim()));
+        } else if (inner.startsWith('&, ')) {
+          // N-ary conjunction: (&, A, B, C, ...)
+          const operands = inner.substring(3).trim();
+          const operandList = parseNaryOperands(operands);
+          operandList.forEach(op => parseExpression(op.trim()));
+        } else if (inner.startsWith('|, ')) {
+          // N-ary disjunction: (|, A, B, C, ...)
+          const operands = inner.substring(3).trim();
+          const operandList = parseNaryOperands(operands);
+          operandList.forEach(op => parseExpression(op.trim()));
+        } else if (inner.startsWith('&/, ')) {
+          // Sequential conjunction: (&/, A, B, C, ...)
+          const operands = inner.substring(4).trim();
+          const operandList = parseNaryOperands(operands);
+          operandList.forEach(op => parseExpression(op.trim()));
+        } else {
+          // Handle n-ary product: (A, B, C, ...) or other comma-separated structures
+          const operandList = parseNaryOperands(inner);
+          operandList.forEach(op => parseExpression(op.trim()));
+        }
+      } else if (expr.startsWith('{') && expr.endsWith('}')) {
+        // Extensional set: {A, B, C}
+        const inner = expr.substring(1, expr.length - 1).trim();
+        const operandList = parseNaryOperands(inner);
+        operandList.forEach(op => parseExpression(op.trim()));
+      } else if (expr.startsWith('[') && expr.endsWith(']')) {
+        // Intensional set: [A, B, C]
+        const inner = expr.substring(1, expr.length - 1).trim();
+        const operandList = parseNaryOperands(inner);
+        operandList.forEach(op => parseExpression(op.trim()));
+      } else if (expr.startsWith('--, ')) {
+        // Negation: (--, A)  
+        const operand = expr.substring(4).trim();
+        parseExpression(operand);
+      } else {
+        // It's an atomic concept, add it if not already present
+        if (expr && !conceptSet.has(expr)) {
+          conceptSet.add(expr);
+          concepts.push(expr);
+        }
       }
-    }
+    };
+    
+    // Helper to split by commas respecting nested parentheses
+    const parseNaryOperands = (commaSeparated) => {
+      const operands = [];
+      let current = '';
+      let parenDepth = 0;
+      let braceDepth = 0;
+      let bracketDepth = 0;
+      
+      for (let i = 0; i < commaSeparated.length; i++) {
+        const char = commaSeparated[i];
+        
+        if (char === '(') {
+          parenDepth++;
+          current += char;
+        } else if (char === ')') {
+          parenDepth--;
+          current += char;
+        } else if (char === '{') {
+          braceDepth++;
+          current += char;
+        } else if (char === '}') {
+          braceDepth--;
+          current += char;
+        } else if (char === '[') {
+          bracketDepth++;
+          current += char;
+        } else if (char === ']') {
+          bracketDepth--;
+          current += char;
+        } else if (char === ',' && parenDepth === 0 && braceDepth === 0 && bracketDepth === 0) {
+          operands.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      
+      if (current.trim() !== '') {
+        operands.push(current.trim());
+      }
+      
+      return operands;
+    };
+    
+    // Extract concepts from content that may contain multiple NARS expressions
+    // Split on common NARS operators and spaces to find expressions
+    const expressions = [content];
+    
+    // Look for top-level NARS expressions in the content
+    // This is a more naive approach, but handles the most common cases
+    parseExpression(content);
     
     return concepts;
   };
   
   // Process different types of entities and extract relationships
   const processEntities = (concepts) => {
-    if (!concepts || concepts.length === 0) return { nodes: [], links: [] };
+    if (!concepts || !Array.isArray(concepts) || concepts.length === 0) return { nodes: [], links: [] };
 
     const nodes = [];
     const links = [];
@@ -59,21 +157,21 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
       // Handle both Yjs Map format and JSON format
       let itemType, itemData;
       
-      if (item.get && typeof item.get === 'function') {
+      if (item && typeof item.get === 'function') {
         // Yjs Map format
         itemType = item.get('type');
         itemData = item.get('data');
       } else {
         // JSON format from Yjs conversion
         // Check if this item came from the tasks array (_isTask marker)
-        if (item._isTask) {
+        if (item && item._isTask) {
           // Use 'task' type for items from the tasks array
           itemType = 'task';
           itemData = item;
         } else {
           // Use the original type for regular items
-          itemType = item.type || 'concept'; // Default to concept if no type specified
-          itemData = item;
+          itemType = (item && item.type) || 'concept'; // Default to concept if no type specified
+          itemData = item || {};
         }
       }
       
@@ -153,8 +251,11 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
 
   // Function to get color based on priority and type
   const getColorForNode = (node) => {
-    // Define a color scale based on priority
-    const priority = node.priority || 0.5;
+    // Validate input and provide defaults
+    if (!node) return new THREE.Color(0.5, 0.5, 0.5); // Gray fallback
+    
+    // Define a color scale based on priority (clamped between 0 and 1)
+    const priority = Math.max(0, Math.min(1, node.priority !== undefined ? node.priority : 0.5));
     const type = node.type || 'concept';
     
     // Use different color schemes based on type
@@ -192,10 +293,14 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
     // Calculate aggregate priority for concept nodes based on connected task priorities
     const conceptPriorities = new Map(); // Map from concept id to sum of connected task priorities
     
+    // Create a node map for faster lookup
+    const nodeMap = new Map();
+    nodes.forEach(node => nodeMap.set(node.id, node));
+    
     // Sum the priorities of tasks connected to each concept
     links.forEach(link => {
       if (link.type === 'task-contains') {
-        const taskNode = nodes.find(n => n.id === link.source);
+        const taskNode = nodeMap.get(link.source);
         if (taskNode && taskNode.type === 'task') {
           const taskPriority = taskNode.priority || 0.5;
           

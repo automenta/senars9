@@ -1,6 +1,6 @@
 import React from 'react';
 import DockingLayout from './components/DockingLayout';
-import UnifiedMenuBar from './components/UnifiedMenuBar';
+import ReasonerControlPanel from './components/ReasonerControlPanel';
 import useCrdtWebSocket from './core/crdtWebSocket';
 import { CONNECTION_DEFAULTS } from './constants';
 import './App.css';
@@ -42,9 +42,8 @@ const App = () => {
           onDeleteTask={handleDeleteTask}
         />
       </div>
-      <UnifiedMenuBar
+      <ReasonerControlPanel
         stats={reasonerStats}
-        connectionStatus={connectionStatus}
         onCommand={handleSendRawMessage}
         onAddTask={handleAddTask}
       />

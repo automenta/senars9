@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import ReasonerControlPanel from './ReasonerControlPanel';
-import InputField from './InputField';
 import LogList from './LogList';
 import TasksPanel from './TasksPanel';
 import ConceptMap from './ConceptMap';
@@ -62,8 +61,11 @@ const ConnectionTab = ({ name, url }) => {
       case 'topPanel':
         return (
           <Panel title={panel.name}>
-            <ReasonerControlPanel stats={reasonerStats} onCommand={handleCommand} />
-            <InputField onSend={handleSendMessage} />
+            <ReasonerControlPanel 
+              stats={reasonerStats} 
+              onCommand={handleCommand} 
+              onAddTask={handleAddTask} 
+            />
           </Panel>
         );
       case 'conceptMapPanel':

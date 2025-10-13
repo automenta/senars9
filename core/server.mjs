@@ -2,6 +2,7 @@ import { WebSocketServer } from 'ws';
 import { Server } from 'http';
 import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
+import { Awareness } from 'y-protocols/awareness';
 import { setupWSConnection } from '@y/websocket-server/utils';
 import { initialTasks, initialConcepts, initialLogs } from '../ui/src/example-data.js';
 
@@ -11,7 +12,7 @@ const yConcepts = doc.getArray('concepts');
 const yLogs = doc.getArray('logs');
 
 // Initialize awareness for sharing real-time stats
-const awareness = new Y.Awareness(doc);
+const awareness = new Awareness(doc);
 
 class SenarsServer {
   constructor(port = 8080) {
@@ -60,6 +61,70 @@ class SenarsServer {
     }, 5000);
   }
 
+  async handleControlCommand(command, payload) {
+    console.log(`Received command: ${command}`, payload);
+    
+    switch (command) {
+      case 'start':
+        console.log('Start command received - not implemented in simple server');
+        break;
+      case 'stop':
+        console.log('Stop command received - not implemented in simple server');
+        break;
+      case 'step':
+        console.log('Step command received - not implemented in simple server');
+        // This would trigger a single cognitive cycle in a full implementation
+        // For now, just update the cycle count to simulate a step
+        const currentState = awareness.getLocalState()?.reasonerStats || {};
+        const newCycleCount = (currentState.cycles || 0) + 1;
+        
+        awareness.setLocalStateField('reasonerStats', {
+          ...currentState,
+          cycles: newCycleCount,
+          timestamp: Date.now()
+        });
+        break;
+      case 'reset':
+        // Reset the cycle count
+        const resetState = awareness.getLocalState()?.reasonerStats || {};
+        awareness.setLocalStateField('reasonerStats', {
+          ...resetState,
+          cycles: 0,
+          timestamp: Date.now()
+        });
+        break;
+      case 'throttle':
+        console.log(`Throttle command: ${payload.value}%`);
+        break;
+      case 'add_task':
+        // Add a new task to the Yjs document
+        const newTask = {
+          id: randomUUID(),
+          content: payload.content || 'User task',
+          priority: payload.priority || 0.5,
+          status: 'Input',
+          type: 'Input',
+          createdAt: Date.now()
+        };
+        const taskMap = new Y.Map();
+        Object.entries(newTask).forEach(([key, value]) => {
+          taskMap.set(key, value);
+        });
+        yTasks.push([taskMap]);
+        
+        // Update stats
+        const addTaskState = awareness.getLocalState()?.reasonerStats || {};
+        awareness.setLocalStateField('reasonerStats', {
+          ...addTaskState,
+          tasks: yTasks.length,
+          timestamp: Date.now()
+        });
+        break;
+      default:
+        console.log(`Unknown command: ${command}`);
+    }
+  }
+
   start() {
     this.loadInitialData();
 
@@ -77,6 +142,25 @@ class SenarsServer {
       this.wss.on('connection', (ws, req) => {
         setupWSConnection(ws, req, { doc, awareness });
         console.log('New client connected and attached to Y.Doc with awareness');
+
+        // Handle messages for command control
+        ws.on('message', async (data) => {
+          try {
+            const message = JSON.parse(data.toString());
+            
+            if (message.type === 'control' && message.command) {
+              await this.handleControlCommand(message.command, message.payload || {});
+            } else if (message.type === 'command') {
+              // Handle legacy command format
+              const command = message.payload?.data;
+              if (command) {
+                await this.handleControlCommand(command, {});
+              }
+            }
+          } catch (error) {
+            console.error('Error handling message:', error);
+          }
+        });
       });
 
       this.startMockData();

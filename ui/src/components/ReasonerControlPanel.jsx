@@ -1,7 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { CONNECTION_DEFAULTS } from '../constants';
 
-const ReasonerControlPanel = ({ stats, onCommand }) => {
+const NARSESE_SUGGESTIONS = [...new Set([
+  '-->', '==>', '<=>',
+  '&/', '&|', '&&', '||', '--', '~~',
+  '<', '>', '(', ')', '{', '}', '[', ']',
+  '.', '!', '?'
+])];
+
+const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
+  const [inputValue, setInputValue] = useState('');
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const [cpuThrottle, setCpuThrottle] = useState(100);
   const [chartData, setChartData] = useState([]);
 
@@ -25,6 +36,60 @@ const ReasonerControlPanel = ({ stats, onCommand }) => {
     const value = parseInt(e.target.value);
     setCpuThrottle(value);
     onCommand('throttle', { value });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (inputValue.trim()) {
+      if (inputValue.startsWith('/cmd')) {
+        // This is a command, send it via onCommand
+        onCommand(inputValue.slice(5).trim()); // Remove '/cmd ' prefix and send command
+      } else {
+        // This is a task, add it via onAddTask
+        if (onAddTask) {
+          onAddTask({ content: inputValue, priority: 0.5 });
+        } else {
+          // Fallback to command if onAddTask is not provided
+          onCommand('add_task', { content: inputValue, priority: 0.5 });
+        }
+      }
+      if (inputValue !== history[0]) {
+        const newHistory = [inputValue, ...history];
+        setHistory(newHistory.slice(0, CONNECTION_DEFAULTS.maxHistorySize));
+      }
+      setHistoryIndex(-1);
+      setInputValue('');
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (history.length > 0) {
+        const newIndex = Math.min(historyIndex + 1, history.length - 1);
+        setHistoryIndex(newIndex);
+        setInputValue(history[newIndex] || '');
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIndex > -1) {
+        const newIndex = historyIndex - 1;
+        setHistoryIndex(newIndex);
+        setInputValue(history[newIndex] || '');
+      }
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      const parts = inputValue.split(/(\s+)/);
+      const lastPart = parts[parts.length - 1];
+      if (lastPart.trim()) {
+        const match = NARSESE_SUGGESTIONS.find(s => s.startsWith(lastPart));
+        if (match) {
+          parts[parts.length - 1] = match;
+          const newValue = parts.join('');
+          setInputValue(newValue);
+        }
+      }
+    }
   };
 
   const styles = {
@@ -52,8 +117,10 @@ const ReasonerControlPanel = ({ stats, onCommand }) => {
     statusBadge: {
       marginLeft: '10px',
       padding: '2px 8px',
-      backgroundColor: stats?.running ? '#d4edda' : '#f8d7da',
-      color: stats?.running ? '#155724' : '#721c24',
+      backgroundColor: stats?.running && !stats?.paused ? '#d4edda' : 
+                      stats?.paused ? '#fff3cd' : '#f8d7da',
+      color: stats?.running && !stats?.paused ? '#155724' : 
+             stats?.paused ? '#856404' : '#721c24',
       borderRadius: '12px',
       fontSize: '12px',
     },
@@ -62,6 +129,22 @@ const ReasonerControlPanel = ({ stats, onCommand }) => {
     statValue: (color) => ({ fontSize: '14px', fontWeight: 'bold', color }),
     statLabel: { fontSize: '12px', color: '#666' },
     chartContainer: { marginTop: '15px', height: '120px' },
+    form: { display: 'flex', marginTop: '10px' },
+    inputField: { 
+      flex: 1, 
+      padding: '5px',
+      border: '1px solid #ccc',
+      borderRadius: '3px',
+      marginRight: '5px'
+    },
+    sendButton: {
+      padding: '5px 10px',
+      backgroundColor: '#007bff',
+      color: 'white',
+      border: 'none',
+      borderRadius: '3px',
+      cursor: 'pointer',
+    }
   };
 
   return (
@@ -124,6 +207,17 @@ const ReasonerControlPanel = ({ stats, onCommand }) => {
           </LineChart>
         </ResponsiveContainer>
       </div>
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Enter a command or task (e.g. /cmd start)..."
+          style={styles.inputField}
+        />
+        <button type="submit" style={styles.sendButton}>Send</button>
+      </form>
     </div>
   );
 };
