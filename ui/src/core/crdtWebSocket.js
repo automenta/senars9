@@ -45,6 +45,25 @@ const useCrdtWebSocket = (url) => {
     };
   }, [url, ydoc]);
 
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      const initialTasks = [
+        { content: '(a-->b).', priority: 0.9 },
+        { content: '(b-->c).', priority: 0.8 },
+      ];
+      initialTasks.forEach(task => {
+        if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
+          const message = {
+            type: 'control',
+            command: 'add_task',
+            payload: task
+          };
+          provider.ws.send(JSON.stringify(message));
+        }
+      });
+    }
+  }, [connectionStatus, provider]);
+
   const handleAddTask = useCallback((task) => {
     // Send the add_task command to server instead of directly modifying Yjs document
     if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {

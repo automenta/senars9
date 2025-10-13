@@ -216,10 +216,10 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
             if (concept && !existingNodes.has(concept)) {
               nodes.push({
                 id: concept,
-                type: 'concept-individual',
+                type: 'concept',
                 name: concept,
                 priority: (itemData?.priority || 0.3) + 0.1, // Slightly higher priority
-                color: 0x6610f2, // Purple
+                color: 0x007bff, // Blue
               });
               existingNodes.set(concept, nodes.length - 1);
             }
@@ -269,10 +269,6 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
         // For concepts, use blue-based colors with priority affecting intensity
         const conceptIntensity = 0.3 + priority * 0.7;
         return new THREE.Color(0.0, 0.0, conceptIntensity);
-      case 'concept-individual':
-        // For individual concepts from tasks, use purple-based colors
-        const conceptIndividualIntensity = 0.3 + priority * 0.7;
-        return new THREE.Color(conceptIndividualIntensity * 0.6, 0.0, conceptIndividualIntensity);
       default:
         // Fallback color based on priority
         return new THREE.Color(priority, priority * 0.7, 1 - priority);
@@ -315,7 +311,7 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
     
     // Normalize concept priorities based on their connections
     nodes.forEach(node => {
-      if (node.type === 'concept-individual' && conceptPriorities.has(node.id)) {
+      if (node.type === 'concept' && conceptPriorities.has(node.id)) {
         // Set the priority to the sum of connected task priorities, capped at 1.0
         const aggregatePriority = Math.min(1.0, conceptPriorities.get(node.id));
         node.priority = aggregatePriority;
@@ -340,9 +336,6 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
       switch(node.type) {
         case 'task':
           geometry = new THREE.ConeGeometry(0.8, 1.5, 8);
-          break;
-        case 'concept-individual':
-          geometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
           break;
         case 'concept':
         default:
@@ -555,10 +548,6 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
           <div style={{ width: '12px', height: '12px', backgroundColor: '#28a745', marginRight: '6px' }}></div>
           <span>Tasks</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-          <div style={{ width: '12px', height: '12px', backgroundColor: '#6610f2', marginRight: '6px' }}></div>
-          <span>Individual Concepts</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
           <div style={{ width: '12px', height: '12px', backgroundColor: '#ff6b6b', borderRadius: '50%', marginRight: '6px' }}></div>

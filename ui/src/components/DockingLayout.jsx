@@ -69,7 +69,6 @@ const DockingLayout = ({
   concepts,
   reasonerStats,
   connectionStatus,
-  onAddTask,
   onUpdateTask,
   onDeleteTask,
 }) => {
@@ -82,7 +81,6 @@ const DockingLayout = ({
       return (
         <TasksPanel
           tasks={tasks}
-          onAddTask={onAddTask}
           onUpdateTask={onUpdateTask}
           onDeleteTask={onDeleteTask}
         />

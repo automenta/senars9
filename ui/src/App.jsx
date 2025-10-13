@@ -47,7 +47,6 @@ const App = () => {
               concepts={concepts}
               reasonerStats={reasonerStats}
               connectionStatus={connectionStatus}
-              onAddTask={handleAddTask}
               onUpdateTask={handleUpdateTask}
               onDeleteTask={handleDeleteTask}
             />

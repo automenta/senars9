@@ -119,65 +119,71 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
           {controlConfig.showStartButton || controlConfig.showStopButton || controlConfig.showStepButton || controlConfig.showResetButton ? (
             <div>
               <label style={labelStyle()}>Control:</label>
-              <div style={{ display: 'flex', gap: '5px' }}>
+              <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                 {controlConfig.showStartButton && (
-                  <button 
+                  <button
                     onClick={() => {
                       onCommand('start');
                       addNotification('Reasoner started', 'success');
-                    }} 
-                    style={{...buttonStyle('success'), padding: '5px 10px', borderRadius: '3px'}}
+                    }}
+                    style={{ ...buttonStyle('success'), padding: '5px 10px', borderRadius: '3px' }}
                   >
                     Start
                   </button>
                 )}
                 {controlConfig.showStopButton && (
-                  <button 
+                  <button
                     onClick={() => {
                       onCommand('stop');
                       addNotification('Reasoner stopped', 'info');
-                    }} 
-                    style={{...buttonStyle('danger'), padding: '5px 10px', borderRadius: '3px'}}
+                    }}
+                    style={{ ...buttonStyle('danger'), padding: '5px 10px', borderRadius: '3px' }}
                   >
                     Stop
                   </button>
                 )}
                 {controlConfig.showStepButton && (
-                  <button 
+                  <button
                     onClick={() => {
                       onCommand('step');
                       addNotification('Single cognitive cycle executed', 'info');
-                    }} 
-                    style={{...buttonStyle('info'), padding: '5px 10px', borderRadius: '3px'}}
+                    }}
+                    style={{ ...buttonStyle('info'), padding: '5px 10px', borderRadius: '3px' }}
                   >
                     Step
                   </button>
                 )}
                 {controlConfig.showResetButton && (
-                  <button 
+                  <button
                     onClick={() => {
                       onCommand('reset');
                       addNotification('System reset completed', 'info');
-                    }} 
-                    style={{...buttonStyle('warning'), padding: '5px 10px', borderRadius: '3px'}}
+                    }}
+                    style={{ ...buttonStyle('warning'), padding: '5px 10px', borderRadius: '3px' }}
                   >
                     Reset
                   </button>
                 )}
+                {controlConfig.showThrottleControl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '10px' }}>
+                    <label htmlFor="cpu-throttle-slider" style={{ ...labelStyle(), cursor: 'pointer' }} title={`CPU Throttle: ${cpuThrottle}%`}>
+                      <span role="img" aria-label="CPU Throttle">💨</span>
+                    </label>
+                    <input
+                      id="cpu-throttle-slider"
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={cpuThrottle}
+                      onChange={handleCpuThrottleChange}
+                      style={{ width: '80px', cursor: 'pointer' }}
+                      title={`CPU Throttle: ${cpuThrottle}%`}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           ) : null}
-          {controlConfig.showThrottleControl && (
-            <div>
-              <label style={labelStyle()}>CPU Throttle: {cpuThrottle}%</label>
-              <input type="range" min="1" max="100" value={cpuThrottle} onChange={handleCpuThrottleChange} style={{ width: '100%' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666' }}>
-                <span>1%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-          )}
         </div>
         {controlConfig.showStats && (
           <div>
