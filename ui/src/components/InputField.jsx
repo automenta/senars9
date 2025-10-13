@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CONNECTION_DEFAULTS } from '../constants';
+import React from 'react';
+import { useInputWithHistory } from '../utils/hooks';
 
 const NARSESE_SUGGESTIONS = [...new Set([
   '-->', '==>', '<=>',
@@ -9,43 +9,26 @@ const NARSESE_SUGGESTIONS = [...new Set([
 ])];
 
 const InputField = ({ onSend }) => {
-  const [inputValue, setInputValue] = useState('');
-  const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1); // -1 means new input, not from history
+  const {
+    inputValue,
+    setInputValue,
+    history,
+    handleSubmit: handleFormSubmit,
+    handleArrowNavigation
+  } = useInputWithHistory();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      onSend(inputValue);
-
-      if (inputValue !== history[0]) {
-        const newHistory = [inputValue, ...history];
-        setHistory(newHistory.slice(0, CONNECTION_DEFAULTS.maxHistorySize));
-      }
-
-      setHistoryIndex(-1);
-      setInputValue('');
-    }
+    handleFormSubmit(onSend);
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (history.length > 0) {
-        const newIndex = Math.min(historyIndex + 1, history.length - 1);
-        setHistoryIndex(newIndex);
-        setInputValue(history[newIndex] || '');
-      }
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (historyIndex > -1) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInputValue(history[newIndex] || '');
-      }
+    // Handle arrow navigation via the hook
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      handleArrowNavigation(e);
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const parts = inputValue.split(/(\s+)/); // Split by space, keeping delimiter
+      const parts = inputValue.split(/(\\s+)/); // Split by space, keeping delimiter
       const lastPart = parts[parts.length - 1];
 
       if (lastPart.trim()) { // Don't autocomplete on spaces

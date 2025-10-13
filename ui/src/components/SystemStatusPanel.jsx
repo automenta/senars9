@@ -1,5 +1,6 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { panelContainerStyle, headerStyle, statBoxStyle, labelStyle, statusBadgeStyle } from '../utils/styling';
 
 const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] }) => {
   // Calculate system metrics
@@ -54,21 +55,13 @@ const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] 
   const health = getSystemHealth();
 
   return (
-    <div style={{
-      padding: '12px',
-      border: '1px solid #ddd',
-      borderRadius: '6px',
-      backgroundColor: '#f8f9fa',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
-      <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#333', borderBottom: '1px solid #eee', paddingBottom: '6px' }}>
+    <div style={{...panelContainerStyle({ height: '100%', display: 'flex', flexDirection: 'column' }), border: '1px solid #ddd' }}>
+      <h3 style={headerStyle({ margin: '0 0 12px 0', fontSize: '14px', color: '#333', paddingBottom: '6px' })}>
         System Status
       </h3>
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-        <div style={{ padding: '8px', backgroundColor: '#e9ecef', borderRadius: '4px' }}>
+        <div style={statBoxStyle()}>
           <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>Connection</div>
           <div style={{ 
             fontSize: '12px', 
@@ -79,7 +72,7 @@ const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] 
           </div>
         </div>
         
-        <div style={{ padding: '8px', backgroundColor: '#e9ecef', borderRadius: '4px' }}>
+        <div style={statBoxStyle()}>
           <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>Health</div>
           <div style={{ 
             fontSize: '12px', 
@@ -94,19 +87,19 @@ const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] 
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
-        <div style={{ padding: '8px', backgroundColor: '#f1f3f4', borderRadius: '4px', textAlign: 'center' }}>
+        <div style={{...statBoxStyle({ textAlign: 'center' }), backgroundColor: '#f1f3f4' }}>
           <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#007bff' }}>
             {stats?.cycles || 0}
           </div>
           <div style={{ fontSize: '10px', color: '#666' }}>Cycles</div>
         </div>
-        <div style={{ padding: '8px', backgroundColor: '#f1f3f4', borderRadius: '4px', textAlign: 'center' }}>
+        <div style={{...statBoxStyle({ textAlign: 'center' }), backgroundColor: '#f1f3f4' }}>
           <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#28a745' }}>
             {tasks.length}
           </div>
           <div style={{ fontSize: '10px', color: '#666' }}>Tasks</div>
         </div>
-        <div style={{ padding: '8px', backgroundColor: '#f1f3f4', borderRadius: '4px', textAlign: 'center' }}>
+        <div style={{...statBoxStyle({ textAlign: 'center' }), backgroundColor: '#f1f3f4' }}>
           <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#fd7e14' }}>
             {concepts.length}
           </div>
