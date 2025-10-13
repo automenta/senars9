@@ -4,6 +4,12 @@ import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
 import { Awareness } from 'y-protocols/awareness';
 import { setupWSConnection } from '@y/websocket-server/utils';
+import { Memory } from './Memory.js';
+import { Reasoner } from './Reasoner.js';
+import { FocusSetSelector } from './FocusSetSelector.js';
+import { runSingleCycle, CycleContext } from './Cycle.js';
+import { Task, TruthValue } from './Task.js';
+import { Term, TermType } from './Term.js';
 
 
 const doc = new Y.Doc();
@@ -17,6 +23,10 @@ const awareness = new Awareness(doc);
 // Simple message protocol support
 const simpleClients = new Set();
 
+// Reasoning system components
+let memory, reasoner, selector;
+let reasoningInterval = null;
+
 // Add observer to Yjs arrays to automatically broadcast changes to simple protocol clients - will be set up in start()
 
 class SenarsServer {
@@ -28,6 +38,190 @@ class SenarsServer {
     });
     this.wss = new WebSocketServer({ server: this.httpServer });
     this.mockDataInterval = null;
+  }
+
+  // Synchronize tasks from memory to Yjs arrays
+  syncMemoryToYjs() {
+    try {
+      // Get all tasks from memory
+      const allMemoryTasks = memory?.getAllTasks ? memory.getAllTasks() : [];
+      
+      if (!Array.isArray(allMemoryTasks) || allMemoryTasks.length === 0) {
+        return; // No tasks to sync
+      }
+      
+      // Create a set of task IDs currently in Yjs for comparison
+      const yTaskIds = new Set();
+      yTasks.forEach(yTask => {
+        if (yTask instanceof Y.Map) {
+          const id = yTask.get('id');
+          if (id) {
+            yTaskIds.add(id);
+          }
+        }
+      });
+      
+      // Add tasks that exist in memory but not in Yjs
+      for (const task of allMemoryTasks) {
+        if (!task) continue;
+        
+        // Create an ID for the task if it doesn't have one
+        const taskId = task.id || `task_${task.createdAt || Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Only add if not already in Yjs
+        if (!yTaskIds.has(taskId)) {
+          try {
+            // Convert task to the format expected by UI
+            const taskObj = {
+              id: taskId,
+              content: task.toString ? task.toString() : (task.content || 'Unknown Task'), // Use the string representation from Task class
+              priority: task.getPriority ? task.getPriority() : (task.priority || 0.5),
+              status: task.status || 'Derived', // Default to Derived if not specified
+              type: task.isBelief ? (task.isBelief() ? 'Belief' : task.isGoal() ? 'Goal' : 'Question') : (task.type || 'Derived'),
+              createdAt: task.createdAt || Date.now(),
+              lastModified: task.getAccessedAt ? task.getAccessedAt() : Date.now(),
+              // Include other relevant fields if available
+              punctuation: task.punctuation || (task.content?.endsWith('!') ? '!' : task.content?.endsWith('?') ? '?' : '.'),
+              truth: task.truth || null,
+              occurrenceTime: task.occurrenceTime || Date.now(),
+              derivationPath: task.derivationPath || []
+            };
+            
+            const taskMap = new Y.Map();
+            Object.entries(taskObj).forEach(([key, value]) => {
+              taskMap.set(key, value);
+            });
+            yTasks.push([taskMap]);
+            
+            console.log(`Added derived task to Yjs: ${taskObj.content}`);
+          } catch (taskError) {
+            console.error('Error converting task for Yjs sync:', taskError, task);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in syncMemoryToYjs:', error);
+    }
+  }
+
+  // Enhanced: Start the reasoning cycle that will generate derived tasks
+  startReasoningCycle() {
+    // Initialize reasoning components
+    memory = new Memory();
+    reasoner = new Reasoner();
+    selector = new FocusSetSelector();
+    
+    // Register reasoning rules that can derive new tasks
+    // Import and register the DeductiveSyllogism rule for transitive inference
+    import('./reasoning/SyllogisticRules.js').then(({ DeductiveSyllogism, Induction, Abduction }) => {
+      reasoner.addRule(new DeductiveSyllogism());  // For deriving (a-->c) from (a-->b) and (b-->c)
+      reasoner.addRule(new Induction());          // For other types of inference
+      reasoner.addRule(new Abduction());          // For other types of inference
+      console.log('✅ Reasoning rules registered for task derivation');
+    }).catch(err => {
+      console.error('Failed to import reasoning rules:', err);
+    });
+    
+    // Load initial tasks from Yjs arrays into memory so they can be reasoned about
+    this.loadYjsToMemory();
+    
+    // Set up interval for running reasoning cycles
+    reasoningInterval = setInterval(() => {
+      // Run a single cognitive cycle
+      const context = new CycleContext(Date.now());
+      runSingleCycle(memory, reasoner, selector, context);
+      
+      // Sync new tasks from memory to Yjs arrays
+      this.syncMemoryToYjs();
+    }, 1000); // Run cycle every second
+  }
+  
+  // Load tasks from Yjs arrays into memory so they can be processed by the reasoning system
+  loadYjsToMemory() {
+    try {
+      // Load tasks from Yjs into memory
+      yTasks.forEach(yTask => {
+        if (yTask instanceof Y.Map) {
+          const taskData = {};
+          yTask.forEach((value, key) => {
+            taskData[key] = value;
+          });
+          
+          if (!taskData.content) {
+            console.warn('Task missing content, skipping:', taskData);
+            return;
+          }
+          
+          try {
+            // Create a simple Term - use the content to generate appropriate term structure
+            // For the basic case like "(a-->b).", parse the subject and predicate if possible
+            let term;
+            let truth = taskData.truth || null;
+            const content = taskData.content.replace(/[.!?:]+$/, '').trim(); // Remove ending punctuation
+            
+            // Try to parse simple implication format like "(a-->b)"
+            const impMatch = content.match(/\(([^(]+)-->([^)]+)\)/);
+            if (impMatch) {
+              // This looks like an implication "subject --> predicate"
+              const subject = impMatch[1].trim();
+              const predicate = impMatch[2].trim();
+              
+              const subjTerm = Term.newAtom(subject);
+              const predTerm = Term.newAtom(predicate);
+              term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]); // Using inheritance for implication
+              
+              // Create a default TruthValue object if not provided
+              if (!truth) {
+                truth = new TruthValue(0.8, 0.8); // Reasonable default values with proper TruthValue object
+              } else if (typeof truth === 'object' && !truth.hasOwnProperty('frequency')) {
+                // If it's an object but not a TruthValue instance, create one
+                truth = new TruthValue(truth.frequency || 0.8, truth.confidence || 0.8);
+              }
+            } else {
+              // Default to simple atom
+              term = Term.newAtom(content);
+              
+              // For non-inheritance terms, create default truth
+              if (!truth) {
+                truth = new TruthValue(0.5, 0.5);
+              } else if (typeof truth === 'object' && !truth.hasOwnProperty('frequency')) {
+                truth = new TruthValue(truth.frequency || 0.5, truth.confidence || 0.5);
+              }
+            }
+            
+            // Create Task object with proper punctuation from the content
+            let punctuation = taskData.punctuation || '.';
+            if (taskData.content && taskData.content.endsWith('!')) {
+              punctuation = '!';
+            } else if (taskData.content && taskData.content.endsWith('?')) {
+              punctuation = '?';
+            } else if (taskData.content && taskData.content.endsWith('.')) {
+              punctuation = '.';
+            }
+            
+            const task = new Task(
+              term,
+              punctuation,
+              truth, // Use the truth value we created
+              taskData.createdAt || Date.now(),
+              taskData.occurrenceTime || Date.now(),
+              taskData.priority || 0.5
+            );
+            
+            // Add any additional properties
+            task.id = taskData.id;
+            
+            // Add to memory
+            memory.addTask(task, Date.now());
+            console.log(`Loaded task into memory: ${taskData.content} [type: ${term.termType}, subject: ${term.subject?.name || 'none'}, predicate: ${term.predicate?.name || 'none'}]`);
+          } catch (taskError) {
+            console.error('Error creating task from Yjs data:', taskError, taskData);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error in loadYjsToMemory:', error);
+    }
   }
 
   // Convert Yjs arrays to plain JavaScript objects for simple protocol
@@ -600,12 +794,19 @@ class SenarsServer {
       });
 
       this.startMockData();
+      
+      // Start the reasoning cycle to generate derived tasks
+      this.startReasoningCycle();
     });
   }
 
   stop() {
     if (this.mockDataInterval) {
       clearInterval(this.mockDataInterval);
+    }
+    
+    if (reasoningInterval) {
+      clearInterval(reasoningInterval);
     }
 
     // Close all simple protocol connections
