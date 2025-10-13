@@ -22,6 +22,11 @@ const json = {
             name: 'Tasks',
             component: 'tasks-panel',
           },
+          {
+            type: 'tab',
+            name: 'Concepts',
+            component: 'concepts-panel',
+          },
         ],
       },
       {
@@ -83,6 +88,16 @@ const DockingLayout = ({
           tasks={tasks}
           onUpdateTask={onUpdateTask}
           onDeleteTask={onDeleteTask}
+        />
+      );
+    }
+    if (component === 'concepts-panel') {
+      const ConceptsPanel = React.lazy(() => import('./ConceptsPanel'));
+      return (
+        <ConceptsPanel
+          concepts={concepts}
+          onUpdateConcept={onUpdateTask}  // Using same handler for now
+          onDeleteConcept={onDeleteTask}  // Using same handler for now
         />
       );
     }

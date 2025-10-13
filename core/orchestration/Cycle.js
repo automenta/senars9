@@ -108,16 +108,60 @@ class Cycle extends Component {
       if (this.core.reasoning) {
         const derivedTasks = await this.core.reasoning.reason(focusSet);
         if (derivedTasks.length > 0 && this.core.memory) {
-          // TODO: Uncomment when core.memory.addTasks is implemented
-          // await this.core.memory.addTasks(derivedTasks);
+          // Add derived tasks to memory if the method exists, otherwise add them one by one
+          if (typeof this.core.memory.addTasks === 'function') {
+            await this.core.memory.addTasks(derivedTasks);
+          } else {
+            // Add each task individually
+            for (const task of derivedTasks) {
+              if (task) {
+                // Add to memory - this might require creating proper Task objects
+                if (this.core.memory.addTask) {
+                  this.core.memory.addTask(task, Date.now());
+                }
+                
+                // Emit task.processed event
+                if (this.core.messages) {
+                  this.core.messages.emit('task.processed', {
+                    id: task.id || `task_${Date.now()}`,
+                    content: task.term?.toString?.() || task.toString?.() || task.content || task.term,
+                    status: 'processed',
+                    timestamp: Date.now()
+                  });
+                }
+              }
+            }
+          }
         }
       }
       // For backward compatibility, check for old reasoner property too
       else if (this.core.reasoner) {
         const derivedTasks = await this.core.reasoner.reason(focusSet);
         if (derivedTasks.length > 0 && this.core.memory) {
-          // TODO: Uncomment when core.memory.addTasks is implemented
-          // await this.core.memory.addTasks(derivedTasks);
+          // Add derived tasks to memory if the method exists, otherwise add them one by one
+          if (typeof this.core.memory.addTasks === 'function') {
+            await this.core.memory.addTasks(derivedTasks);
+          } else {
+            // Add each task individually
+            for (const task of derivedTasks) {
+              if (task) {
+                // Add to memory
+                if (this.core.memory.addTask) {
+                  this.core.memory.addTask(task, Date.now());
+                }
+                
+                // Emit task.processed event
+                if (this.core.messages) {
+                  this.core.messages.emit('task.processed', {
+                    id: task.id || `task_${Date.now()}`,
+                    content: task.term?.toString?.() || task.toString?.() || task.content || task.term,
+                    status: 'processed',
+                    timestamp: Date.now()
+                  });
+                }
+              }
+            }
+          }
         }
       }
 

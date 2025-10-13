@@ -1,7 +1,7 @@
 import React from 'react';
 import DockingLayout from './components/DockingLayout';
 import ReasonerControlPanel from './components/ReasonerControlPanel';
-import useSimpleWebSocket from './core/useSimpleWebSocket';
+import useWebSocket from './core/useWebSocket';
 import CommandService from './services/CommandService';
 import { UIProvider } from './core/UIContext';
 import { NotificationProvider } from './core/NotificationSystem';
@@ -29,7 +29,7 @@ const App = () => {
     handleAddTask,
     handleUpdateTask,
     handleDeleteTask,
-  } = useSimpleWebSocket(wsUrl);
+  } = useWebSocket(wsUrl);
 
   // Create command service instance
   const commandService = new CommandService(sendRawMessage);

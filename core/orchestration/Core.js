@@ -157,6 +157,33 @@ class Core {
             timestamp: Date.now()
           });
         });
+        
+        // Listen for task.derived events and broadcast them
+        this.messages.on('task.derived', (data) => {
+          this.webSocketServer.broadcast({
+            type: 'task_derived',
+            data: data,
+            timestamp: Date.now()
+          });
+        });
+        
+        // Listen for task.processed events and broadcast them
+        this.messages.on('task.processed', (data) => {
+          this.webSocketServer.broadcast({
+            type: 'task_processed',
+            data: data,
+            timestamp: Date.now()
+          });
+        });
+        
+        // Listen for concept.updated events and broadcast them
+        this.messages.on('concept.updated', (data) => {
+          this.webSocketServer.broadcast({
+            type: 'concept_updated',
+            data: data,
+            timestamp: Date.now()
+          });
+        });
       }
     }
 
@@ -236,6 +263,100 @@ class Core {
     if (this.resolutionStrategy && !this.resolutionStrategy.isInitialized) {
       await this.resolutionStrategy.initialize(this.config?.get('components.resolutionStrategy', {}) || {});
     }
+  }
+
+  // Methods for broadcasting current state
+  _broadcastCurrentState() {
+    if (!this.messages) return;
+    
+    // Emit snapshot of current tasks
+    if (this.memory) {
+      const tasksSnapshot = this._getTasksSnapshot();
+      this.messages.emit('tasks_snapshot', tasksSnapshot);
+      
+      // Emit snapshot of current concepts
+      const conceptsSnapshot = this._getConceptsSnapshot();
+      this.messages.emit('concepts_snapshot', conceptsSnapshot);
+    }
+    
+    // Emit system stats
+    const stats = this._getSystemStats();
+    this.messages.emit('system_stats', stats);
+  }
+
+  // Get a snapshot of all tasks
+  _getTasksSnapshot() {
+    if (!this.memory || !this.memory.getAllTasks) return [];
+    
+    const allTasks = this.memory.getAllTasks();
+    return allTasks.map(task => ({
+      id: task.hashCode ? task.hashCode() : (task.id || `task_${Date.now()}`),
+      content: task.toString ? task.toString() : (task.content || 'Unknown Task'),
+      priority: task.getPriority ? task.getPriority() : (task.priority || 0.5),
+      status: this._getTaskStatus(task),
+      type: this._getTaskType(task),
+      createdAt: task.createdAt || Date.now(),
+      lastModified: task.getAccessedAt ? task.getAccessedAt() : Date.now(),
+      punctuation: task.punctuation || '.',
+      truth: task.truth || null,
+      occurrenceTime: task.occurrenceTime || Date.now(),
+      derivationPath: task.derivationPath || []
+    }));
+  }
+
+  // Get a snapshot of all concepts
+  _getConceptsSnapshot() {
+    if (!this.memory || !this.memory.conceptStorage) return [];
+    
+    const concepts = [];
+    for (const [hash, concept] of this.memory.conceptStorage) {
+      concepts.push({
+        id: hash,
+        content: concept.term?.toString() || concept.name || 'Unknown Concept',
+        priority: this._getConceptTaskCount(concept),
+        type: concept.term?.termType || 'concept'
+      });
+    }
+    return concepts;
+  }
+
+  // Get count of tasks associated with a concept
+  _getConceptTaskCount(concept) {
+    if (!concept || !concept.taskTable) return 0;
+    // Return the number of tasks in the concept's task table
+    return concept.taskTable?.size || 0;
+  }
+
+  // Get the status of a task
+  _getTaskStatus(task) {
+    if (!task) return 'Unknown';
+    if (task.isBelief && task.isBelief()) return 'Belief';
+    if (task.isGoal && task.isGoal()) return 'Goal';
+    if (task.isQuestion && task.isQuestion()) return 'Question';
+    return 'Derived';
+  }
+
+  // Get the type of a task based on its characteristics
+  _getTaskType(task) {
+    if (!task) return 'Unknown';
+    if (task.punctuation === '.') return 'Belief';
+    if (task.punctuation === '!') return 'Goal';
+    if (task.punctuation === '?') return 'Question';
+    return 'Derived';
+  }
+
+  // Get system statistics
+  _getSystemStats() {
+    const stats = {
+      isRunning: this.cycle ? this.cycle.isRunning : false,
+      isPaused: this.cycle ? this.cycle.isPaused : true,
+      cycles: this.cycle ? this.cycle.cycleCount : 0,
+      tasks: this.memory && this.memory.getAllTasks ? this.memory.getAllTasks().length : 0,
+      concepts: this.memory && this.memory.conceptStorage ? this.memory.conceptStorage.size : 0,
+      timestamp: Date.now()
+    };
+    
+    return stats;
   }
 
   async start() {

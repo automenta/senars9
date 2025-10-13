@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 
-const useSimpleWebSocket = (url) => {
+const useWebSocket = (url) => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [tasks, setTasks] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -11,9 +11,7 @@ const useSimpleWebSocket = (url) => {
   useEffect(() => {
     if (!url) return;
 
-    // For the simple protocol, we need to ensure we're connecting properly
-    // Note: Browser WebSocket API doesn't allow custom headers, so we rely on the server
-    // to default to simple protocol for browser clients or use URL parameters if needed
+    // Connect to the server with the appropriate protocol
     const websocket = new WebSocket(url);
     setWs(websocket);
 
@@ -55,6 +53,11 @@ const useSimpleWebSocket = (url) => {
                 setConcepts(concepts || []);
                 setLogs(logs || []);
                 setReasonerStats(stats || null);
+              } else if (message.type === 'complete_state' && message.payload) {
+                const { tasks, concepts, stats } = message.payload;
+                setTasks(tasks || []);
+                setConcepts(concepts || []);
+                setReasonerStats(stats || null);
               }
             } catch (parseError) {
               console.error('Error parsing WebSocket message:', parseError);
@@ -73,9 +76,32 @@ const useSimpleWebSocket = (url) => {
           setConcepts(concepts || []);
           setLogs(logs || []);
           setReasonerStats(stats || null);
+        } else if (message.type === 'complete_state' && message.payload) {
+          const { tasks, concepts, stats } = message.payload;
+          setTasks(tasks || []);
+          setConcepts(concepts || []);
+          setReasonerStats(stats || null);
+        } else if (message.type === 'task_derived' && message.data) {
+          // Handle a newly derived task
+          setTasks(prevTasks => {
+            const newTask = { ...message.data, type: 'derived', createdAt: message.timestamp };
+            return [...prevTasks, newTask];
+          });
+        } else if (message.type === 'task_processed' && message.data) {
+          // Handle a processed task
+          setTasks(prevTasks => {
+            const processedTask = { ...message.data, type: 'processed', createdAt: message.timestamp };
+            return [...prevTasks, processedTask];
+          });
+        } else if (message.type === 'concept_updated' && message.data) {
+          // Handle a concept update
+          setConcepts(prevConcepts => {
+            const updatedConcept = { ...message.data, lastUpdated: message.timestamp };
+            return [...prevConcepts, updatedConcept];
+          });
         } else {
           // Handle other message types if needed
-          console.log('Received non-state-update message:', message);
+          console.log('Received message:', message);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -134,4 +160,4 @@ const useSimpleWebSocket = (url) => {
   };
 };
 
-export default useSimpleWebSocket;
+export default useWebSocket;

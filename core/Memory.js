@@ -460,4 +460,53 @@ export class Memory {
     }
     return Math.abs(hash).toString(36);
   }
+
+  /**
+   * Get the top N most active/important concepts from memory.
+   * @param {number} n - Number of top concepts to return (default: 10)
+   * @returns {Array} Array of top concepts sorted by activity/importance
+   */
+  getTopConcepts(n = 10) {
+    if (this.conceptStorage.size === 0) return [];
+    
+    // Convert the map to an array and sort by task count (a proxy for importance)
+    const conceptArray = Array.from(this.conceptStorage.entries()).map(([hash, concept]) => {
+      // Count tasks associated with this concept
+      const taskCount = concept.taskTable ? concept.taskTable.size : 0;
+      
+      return {
+        id: hash,
+        concept: concept,
+        term: concept.term,
+        taskCount: taskCount,
+        // Additional metrics for ranking
+        priority: taskCount, // Use task count as priority for now
+        createdAt: concept.createdAt || Date.now()
+      };
+    });
+    
+    // Sort by task count (descending) and return top N
+    conceptArray.sort((a, b) => b.taskCount - a.taskCount);
+    return conceptArray.slice(0, n);
+  }
+
+  /**
+   * Get the top N tasks from memory.
+   * @param {number} n - Number of top tasks to return (default: 10)
+   * @returns {Array} Array of top tasks sorted by priority/access time
+   */
+  getTopTasks(n = 10) {
+    const allTasks = this.getAllTasks();
+    
+    if (allTasks.length === 0) return [];
+    
+    // Sort tasks by priority (descending) and return top N
+    allTasks.sort((a, b) => {
+      const priorityB = b.getPriority ? b.getPriority() : (b.priority || 0.5);
+      const priorityA = a.getPriority ? a.getPriority() : (a.priority || 0.5);
+      return priorityB - priorityA;
+    });
+    
+    return allTasks.slice(0, n);
+  }
 }

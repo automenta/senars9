@@ -467,7 +467,7 @@ class Reasoning extends Component {
     // Convert successful inferences to tasks
     for (const inference of inferences) {
       if (inference.confidence >= (context.confidence ?? 0.8)) {
-        derivedTasks.push({
+        const newTask = {
           term: inference.conclusion,
           punctuation: '.',
           truth: {
@@ -477,13 +477,20 @@ class Reasoning extends Component {
           priority: inference.priority ?? 0.5,
           timestamp: Date.now(),
           derivationPath: [`reasoning:${inference.type}`]
-        });
+        };
+        
+        derivedTasks.push(newTask);
+        
+        // Emit task.derived event if messaging is available
+        if (this.core?.messages) {
+          this.core.messages.emit('task.derived', newTask);
+        }
       }
     }
 
     // Create tasks for contradiction resolution
     for (const contradiction of contradictions) {
-      derivedTasks.push({
+      const conflictTask = {
         term: `(${contradiction.term} --> resolve_conflict)`,
         punctuation: '!',
         truth: {
@@ -493,7 +500,14 @@ class Reasoning extends Component {
         priority: 0.8,
         timestamp: Date.now(),
         derivationPath: ['reasoning:contradiction_resolution']
-      });
+      };
+      
+      derivedTasks.push(conflictTask);
+      
+      // Emit task.derived event for contradiction resolution task
+      if (this.core?.messages) {
+        this.core.messages.emit('task.derived', conflictTask);
+      }
     }
 
     return derivedTasks;

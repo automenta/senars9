@@ -75,6 +75,121 @@ class WebSocketServer extends Component {
       });
     });
   }
+  
+  // Broadcast full current state to all clients
+  broadcastCurrentState() {
+    if (!this.core) {
+      Logger.warn('No core reference available for state broadcasting');
+      return;
+    }
+    
+    try {
+      // Get current state from core components
+      const state = {
+        tasks: [],
+        concepts: [],
+        stats: {}
+      };
+      
+      // Get tasks from memory if available
+      if (this.core.memory) {
+        const allTasks = this.core.memory.getAllTasks ? this.core.memory.getAllTasks() : [];
+        state.tasks = allTasks.map(task => ({
+          id: task.hashCode ? task.hashCode() : (task.id || `task_${Date.now()}`),
+          content: task.toString ? task.toString() : (task.content || 'Unknown Task'),
+          priority: task.getPriority ? task.getPriority() : (task.priority || 0.5),
+          status: this._getTaskStatus(task),
+          type: this._getTaskType(task),
+          createdAt: task.createdAt || Date.now(),
+          lastModified: task.getAccessedAt ? task.getAccessedAt() : Date.now(),
+          punctuation: task.punctuation || '.',
+          truth: task.truth || null,
+          occurrenceTime: task.occurrenceTime || Date.now(),
+          derivationPath: task.derivationPath || []
+        }));
+        
+        // Get top concepts if available
+        if (this.core.memory.getTopConcepts) {
+          const topConcepts = this.core.memory.getTopConcepts(50); // Get top 50 concepts
+          state.concepts = topConcepts.map(c => ({
+            id: c.id,
+            content: c.term?.toString() || c.concept?.term?.toString() || c.term || 'Unknown Concept',
+            priority: c.priority || 0,
+            taskCount: c.taskCount || 0,
+            type: c.term?.termType || 'concept'
+          }));
+        } else {
+          // Fallback to existing concept storage if getTopConcepts not available
+          state.concepts = [];
+          if (this.core.memory.conceptStorage) {
+            for (const [hash, concept] of this.core.memory.conceptStorage) {
+              state.concepts.push({
+                id: hash,
+                content: concept.term?.toString() || concept.name || 'Unknown Concept',
+                priority: concept.taskTable ? concept.taskTable.size : 0,
+                type: concept.term?.termType || 'concept'
+              });
+            }
+          }
+        }
+      }
+      
+      // Get system stats if available
+      if (this.core.cycle) {
+        state.stats = {
+          isRunning: this.core.cycle.isRunning,
+          isPaused: this.core.cycle.isPaused,
+          cycles: this.core.cycle.cycleCount,
+          tasks: state.tasks.length,
+          concepts: state.concepts.length,
+          timestamp: Date.now()
+        };
+      } else if (this.core.messages) {
+        // Use core's stats if cycle is not available
+        state.stats = this._getSystemStats();
+      }
+
+      // Broadcast the complete state
+      this.broadcast({
+        type: 'complete_state',
+        payload: state,
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      Logger.error('Error broadcasting current state', error);
+    }
+  }
+  
+  // Helper to get task status
+  _getTaskStatus(task) {
+    if (!task) return 'Unknown';
+    if (task.isBelief && task.isBelief()) return 'Belief';
+    if (task.isGoal && task.isGoal()) return 'Goal';
+    if (task.isQuestion && task.isQuestion()) return 'Question';
+    return 'Derived';
+  }
+  
+  // Helper to get task type
+  _getTaskType(task) {
+    if (!task) return 'Unknown';
+    if (task.punctuation === '.') return 'Belief';
+    if (task.punctuation === '!') return 'Goal';
+    if (task.punctuation === '?') return 'Question';
+    return 'Derived';
+  }
+  
+  // Helper to get system stats
+  _getSystemStats() {
+    return {
+      isRunning: false,
+      isPaused: true,
+      cycles: 0,
+      tasks: 0,
+      concepts: 0,
+      timestamp: Date.now()
+    };
+  }
 
   async stop() {
     if (!this.isRunning) return;
@@ -206,6 +321,87 @@ class WebSocketServer extends Component {
         timestamp: new Date().toISOString()
       });
     }
+    
+    // Send current state to the new client specifically
+    setImmediate(() => {
+      if (this.core) {
+        try {
+          // Get current state from core components
+          const state = {
+            tasks: [],
+            concepts: [],
+            stats: {}
+          };
+          
+          // Get tasks from memory if available
+          if (this.core.memory) {
+            const allTasks = this.core.memory.getAllTasks ? this.core.memory.getAllTasks() : [];
+            state.tasks = allTasks.map(task => ({
+              id: task.hashCode ? task.hashCode() : (task.id || `task_${Date.now()}`),
+              content: task.toString ? task.toString() : (task.content || 'Unknown Task'),
+              priority: task.getPriority ? task.getPriority() : (task.priority || 0.5),
+              status: this._getTaskStatus(task),
+              type: this._getTaskType(task),
+              createdAt: task.createdAt || Date.now(),
+              lastModified: task.getAccessedAt ? task.getAccessedAt() : Date.now(),
+              punctuation: task.punctuation || '.',
+              truth: task.truth || null,
+              occurrenceTime: task.occurrenceTime || Date.now(),
+              derivationPath: task.derivationPath || []
+            }));
+            
+            // Get top concepts if available
+            if (this.core.memory.getTopConcepts) {
+              const topConcepts = this.core.memory.getTopConcepts(50); // Get top 50 concepts
+              state.concepts = topConcepts.map(c => ({
+                id: c.id,
+                content: c.term?.toString() || c.concept?.term?.toString() || c.term || 'Unknown Concept',
+                priority: c.priority || 0,
+                taskCount: c.taskCount || 0,
+                type: c.term?.termType || 'concept'
+              }));
+            } else {
+              // Fallback to existing concept storage if getTopConcepts not available
+              state.concepts = [];
+              if (this.core.memory.conceptStorage) {
+                for (const [hash, concept] of this.core.memory.conceptStorage) {
+                  state.concepts.push({
+                    id: hash,
+                    content: concept.term?.toString() || concept.name || 'Unknown Concept',
+                    priority: concept.taskTable ? concept.taskTable.size : 0,
+                    type: concept.term?.termType || 'concept'
+                  });
+                }
+              }
+            }
+          }
+          
+          // Get system stats if available
+          if (this.core.cycle) {
+            state.stats = {
+              isRunning: this.core.cycle.isRunning,
+              isPaused: this.core.cycle.isPaused,
+              cycles: this.core.cycle.cycleCount,
+              tasks: state.tasks.length,
+              concepts: state.concepts.length,
+              timestamp: Date.now()
+            };
+          } else if (this.core.messages) {
+            // Use core's stats if cycle is not available
+            state.stats = this._getSystemStats();
+          }
+
+          // Send the complete state to the new client only
+          this.sendToClient(clientId, {
+            type: 'complete_state',
+            payload: state,
+            timestamp: new Date().toISOString()
+          });
+        } catch (error) {
+          Logger.error('Error sending current state to new client', error);
+        }
+      }
+    });
   }
 
   /**
