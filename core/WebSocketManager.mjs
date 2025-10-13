@@ -1,17 +1,23 @@
-import ws from 'ws';
 import { EventEmitter } from 'events';
+import { isValidWebSocketUrl, DEFAULT_WS_CONFIG } from '../ui/src/utils/webSocketUtils';
 
-const WebSocket = ws;
+// Dynamic import for Node.js WebSocket
+const WebSocket = await import('ws').then(module => module.default);
 
 class WebSocketManager extends EventEmitter {
   constructor(url, config = {}) {
     super();
+
+    if (!isValidWebSocketUrl(url)) {
+      throw new Error(`Invalid WebSocket URL: ${url}`);
+    }
+
     this.url = url;
+    this.config = { ...DEFAULT_WS_CONFIG, ...config };
     this.ws = null;
     this.isConnected = false;
-    this.reconnectInterval = config.reconnectInterval || 5000;
-    this.maxReconnectAttempts = config.maxReconnectAttempts || 10;
     this.reconnectAttempts = 0;
+    this.reconnectTimeoutId = null;
   }
 
   connect() {
@@ -24,21 +30,25 @@ class WebSocketManager extends EventEmitter {
         this.isConnected = true;
         this.reconnectAttempts = 0;
         this.emit('connect');
+        this.emit('open');
       });
 
-      this.ws.on('message', data => this.emit('message', data));
+      this.ws.on('message', (data) => {
+        this.emit('message', data);
+      });
 
-      this.ws.on('close', () => {
+      this.ws.on('close', (event) => {
         this.isConnected = false;
         this.emit('disconnect');
+        this.emit('close', event);
 
-        this.reconnectAttempts < this.maxReconnectAttempts && setTimeout(() => {
-          this.reconnectAttempts++;
-          this.connect();
-        }, this.reconnectInterval);
+        // Attempt reconnection if not manually closed
+        if (!event.wasClean && this.reconnectAttempts < this.config.maxReconnectAttempts) {
+          this.scheduleReconnect();
+        }
       });
 
-      this.ws.on('error', error => {
+      this.ws.on('error', (error) => {
         this.isConnected = false;
         this.emit('error', error);
       });
@@ -47,17 +57,52 @@ class WebSocketManager extends EventEmitter {
     }
   }
 
+  scheduleReconnect() {
+    this.reconnectAttempts++;
+
+    this.reconnectTimeoutId = setTimeout(() => {
+      this.connect();
+    }, this.config.reconnectInterval);
+  }
+
   send(message) {
-    this.isConnected && this.ws ? this.ws.send(message) : this.emit('error', new Error('WebSocket not connected'));
+    if (this.isConnected && this.ws) {
+      try {
+        this.ws.send(JSON.stringify(message));
+        return true;
+      } catch (error) {
+        this.emit('error', error);
+        return false;
+      }
+    }
+    this.emit('error', new Error('WebSocket not connected'));
+    return false;
   }
 
   disconnect() {
-    this.ws?.close();
+    if (this.reconnectTimeoutId) {
+      clearTimeout(this.reconnectTimeoutId);
+      this.reconnectTimeoutId = null;
+    }
+
+    if (this.ws) {
+      this.ws.close(1000, 'Manual disconnect');
+    }
+
     this.isConnected = false;
   }
 
   getStatus() {
-    return this.isConnected;
+    return {
+      isConnected: this.isConnected,
+      reconnectAttempts: this.reconnectAttempts,
+      url: this.url
+    };
+  }
+
+  destroy() {
+    this.disconnect();
+    this.removeAllListeners();
   }
 }
 

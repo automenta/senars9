@@ -44,7 +44,7 @@ const useCrdtWebSocket = (url) => {
       [{ content: '(a-->b).', priority: 0.9 }, { content: '(b-->c).', priority: 0.8 }]
         .forEach(task => sendMessage('add_task', task));
     }
-  }, [connectionStatus, provider]);
+  }, [connectionStatus, provider, sendMessage]);
 
   const sendMessage = useCallback((command, payload = {}) => {
     provider?.ws?.readyState === WebSocket.OPEN && provider.ws.send(JSON.stringify({

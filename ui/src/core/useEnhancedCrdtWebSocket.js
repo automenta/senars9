@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import useCrdtWebSocket from './crdtWebSocket';
 import { useNotification } from './NotificationSystem';
+import { CONNECTION_STATUS } from '../utils/webSocketUtils';
 
 export const useEnhancedCrdtWebSocket = (url) => {
   const { addNotification } = useNotification();
@@ -9,7 +10,11 @@ export const useEnhancedCrdtWebSocket = (url) => {
   const enhancedConnectionStatus = useCallback((status) => {
     addNotification(
       `Connection status: ${status}`,
-      { connected: 'success', disconnected: 'error' }[status] || 'info'
+      {
+        [CONNECTION_STATUS.CONNECTED]: 'success',
+        [CONNECTION_STATUS.DISCONNECTED]: 'error',
+        [CONNECTION_STATUS.ERROR]: 'error'
+      }[status] || 'info'
     );
   }, [addNotification]);
 
