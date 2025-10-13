@@ -13,7 +13,7 @@ import {
   createListContainerStyle,
   createScrollableContainerStyle,
   createPanelHeaderStyle,
-  createEmptyState
+  createEmptyStateStyle
 } from '../utils/componentPatterns';
 
 const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
@@ -21,7 +21,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const priority = task.priority || 0.5;
-  const itemStyle = createTaskItemStyle(isExpanded, isDragging, priority);
+  const itemStyle = createTaskItemStyle(isExpanded, isDragging);
   const controlsStyle = createTaskControlsStyle();
   const detailsStyle = createTaskDetailsStyle();
 
@@ -160,10 +160,10 @@ const TasksPanel = ({ tasks = [], memoryTasks = [], onUpdateTask, onDeleteTask }
                 </div>
               ))
             ) : (
-              <div style={createEmptyState(emptyStateIcon, emptyStateTitle, emptyStateSubtitle)}>
-                <div style={createEmptyState().content.icon}>{emptyStateIcon}</div>
-                <div style={createEmptyState().content.title}>{emptyStateTitle}</div>
-                <div style={createEmptyState().content.subtitle}>{emptyStateSubtitle}</div>
+              <div style={createEmptyStateStyle()}>
+                <div style={createEmptyStateStyle().icon}>{emptyStateIcon}</div>
+                <div style={createEmptyStateStyle().title}>{emptyStateTitle}</div>
+                <div style={createEmptyStateStyle().subtitle}>{emptyStateSubtitle}</div>
               </div>
             )}
           </SortableContext>

@@ -42,7 +42,24 @@ class WebSocketConnectionManager {
 
     try {
       const WebSocketClass = typeof window !== 'undefined' ? WebSocket : (await import('ws')).default;
-      this.ws = new WebSocketClass(this.url);
+
+      // Add error handling for WebSocket constructor
+      let ws;
+      try {
+        ws = new WebSocketClass(this.url);
+      } catch (constructorError) {
+        // Handle immediate connection failures gracefully - only warn in development
+        if (process.env.NODE_ENV === 'development' && this.url.includes('localhost')) {
+          console.info('WebSocket connection to localhost server not available - this is normal for frontend-only development');
+        } else {
+          console.warn('WebSocket connection failed:', constructorError.message);
+        }
+        this.connectionManager?.setStatus(CONNECTION_STATUS.DISCONNECTED);
+        this.scheduleReconnect();
+        return;
+      }
+
+      this.ws = ws;
 
       this.ws.onopen = () => {
         this.isConnected = true;
@@ -68,6 +85,12 @@ class WebSocketConnectionManager {
       };
 
       this.ws.onerror = error => {
+        // Only log WebSocket errors if we're not in a development environment trying to connect to localhost
+        if (process.env.NODE_ENV === 'development' && error.target?.url?.includes('localhost') && window.location.hostname === 'localhost') {
+          // Silent fail for localhost development - this is expected when no backend is running
+        } else {
+          console.error('WebSocket error:', error);
+        }
         this.isConnected = false;
         this.connectionManager?.setStatus(CONNECTION_STATUS.ERROR);
         this.emit('error', error);

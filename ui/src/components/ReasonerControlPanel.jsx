@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { CONNECTION_DEFAULTS } from '../constants';
 import { useUI } from '../core/UIContext';
 import { useNotification } from '../core/NotificationSystem';
 import { useCommandHistory } from '../utils/hooks';

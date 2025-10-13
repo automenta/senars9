@@ -2,6 +2,7 @@
 
 import { getPriorityColor } from './common';
 import { createStyle, createLayout, composeStyles, conditionalStyles } from './styling';
+import { THEME } from '../constants';
 
 // Generic empty state pattern
 export const createEmptyState = (icon, title, subtitle, style = {}) => ({
@@ -22,7 +23,7 @@ export const createEmptyState = (icon, title, subtitle, style = {}) => ({
 });
 
 // Task item patterns using consolidated styling
-export const createTaskItemStyle = (isExpanded, isDragging, priority) => {
+export const createTaskItemStyle = (isExpanded, isDragging) => {
   const base = createLayout('flex', {
     direction: 'row',
     align: 'center',
@@ -58,7 +59,7 @@ export const createTaskItemStyle = (isExpanded, isDragging, priority) => {
 // Priority indicator using consolidated styling
 export const createPriorityIndicatorStyle = (priority) => {
   const color = getPriorityColor(priority);
-  return createStyle('container', 'default', null, {
+  return createStyle('container', 'default', THEME, {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -203,6 +204,152 @@ export const createEventHandlers = (handlers) => ({
   onDelete: handlers.onDelete || (() => {}),
   onUpdate: handlers.onUpdate || (() => {}),
   onToggle: handlers.onToggle || (() => {})
+});
+
+// Empty state pattern
+export const createEmptyStateStyle = (iconSize = '24px', textAlign = 'center') => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '100%',
+  color: '#999',
+  fontStyle: 'italic',
+  textAlign,
+  icon: {
+    fontSize: iconSize,
+    marginBottom: '10px'
+  },
+  title: {
+    margin: 0,
+    marginBottom: '5px'
+  },
+  subtitle: {
+    fontSize: '10px',
+    margin: 0
+  }
+});
+
+// Button pattern abstractions
+export const createButtonStyle = (variant = 'default', size = 'md') => {
+  const base = {
+    padding: '4px 8px',
+    border: 'none',
+    borderRadius: '3px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    transition: 'all 0.2s ease'
+  };
+
+  const variants = {
+    primary: { backgroundColor: '#007bff', color: 'white' },
+    success: { backgroundColor: '#28a745', color: 'white' },
+    danger: { backgroundColor: '#dc3545', color: 'white' },
+    warning: { backgroundColor: '#ffc107', color: '#212529' },
+    secondary: { backgroundColor: '#6c757d', color: 'white' }
+  };
+
+  const sizes = {
+    sm: { padding: '2px 6px', fontSize: '11px' },
+    md: { padding: '4px 8px', fontSize: '12px' },
+    lg: { padding: '6px 12px', fontSize: '14px' }
+  };
+
+  return {
+    ...base,
+    ...variants[variant],
+    ...sizes[size]
+  };
+};
+
+// Log item styling patterns
+export const createLogItemStyle = (isExpanded, level) => {
+  const base = createLayout('flex', {
+    align: 'flex-start',
+    gap: '8px',
+    overrides: {
+      padding: '6px 8px',
+      margin: '3px 0',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease'
+    }
+  });
+
+  const levelStyles = {
+    error: { borderLeft: '3px solid #dc3545' },
+    warn: { borderLeft: '3px solid #ffc107' },
+    info: { borderLeft: '3px solid #17a2b8' },
+    debug: { borderLeft: '3px solid #6c757d' }
+  };
+
+  return composeStyles(
+    base,
+    conditionalStyles(isExpanded, { backgroundColor: '#f1f3f5' }),
+    levelStyles[level] || { borderLeft: '3px solid #28a745' }
+  );
+};
+
+// Header controls pattern
+export const createHeaderControlsStyle = () => createLayout('flex', {
+  gap: '4px',
+  align: 'center'
+});
+
+// Form input patterns
+export const createInputGroupStyle = () => createLayout('flex', {
+  overrides: { flex: 1, gap: '5px' }
+});
+
+export const createInputStyle = (size = 'md') => {
+  const sizes = {
+    sm: { padding: '2px 4px', fontSize: '11px' },
+    md: { padding: '4px 8px', fontSize: '12px' },
+    lg: { padding: '6px 10px', fontSize: '14px' }
+  };
+
+  return {
+    flex: 1,
+    border: '1px solid #ced4da',
+    borderRadius: '3px',
+    ...sizes[size],
+    '&:focus': {
+      outline: 'none',
+      borderColor: '#80bdff',
+      boxShadow: '0 0 0 0.2rem rgba(0, 123, 255, 0.25)'
+    }
+  };
+};
+
+// Event handler abstractions
+export const createKeyboardHandlers = (handlers) => ({
+  onKeyDown: (e) => {
+    handlers.onArrowUp?.(e);
+    handlers.onArrowDown?.(e);
+    handlers.onTab?.(e);
+    handlers.onEnter?.(e);
+    handlers.onEscape?.(e);
+  }
+});
+
+export const createHistoryHandlers = (inputValue, setInputValue, history) => ({
+  onArrowUp: (e) => {
+    e.preventDefault();
+    if (history.length > 0) {
+      const historyIndex = history.indexOf(inputValue);
+      const newIndex = Math.min(historyIndex + 1, history.length - 1);
+      setInputValue(history[newIndex] || '');
+    }
+  },
+  onArrowDown: (e) => {
+    e.preventDefault();
+    if (history.length > 0) {
+      const historyIndex = history.indexOf(inputValue);
+      if (historyIndex > 0) {
+        setInputValue(history[historyIndex - 1] || '');
+      }
+    }
+  }
 });
 
 // Style composition utility (now imported from styling.js)

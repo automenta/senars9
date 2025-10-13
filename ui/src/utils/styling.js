@@ -192,15 +192,14 @@ export const conditionalStyles = (condition, trueStyle, falseStyle = {}) =>
 export const createParameterizedStyle = (baseStyleFn) => (params = {}) =>
   baseStyleFn(params);
 
-// Backward compatibility aliases
+// Backward compatibility aliases - consolidated
 export const createContainerStyle = (theme, overrides) => createStyle('container', 'default', theme, overrides);
 export const createHeaderStyle = (theme, overrides) => createStyle('header', 'default', theme, overrides);
-export const createButtonStyle = (type, theme, overrides) => createStyle('button', type, theme, overrides);
 export const createInputStyle = (theme, overrides) => createStyle('input', 'default', theme, overrides);
 export const createStatusBadgeStyle = (status, theme, overrides) => createStyle('badge', status, theme, overrides);
 export const createGridStyle = (columns, gap, theme) => createStyle('grid', 'default', theme, { columns, gap });
 
-// Legacy function-style aliases for backward compatibility
+// Legacy function-style aliases for backward compatibility - reduced set
 export const panelContainerStyle = (overrides) => createStyle('panel', 'default', THEME, overrides);
 export const headerStyle = (overrides) => createStyle('header', 'default', THEME, overrides);
 export const labelStyle = (overrides) => createStyle('label', 'default', THEME, overrides);

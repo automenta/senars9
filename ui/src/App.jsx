@@ -9,7 +9,7 @@ import { UIProvider } from './core/UIContext';
 import { NotificationProvider } from './core/NotificationSystem';
 import './App.css';
 
-const App = () => {
+const AppContent = () => {
   const wsUrl = useWebSocketUrl();
 
   const {
@@ -48,27 +48,33 @@ const App = () => {
   }, [connectionStatus, requestConcepts, requestTopTasks]);
 
   return (
+    <div className="main-container" data-testid="app-container">
+      <div className="docking-layout-container">
+        <DockingLayout
+          logs={logs}
+          tasks={tasks}
+          concepts={concepts}
+          memoryTasks={memoryTasks}
+          reasonerStats={reasonerStats}
+          connectionStatus={connectionStatus}
+          onUpdateTask={handleUpdateTaskWithConcepts}
+          onDeleteTask={handleDeleteTask}
+        />
+      </div>
+      <ReasonerControlPanel
+        stats={reasonerStats}
+        onCommand={handleCommand}
+        onAddTask={handleAddTaskWithConcepts}
+      />
+    </div>
+  );
+};
+
+const App = () => {
+  return (
     <UIProvider>
       <NotificationProvider>
-        <div className="main-container" data-testid="app-container">
-          <div className="docking-layout-container">
-            <DockingLayout
-              logs={logs}
-              tasks={tasks}
-              concepts={concepts}
-              memoryTasks={memoryTasks}
-              reasonerStats={reasonerStats}
-              connectionStatus={connectionStatus}
-              onUpdateTask={handleUpdateTaskWithConcepts}
-              onDeleteTask={handleDeleteTask}
-            />
-          </div>
-          <ReasonerControlPanel
-            stats={reasonerStats}
-            onCommand={handleCommand}
-            onAddTask={handleAddTaskWithConcepts}
-          />
-        </div>
+        <AppContent />
       </NotificationProvider>
     </UIProvider>
   );

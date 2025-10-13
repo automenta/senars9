@@ -139,7 +139,10 @@ export const createWebSocketHook = (WebSocketClass, config = {}) => {
           const message = parseWebSocketMessage(event);
           createStateUpdater(setData)(message);
         } catch (parseError) {
-          console.error('Error parsing WebSocket message:', parseError);
+          // Only log parsing errors if not in development with localhost
+          if (!(window.location.hostname === 'localhost' && window.location.protocol === 'http:')) {
+            console.error('Error parsing WebSocket message:', parseError);
+          }
         }
       }
     },

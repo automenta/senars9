@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getLogLevelColor, getLogIcon, extractLogData, extractLogLevel } from '../utils/common';
+import { createButtonStyle, createLogItemStyle, createHeaderControlsStyle, createEmptyStateStyle } from '../utils/componentPatterns';
 
 const LogList = ({ logs = [] }) => {
   const [displayLogs, setDisplayLogs] = useState([]);
@@ -33,20 +34,7 @@ const LogList = ({ logs = [] }) => {
     setExpandedLog(expandedLog === index ? null : index);
   };
 
-  const headerControlsStyle = {
-    display: 'flex',
-    gap: '4px'
-  };
-
-  const controlButtonStyle = (bgColor) => ({
-    padding: '2px 8px',
-    fontSize: '12px',
-    border: 'none',
-    borderRadius: '2px',
-    cursor: 'pointer',
-    backgroundColor: bgColor,
-    color: 'white'
-  });
+  const headerControlsStyle = createHeaderControlsStyle();
 
   return (
     <div className="log-list" style={{
@@ -69,13 +57,13 @@ const LogList = ({ logs = [] }) => {
         <div style={headerControlsStyle}>
           <button
             onClick={() => setIsPaused(!isPaused)}
-            style={controlButtonStyle(isPaused ? '#28a745' : '#6c757d')}
+            style={createButtonStyle(isPaused ? 'success' : 'secondary', 'sm')}
           >
             {isPaused ? '▶️ Resume' : '⏸️ Pause'}
           </button>
           <button
             onClick={clearLogs}
-            style={controlButtonStyle('#dc3545')}
+            style={createButtonStyle('danger', 'sm')}
           >
             🗑️ Clear
           </button>
@@ -114,17 +102,7 @@ const LogList = ({ logs = [] }) => {
                 <li
                   key={`${isYjsObject ? log.get('timestamp') : log.timestamp || Date.now() + index}-${index}-${message.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '')}`}
                   className="log-item"
-                  style={{
-                    padding: '6px 8px',
-                    margin: '3px 0',
-                    borderRadius: '4px',
-                    backgroundColor: expandedLog === index ? '#f1f3f5' : 'transparent',
-                    borderLeft: `3px solid ${color}`,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'flex-start'
-                  }}
+                  style={createLogItemStyle(expandedLog === index, level)}
                   onClick={() => handleLogClick(log, index)}
                 >
                   <span style={{ 
@@ -206,21 +184,14 @@ const LogList = ({ logs = [] }) => {
                         {isYjsObject ? JSON.stringify(log.toJSON(), null, 2) : JSON.stringify(log, null, 2)}
                       </div>
                       
-                      <div style={{ 
-                        display: 'flex', 
-                        gap: '8px', 
+                      <div style={{
+                        display: 'flex',
+                        gap: '8px',
                         marginTop: '6px',
                         flexWrap: 'wrap'
                       }}>
-                        <button 
-                          style={{
-                            padding: '2px 6px',
-                            fontSize: '10px',
-                            border: '1px solid #ccc',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            backgroundColor: '#e9ecef'
-                          }}
+                        <button
+                          style={createButtonStyle('secondary', 'sm')}
                           onClick={(e) => {
                             e.stopPropagation();
                             navigator.clipboard.writeText(message);
@@ -228,15 +199,8 @@ const LogList = ({ logs = [] }) => {
                         >
                           📋 Copy
                         </button>
-                        <button 
-                          style={{
-                            padding: '2px 6px',
-                            fontSize: '10px',
-                            border: '1px solid #ccc',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            backgroundColor: '#e9ecef'
-                          }}
+                        <button
+                          style={createButtonStyle('secondary', 'sm')}
                           onClick={(e) => {
                             e.stopPropagation();
                             // In a real implementation, this could filter logs by type
@@ -253,19 +217,10 @@ const LogList = ({ logs = [] }) => {
             })}
           </ul>
         ) : (
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            alignItems: 'center', 
-            justifyContent: 'center',
-            height: '100%',
-            color: '#999', 
-            fontStyle: 'italic',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', marginBottom: '10px' }}>📋</div>
-            <div>No log messages yet...</div>
-            <div style={{ fontSize: '10px', marginTop: '5px' }}>Connect to a server to see activity logs</div>
+          <div style={createEmptyStateStyle()}>
+            <div style={createEmptyStateStyle().icon}>📋</div>
+            <div style={createEmptyStateStyle().title}>No log messages yet...</div>
+            <div style={createEmptyStateStyle().subtitle}>Connect to a server to see activity logs</div>
           </div>
         )}
       </div>

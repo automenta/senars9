@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CONNECTION_DEFAULTS } from '../constants';
-import { createLayout, createStyle } from '../utils/styling';
+import { createLayout } from '../utils/styling';
+import { createButtonStyle, createInputGroupStyle, createInputStyle } from '../utils/componentPatterns';
 
 const NARSESE_SUGGESTIONS = [...new Set([
   '-->', '==>', '<=>',
@@ -80,19 +81,9 @@ const StatusBar = ({ onSend, stats }) => {
     overrides: { marginRight: '10px' }
   });
 
-  const inputGroupStyle = createLayout('flex', {
-    overrides: { flex: 1 }
-  });
-
-  const controlButtonStyle = createStyle('button', 'secondary', null, {
-    padding: '4px 8px',
-    fontSize: '12px'
-  });
-
-  const inputStyle = createStyle('input', 'default', null, {
-    flex: 1,
-    marginRight: '5px'
-  });
+  const inputGroupStyle = createInputGroupStyle();
+  const controlButtonStyle = createButtonStyle('secondary', 'sm');
+  const inputStyle = createInputStyle('sm');
 
   return (
     <div className="status-bar" style={statusBarStyle}>
@@ -118,7 +109,7 @@ const StatusBar = ({ onSend, stats }) => {
           placeholder="Enter command..."
           style={inputStyle}
         />
-        <button type="submit" style={createStyle('button', 'primary', null, { padding: '4px 8px', fontSize: '12px' })}>Send</button>
+        <button type="submit" style={createButtonStyle('primary', 'sm')}>Send</button>
       </form>
     </div>
   );
