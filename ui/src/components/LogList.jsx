@@ -33,6 +33,21 @@ const LogList = ({ logs = [] }) => {
     setExpandedLog(expandedLog === index ? null : index);
   };
 
+  const headerControlsStyle = {
+    display: 'flex',
+    gap: '4px'
+  };
+
+  const controlButtonStyle = (bgColor) => ({
+    padding: '2px 8px',
+    fontSize: '12px',
+    border: 'none',
+    borderRadius: '2px',
+    cursor: 'pointer',
+    backgroundColor: bgColor,
+    color: 'white'
+  });
+
   return (
     <div className="log-list" style={{
       height: '100%',
@@ -51,33 +66,16 @@ const LogList = ({ logs = [] }) => {
         <div>
           Log Activity (Buffer: {displayLogs.length}/{fixedBufferSize})
         </div>
-        <div>
+        <div style={headerControlsStyle}>
           <button
             onClick={() => setIsPaused(!isPaused)}
-            style={{
-              padding: '2px 8px',
-              margin: '0 5px',
-              fontSize: '12px',
-              border: 'none',
-              borderRadius: '2px',
-              cursor: 'pointer',
-              backgroundColor: isPaused ? '#28a745' : '#6c757d',
-              color: 'white'
-            }}
+            style={controlButtonStyle(isPaused ? '#28a745' : '#6c757d')}
           >
             {isPaused ? '▶️ Resume' : '⏸️ Pause'}
           </button>
           <button
             onClick={clearLogs}
-            style={{
-              padding: '2px 8px',
-              fontSize: '12px',
-              border: 'none',
-              borderRadius: '2px',
-              cursor: 'pointer',
-              backgroundColor: '#dc3545',
-              color: 'white'
-            }}
+            style={controlButtonStyle('#dc3545')}
           >
             🗑️ Clear
           </button>

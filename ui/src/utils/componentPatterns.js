@@ -137,34 +137,34 @@ export const createPanelHeaderStyle = (title, count, style = {}) =>
     }
   );
 
-// Expanded task details using grid layout
-export const createTaskDetailsStyle = () => ({
-  position: 'absolute',
-  left: '0',
-  right: '0',
-  top: '100%',
-  backgroundColor: 'white',
-  border: '1px solid #0d6efd',
-  borderRadius: '4px',
-  padding: '10px',
-  zIndex: 20,
-  marginTop: '2px',
-  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-  fontSize: '11px',
-  header: createLayout('flex', {
-    justify: 'space-between',
-    align: 'center',
-    overrides: { marginBottom: '8px' }
-  }),
-  grid: createLayout('grid', {
-    columns: '1fr 1fr',
-    gap: '8px'
-  }),
-  actions: createLayout('flex', {
-    gap: '8px',
-    overrides: { marginTop: '10px' }
-  })
-});
+// Expanded task details - simplified and consolidated
+export const createTaskDetailsStyle = () => {
+  const base = {
+    position: 'absolute',
+    left: '0',
+    right: '0',
+    top: '100%',
+    backgroundColor: 'white',
+    border: '1px solid #0d6efd',
+    borderRadius: '4px',
+    padding: '10px',
+    zIndex: 20,
+    marginTop: '2px',
+    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+    fontSize: '11px'
+  };
+
+  return {
+    ...base,
+    header: createLayout('flex', {
+      justify: 'space-between',
+      align: 'center',
+      overrides: { marginBottom: '8px' }
+    }),
+    grid: createLayout('grid', { columns: '1fr 1fr', gap: '8px' }),
+    actions: createLayout('flex', { gap: '8px', overrides: { marginTop: '10px' } })
+  };
+};
 
 // Button group using layout utilities
 export const createButtonGroupStyle = (buttons, gap = '8px') =>

@@ -128,7 +128,7 @@ const TasksPanel = ({ tasks = [], memoryTasks = [], onUpdateTask, onDeleteTask }
     const oldIndex = displayTasks.findIndex(task => task.id === active.id);
     const newIndex = displayTasks.findIndex(task => task.id === over.id);
 
-    (oldIndex !== -1 && newIndex !== -1) &&
+    oldIndex !== -1 && newIndex !== -1 &&
       setDisplayTasks(arrayMove(displayTasks, oldIndex, newIndex));
   };
 

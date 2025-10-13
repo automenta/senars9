@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CONNECTION_DEFAULTS } from '../constants';
+import { createLayout, createStyle } from '../utils/styling';
 
 const NARSESE_SUGGESTIONS = [...new Set([
   '-->', '==>', '<=>',
@@ -60,31 +61,64 @@ const StatusBar = ({ onSend, stats }) => {
     onSend(command);
   };
 
+  const statusBarStyle = createLayout('flex', {
+    align: 'center',
+    overrides: {
+      padding: '5px',
+      backgroundColor: '#f0f0f0',
+      gap: '10px'
+    }
+  });
+
+  const controlsGroupStyle = createLayout('flex', {
+    gap: '5px',
+    overrides: { marginRight: '10px' }
+  });
+
+  const statsGroupStyle = createLayout('flex', {
+    gap: '10px',
+    overrides: { marginRight: '10px' }
+  });
+
+  const inputGroupStyle = createLayout('flex', {
+    overrides: { flex: 1 }
+  });
+
+  const controlButtonStyle = createStyle('button', 'secondary', null, {
+    padding: '4px 8px',
+    fontSize: '12px'
+  });
+
+  const inputStyle = createStyle('input', 'default', null, {
+    flex: 1,
+    marginRight: '5px'
+  });
+
   return (
-    <div className="status-bar" style={{ display: 'flex', alignItems: 'center', padding: '5px', backgroundColor: '#f0f0f0' }}>
-      <div style={{ display: 'flex', gap: '5px', marginRight: '10px' }}>
-        <button onClick={() => handleControlCommand('start')}>Start</button>
-        <button onClick={() => handleControlCommand('stop')}>Stop</button>
-        <button onClick={() => handleControlCommand('reset')}>Reset</button>
+    <div className="status-bar" style={statusBarStyle}>
+      <div style={controlsGroupStyle}>
+        <button onClick={() => handleControlCommand('start')} style={controlButtonStyle}>Start</button>
+        <button onClick={() => handleControlCommand('stop')} style={controlButtonStyle}>Stop</button>
+        <button onClick={() => handleControlCommand('reset')} style={controlButtonStyle}>Reset</button>
       </div>
       <div style={{ marginRight: '10px' }}>
         <span>Status: {stats?.running ? 'Running' : 'Stopped'}</span>
       </div>
-      <div style={{ display: 'flex', gap: '10px', marginRight: '10px' }}>
+      <div style={statsGroupStyle}>
         <span>Concepts: {stats?.concepts || 0}</span>
         <span>Tasks: {stats?.tasks || 0}</span>
         <span>Cycles: {stats?.cycles || 0}</span>
       </div>
-      <form onSubmit={handleSubmit} style={{ flex: 1, display: 'flex' }}>
+      <form onSubmit={handleSubmit} style={inputGroupStyle}>
         <input
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Enter command..."
-          style={{ flex: 1 }}
+          style={inputStyle}
         />
-        <button type="submit">Send</button>
+        <button type="submit" style={createStyle('button', 'primary', null, { padding: '4px 8px', fontSize: '12px' })}>Send</button>
       </form>
     </div>
   );

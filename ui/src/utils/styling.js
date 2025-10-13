@@ -181,12 +181,16 @@ export const createResponsive = (breakpoints, theme = THEME) => {
   return styles;
 };
 
-// Style composition utilities
+// Style composition utilities - enhanced for better modularity
 export const composeStyles = (...styleConfigs) =>
   styleConfigs.reduce((acc, config) => ({ ...acc, ...config }), {});
 
 export const conditionalStyles = (condition, trueStyle, falseStyle = {}) =>
   condition ? { ...falseStyle, ...trueStyle } : falseStyle;
+
+// New parameterized style builder for better modularity
+export const createParameterizedStyle = (baseStyleFn) => (params = {}) =>
+  baseStyleFn(params);
 
 // Backward compatibility aliases
 export const createContainerStyle = (theme, overrides) => createStyle('container', 'default', theme, overrides);
@@ -205,6 +209,6 @@ export const inputStyle = (overrides) => createStyle('input', 'default', THEME, 
 export const statBoxStyle = (overrides) => createStyle('statBox', 'default', THEME, overrides);
 export const statusBadgeStyle = (status, overrides) => createStyle('badge', status, THEME, overrides);
 
-// Enhanced style factory
-export const createStyleFactory = (componentType) => (variant, theme, ...args) =>
-  createStyle(componentType, variant, theme, ...args);
+// Enhanced style factory - simplified
+export const createStyleFactory = (componentType) => (variant, theme, overrides) =>
+  createStyle(componentType, variant, theme, overrides);
