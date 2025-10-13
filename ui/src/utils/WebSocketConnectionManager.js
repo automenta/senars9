@@ -2,12 +2,11 @@ import {
   CONNECTION_STATUS,
   DEFAULT_WS_CONFIG,
   isValidWebSocketUrl,
-  createConnectionManager,
-  createStateUpdater
+  createConnectionManager
 } from './webSocketUtils';
 
-// Base connection class with common WebSocket functionality
-class BaseWebSocketConnection {
+// WebSocket connection manager - simplified and consolidated
+class WebSocketConnectionManager {
   constructor(url, config = {}) {
     if (!isValidWebSocketUrl(url)) throw new Error(`Invalid WebSocket URL: ${url}`);
 
@@ -17,13 +16,10 @@ class BaseWebSocketConnection {
     this.isConnected = false;
     this.reconnectAttempts = 0;
     this.reconnectTimeoutId = null;
+    this.events = {};
 
     this.connectionManager = createConnectionManager();
-    this.connectionManager.subscribe(status => this.onStatusChange(status));
-  }
-
-  onStatusChange(status) {
-    // Override in subclasses for custom status handling
+    this.connectionManager.subscribe(status => this.emit('statusChange', status));
   }
 
   async connect() {
@@ -32,10 +28,7 @@ class BaseWebSocketConnection {
     this.connectionManager.setStatus(CONNECTION_STATUS.CONNECTING);
 
     try {
-      const WebSocketClass = typeof window !== 'undefined'
-        ? WebSocket
-        : (await import('ws')).default;
-
+      const WebSocketClass = typeof window !== 'undefined' ? WebSocket : (await import('ws')).default;
       this.ws = new WebSocketClass(this.url);
 
       this.ws.onopen = () => {
@@ -43,30 +36,28 @@ class BaseWebSocketConnection {
         this.reconnectAttempts = 0;
         this.connectionManager.setStatus(CONNECTION_STATUS.CONNECTED);
         this.connectionManager.resetReconnectAttempts();
-        this.onConnect('open');
+        this.emit('connect');
       };
 
-      this.ws.onmessage = data => this.onMessage(data);
+      this.ws.onmessage = data => this.emit('message', data);
 
       this.ws.onclose = event => {
         this.isConnected = false;
         this.connectionManager.setStatus(CONNECTION_STATUS.DISCONNECTED);
-        this.onDisconnect('close', event);
+        this.emit('disconnect', event);
 
-        if (!event.wasClean && this.reconnectAttempts < this.config.maxReconnectAttempts) {
-          this.scheduleReconnect();
-        }
+        !event.wasClean && this.reconnectAttempts < this.config.maxReconnectAttempts && this.scheduleReconnect();
       };
 
       this.ws.onerror = error => {
         this.isConnected = false;
         this.connectionManager.setStatus(CONNECTION_STATUS.ERROR);
-        this.onError(error);
+        this.emit('error', error);
       };
 
     } catch (error) {
       this.connectionManager.setStatus(CONNECTION_STATUS.ERROR);
-      this.onError(error);
+      this.emit('error', error);
     }
   }
 
@@ -84,11 +75,11 @@ class BaseWebSocketConnection {
         this.ws.send(JSON.stringify(message));
         return true;
       } catch (error) {
-        this.onError(error);
+        this.emit('error', error);
         return false;
       }
     }
-    this.onError(new Error('WebSocket not connected'));
+    this.emit('error', new Error('WebSocket not connected'));
     return false;
   }
 
@@ -98,7 +89,7 @@ class BaseWebSocketConnection {
       this.reconnectTimeoutId = null;
     }
 
-    if (this.ws) this.ws.close(1000, 'Manual disconnect');
+    this.ws?.close(1000, 'Manual disconnect');
     this.isConnected = false;
     this.connectionManager.setStatus(CONNECTION_STATUS.DISCONNECTED);
   }
@@ -110,66 +101,6 @@ class BaseWebSocketConnection {
       reconnectAttempts: this.reconnectAttempts,
       url: this.url
     };
-  }
-
-  destroy() {
-    this.disconnect();
-    this.connectionManager = null;
-  }
-
-  // Hook methods for subclasses to override
-  onConnect(event) {}
-  onMessage(data) {}
-  onDisconnect(event, closeEvent) {}
-  onError(error) {}
-}
-
-// Unified event emitter for both environments
-class EventEmitter {
-  constructor() {
-    this.events = {};
-  }
-
-  on(event, listener) {
-    (this.events[event] ||= []).push(listener);
-    return this;
-  }
-
-  emit(event, ...args) {
-    this.events[event]?.forEach(listener => listener(...args));
-    return this;
-  }
-
-  removeAllListeners() {
-    this.events = {};
-  }
-}
-
-// Unified WebSocket manager for browser and Node.js
-class WebSocketManager extends BaseWebSocketConnection {
-  constructor(url, config = {}) {
-    super(url, config);
-    this.events = {};
-  }
-
-  onStatusChange(status) {
-    this.emit('statusChange', status);
-  }
-
-  onConnect(event) {
-    this.emit('connect', event);
-  }
-
-  onMessage(data) {
-    this.emit('message', data);
-  }
-
-  onDisconnect(event, closeEvent) {
-    this.emit('disconnect', event, closeEvent);
-  }
-
-  onError(error) {
-    this.emit('error', error);
   }
 
   on(event, listener) {
@@ -188,10 +119,9 @@ class WebSocketManager extends BaseWebSocketConnection {
 
   destroy() {
     this.removeAllListeners();
-    super.destroy();
+    this.disconnect();
+    this.connectionManager = null;
   }
 }
 
-// Export with both names for compatibility
-const WebSocketConnectionManager = WebSocketManager;
 export default WebSocketConnectionManager;

@@ -1,10 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import WebSocketConnectionManager from '../utils/WebSocketConnectionManager';
-import {
-  createWebSocketConfig,
-  MESSAGE_TYPES,
-  BaseWebSocketHook
-} from '../utils/webSocketUtils';
+import { createWebSocketConfig, MESSAGE_TYPES, WebSocketManager } from '../utils/webSocketUtils';
 
 const useWebSocket = (url, config = {}) => {
   const [messages, setMessages] = useState([]);
@@ -13,7 +9,7 @@ const useWebSocket = (url, config = {}) => {
   const [data, setData] = useState({});
 
   const wsManagerRef = useRef(null);
-  const currentUrlRef = useRef(url);
+  const wsUtilsRef = useRef(null);
   const configRef = useRef(createWebSocketConfig(config));
 
   const {
@@ -23,73 +19,50 @@ const useWebSocket = (url, config = {}) => {
     enableMessageHistory
   } = configRef.current;
 
-  // Initialize WebSocket manager
+  // Initialize WebSocket connection
   useEffect(() => {
-    const initializeWebSocket = async () => {
-      if (!wsManagerRef.current) {
-        wsManagerRef.current = new WebSocketConnectionManager(currentUrlRef.current, configRef.current);
+    if (!wsManagerRef.current) {
+      wsManagerRef.current = new WebSocketConnectionManager(url, configRef.current);
+      wsUtilsRef.current = new WebSocketManager({
+        setData,
+        setError,
+        setLastMessage,
+        setMessages,
+        sendMessage,
+        sendRawMessage,
+        config: configRef.current
+      });
 
-        const baseHook = new BaseWebSocketHook({
-          setData,
-          setError,
-          setLastMessage,
-          setMessages,
-          sendMessage,
-          sendRawMessage,
-          config: {
-            enableMessageHistory,
-            maxMessages,
-            messageRetention,
-            autoRequestState
-          }
-        });
+      wsManagerRef.current
+        .on('message', event => wsUtilsRef.current.handleMessage(event))
+        .on('error', error => wsUtilsRef.current.handleError(error))
+        .on('connect', () => wsUtilsRef.current.handleConnect());
 
-        wsManagerRef.current
-          .on('message', event => baseHook.handleMessage(event))
-          .on('error', error => baseHook.handleError(error))
-          .on('connect', () => baseHook.handleConnect());
-
-        await wsManagerRef.current.connect();
-      }
-    };
-
-    initializeWebSocket();
+      wsManagerRef.current.connect();
+    }
 
     return () => {
-      if (wsManagerRef.current) {
-        wsManagerRef.current.destroy();
-        wsManagerRef.current = null;
-      }
+      wsManagerRef.current?.destroy();
+      wsManagerRef.current = null;
+      wsUtilsRef.current = null;
     };
   }, []);
 
-  const sendRawMessage = useCallback((message) => {
-    return wsManagerRef.current?.send(message) || false;
-  }, []);
+  // Handle URL changes
+  useEffect(() => {
+    if (wsManagerRef.current) {
+      wsManagerRef.current.disconnect();
+      setTimeout(() => wsManagerRef.current?.connect(), 100);
+    }
+  }, [url]);
 
-  const sendMessage = useCallback((command, payload = {}) => {
-    return sendRawMessage({ type: MESSAGE_TYPES.CONTROL, command, payload });
-  }, [sendRawMessage]);
+  const sendRawMessage = useCallback((message) =>
+    wsManagerRef.current?.send(message) || false, []);
 
-  const baseHook = useMemo(() =>
-    new BaseWebSocketHook({
-      setData,
-      setError,
-      setLastMessage,
-      setMessages,
-      sendMessage,
-      sendRawMessage,
-      config: {
-        enableMessageHistory,
-        maxMessages,
-        messageRetention,
-        autoRequestState
-      }
-    }),
-    [setData, setError, setLastMessage, setMessages, sendMessage, sendRawMessage, enableMessageHistory, maxMessages, messageRetention, autoRequestState]
-  );
+  const sendMessage = useCallback((command, payload = {}) =>
+    sendRawMessage({ type: MESSAGE_TYPES.CONTROL, command, payload }), [sendRawMessage]);
 
-  const taskHandlers = useMemo(() => baseHook.getTaskHandlers(), [baseHook]);
+  const taskHandlers = useMemo(() => wsUtilsRef.current?.getTaskHandlers() || {}, []);
 
   const requestConcepts = useCallback(() => sendMessage('get_concepts'), [sendMessage]);
   const requestTopTasks = useCallback(() => sendMessage('get_top_tasks'), [sendMessage]);
@@ -105,48 +78,31 @@ const useWebSocket = (url, config = {}) => {
     setTimeout(() => wsManagerRef.current?.connect(), 1000);
   }, []);
 
-  // Handle URL changes
-  useEffect(() => {
-    currentUrlRef.current = url;
-    if (wsManagerRef.current) {
-      wsManagerRef.current.disconnect();
-      setTimeout(() => wsManagerRef.current?.connect(), 100);
-    }
-  }, [url]);
-
   // Manage message history retention
   useEffect(() => {
-    if (enableMessageHistory) {
-      setMessages(prev => baseHook.manageMessageHistory(prev));
+    if (enableMessageHistory && wsUtilsRef.current) {
+      setMessages(prev => wsUtilsRef.current.manageMessageHistory(prev));
     }
-  }, [messages, baseHook, enableMessageHistory]);
+  }, [messages, enableMessageHistory]);
 
-   const sortedTasks = useMemo(() =>
-     baseHook.getSortedTasks(data.tasks || []),
-     [data.tasks, baseHook]
-   );
+  const sortedTasks = useMemo(() =>
+    wsUtilsRef.current?.getSortedTasks(data.tasks || []) || [],
+    [data.tasks]);
 
   const status = wsManagerRef.current?.getStatus();
   const connectionStatus = status?.status || 'disconnected';
 
   return {
-    // Connection state
     isConnected: status?.isConnected || false,
     connectionStatus,
     error: error || (connectionStatus === 'error' ? 'WebSocket connection error' : null),
-
-    // Message history (if enabled)
     messages: enableMessageHistory ? messages : [],
     lastMessage,
-
-    // Application data
     tasks: sortedTasks,
     logs: data.logs || [],
     concepts: data.concepts || [],
     memoryTasks: data.memoryTasks || [],
     reasonerStats: data.reasonerStats || null,
-
-    // Actions
     sendRawMessage,
     sendMessage,
     handleAddTask: taskHandlers.handleAddTask,
@@ -157,8 +113,6 @@ const useWebSocket = (url, config = {}) => {
     requestState,
     reconnect,
     disconnect,
-
-    // Status
     reconnectAttempts: status?.reconnectAttempts || 0
   };
 };

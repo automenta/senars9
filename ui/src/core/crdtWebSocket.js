@@ -1,7 +1,40 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
-import { sortTasksByPriority, WebSocketTaskManager } from '../utils/webSocketUtils';
+import { WebSocketManager, sortTasksByPriority } from '../utils/webSocketUtils';
+
+// Yjs utilities abstraction
+const createYjsObservers = (ydoc, setters) => {
+  const { setTasks, setLogs, setConcepts, setReasonerStats } = setters;
+
+  return {
+    setup: (provider) => {
+      const yTasks = ydoc.getArray('tasks');
+      const yLogs = ydoc.getArray('logs');
+      const yConcepts = ydoc.getArray('concepts');
+
+      // Observer setup with consistent patterns
+      const observers = {
+        tasks: () => setTasks(yTasks.toArray().map(task =>
+          task instanceof Y.Map ? task.toJSON() : task
+        )),
+        logs: () => setLogs(yLogs.toArray()),
+        concepts: () => setConcepts(yConcepts.toArray())
+      };
+
+      Object.entries(observers).forEach(([key, observer]) =>
+        ydoc.getArray(key).observe(observer));
+
+      provider.awareness.on('change', () => {
+        setReasonerStats(Array.from(provider.awareness.getStates().values())
+          .find(state => state.reasonerStats)?.reasonerStats || null);
+      });
+
+      return () => Object.keys(observers).forEach(key =>
+        ydoc.getArray(key).unobserve(observers[key]));
+    }
+  };
+};
 
 const useCrdtWebSocket = (url) => {
   const [ydoc] = useState(() => new Y.Doc());
@@ -20,23 +53,14 @@ const useCrdtWebSocket = (url) => {
 
     wsProvider.on('status', event => setConnectionStatus(event.status));
 
-    const yTasks = ydoc.getArray('tasks');
-    const yLogs = ydoc.getArray('logs');
-    const yConcepts = ydoc.getArray('concepts');
+    // Use abstracted Yjs observer pattern
+    const observers = createYjsObservers(ydoc, { setTasks, setLogs, setConcepts, setReasonerStats });
+    const cleanup = observers.setup(wsProvider);
 
-    // Set up Yjs observers
-    yTasks.observe(() => setTasks(yTasks.toArray().map(task =>
-      task instanceof Y.Map ? task.toJSON() : task
-    )));
-    yLogs.observe(() => setLogs(yLogs.toArray()));
-    yConcepts.observe(() => setConcepts(yConcepts.toArray()));
-
-    wsProvider.awareness.on('change', () => {
-      setReasonerStats(Array.from(wsProvider.awareness.getStates().values())
-        .find(state => state.reasonerStats)?.reasonerStats || null);
-    });
-
-    return () => wsProvider.disconnect();
+    return () => {
+      cleanup?.();
+      wsProvider.disconnect();
+    };
   }, [url, ydoc]);
 
   const sendMessage = useCallback((command, payload = {}) => {
@@ -45,15 +69,22 @@ const useCrdtWebSocket = (url) => {
     }
   }, [provider]);
 
-  const taskManager = useMemo(() =>
-    new WebSocketTaskManager({ sendMessage, sortTasksByPriority }),
-    [sendMessage]
-  );
+  const sendRawMessage = useCallback((message) => {
+    if (provider?.ws?.readyState === WebSocket.OPEN) {
+      provider.ws.send(JSON.stringify(message));
+      return true;
+    }
+    return false;
+  }, [provider]);
+
+  // Use consolidated WebSocket manager
+  const wsManager = useMemo(() => new WebSocketManager({
+    sendMessage,
+    config: { enableMessageHistory: false }
+  }), [sendMessage]);
 
   const sortedTasks = useMemo(() =>
-    taskManager.getSortedTasks(tasks),
-    [tasks, taskManager]
-  );
+    sortTasksByPriority(tasks), [tasks]);
 
   return {
     isConnected: connectionStatus === 'connected',
@@ -63,12 +94,11 @@ const useCrdtWebSocket = (url) => {
     logs,
     concepts,
     reasonerStats,
-    sendRawMessage: message => provider?.ws?.readyState === WebSocket.OPEN &&
-      provider.ws.send(JSON.stringify(message)),
+    sendRawMessage,
     sendMessage,
-    handleAddTask: task => taskManager.handleAddTask(task),
-    handleUpdateTask: task => taskManager.handleUpdateTask(task),
-    handleDeleteTask: task => taskManager.handleDeleteTask(task),
+    handleAddTask: task => wsManager.getTaskHandlers().handleAddTask(task),
+    handleUpdateTask: task => wsManager.getTaskHandlers().handleUpdateTask(task),
+    handleDeleteTask: task => wsManager.getTaskHandlers().handleDeleteTask(task),
   };
 };
 
