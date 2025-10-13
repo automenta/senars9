@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { CONNECTION_DEFAULTS } from '../constants';
+import { useUI } from '../core/UIContext';
+import { useNotification } from '../core/NotificationSystem';
 
 const NARSESE_SUGGESTIONS = [...new Set([
   '-->', '==>', '<=>',
@@ -10,10 +12,14 @@ const NARSESE_SUGGESTIONS = [...new Set([
 ])];
 
 const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
+  const { config } = useUI();
+  const { addNotification } = useNotification();
+  const controlConfig = config?.controlPanel || {};
+  
   const [inputValue, setInputValue] = useState('');
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [cpuThrottle, setCpuThrottle] = useState(100);
+  const [cpuThrottle, setCpuThrottle] = useState(controlConfig.defaultThrottle || 100);
   const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
@@ -36,6 +42,7 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
     const value = parseInt(e.target.value);
     setCpuThrottle(value);
     onCommand('throttle', { value });
+    addNotification(`CPU throttle set to ${value}%`, 'info');
   };
 
   const handleSubmit = (e) => {
@@ -43,14 +50,25 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
     if (inputValue.trim()) {
       if (inputValue.startsWith('/cmd')) {
         // This is a command, send it via onCommand
-        onCommand(inputValue.slice(5).trim()); // Remove '/cmd ' prefix and send command
+        const command = inputValue.slice(5).trim();
+        // Extract potential payload from command if present in format: command payload
+        const [cmd, ...args] = command.split(' ');
+        if (args.length > 0) {
+          onCommand(cmd, { payload: args.join(' ') });
+          addNotification(`Command '${cmd}' executed with payload`, 'info');
+        } else {
+          onCommand(cmd);
+          addNotification(`Command '${cmd}' executed`, 'info');
+        }
       } else {
         // This is a task, add it via onAddTask
         if (onAddTask) {
           onAddTask({ content: inputValue, priority: 0.5 });
+          addNotification(`Task added: ${inputValue.substring(0, 30)}${inputValue.length > 30 ? '...' : ''}`, 'success');
         } else {
           // Fallback to command if onAddTask is not provided
           onCommand('add_task', { content: inputValue, priority: 0.5 });
+          addNotification(`Task added via command: ${inputValue.substring(0, 30)}${inputValue.length > 30 ? '...' : ''}`, 'success');
         }
       }
       if (inputValue !== history[0]) {
@@ -152,72 +170,122 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
       <h3 style={styles.header}>Reasoner Control</h3>
       <div style={styles.grid}>
         <div style={styles.column}>
-          <div>
-            <label style={styles.label}>Control:</label>
-            <div style={styles.buttonContainer}>
-              <button onClick={() => onCommand('start')} style={styles.button('white', '#28a745')}>Start</button>
-              <button onClick={() => onCommand('stop')} style={styles.button('white', '#dc3545')}>Stop</button>
-              <button onClick={() => onCommand('step')} style={styles.button('white', '#17a2b8')}>Step</button>
-              <button onClick={() => onCommand('reset')} style={styles.button('black', '#ffc107')}>Reset</button>
+          {controlConfig.showStartButton || controlConfig.showStopButton || controlConfig.showStepButton || controlConfig.showResetButton ? (
+            <div>
+              <label style={styles.label}>Control:</label>
+              <div style={styles.buttonContainer}>
+                {controlConfig.showStartButton && (
+                  <button 
+                    onClick={() => {
+                      onCommand('start');
+                      addNotification('Reasoner started', 'success');
+                    }} 
+                    style={styles.button('white', '#28a745')}
+                  >
+                    Start
+                  </button>
+                )}
+                {controlConfig.showStopButton && (
+                  <button 
+                    onClick={() => {
+                      onCommand('stop');
+                      addNotification('Reasoner stopped', 'info');
+                    }} 
+                    style={styles.button('white', '#dc3545')}
+                  >
+                    Stop
+                  </button>
+                )}
+                {controlConfig.showStepButton && (
+                  <button 
+                    onClick={() => {
+                      onCommand('step');
+                      addNotification('Single cognitive cycle executed', 'info');
+                    }} 
+                    style={styles.button('white', '#17a2b8')}
+                  >
+                    Step
+                  </button>
+                )}
+                {controlConfig.showResetButton && (
+                  <button 
+                    onClick={() => {
+                      onCommand('reset');
+                      addNotification('System reset completed', 'info');
+                    }} 
+                    style={styles.button('black', '#ffc107')}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-          <div>
-            <label style={styles.label}>CPU Throttle: {cpuThrottle}%</label>
-            <input type="range" min="1" max="100" value={cpuThrottle} onChange={handleCpuThrottleChange} style={{ width: '100%' }} />
-            <div style={styles.throttleContainer}>
-              <span>1%</span>
-              <span>50%</span>
-              <span>100%</span>
+          ) : null}
+          {controlConfig.showThrottleControl && (
+            <div>
+              <label style={styles.label}>CPU Throttle: {cpuThrottle}%</label>
+              <input type="range" min="1" max="100" value={cpuThrottle} onChange={handleCpuThrottleChange} style={{ width: '100%' }} />
+              <div style={styles.throttleContainer}>
+                <span>1%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-        <div>
-          <label style={styles.label}>
-            Status:
-            <span style={styles.statusBadge}>
-              {stats?.running && !stats?.paused ? 'Running' : 
-               stats?.paused ? 'Paused' : 'Stopped'}
-            </span>
-          </label>
-          <div style={styles.statsGrid}>
-            <div style={styles.statBox}>
-              <div style={styles.statValue('#007bff')}>{stats?.concepts || 0}</div>
-              <div style={styles.statLabel}>Concepts</div>
-            </div>
-            <div style={styles.statBox}>
-              <div style={styles.statValue('#28a745')}>{stats?.tasks || 0}</div>
-              <div style={styles.statLabel}>Tasks</div>
-            </div>
-            <div style={styles.statBox}>
-              <div style={styles.statValue('#ffc107')}>{stats?.cycles || 0}</div>
-              <div style={styles.statLabel}>Cycles</div>
+        {controlConfig.showStats && (
+          <div>
+            <label style={styles.label}>
+              Status:
+              <span style={styles.statusBadge}>
+                {stats?.running && !stats?.paused ? 'Running' : 
+                 stats?.paused ? 'Paused' : 'Stopped'}
+              </span>
+            </label>
+            <div style={styles.statsGrid}>
+              <div style={styles.statBox}>
+                <div style={styles.statValue('#007bff')}>{stats?.concepts || 0}</div>
+                <div style={styles.statLabel}>Concepts</div>
+              </div>
+              <div style={styles.statBox}>
+                <div style={styles.statValue('#28a745')}>{stats?.tasks || 0}</div>
+                <div style={styles.statLabel}>Tasks</div>
+              </div>
+              <div style={styles.statBox}>
+                <div style={styles.statValue('#ffc107')}>{stats?.cycles || 0}</div>
+                <div style={styles.statLabel}>Cycles</div>
+              </div>
             </div>
           </div>
+        )}
+      </div>
+      {controlConfig.showChart && (
+        <div style={styles.chartContainer}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="time" hide />
+              <YAxis width={30} />
+              <Tooltip />
+              <Line type="monotone" dataKey="concepts" stroke="#007bff" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="tasks" stroke="#28a745" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
-      </div>
-      <div style={styles.chartContainer}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="time" hide />
-            <YAxis width={30} />
-            <Tooltip />
-            <Line type="monotone" dataKey="concepts" stroke="#007bff" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="tasks" stroke="#28a745" strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Enter a command or task (e.g. /cmd start)..."
-          style={styles.inputField}
-        />
-        <button type="submit" style={styles.sendButton}>Send</button>
-      </form>
+      )}
+      {controlConfig.showInputField && (
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Enter a command or task (e.g. /cmd start)..."
+            style={styles.inputField}
+          />
+          <button type="submit" style={styles.sendButton}>Send</button>
+        </form>
+      )}
     </div>
   );
 };

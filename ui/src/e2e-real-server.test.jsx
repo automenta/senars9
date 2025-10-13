@@ -15,7 +15,7 @@ describe('End-to-end test with a real server connection', () => {
       expect(screen.getByText('Connected')).toBeInTheDocument();
     }, { timeout: 5000 }); // Generous timeout for connection
 
-    // Find the input field and the send button in the UnifiedMenuBar
+    // Find the input field and the send button in the ReasonerControlPanel
     const taskInput = screen.getByPlaceholderText('Enter a command or task (e.g. /cmd start)...');
     const sendButton = screen.getByText('Send');
 

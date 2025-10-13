@@ -64,64 +64,185 @@ class SenarsServer {
   async handleControlCommand(command, payload) {
     console.log(`Received command: ${command}`, payload);
     
-    switch (command) {
-      case 'start':
-        console.log('Start command received - not implemented in simple server');
-        break;
-      case 'stop':
-        console.log('Stop command received - not implemented in simple server');
-        break;
-      case 'step':
-        console.log('Step command received - not implemented in simple server');
-        // This would trigger a single cognitive cycle in a full implementation
-        // For now, just update the cycle count to simulate a step
-        const currentState = awareness.getLocalState()?.reasonerStats || {};
-        const newCycleCount = (currentState.cycles || 0) + 1;
-        
-        awareness.setLocalStateField('reasonerStats', {
-          ...currentState,
-          cycles: newCycleCount,
-          timestamp: Date.now()
-        });
-        break;
-      case 'reset':
-        // Reset the cycle count
-        const resetState = awareness.getLocalState()?.reasonerStats || {};
-        awareness.setLocalStateField('reasonerStats', {
-          ...resetState,
-          cycles: 0,
-          timestamp: Date.now()
-        });
-        break;
-      case 'throttle':
-        console.log(`Throttle command: ${payload.value}%`);
-        break;
-      case 'add_task':
-        // Add a new task to the Yjs document
-        const newTask = {
-          id: randomUUID(),
-          content: payload.content || 'User task',
-          priority: payload.priority || 0.5,
-          status: 'Input',
-          type: 'Input',
-          createdAt: Date.now()
-        };
-        const taskMap = new Y.Map();
-        Object.entries(newTask).forEach(([key, value]) => {
-          taskMap.set(key, value);
-        });
-        yTasks.push([taskMap]);
-        
-        // Update stats
-        const addTaskState = awareness.getLocalState()?.reasonerStats || {};
-        awareness.setLocalStateField('reasonerStats', {
-          ...addTaskState,
-          tasks: yTasks.length,
-          timestamp: Date.now()
-        });
-        break;
-      default:
-        console.log(`Unknown command: ${command}`);
+    try {
+      switch (command) {
+        case 'start':
+          console.log('Start command received');
+          // Update the reasoner state to running
+          const startState = awareness.getLocalState()?.reasonerStats || {};
+          awareness.setLocalStateField('reasonerStats', {
+            ...startState,
+            isRunning: true,
+            isPaused: false,
+            timestamp: Date.now()
+          });
+          break;
+        case 'stop':
+          console.log('Stop command received');
+          // Update the reasoner state to stopped/paused
+          const stopState = awareness.getLocalState()?.reasonerStats || {};
+          awareness.setLocalStateField('reasonerStats', {
+            ...stopState,
+            isRunning: false,
+            isPaused: true,
+            timestamp: Date.now()
+          });
+          break;
+        case 'step':
+          console.log('Step command received - executing single cognitive cycle');
+          // Simulate a cognitive step by updating the cycle count and maintaining current state
+          const currentState = awareness.getLocalState()?.reasonerStats || {};
+          const newCycleCount = (currentState.cycles || 0) + 1;
+          
+          // Update awareness with new cycle count and maintain other stats
+          awareness.setLocalStateField('reasonerStats', {
+            ...currentState,
+            cycles: newCycleCount,
+            isRunning: false,  // After step execution, remain paused
+            isPaused: true,    // Step executed in isolation
+            concepts: yConcepts.length,
+            tasks: yTasks.length,
+            timestamp: Date.now()
+          });
+          
+          console.log(`Cognitive cycle ${newCycleCount} completed`);
+          break;
+        case 'reset':
+          console.log('Reset command received');
+          // Reset the system to initial state
+          const resetState = awareness.getLocalState()?.reasonerStats || {};
+          awareness.setLocalStateField('reasonerStats', {
+            isRunning: false,
+            isPaused: true,
+            cycles: 0,
+            concepts: initialConcepts.length,
+            tasks: initialTasks.length,
+            timestamp: Date.now()
+          });
+          
+          // Clear all dynamic tasks and concepts, keeping initial ones in the mock version
+          yTasks.delete(0, yTasks.length);
+          yConcepts.delete(0, yConcepts.length);
+          
+          // Reinitialize with initial data
+          initialTasks.forEach(task => yTasks.push([new Y.Map(Object.entries(task))]));
+          initialConcepts.forEach(concept => yConcepts.push([new Y.Map(Object.entries(concept))]));
+          break;
+        case 'throttle':
+          console.log(`Throttle command: ${payload.value}%`);
+          // In a real implementation, this would adjust the reasoning cycle speed
+          const throttleState = awareness.getLocalState()?.reasonerStats || {};
+          awareness.setLocalStateField('reasonerStats', {
+            ...throttleState,
+            timestamp: Date.now()
+          });
+          break;
+        case 'add_task':
+          console.log('Add task command received');
+          // Validate required fields
+          if (!payload.content) {
+            console.error('Add task command failed: missing content');
+            return;
+          }
+          
+          // Add a new task to the Yjs document
+          const newTask = {
+            id: randomUUID(),
+            content: payload.content,
+            priority: typeof payload.priority === 'number' ? Math.max(0, Math.min(1, payload.priority)) : 0.5,
+            status: payload.status || 'Input',
+            type: payload.type || 'Input',
+            createdAt: Date.now(),
+            lastModified: Date.now(),
+            dependencies: Array.isArray(payload.dependencies) ? payload.dependencies : [],
+            metadata: typeof payload.metadata === 'object' ? payload.metadata : {}
+          };
+          
+          const taskMap = new Y.Map();
+          Object.entries(newTask).forEach(([key, value]) => {
+            taskMap.set(key, value);
+          });
+          yTasks.push([taskMap]);
+          
+          // Update stats
+          const addTaskState = awareness.getLocalState()?.reasonerStats || {};
+          awareness.setLocalStateField('reasonerStats', {
+            ...addTaskState,
+            tasks: yTasks.length,
+            timestamp: Date.now()
+          });
+          break;
+        case 'update_task':
+          console.log('Update task command received');
+          // Update an existing task
+          const taskId = payload.id;
+          if (!taskId) {
+            console.error('Update task command failed: missing task ID');
+            return;
+          }
+          
+          const yTasksArr = ydoc.getArray('tasks');
+          const taskIndex = yTasksArr.toArray().findIndex(task => task.get('id') === taskId);
+          if (taskIndex !== -1) {
+            const taskMap = yTasksArr.get(taskIndex);
+            // Ensure ID can't be changed and sanitize the update
+            const allowedFields = ['priority', 'status', 'type', 'content', 'dependencies', 'missionId', 'metadata'];
+            const updatedFields = { lastModified: Date.now() };
+            
+            for (const [key, value] of Object.entries(payload)) {
+              if (allowedFields.includes(key) && key !== 'id') {
+                updatedFields[key] = value;
+              }
+            }
+            
+            for (const [key, value] of Object.entries(updatedFields)) {
+              taskMap.set(key, value);
+            }
+            
+            // Update stats
+            const updateTaskState = awareness.getLocalState()?.reasonerStats || {};
+            awareness.setLocalStateField('reasonerStats', {
+              ...updateTaskState,
+              timestamp: Date.now()
+            });
+          } else {
+            console.error(`Update task command failed: task with ID ${taskId} not found`);
+          }
+          break;
+        case 'delete_task':
+          console.log('Delete task command received');
+          // Remove a task from the Yjs document
+          const deleteTaskId = payload.id;
+          if (!deleteTaskId) {
+            console.error('Delete task command failed: missing task ID');
+            return;
+          }
+          
+          const yTasksArr2 = ydoc.getArray('tasks');
+          const deleteIndex = yTasksArr2.toArray().findIndex(task => task.get('id') === deleteTaskId);
+          if (deleteIndex !== -1) {
+            yTasksArr2.delete(deleteIndex, 1);
+            
+            // Update stats
+            const deleteTaskState = awareness.getLocalState()?.reasonerStats || {};
+            awareness.setLocalStateField('reasonerStats', {
+              ...deleteTaskState,
+              tasks: yTasksArr2.length,
+              timestamp: Date.now()
+            });
+          } else {
+            console.error(`Delete task command failed: task with ID ${deleteTaskId} not found`);
+          }
+          break;
+
+        default:
+          console.log(`Unknown command: ${command}`);
+          // Send an error response for unknown commands
+          break;
+      }
+    } catch (error) {
+      console.error(`Error handling command ${command}:`, error);
+      // In a real implementation, we might want to send an error response back to the client
     }
   }
 

@@ -46,34 +46,43 @@ const useCrdtWebSocket = (url) => {
   }, [url, ydoc]);
 
   const handleAddTask = useCallback((task) => {
-    const yTasks = ydoc.getArray('tasks');
-    const taskMap = new Y.Map();
-    Object.entries(task).forEach(([key, value]) => {
-      taskMap.set(key, value);
-    });
-    yTasks.push([taskMap]);
-  }, [ydoc]);
+    // Send the add_task command to server instead of directly modifying Yjs document
+    if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
+      const message = {
+        type: 'control',
+        command: 'add_task',
+        payload: task
+      };
+      const encodedMessage = JSON.stringify(message);
+      provider.ws.send(encodedMessage);
+    }
+  }, [provider]);
 
   const handleUpdateTask = useCallback((updatedTask) => {
-    const yTasks = ydoc.getArray('tasks');
-    const taskIndex = yTasks.toArray().findIndex(task => task.get('id') === updatedTask.id);
-    if (taskIndex !== -1) {
-      const taskMap = yTasks.get(taskIndex);
-      for (const key in updatedTask) {
-        if (key !== 'id') {
-          taskMap.set(key, updatedTask[key]);
-        }
-      }
+    // Send the update_task command to server instead of directly modifying Yjs document
+    if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
+      const message = {
+        type: 'control',
+        command: 'update_task',
+        payload: updatedTask
+      };
+      const encodedMessage = JSON.stringify(message);
+      provider.ws.send(encodedMessage);
     }
-  }, [ydoc]);
+  }, [provider]);
 
   const handleDeleteTask = useCallback((taskToDelete) => {
-    const yTasks = ydoc.getArray('tasks');
-    const taskIndex = yTasks.toArray().findIndex(task => task.get('id') === taskToDelete.id);
-    if (taskIndex !== -1) {
-      yTasks.delete(taskIndex, 1);
+    // Send the delete_task command to server instead of directly modifying Yjs document
+    if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
+      const message = {
+        type: 'control',
+        command: 'delete_task',
+        payload: { id: taskToDelete.id }
+      };
+      const encodedMessage = JSON.stringify(message);
+      provider.ws.send(encodedMessage);
     }
-  }, [ydoc]);
+  }, [provider]);
 
   const sortedTasks = useMemo(() => tasks.sort((a, b) => (b.priority || 0) - (a.priority || 0)), [tasks]);
 
@@ -86,8 +95,20 @@ const useCrdtWebSocket = (url) => {
     concepts,
     reasonerStats,
     sendRawMessage: (message) => {
-      if (provider && provider.ws) {
+      if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
         // Properly encode and send message to WebSocket
+        const encodedMessage = JSON.stringify(message);
+        provider.ws.send(encodedMessage);
+      }
+    },
+    sendMessage: (command, payload = {}) => {
+      // Standardized method to send control commands
+      if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
+        const message = {
+          type: 'control',
+          command,
+          payload
+        };
         const encodedMessage = JSON.stringify(message);
         provider.ws.send(encodedMessage);
       }

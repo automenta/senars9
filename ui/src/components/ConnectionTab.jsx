@@ -6,13 +6,14 @@ import LogList from './LogList';
 import TasksPanel from './TasksPanel';
 import ConceptMap from './ConceptMap';
 import SortableItem from './SortableItem';
+import SystemStatusPanel from './SystemStatusPanel';
 import useCrdtWebSocket from '../core/crdtWebSocket';
+import CommandService from '../services/CommandService';
 import { PANEL_CONFIG, THEME } from '../constants';
 import Panel from './Panel';
 
 const ConnectionTab = ({ name, url }) => {
   const {
-    isConnected,
     connectionStatus,
     error,
     tasks,
@@ -32,12 +33,11 @@ const ConnectionTab = ({ name, url }) => {
     PANEL_CONFIG.bottomPanel,
   ]);
 
-  const handleSendMessage = (command) => {
-    sendRawMessage({ type: 'command', payload: { data: command } });
-  };
+  // Create command service instance
+  const commandService = new CommandService(sendRawMessage);
 
-  const handleCommand = (command, payload) => {
-    sendRawMessage({ type: 'control', command, payload });
+  const handleCommand = (command, payload = {}) => {
+    commandService.execute(command, payload);
   };
 
   const handleDragStart = (event) => {
@@ -86,8 +86,19 @@ const ConnectionTab = ({ name, url }) => {
               <Panel title="Tasks">
                 <TasksPanel
                   tasks={tasks}
+                  onAddTask={handleAddTask}
                   onUpdateTask={handleUpdateTask}
                   onDeleteTask={handleDeleteTask}
+                />
+              </Panel>
+            </div>
+            <div style={{ flex: 0.8 }}>
+              <Panel title="System">
+                <SystemStatusPanel
+                  stats={reasonerStats}
+                  connectionStatus={connectionStatus}
+                  tasks={tasks}
+                  concepts={concepts}
                 />
               </Panel>
             </div>

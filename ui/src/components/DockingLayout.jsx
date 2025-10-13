@@ -4,6 +4,7 @@ import 'flexlayout-react/style/light.css';
 import ConceptMap from './ConceptMap';
 import TasksPanel from './TasksPanel';
 import LogList from './LogList';
+import SystemStatusPanel from './SystemStatusPanel';
 
 const json = {
   global: {},
@@ -47,6 +48,11 @@ const json = {
                         name: 'Logs',
                         component: 'log-list',
                     },
+                    {
+                        type: 'tab',
+                        name: 'System',
+                        component: 'system-status',
+                    },
                 ],
             },
         ],
@@ -61,6 +67,8 @@ const DockingLayout = ({
   logs,
   tasks,
   concepts,
+  reasonerStats,
+  connectionStatus,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
@@ -82,6 +90,14 @@ const DockingLayout = ({
     }
     if (component === 'log-list') {
         return <LogList logs={logs} />;
+    }
+    if (component === 'system-status') {
+      return <SystemStatusPanel 
+        stats={reasonerStats} 
+        connectionStatus={connectionStatus}
+        tasks={tasks}
+        concepts={concepts}
+      />;
     }
   };
 

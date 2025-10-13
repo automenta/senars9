@@ -243,10 +243,14 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
   );
 };
 
-const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask }) => {
+const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask, onAddTask }) => {
   // The tasks prop is already sorted by the useCrdtWebSocket hook.
   // We keep a local state only to handle the drag-and-drop reordering visually.
   const [displayTasks, setDisplayTasks] = useState(tasks || []);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTaskContent, setNewTaskContent] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState(0.5);
+  const [newTaskType, setNewTaskType] = useState('Input');
 
   React.useEffect(() => {
     setDisplayTasks(tasks || []);
@@ -257,8 +261,35 @@ const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask }) => {
       const updatedTask = {
         ...task,
         priority: newPriority,
+        lastModified: Date.now(),
       };
       onUpdateTask(updatedTask);
+    }
+  };
+
+  const handleAddNewTask = () => {
+    if (newTaskContent.trim() && onAddTask) {
+      const newTask = {
+        content: newTaskContent.trim(),
+        priority: parseFloat(newTaskPriority),
+        type: newTaskType,
+        status: 'Input',
+        dependencies: [],
+        metadata: { createdAt: Date.now() }
+      };
+      onAddTask(newTask);
+      
+      // Reset form
+      setNewTaskContent('');
+      setNewTaskPriority(0.5);
+      setNewTaskType('Input');
+      setShowAddForm(false);
+    }
+  };
+
+  const handleDeleteTask = (task) => {
+    if (onDeleteTask) {
+      onDeleteTask(task);
     }
   };
 
@@ -290,10 +321,102 @@ const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask }) => {
         backgroundColor: '#e9ecef',
         borderBottom: '1px solid #ccc',
         fontSize: '12px',
-        fontWeight: 'bold'
+        fontWeight: 'bold',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
-        Active Tasks ({displayTasks.length})
+        <div>Active Tasks ({displayTasks.length})</div>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          style={{
+            padding: '2px 8px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '3px',
+            cursor: 'pointer',
+            fontSize: '10px'
+          }}
+        >
+          {showAddForm ? 'Cancel' : '+ Add Task'}
+        </button>
       </div>
+
+      {/* Add Task Form - Progressive Disclosure */}
+      {showAddForm && (
+        <div style={{
+          padding: '8px',
+          backgroundColor: '#f8f9fa',
+          borderBottom: '1px solid #ddd',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          <input
+            type="text"
+            placeholder="Task content..."
+            value={newTaskContent}
+            onChange={(e) => setNewTaskContent(e.target.value)}
+            style={{
+              padding: '4px',
+              border: '1px solid #ccc',
+              borderRadius: '3px'
+            }}
+          />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ fontSize: '11px' }}>Priority:</div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={newTaskPriority}
+              onChange={(e) => setNewTaskPriority(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <span style={{ fontSize: '11px', minWidth: '30px' }}>
+              {newTaskPriority.toFixed(2)}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <select
+              value={newTaskType}
+              onChange={(e) => setNewTaskType(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '2px',
+                border: '1px solid #ccc',
+                borderRadius: '3px',
+                fontSize: '11px'
+              }}
+            >
+              <option value="Input">Input</option>
+              <option value="Goal">Goal</option>
+              <option value="Question">Question</option>
+              <option value="Operation">Operation</option>
+              <option value="Inference">Inference</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+            <button
+              onClick={handleAddNewTask}
+              disabled={!newTaskContent.trim()}
+              style={{
+                padding: '3px 8px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontSize: '11px'
+              }}
+            >
+              Add Task
+            </button>
+          </div>
+        </div>
+      )}
 
       <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         <div style={{
@@ -310,7 +433,7 @@ const TasksPanel = ({ tasks = [], onUpdateTask, onDeleteTask }) => {
                     task={task}
                     index={index}
                     onPriorityChange={handlePriorityChange}
-                    onDeleteTask={onDeleteTask}
+                    onDeleteTask={handleDeleteTask}
                   />
                 </div>
               ))
