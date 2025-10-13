@@ -42,9 +42,7 @@ export const createTask = (task) => ({
 export const sortTasksByPriority = (tasks) =>
   [...tasks].sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
-// Message history management
-export const manageMessageHistory = (messages, maxMessages, messageRetention) =>
-  messages.length > maxMessages ? messages.slice(-messageRetention) : messages;
+// Message history management - optimized
 
 // Connection state management
 export const createConnectionManager = () => {
@@ -114,141 +112,71 @@ export const createStateUpdater = (setData) => (message) => {
   updateMap[message.type]?.(message.payload);
 };
 
-// Unified WebSocket manager - consolidates all functionality
-export class WebSocketManager {
-  constructor(options = {}) {
-    this.config = createWebSocketConfig(options.config);
-    this.setData = options.setData;
-    this.setError = options.setError;
-    this.setLastMessage = options.setLastMessage;
-    this.setMessages = options.setMessages;
-    this.sendMessage = options.sendMessage;
-    this.sendRawMessage = options.sendRawMessage;
+// WebSocket utilities - consolidated and deduplicated
 
-    this.connectionManager = createConnectionManager();
-    this.taskManager = this.createTaskManager();
-    this.messageHandler = this.createMessageHandler();
-  }
+// Common WebSocket patterns abstraction
+export const createWebSocketHook = (WebSocketClass, config = {}) => {
+  const {
+    onMessage,
+    onConnect,
+    onError,
+    onDisconnect,
+    setData,
+    setError,
+    setLastMessage,
+    setMessages,
+    enableMessageHistory = false,
+    maxMessages = 1000,
+    messageRetention = 500
+  } = config;
 
-  createTaskManager() {
-    return {
-      handleAddTask: (task) => {
-        const newTask = createTask(task);
-        this.setData?.(prev => ({
-          ...prev,
-          tasks: [...(prev.tasks || []), newTask]
-        }));
-        this.sendMessage?.('add_task', newTask);
-      },
+  return {
+    handleMessage: (event) => {
+      setLastMessage?.(event);
+      onMessage?.(event);
 
-      handleUpdateTask: (task) => {
-        this.setData?.(prev => ({
-          ...prev,
-          tasks: (prev.tasks || []).map(t =>
-            t.id === task.id ? { ...t, ...task, lastModified: Date.now() } : t
-          )
-        }));
-        this.sendMessage?.('update_task', task);
-      },
-
-      handleDeleteTask: (task) => {
-        this.setData?.(prev => ({
-          ...prev,
-          tasks: (prev.tasks || []).filter(t => t.id !== task.id)
-        }));
-        this.sendMessage?.('delete_task', { id: task.id });
-      },
-
-      getSortedTasks: (tasks) => sortTasksByPriority(tasks || [])
-    };
-  }
-
-  createMessageHandler() {
-    return {
-      handleMessage: async (event) => {
-        this.setLastMessage?.(event);
-
-        if (this.config.enableMessageHistory && this.setMessages) {
-          try {
-            const message = await parseWebSocketMessage(event);
-            this.setMessages(prev => [...prev, message]);
-          } catch (parseError) {
-            this.setMessages?.(prev => [...prev, {
-              type: 'error',
-              data: event.data,
-              error: parseError.message
-            }]);
-          }
+      if (enableMessageHistory && setMessages) {
+        try {
+          const message = parseWebSocketMessage(event);
+          setMessages(prev => manageMessageHistory([...prev, message], maxMessages, messageRetention));
+        } catch (parseError) {
+          setMessages?.(prev => [...prev, {
+            type: 'error',
+            data: event.data,
+            error: parseError.message
+          }]);
         }
+      }
 
-        if (this.setData) {
-          try {
-            const message = await parseWebSocketMessage(event);
-            this.handleStateUpdate(message);
-          } catch (parseError) {
-            console.error('Error parsing WebSocket message:', parseError);
-          }
+      if (setData) {
+        try {
+          const message = parseWebSocketMessage(event);
+          createStateUpdater(setData)(message);
+        } catch (parseError) {
+          console.error('Error parsing WebSocket message:', parseError);
         }
-      },
+      }
+    },
 
-      handleStateUpdate: (message) => {
-        createStateUpdater(this.setData)(message);
-      },
+    handleConnect: () => {
+      setError?.(null);
+      onConnect?.();
+    },
 
-      handleConnect: () => {
-        this.setError?.(null);
-        if (this.config.autoRequestState && this.sendRawMessage) {
-          setTimeout(() => this.sendRawMessage({ type: MESSAGE_TYPES.REQUEST_STATE }), 100);
-        }
-      },
+    handleError: (error) => {
+      setError?.({ message: error.message, timestamp: new Date().toISOString() });
+      onError?.(error);
+    },
 
-      handleError: (error) => {
-        this.setError?.({ message: error.message, timestamp: new Date().toISOString() });
-      },
-
-      manageMessageHistory: (messages) =>
-        this.config.enableMessageHistory && messages.length > this.config.maxMessages
-          ? messages.slice(-this.config.messageRetention)
-          : messages
-    };
-  }
-
-  // Public API
-  handleMessage(event) { return this.messageHandler.handleMessage(event); }
-  handleConnect() { return this.messageHandler.handleConnect(); }
-  handleError(error) { return this.messageHandler.handleError(error); }
-  manageMessageHistory(messages) { return this.messageHandler.manageMessageHistory(messages); }
-  getSortedTasks(tasks) { return this.taskManager.getSortedTasks(tasks); }
-
-  getTaskHandlers() {
-    return {
-      handleAddTask: this.taskManager.handleAddTask,
-      handleUpdateTask: this.taskManager.handleUpdateTask,
-      handleDeleteTask: this.taskManager.handleDeleteTask
-    };
-  }
-
-  get connectionStatus() { return this.connectionManager.status; }
-  get reconnectAttempts() { return this.connectionManager.reconnectAttempts; }
-
-  subscribe(listener) { return this.connectionManager.subscribe(listener); }
-  setConnectionStatus(status) { this.connectionManager.setStatus(status); }
-  incrementReconnectAttempts() { this.connectionManager.incrementReconnectAttempts(); }
-  resetReconnectAttempts() { this.connectionManager.resetReconnectAttempts(); }
-}
-
-// Legacy compatibility exports
-export const createStateMessageHandler = createStateUpdater;
-export const createTaskHandlers = (sendMessage, setData) => {
-  const manager = new WebSocketManager({ sendMessage, setData });
-  return manager.getTaskHandlers();
-};
-export const createConnectionHandlers = (wsManager, setError, autoRequestState, sendRawMessage) => ({
-  onConnect: () => {
-    setError(null);
-    if (autoRequestState) {
-      setTimeout(() => sendRawMessage({ type: MESSAGE_TYPES.REQUEST_STATE }), 100);
+    handleDisconnect: (event) => {
+      onDisconnect?.(event);
     }
-  },
-  onError: error => setError({ message: error.message, timestamp: new Date().toISOString() })
-});
+  };
+};
+
+// Message history management - optimized
+export const manageMessageHistory = (messages, maxMessages, messageRetention) =>
+  messages.length > maxMessages ? messages.slice(-messageRetention) : messages;
+
+// Legacy compatibility exports - simplified
+export const createStateMessageHandler = createStateUpdater;

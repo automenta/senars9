@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
-import { WebSocketManager, sortTasksByPriority } from '../utils/webSocketUtils';
+import WebSocketConnectionManager from '../utils/WebSocketConnectionManager';
+import { sortTasksByPriority } from '../utils/webSocketUtils';
 
-// Yjs utilities abstraction
+// Yjs utilities abstraction - simplified
 const createYjsObservers = (ydoc, setters) => {
   const { setTasks, setLogs, setConcepts, setReasonerStats } = setters;
 
@@ -13,7 +14,6 @@ const createYjsObservers = (ydoc, setters) => {
       const yLogs = ydoc.getArray('logs');
       const yConcepts = ydoc.getArray('concepts');
 
-      // Observer setup with consistent patterns
       const observers = {
         tasks: () => setTasks(yTasks.toArray().map(task =>
           task instanceof Y.Map ? task.toJSON() : task
@@ -77,14 +77,28 @@ const useCrdtWebSocket = (url) => {
     return false;
   }, [provider]);
 
-  // Use consolidated WebSocket manager
-  const wsManager = useMemo(() => new WebSocketManager({
-    sendMessage,
+  // Use consolidated WebSocket manager for task operations
+  const wsManager = useMemo(() => new WebSocketConnectionManager('', {
     config: { enableMessageHistory: false }
-  }), [sendMessage]);
+  }), []);
 
   const sortedTasks = useMemo(() =>
     sortTasksByPriority(tasks), [tasks]);
+
+  const taskHandlers = useMemo(() => ({
+    handleAddTask: (task) => {
+      wsManager.handleAddTask(task);
+      sendMessage('add_task', task);
+    },
+    handleUpdateTask: (task) => {
+      wsManager.handleUpdateTask(task);
+      sendMessage('update_task', task);
+    },
+    handleDeleteTask: (task) => {
+      wsManager.handleDeleteTask(task);
+      sendMessage('delete_task', { id: task.id });
+    }
+  }), [wsManager, sendMessage]);
 
   return {
     isConnected: connectionStatus === 'connected',
@@ -96,9 +110,9 @@ const useCrdtWebSocket = (url) => {
     reasonerStats,
     sendRawMessage,
     sendMessage,
-    handleAddTask: task => wsManager.getTaskHandlers().handleAddTask(task),
-    handleUpdateTask: task => wsManager.getTaskHandlers().handleUpdateTask(task),
-    handleDeleteTask: task => wsManager.getTaskHandlers().handleDeleteTask(task),
+    handleAddTask: taskHandlers.handleAddTask,
+    handleUpdateTask: taskHandlers.handleUpdateTask,
+    handleDeleteTask: taskHandlers.handleDeleteTask,
   };
 };
 

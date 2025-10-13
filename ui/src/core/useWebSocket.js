@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import WebSocketConnectionManager from '../utils/WebSocketConnectionManager';
-import { createWebSocketConfig, MESSAGE_TYPES, WebSocketManager } from '../utils/webSocketUtils';
+import { createWebSocketConfig, MESSAGE_TYPES } from '../utils/webSocketUtils';
 
 const useWebSocket = (url, config = {}) => {
   const [messages, setMessages] = useState([]);
@@ -9,34 +9,18 @@ const useWebSocket = (url, config = {}) => {
   const [data, setData] = useState({});
 
   const wsManagerRef = useRef(null);
-  const wsUtilsRef = useRef(null);
   const configRef = useRef(createWebSocketConfig(config));
-
-  const {
-    maxMessages,
-    messageRetention,
-    autoRequestState,
-    enableMessageHistory
-  } = configRef.current;
 
   // Initialize WebSocket connection
   useEffect(() => {
     if (!wsManagerRef.current) {
-      wsManagerRef.current = new WebSocketConnectionManager(url, configRef.current);
-      wsUtilsRef.current = new WebSocketManager({
+      wsManagerRef.current = new WebSocketConnectionManager(url, {
+        config: configRef.current,
         setData,
         setError,
         setLastMessage,
-        setMessages,
-        sendMessage,
-        sendRawMessage,
-        config: configRef.current
+        setMessages
       });
-
-      wsManagerRef.current
-        .on('message', event => wsUtilsRef.current.handleMessage(event))
-        .on('error', error => wsUtilsRef.current.handleError(error))
-        .on('connect', () => wsUtilsRef.current.handleConnect());
 
       wsManagerRef.current.connect();
     }
@@ -44,7 +28,6 @@ const useWebSocket = (url, config = {}) => {
     return () => {
       wsManagerRef.current?.destroy();
       wsManagerRef.current = null;
-      wsUtilsRef.current = null;
     };
   }, []);
 
@@ -62,7 +45,7 @@ const useWebSocket = (url, config = {}) => {
   const sendMessage = useCallback((command, payload = {}) =>
     sendRawMessage({ type: MESSAGE_TYPES.CONTROL, command, payload }), [sendRawMessage]);
 
-  const taskHandlers = useMemo(() => wsUtilsRef.current?.getTaskHandlers() || {}, []);
+  const taskHandlers = useMemo(() => wsManagerRef.current?.getTaskHandlers() || {}, []);
 
   const requestConcepts = useCallback(() => sendMessage('get_concepts'), [sendMessage]);
   const requestTopTasks = useCallback(() => sendMessage('get_top_tasks'), [sendMessage]);
@@ -80,13 +63,13 @@ const useWebSocket = (url, config = {}) => {
 
   // Manage message history retention
   useEffect(() => {
-    if (enableMessageHistory && wsUtilsRef.current) {
-      setMessages(prev => wsUtilsRef.current.manageMessageHistory(prev));
+    if (configRef.current.enableMessageHistory && wsManagerRef.current) {
+      setMessages(prev => wsManagerRef.current.manageMessageHistory(prev));
     }
-  }, [messages, enableMessageHistory]);
+  }, [messages]);
 
   const sortedTasks = useMemo(() =>
-    wsUtilsRef.current?.getSortedTasks(data.tasks || []) || [],
+    wsManagerRef.current?.getSortedTasks(data.tasks || []) || [],
     [data.tasks]);
 
   const status = wsManagerRef.current?.getStatus();
@@ -96,7 +79,7 @@ const useWebSocket = (url, config = {}) => {
     isConnected: status?.isConnected || false,
     connectionStatus,
     error: error || (connectionStatus === 'error' ? 'WebSocket connection error' : null),
-    messages: enableMessageHistory ? messages : [],
+    messages: configRef.current.enableMessageHistory ? messages : [],
     lastMessage,
     tasks: sortedTasks,
     logs: data.logs || [],
