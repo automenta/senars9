@@ -1,9 +1,9 @@
 // Common component patterns and abstractions for DRY code
 
-import { getPriorityColor, getItemIcon } from './common';
-import { createButtonStyle, createContainerStyle } from './styling';
+import { getPriorityColor } from './common';
+import { createStyle, createLayout, composeStyles, conditionalStyles } from './styling';
 
-// Generic empty state component pattern
+// Generic empty state pattern
 export const createEmptyState = (icon, title, subtitle, style = {}) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -21,18 +21,21 @@ export const createEmptyState = (icon, title, subtitle, style = {}) => ({
   }
 });
 
-// Task item styling patterns
+// Task item patterns using consolidated styling
 export const createTaskItemStyle = (isExpanded, isDragging, priority) => {
-  const base = {
-    padding: '6px 8px',
-    margin: '2px 0',
-    display: 'flex',
-    alignItems: 'center',
-    fontSize: '12px',
-    cursor: 'grab',
-    transition: 'all 0.2s ease',
-    minHeight: '36px'
-  };
+  const base = createLayout('flex', {
+    direction: 'row',
+    align: 'center',
+    gap: '8px',
+    overrides: {
+      padding: '6px 8px',
+      margin: '2px 0',
+      fontSize: '12px',
+      cursor: 'grab',
+      transition: 'all 0.2s ease',
+      minHeight: '36px'
+    }
+  });
 
   const states = {
     expanded: {
@@ -45,17 +48,17 @@ export const createTaskItemStyle = (isExpanded, isDragging, priority) => {
     }
   };
 
-  return {
-    ...base,
-    ...(isExpanded ? states.expanded : states.collapsed),
-    opacity: isDragging ? 0.5 : 1
-  };
+  return composeStyles(
+    base,
+    isExpanded ? states.expanded : states.collapsed,
+    conditionalStyles(isDragging, { opacity: 0.5 })
+  );
 };
 
-// Priority indicator styling
+// Priority indicator using consolidated styling
 export const createPriorityIndicatorStyle = (priority) => {
   const color = getPriorityColor(priority);
-  return {
+  return createStyle('container', 'default', null, {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -65,8 +68,10 @@ export const createPriorityIndicatorStyle = (priority) => {
     backgroundColor: `${color}20`,
     marginRight: '8px',
     fontSize: '12px',
-    color
-  };
+    color,
+    padding: 0,
+    border: 'none'
+  });
 };
 
 // Task content styling
@@ -83,49 +88,56 @@ export const createTaskContentStyle = () => ({
   }
 });
 
-// Task controls styling
-export const createTaskControlsStyle = () => ({
-  display: 'flex',
-  alignItems: 'center',
+// Task controls using layout utilities
+export const createTaskControlsStyle = () => createLayout('flex', {
+  align: 'center',
+  justify: 'flex-end',
   gap: '6px',
-  minWidth: '120px',
-  justifyContent: 'flex-end',
-  priority: {
-    fontWeight: 'bold',
-    fontSize: '11px',
-    minWidth: '30px',
-    textAlign: 'right'
-  },
-  slider: {
-    width: '40px',
-    cursor: 'ew-resize',
-    height: '16px'
-  },
-  toggle: {
-    padding: '2px 6px',
-    border: 'none',
-    borderRadius: '3px',
-    cursor: 'pointer',
-    fontSize: '12px'
+  overrides: {
+    minWidth: '120px',
+    priority: {
+      fontWeight: 'bold',
+      fontSize: '11px',
+      minWidth: '30px',
+      textAlign: 'right'
+    },
+    slider: {
+      width: '40px',
+      cursor: 'ew-resize',
+      height: '16px'
+    },
+    toggle: {
+      padding: '2px 6px',
+      border: 'none',
+      borderRadius: '3px',
+      cursor: 'pointer',
+      fontSize: '12px'
+    }
   }
 });
 
-// Panel header styling
-export const createPanelHeaderStyle = (title, count, style = {}) => ({
-  padding: '5px 10px',
-  backgroundColor: '#e9ecef',
-  borderBottom: '1px solid #ccc',
-  fontSize: '12px',
-  fontWeight: 'bold',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  ...style,
-  title: { margin: 0 },
-  count: { color: '#666' }
-});
+// Panel header using consolidated styling
+export const createPanelHeaderStyle = (title, count, style = {}) =>
+  composeStyles(
+    createLayout('flex', {
+      justify: 'space-between',
+      align: 'center',
+      overrides: {
+        padding: '5px 10px',
+        backgroundColor: '#e9ecef',
+        borderBottom: '1px solid #ccc',
+        fontSize: '12px',
+        fontWeight: 'bold'
+      }
+    }),
+    style,
+    {
+      title: { margin: 0 },
+      count: { color: '#666' }
+    }
+  );
 
-// Expanded task details styling
+// Expanded task details using grid layout
 export const createTaskDetailsStyle = () => ({
   position: 'absolute',
   left: '0',
@@ -139,66 +151,50 @@ export const createTaskDetailsStyle = () => ({
   marginTop: '2px',
   boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
   fontSize: '11px',
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '8px',
-    title: { margin: 0, color: '#0d6efd' },
-    close: {
-      background: 'none',
-      border: 'none',
-      fontSize: '14px',
-      cursor: 'pointer',
-      color: '#6c757d'
-    }
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+  header: createLayout('flex', {
+    justify: 'space-between',
+    align: 'center',
+    overrides: { marginBottom: '8px' }
+  }),
+  grid: createLayout('grid', {
+    columns: '1fr 1fr',
     gap: '8px'
-  },
-  actions: {
-    marginTop: '10px',
-    display: 'flex',
+  }),
+  actions: createLayout('flex', {
     gap: '8px',
-    button: {
-      padding: '4px 8px',
-      fontSize: '10px',
-      border: '1px solid #ccc',
-      borderRadius: '3px',
-      cursor: 'pointer',
-      backgroundColor: '#e9ecef'
-    }
-  }
+    overrides: { marginTop: '10px' }
+  })
 });
 
-// Generic button group styling
-export const createButtonGroupStyle = (buttons, gap = '8px') => ({
-  display: 'flex',
-  gap,
-  ...buttons.reduce((acc, btn, i) => ({
-    ...acc,
-    [`button${i}`]: btn.style || {}
-  }), {})
-});
+// Button group using layout utilities
+export const createButtonGroupStyle = (buttons, gap = '8px') =>
+  createLayout('flex', {
+    gap,
+    overrides: buttons.reduce((acc, btn, i) => ({
+      ...acc,
+      [`button${i}`]: btn.style || {}
+    }), {})
+  });
 
 // Scrollable container pattern
-export const createScrollableContainerStyle = (style = {}) => ({
-  flex: 1,
-  overflowY: 'auto',
-  padding: '8px',
-  position: 'relative',
-  ...style
-});
+export const createScrollableContainerStyle = (style = {}) =>
+  composeStyles(
+    createLayout('flex', {
+      direction: 'column',
+      overrides: { flex: 1, overflowY: 'auto', padding: '8px', position: 'relative' }
+    }),
+    style
+  );
 
-// Generic list container pattern
-export const createListContainerStyle = (style = {}) => ({
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-  ...style
-});
+// List container pattern
+export const createListContainerStyle = (style = {}) =>
+  composeStyles(
+    createLayout('flex', {
+      direction: 'column',
+      overrides: { height: '100%' }
+    }),
+    style
+  );
 
 // Event handler abstractions
 export const createEventHandlers = (handlers) => ({
@@ -209,10 +205,5 @@ export const createEventHandlers = (handlers) => ({
   onToggle: handlers.onToggle || (() => {})
 });
 
-// Style composition utility
-export const composeStyles = (...styles) =>
-  styles.reduce((acc, style) => ({ ...acc, ...style }), {});
-
-// Conditional style application
-export const applyConditionalStyles = (condition, trueStyle, falseStyle = {}) =>
-  condition ? { ...falseStyle, ...trueStyle } : falseStyle;
+// Style composition utility (now imported from styling.js)
+// Conditional style application (now imported from styling.js)

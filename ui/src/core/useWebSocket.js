@@ -1,104 +1,144 @@
-import { useEffect, useState, useCallback, useRef, useMemo, useReducer } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
 import WebSocketConnectionManager from '../utils/WebSocketConnectionManager';
-import { createWebSocketConfig, MESSAGE_TYPES } from '../utils/webSocketUtils';
+import { createWebSocketConfig, MESSAGE_TYPES, sortTasksByPriority } from '../utils/webSocketUtils';
+import { useNotification } from './NotificationSystem';
+import { CONNECTION_STATUS } from '../constants';
 
-// State reducer for better state management
-const initialState = {
-  messages: [],
-  lastMessage: null,
-  error: null,
-  data: {},
-  connectionStatus: 'disconnected',
-  reconnectAttempts: 0
-};
+// Unified WebSocket hook with multiple modes
+const useWebSocket = (url, options = {}) => {
+  const {
+    mode = 'standard', // 'standard', 'crdt', 'unified'
+    wsConfig = {},
+    enableNotifications = false
+  } = options;
 
-const wsReducer = (state, action) => {
-  switch (action.type) {
-    case 'SET_MESSAGES': return { ...state, messages: action.payload };
-    case 'SET_MESSAGE': return { ...state, lastMessage: action.payload };
-    case 'SET_ERROR': return { ...state, error: action.payload };
-    case 'SET_DATA': return { ...state, data: action.payload };
-    case 'SET_CONNECTION_STATUS': return { ...state, connectionStatus: action.payload };
-    case 'SET_RECONNECT_ATTEMPTS': return { ...state, reconnectAttempts: action.payload };
-    case 'RESET_ERROR': return { ...state, error: null };
-    default: return state;
-  }
-};
-
-const useWebSocket = (url, config = {}) => {
-  const [state, dispatch] = useReducer(wsReducer, initialState);
+  const { addNotification } = useNotification();
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [data, setData] = useState({});
+  const [messages, setMessages] = useState([]);
+  const [error, setError] = useState(null);
   const wsManagerRef = useRef(null);
-  const configRef = useRef(createWebSocketConfig(config));
-  const reconnectTimeoutRef = useRef(null);
+  const providerRef = useRef(null);
+  const ydocRef = useRef(null);
 
-  // Memoized callbacks to prevent unnecessary re-renders
-  const setData = useCallback((data) => dispatch({ type: 'SET_DATA', payload: data }), []);
-  const setError = useCallback((error) => dispatch({ type: 'SET_ERROR', payload: error }), []);
-  const setLastMessage = useCallback((message) => dispatch({ type: 'SET_MESSAGE', payload: message }), []);
-  const setMessages = useCallback((messages) => dispatch({ type: 'SET_MESSAGES', payload: messages }), []);
-
-  // Initialize WebSocket manager
-  useEffect(() => {
+  // Standard WebSocket mode
+  const initStandardWebSocket = useCallback(() => {
+    const config = createWebSocketConfig(wsConfig);
     wsManagerRef.current = new WebSocketConnectionManager(url, {
-      config: configRef.current,
+      config,
       setData,
       setError,
-      setLastMessage,
+      setLastMessage: () => {},
       setMessages,
-      setConnectionStatus: (status) => dispatch({ type: 'SET_CONNECTION_STATUS', payload: status }),
-      setReconnectAttempts: (attempts) => dispatch({ type: 'SET_RECONNECT_ATTEMPTS', payload: attempts })
+      setConnectionStatus,
+      setReconnectAttempts: () => {}
     });
 
     wsManagerRef.current.connect();
+    return () => wsManagerRef.current?.destroy();
+  }, [url, wsConfig]);
 
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      wsManagerRef.current?.destroy();
-      wsManagerRef.current = null;
+  // CRDT WebSocket mode
+  const initCrdtWebSocket = useCallback(() => {
+    if (!url) return;
+
+    const ydoc = new Y.Doc();
+    const provider = new WebsocketProvider(url, 'senars', ydoc);
+
+    ydocRef.current = ydoc;
+    providerRef.current = provider;
+
+    provider.on('status', event => setConnectionStatus(event.status));
+
+    // Yjs observers for real-time updates
+    const yTasks = ydoc.getArray('tasks');
+    const yLogs = ydoc.getArray('logs');
+    const yConcepts = ydoc.getArray('concepts');
+
+    const observers = {
+      tasks: () => setData(prev => ({
+        ...prev,
+        tasks: sortTasksByPriority(yTasks.toArray().map(task =>
+          task instanceof Y.Map ? task.toJSON() : task))
+      })),
+      logs: () => setData(prev => ({ ...prev, logs: yLogs.toArray() })),
+      concepts: () => setData(prev => ({ ...prev, concepts: yConcepts.toArray() }))
     };
-  }, []);
 
-  // Handle URL changes
-  useEffect(() => {
-    if (!wsManagerRef.current) return;
+    Object.entries(observers).forEach(([key, observer]) =>
+      ydoc.getArray(key).observe(observer));
 
-    wsManagerRef.current.disconnect();
-    reconnectTimeoutRef.current = setTimeout(() => {
-      wsManagerRef.current?.connect();
-    }, 100);
+    provider.awareness.on('change', () => {
+      setData(prev => ({
+        ...prev,
+        reasonerStats: Array.from(provider.awareness.getStates().values())
+          .find(state => state.reasonerStats)?.reasonerStats || null
+      }));
+    });
 
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      Object.keys(observers).forEach(key =>
+        ydoc.getArray(key).unobserve(observers[key]));
+      provider.disconnect();
     };
   }, [url]);
 
-  // Message history management
+  // Initialize WebSocket based on mode
   useEffect(() => {
-    if (configRef.current.enableMessageHistory && wsManagerRef.current) {
-      const managedMessages = wsManagerRef.current.manageMessageHistory(state.messages);
-      if (managedMessages !== state.messages) {
-        dispatch({ type: 'SET_MESSAGES', payload: managedMessages });
-      }
+    let cleanup;
+
+    switch (mode) {
+      case 'crdt':
+        cleanup = initCrdtWebSocket();
+        break;
+      case 'standard':
+      default:
+        cleanup = initStandardWebSocket();
+        break;
     }
-  }, [state.messages]);
 
-  // Memoized handlers
-  const sendRawMessage = useCallback((message) =>
-    wsManagerRef.current?.send(message) || false, []);
+    return cleanup;
+  }, [mode, initStandardWebSocket, initCrdtWebSocket]);
 
-  const sendMessage = useCallback((command, payload = {}) =>
-    sendRawMessage({ type: MESSAGE_TYPES.CONTROL, command, payload }), [sendRawMessage]);
+  // Notification handlers
+  useEffect(() => {
+    if (!enableNotifications) return;
 
-  const taskHandlers = useMemo(() =>
-    wsManagerRef.current?.getTaskHandlers() || {
-      handleAddTask: () => {},
-      handleUpdateTask: () => {},
-      handleDeleteTask: () => {}
-    }, [state.data.tasks]);
+    const statusMessages = {
+      [CONNECTION_STATUS.CONNECTED]: 'Connected to server',
+      [CONNECTION_STATUS.DISCONNECTED]: 'Disconnected from server',
+      [CONNECTION_STATUS.ERROR]: 'Connection error occurred'
+    };
+
+    if (statusMessages[connectionStatus]) {
+      addNotification(statusMessages[connectionStatus], {
+        [CONNECTION_STATUS.CONNECTED]: 'success',
+        [CONNECTION_STATUS.DISCONNECTED]: 'error',
+        [CONNECTION_STATUS.ERROR]: 'error'
+      }[connectionStatus] || 'info');
+    }
+  }, [connectionStatus, enableNotifications, addNotification]);
+
+  // Unified message sender
+  const sendRawMessage = useCallback((message) => {
+    if (mode === 'crdt' && providerRef.current?.ws?.readyState === WebSocket.OPEN) {
+      providerRef.current.ws.send(JSON.stringify(message));
+      return true;
+    }
+    return wsManagerRef.current?.send(message) || false;
+  }, [mode]);
+
+  const sendMessage = useCallback((command, payload = {}) => {
+    const message = { type: MESSAGE_TYPES.CONTROL, command, payload };
+    return sendRawMessage(message);
+  }, [sendRawMessage]);
+
+  // Task handlers
+  const handleAddTask = useCallback((task) => sendMessage('add_task', task), [sendMessage]);
+  const handleUpdateTask = useCallback((task) => sendMessage('update_task', task), [sendMessage]);
+  const handleDeleteTask = useCallback((task) => sendMessage('delete_task', { id: task.id }), [sendMessage]);
 
   // Request handlers
   const requestConcepts = useCallback(() => sendMessage('get_concepts'), [sendMessage]);
@@ -107,46 +147,50 @@ const useWebSocket = (url, config = {}) => {
 
   // Connection management
   const disconnect = useCallback(() => {
-    wsManagerRef.current?.disconnect();
-    dispatch({ type: 'RESET_ERROR' });
-  }, []);
+    if (mode === 'crdt') {
+      providerRef.current?.disconnect();
+    } else {
+      wsManagerRef.current?.disconnect();
+    }
+    setError(null);
+  }, [mode]);
 
   const reconnect = useCallback(() => {
-    wsManagerRef.current?.disconnect();
-    reconnectTimeoutRef.current = setTimeout(() => {
-      wsManagerRef.current?.connect();
+    disconnect();
+    setTimeout(() => {
+      if (mode === 'crdt') {
+        initCrdtWebSocket();
+      } else {
+        initStandardWebSocket();
+      }
     }, 1000);
-  }, []);
-
-  // Memoized derived state
-  const sortedTasks = useMemo(() =>
-    wsManagerRef.current?.getSortedTasks(state.data.tasks || []) || [],
-    [state.data.tasks]);
-
-  const error = state.error || (state.connectionStatus === 'error' ? 'WebSocket connection error' : null);
+  }, [mode, disconnect, initCrdtWebSocket, initStandardWebSocket]);
 
   return {
-    isConnected: state.connectionStatus === 'connected',
-    connectionStatus: state.connectionStatus,
+    // Connection state
+    isConnected: connectionStatus === 'connected',
+    connectionStatus,
     error,
-    messages: configRef.current.enableMessageHistory ? state.messages : [],
-    lastMessage: state.lastMessage,
-    tasks: sortedTasks,
-    logs: state.data.logs || [],
-    concepts: state.data.concepts || [],
-    memoryTasks: state.data.memoryTasks || [],
-    reasonerStats: state.data.reasonerStats || null,
+
+    // Data
+    messages: wsConfig.enableMessageHistory ? messages : [],
+    tasks: data.tasks || [],
+    logs: data.logs || [],
+    concepts: data.concepts || [],
+    memoryTasks: data.memoryTasks || [],
+    reasonerStats: data.reasonerStats || null,
+
+    // Actions
     sendRawMessage,
     sendMessage,
-    handleAddTask: taskHandlers.handleAddTask,
-    handleUpdateTask: taskHandlers.handleUpdateTask,
-    handleDeleteTask: taskHandlers.handleDeleteTask,
+    handleAddTask,
+    handleUpdateTask,
+    handleDeleteTask,
     requestConcepts,
     requestTopTasks,
     requestState,
     reconnect,
-    disconnect,
-    reconnectAttempts: state.reconnectAttempts
+    disconnect
   };
 };
 

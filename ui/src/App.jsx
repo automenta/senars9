@@ -20,13 +20,11 @@ const App = () => {
     reasonerStats,
     connectionStatus,
     sendRawMessage,
-    handleAddTask,
-    handleUpdateTask,
     handleDeleteTask,
     requestConcepts,
     requestTopTasks,
     requestState,
-  } = useWebSocket(wsUrl);
+  } = useWebSocket(wsUrl, { mode: 'standard' });
 
   // Create command service instance
   const commandService = new CommandService(sendRawMessage);

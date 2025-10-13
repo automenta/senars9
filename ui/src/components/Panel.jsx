@@ -1,33 +1,38 @@
-import { THEME } from '../constants';
+import { createStyle, createLayout } from '../utils/styling';
 
-const Panel = ({ title, children }) => (
-  <div style={{
-    border: `1px solid ${THEME.colors.gray[300]}`,
-    borderRadius: THEME.borderRadius,
-    backgroundColor: THEME.colors.white,
-    marginBottom: THEME.spacing.md,
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-  }}>
-    <div style={{
-      padding: `${THEME.spacing.sm} ${THEME.spacing.md}`,
-      backgroundColor: THEME.colors.gray[100],
-      borderBottom: `1px solid ${THEME.colors.gray[300]}`,
-      fontWeight: THEME.fontWeight.bold,
-      fontSize: THEME.fontSize.md,
-      color: THEME.colors.dark
-    }}>
-      {title}
-    </div>
-    <div style={{
-      padding: THEME.spacing.md,
+const Panel = ({ title, children }) => {
+  const panelStyle = createStyle('panel');
+  const headerStyle = createLayout('flex', {
+    align: 'center',
+    overrides: {
+      padding: '8px 16px',
+      backgroundColor: '#f8f9fa',
+      borderBottom: '1px solid #dee2e6',
+      fontWeight: 'bold',
+      fontSize: '16px',
+      color: '#2c3e50'
+    }
+  });
+
+  const contentStyle = createLayout('flex', {
+    direction: 'column',
+    overrides: {
+      padding: '16px',
       flex: 1,
       overflowY: 'auto'
-    }}>
-      {children}
+    }
+  });
+
+  return (
+    <div style={panelStyle}>
+      <div style={headerStyle}>
+        {title}
+      </div>
+      <div style={contentStyle}>
+        {children}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default Panel;

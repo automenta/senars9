@@ -30,9 +30,9 @@ class WebSocketConnectionManager {
     this.connectionManager = createConnectionManager();
     this.connectionManager.subscribe(status => this.emit('statusChange', status));
 
-    this.taskManager = new TaskManager(setData, (type, command, payload) =>
-      this.send({ type, command, payload }));
-    this.messageHandler = new MessageHandler(setData, setError, setLastMessage, setMessages, config, (message) => this.send(message));
+    this.taskManager = setData ? new TaskManager(setData, (type, command, payload) =>
+      this.send({ type, command, payload })) : null;
+    this.messageHandler = setData ? new MessageHandler(setData, setError, setLastMessage, setMessages, config, (message) => this.send(message)) : null;
   }
 
   async connect() {
@@ -50,12 +50,12 @@ class WebSocketConnectionManager {
         this.connectionManager?.setStatus(CONNECTION_STATUS.CONNECTED);
         this.connectionManager?.resetReconnectAttempts();
         this.emit('connect');
-        this.messageHandler.handleConnect();
+        this.messageHandler?.handleConnect();
       };
 
       this.ws.onmessage = event => {
         this.emit('message', event);
-        this.messageHandler.handleMessage(event);
+        this.messageHandler?.handleMessage(event);
       };
 
       this.ws.onclose = event => {
@@ -71,13 +71,13 @@ class WebSocketConnectionManager {
         this.isConnected = false;
         this.connectionManager?.setStatus(CONNECTION_STATUS.ERROR);
         this.emit('error', error);
-        this.messageHandler.handleError(error);
+        this.messageHandler?.handleError(error);
       };
 
     } catch (error) {
       this.connectionManager?.setStatus(CONNECTION_STATUS.ERROR);
       this.emit('error', error);
-      this.messageHandler.handleError(error);
+      this.messageHandler?.handleError(error);
     }
   }
 
@@ -90,8 +90,8 @@ class WebSocketConnectionManager {
   }
 
   manageMessageHistory(messages) {
-    return this.messageHandler.config.enableMessageHistory && messages.length > this.messageHandler.config.maxMessages
-      ? messages.slice(-this.messageHandler.config.messageRetention)
+    return this.messageHandler?.config?.enableMessageHistory && messages.length > this.messageHandler?.config?.maxMessages
+      ? messages.slice(-(this.messageHandler?.config?.messageRetention || 500))
       : messages;
   }
 
@@ -119,9 +119,9 @@ class WebSocketConnectionManager {
 
   getTaskHandlers() {
     return {
-      handleAddTask: this.taskManager.handleAddTask.bind(this.taskManager),
-      handleUpdateTask: this.taskManager.handleUpdateTask.bind(this.taskManager),
-      handleDeleteTask: this.taskManager.handleDeleteTask.bind(this.taskManager)
+      handleAddTask: this.taskManager?.handleAddTask?.bind(this.taskManager) || (() => {}),
+      handleUpdateTask: this.taskManager?.handleUpdateTask?.bind(this.taskManager) || (() => {}),
+      handleDeleteTask: this.taskManager?.handleDeleteTask?.bind(this.taskManager) || (() => {})
     };
   }
 
