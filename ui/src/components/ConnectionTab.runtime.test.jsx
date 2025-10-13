@@ -1,6 +1,8 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { UIProvider } from '../core/UIContext';
+import { NotificationProvider } from '../core/NotificationSystem';
 
 // Mock WebSocketManager to simulate a successful connection
 vi.mock('../core/WebSocketManager', () => ({
@@ -17,6 +19,15 @@ vi.mock('../core/WebSocketManager', () => ({
 // Import the connection tab after mocking
 import ConnectionTab from './ConnectionTab.jsx';
 
+// Wrapper component that includes all necessary providers
+const TestWrapper = ({ children }) => (
+  <UIProvider>
+    <NotificationProvider>
+      {children}
+    </NotificationProvider>
+  </UIProvider>
+);
+
 // Mock console methods to detect errors
 let consoleErrorSpy, consoleWarnSpy;
 
@@ -31,7 +42,7 @@ describe('ConnectionTab Runtime Error Tests', () => {
       <ConnectionTab 
         name="Test Connection" 
         url="ws://localhost:8080" 
-      />
+      />, { wrapper: TestWrapper }
     );
 
     // Check no errors were logged
@@ -45,7 +56,7 @@ describe('ConnectionTab Runtime Error Tests', () => {
       <ConnectionTab
         name="Test Connection"
         url="ws://localhost:8080"
-      />
+      />, { wrapper: TestWrapper }
     );
 
     // Check no errors were logged
@@ -59,7 +70,7 @@ describe('ConnectionTab Runtime Error Tests', () => {
       <ConnectionTab
         name="Test Connection"
         url="ws://localhost:8080"
-      />
+      />, { wrapper: TestWrapper }
     );
 
     // Check no errors were logged

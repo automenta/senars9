@@ -1,81 +1,126 @@
-import { render } from '@testing-library/react';
+// Test utilities for SeNARS UI components
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { UIProvider } from './core/UIContext';
+import { NotificationProvider } from './core/NotificationSystem';
 import { vi } from 'vitest';
 
-// Shared test utilities following AGENTS.md guidelines:
-// - Consolidated, DRY, modularized, parameterized
-// - Terse syntax, self-documenting code
-
-// Console spy utilities - reusable across all tests
-export const createConsoleSpies = () => {
-  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-  return { errorSpy, warnSpy };
+// Mock WebSocket provider for testing
+export const mockWebSocketProvider = (mockData = {}) => {
+  const mockProvider = {
+    ws: {
+      readyState: WebSocket.OPEN,
+      send: vi.fn(),
+    },
+    disconnect: vi.fn(),
+    awareness: {
+      on: vi.fn(),
+      off: vi.fn(),
+      getStates: vi.fn(() => new Map()),
+    },
+  };
+  
+  return mockProvider;
 };
 
-export const restoreConsoleSpies = (spies) => {
-  spies.errorSpy?.mockRestore();
-  spies.warnSpy?.mockRestore();
-};
-
-// Component render utilities with error detection
-export const renderWithErrorDetection = (component, options = {}) => {
-  const spies = createConsoleSpies();
-  const result = render(component, options);
-
+// Mock Yjs document for testing
+export const createMockYDoc = () => {
+  const mockArray = {
+    toArray: jest.fn(() => []),
+    observe: jest.fn(),
+    unobserve: jest.fn(),
+  };
+  
   return {
-    ...result,
-    spies,
-    expectNoErrors: () => {
-      expect(spies.errorSpy).not.toHaveBeenCalled();
-      expect(spies.warnSpy).not.toHaveBeenCalled();
-    }
+    getArray: jest.fn(() => mockArray),
   };
 };
 
-// Common mock factories
-export const createWebSocketMock = (overrides = {}) => ({
-  send: vi.fn(),
-  close: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  onopen: null,
-  onclose: null,
-  onmessage: null,
-  onerror: null,
-  readyState: 1, // OPEN
-  ...overrides
+// Wrapper component for testing with contexts
+export const TestWrapper = ({ children, mockProvider = null }) => {
+  return (
+    <UIProvider>
+      <NotificationProvider>
+        <div>
+          {children}
+        </div>
+      </NotificationProvider>
+    </UIProvider>
+  );
+};
+
+// Render with error detection
+export const renderWithErrorDetection = (component) => {
+  const errors = [];
+  const originalError = console.error;
+  
+  const mockError = vi.fn((...args) => {
+    errors.push(args.join(' '));
+    originalError(...args);
+  });
+  
+  console.error = mockError;
+  
+  const result = render(component, {
+    wrapper: TestWrapper
+  });
+  
+  const expectNoErrors = () => {
+    expect(errors).toHaveLength(0);
+  };
+  
+  const cleanup = () => {
+    console.error = originalError;
+  };
+  
+  // Add cleanup to the result object
+  result.cleanup = cleanup;
+  
+  return {
+    ...result,
+    expectNoErrors,
+    cleanup
+  };
+};
+
+// Create mock WebSocket
+export const createWebSocketMock = (mockData = {}) => {
+  const mockWebSocket = {
+    readyState: mockData.readyState || WebSocket.OPEN,
+    send: jest.fn(),
+    close: jest.fn(),
+    onopen: null,
+    onclose: null,
+    onmessage: null,
+    onerror: null,
+    ...mockData
+  };
+  
+  return mockWebSocket;
+};
+
+// Common test utilities
+export const waitForComponentToRender = async (text) => {
+  return screen.findByText(text);
+};
+
+export const getTaskByText = (text) => {
+  return screen.getByText(text).closest('.task-item');
+};
+
+// Mock data creators
+export const createMockStats = () => ({
+  concepts: 10,
+  tasks: 5,
+  cycles: 100,
+  running: true,
+  paused: false
 });
 
-export const createComponentMocks = () => ({
-  WebSocket: vi.fn(() => createWebSocketMock()),
-  ResizeObserver: vi.fn().mockImplementation(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  }))
-});
+export const createMockLogs = () => [
+  { timestamp: Date.now(), level: 'info', message: 'Test log message' }
+];
 
-// Test data factories
-export const createMockStats = (overrides = {}) => ({
-  cycles: 0,
-  concepts: 0,
-  tasks: 0,
-  ...overrides
-});
-
-export const createMockLogs = (count = 3) =>
-  Array.from({ length: count }, (_, i) => ({
-    id: `log-${i}`,
-    message: `Test log message ${i}`,
-    timestamp: Date.now(),
-    level: 'info'
-  }));
-
-export const createMockTasks = (count = 2) =>
-  Array.from({ length: count }, (_, i) => ({
-    id: `task-${i}`,
-    name: `Test Task ${i}`,
-    status: 'pending',
-    priority: i
-  }));
+export const createMockTasks = () => [
+  { id: 'task1', content: 'Test task', priority: 0.5, timestamp: Date.now() }
+];

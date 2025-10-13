@@ -2,6 +2,17 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ConnectionTab from './ConnectionTab';
+import { UIProvider } from '../core/UIContext';
+import { NotificationProvider } from '../core/NotificationSystem';
+
+// Wrapper component that includes all necessary providers
+const TestWrapper = ({ children }) => (
+  <UIProvider>
+    <NotificationProvider>
+      {children}
+    </NotificationProvider>
+  </UIProvider>
+);
 
 // Mock console methods to detect errors
 const originalConsoleError = console.error;
@@ -25,7 +36,7 @@ describe('ConnectionTab Component - Runtime Error Tests', () => {
       <ConnectionTab 
         name="Test Connection" 
         url="ws://localhost:8080" 
-      />
+      />, { wrapper: TestWrapper }
     );
 
     // Check that no errors were logged during rendering
@@ -40,7 +51,7 @@ describe('ConnectionTab Component - Runtime Error Tests', () => {
       <ConnectionTab 
         name="Test Connection" 
         url="ws://localhost:8080" 
-      />
+      />, { wrapper: TestWrapper }
     );
 
     // Check no errors occurred
@@ -52,7 +63,7 @@ describe('ConnectionTab Component - Runtime Error Tests', () => {
       <ConnectionTab 
         name="Test Connection" 
         url="ws://localhost:8080" 
-      />
+      />, { wrapper: TestWrapper }
     );
 
     // Check no errors occurred during initial render
@@ -68,7 +79,7 @@ describe('ConnectionTab Component - Runtime Error Tests', () => {
       <ConnectionTab 
         name="Test Connection" 
         url="ws://localhost:8080" 
-      />
+      />, { wrapper: TestWrapper }
     );
     
     expect(consoleErrorSpy).not.toHaveBeenCalled();

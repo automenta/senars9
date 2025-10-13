@@ -22,6 +22,7 @@ const App = () => {
     logs,
     concepts,
     reasonerStats,
+    connectionStatus,
     sendRawMessage,
     handleAddTask,
     handleUpdateTask,

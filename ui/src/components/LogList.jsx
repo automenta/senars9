@@ -126,14 +126,18 @@ const LogList = ({ logs = [] }) => {
             animation: 'fadeIn 0.3s ease-in-out'
           }}>
             {displayLogs.map((log, index) => {
-              const logData = log.get('data');
+              // Check if log is a Yjs object (has get method) or a regular object
+              const isYjsObject = log && typeof log.get === 'function';
+              
+              const logData = isYjsObject ? log.get('data') : (log.data || log.message || JSON.stringify(log));
               const message = typeof logData === 'string' ? logData : JSON.stringify(logData);
               const icon = getLogIcon(message);
-              const color = getLogLevelColor(log.get('level') || message);
+              const level = isYjsObject ? (log.get('level') || message) : (log.level || 'info');
+              const color = getLogLevelColor(level);
 
               return (
                 <li
-                  key={`${log.get('timestamp') || index}-${message.substring(0, 10)}`}
+                  key={`${isYjsObject ? log.get('timestamp') : log.timestamp || Date.now() + index}-${index}-${message.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '')}`}
                   className="log-item"
                   style={{
                     padding: '6px 8px',
@@ -174,7 +178,7 @@ const LogList = ({ logs = [] }) => {
                         fontSize: '11px',
                         marginRight: '6px'
                       }}>
-                        {log.get('type') || 'LOG'}
+                        {isYjsObject ? (log.get('type') || 'LOG') : (log.type || 'LOG')}
                       </span>
                       <span style={{ 
                         color: '#666', 
@@ -182,14 +186,14 @@ const LogList = ({ logs = [] }) => {
                         marginRight: '8px',
                         minWidth: '70px'
                       }}>
-                        [{new Date(log.get('timestamp') || Date.now()).toLocaleTimeString()}]
+                        [{new Date(isYjsObject ? log.get('timestamp') : log.timestamp || Date.now()).toLocaleTimeString()}]
                       </span>
                       <span style={{ 
-                        color: getLogLevelColor(log.get('level')),
+                        color: getLogLevelColor(isYjsObject ? log.get('level') : log.level),
                         fontSize: '11px',
                         fontStyle: 'italic'
                       }}>
-                        {log.get('level') || 'info'}
+                        {isYjsObject ? (log.get('level') || 'info') : (log.level || 'info')}
                       </span>
                     </div>
                     
@@ -224,7 +228,7 @@ const LogList = ({ logs = [] }) => {
                         maxHeight: '100px',
                         overflowY: 'auto'
                       }}>
-                        {JSON.stringify(log.toJSON(), null, 2)}
+                        {isYjsObject ? JSON.stringify(log.toJSON(), null, 2) : JSON.stringify(log, null, 2)}
                       </div>
                       
                       <div style={{ 
@@ -261,7 +265,7 @@ const LogList = ({ logs = [] }) => {
                           onClick={(e) => {
                             e.stopPropagation();
                             // In a real implementation, this could filter logs by type
-                            console.log('Filter by type:', log.get('type'));
+                            console.log('Filter by type:', isYjsObject ? log.get('type') : log.type);
                           }}
                         >
                           🔍 Filter

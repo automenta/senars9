@@ -9,6 +9,17 @@ import TasksPanel from './TasksPanel.jsx';
 import InputField from './InputField.jsx';
 import ReasonerControlPanel from './ReasonerControlPanel.jsx';
 import ConceptMap from './ConceptMap.jsx';
+import { UIProvider } from '../core/UIContext';
+import { NotificationProvider } from '../core/NotificationSystem';
+
+// Wrapper component that includes all necessary providers
+const TestWrapper = ({ children }) => (
+  <UIProvider>
+    <NotificationProvider>
+      {children}
+    </NotificationProvider>
+  </UIProvider>
+);
 
 // Mock console methods to detect errors
 let consoleErrorSpy, consoleWarnSpy;
@@ -31,7 +42,7 @@ describe('UI Components - No Runtime Errors', () => {
       { type: 'concept', data: 'New concept formed', timestamp: Date.now() + 2000 }
     ];
     
-    const { unmount } = render(<LogList logs={sampleLogs} />);
+    const { unmount } = render(<LogList logs={sampleLogs} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -40,7 +51,7 @@ describe('UI Components - No Runtime Errors', () => {
   });
 
   it('renders LogList with empty logs without errors', () => {
-    const { unmount } = render(<LogList logs={[]} />);
+    const { unmount } = render(<LogList logs={[]} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -55,7 +66,7 @@ describe('UI Components - No Runtime Errors', () => {
       { id: 'task3', data: { id: 'task3', content: 'Question task', priority: 0.6, type: 'question' } }
     ];
     
-    const { unmount } = render(<TasksPanel tasks={sampleTasks} />);
+    const { unmount } = render(<TasksPanel tasks={sampleTasks} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -64,7 +75,7 @@ describe('UI Components - No Runtime Errors', () => {
   });
 
   it('renders TasksPanel with empty tasks without errors', () => {
-    const { unmount } = render(<TasksPanel tasks={[]} />);
+    const { unmount } = render(<TasksPanel tasks={[]} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -73,7 +84,7 @@ describe('UI Components - No Runtime Errors', () => {
   });
 
   it('renders InputField without errors', () => {
-    const { unmount } = render(<InputField onSend={() => {}} />);
+    const { unmount } = render(<InputField onSend={() => {}} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -89,7 +100,7 @@ describe('UI Components - No Runtime Errors', () => {
       cycles: 120
     };
     
-    const { unmount } = render(<ReasonerControlPanel stats={stats} />);
+    const { unmount } = render(<ReasonerControlPanel stats={stats} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -98,7 +109,7 @@ describe('UI Components - No Runtime Errors', () => {
   });
 
   it('renders ReasonerControlPanel with null stats without errors', () => {
-    const { unmount } = render(<ReasonerControlPanel stats={null} />);
+    const { unmount } = render(<ReasonerControlPanel stats={null} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -108,12 +119,12 @@ describe('UI Components - No Runtime Errors', () => {
 
   it('renders ConceptMap with various entities without errors', () => {
     const sampleEntities = [
-      { type: 'concept', data: { id: 'concept1', name: 'Test Concept', priority: 0.7 } },
-      { type: 'task', data: { id: 'task1', content: 'Test Task', priority: 0.8 } },
-      { type: 'link', data: { source: 'concept1', target: 'task1', linkType: 'relation', strength: 0.5 } }
+      { id: 'concept1', type: 'concept', name: 'Test Concept', priority: 0.7 },
+      { id: 'task1', type: 'task', content: 'Test Task', priority: 0.8 },
+      { id: 'link1', type: 'link', source: 'concept1', target: 'task1', linkType: 'relation', strength: 0.5 }
     ];
     
-    const { unmount } = render(<ConceptMap concepts={sampleEntities} />);
+    const { unmount } = render(<ConceptMap concepts={sampleEntities} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -122,7 +133,7 @@ describe('UI Components - No Runtime Errors', () => {
   });
 
   it('renders ConceptMap with empty concepts without errors', () => {
-    const { unmount } = render(<ConceptMap concepts={[]} />);
+    const { unmount } = render(<ConceptMap concepts={[]} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -153,11 +164,11 @@ describe('UI Components - No Runtime Errors', () => {
     const { unmount } = render(
       <div>
         <LogList logs={sampleLogs} />
-        <TasksTree tasks={sampleTasks} />
+        <TasksPanel tasks={sampleTasks} />
         <InputField onSend={() => {}} />
         <ReasonerControlPanel stats={stats} />
         <ConceptMap concepts={sampleEntities} />
-      </div>
+      </div>, { wrapper: TestWrapper }
     );
     
     // Check no errors were logged

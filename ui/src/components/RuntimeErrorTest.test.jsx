@@ -7,6 +7,17 @@ import LogList from './LogList.jsx';
 import TasksPanel from './TasksPanel.jsx';
 import InputField from './InputField.jsx';
 import ReasonerControlPanel from './ReasonerControlPanel.jsx';
+import { UIProvider } from '../core/UIContext';
+import { NotificationProvider } from '../core/NotificationSystem';
+
+// Wrapper component that includes all necessary providers
+const TestWrapper = ({ children }) => (
+  <UIProvider>
+    <NotificationProvider>
+      {children}
+    </NotificationProvider>
+  </UIProvider>
+);
 
 // Mock console methods to detect errors
 let consoleErrorSpy, consoleWarnSpy;
@@ -18,28 +29,28 @@ describe('Component Runtime Error Tests', () => {
   });
 
   it('LogList handles empty logs without errors', () => {
-    render(<LogList logs={[]} />);
+    render(<LogList logs={[]} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('TasksPanel handles empty tasks without errors', () => {
-    render(<TasksPanel tasks={[]} />);
+    render(<TasksPanel tasks={[]} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('InputField renders without errors', () => {
-    render(<InputField onSend={() => {}} />);
+    render(<InputField onSend={() => {}} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('ReasonerControlPanel handles null stats without errors', () => {
-    render(<ReasonerControlPanel stats={null} />);
+    render(<ReasonerControlPanel stats={null} />, { wrapper: TestWrapper });
     
     // Check no errors were logged
     expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -49,10 +60,10 @@ describe('Component Runtime Error Tests', () => {
     const { container } = render(
       <div>
         <LogList logs={[]} />
-        <TasksTree tasks={[]} />
+        <TasksPanel tasks={[]} />
         <InputField onSend={() => {}} />
         <ReasonerControlPanel stats={null} />
-      </div>
+      </div>, { wrapper: TestWrapper }
     );
     
     // Check no errors were logged
