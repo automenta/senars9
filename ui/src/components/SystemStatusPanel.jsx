@@ -1,6 +1,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { panelContainerStyle, headerStyle, statBoxStyle, labelStyle, statusBadgeStyle } from '../utils/styling';
+import { getConnectionStatusColor } from '../utils/common';
 
 const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] }) => {
   // Calculate system metrics
@@ -29,27 +30,20 @@ const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] 
     { name: '-20s', tasks: Math.max(0, tasks.length - 3) },
   ];
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'connected': return '#28a745';
-      case 'connecting': return '#ffc107';
-      case 'disconnected': return '#dc3545';
-      default: return '#6c757d';
-    }
-  };
+
 
   const getSystemHealth = () => {
     if (!stats) return { level: 'unknown', message: 'Unknown' };
     
+    const { cycles } = stats;
     const taskCount = tasks.length;
     const conceptCount = concepts.length;
-    const cycleRate = stats.cycles > 10 ? Math.round((stats.cycles / systemMetrics.uptime) * 100) / 100 : 0;
+    const cycleRate = cycles > 10 ? Math.round((cycles / systemMetrics.uptime) * 100) / 100 : 0;
     
-    if (taskCount > 100 || conceptCount > 50) return { level: 'warning', message: 'High memory pressure' };
-    if (cycleRate > 10) return { level: 'good', message: 'Active processing' };
-    if (stats.cycles > 0) return { level: 'good', message: 'Steady state' };
-    
-    return { level: 'info', message: 'Idle' };
+    return taskCount > 100 || conceptCount > 50 ? { level: 'warning', message: 'High memory pressure' } :
+           cycleRate > 10 ? { level: 'good', message: 'Active processing' } :
+           cycles > 0 ? { level: 'good', message: 'Steady state' } :
+           { level: 'info', message: 'Idle' };
   };
 
   const health = getSystemHealth();
@@ -66,7 +60,7 @@ const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] 
           <div style={{ 
             fontSize: '12px', 
             fontWeight: 'bold',
-            color: getStatusColor(connectionStatus)
+            color: getConnectionStatusColor(connectionStatus)
           }}>
             {connectionStatus?.toUpperCase()}
           </div>

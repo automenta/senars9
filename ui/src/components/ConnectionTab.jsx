@@ -11,6 +11,7 @@ import useCrdtWebSocket from '../core/crdtWebSocket';
 import CommandService from '../services/CommandService';
 import { PANEL_CONFIG, THEME } from '../constants';
 import Panel from './Panel';
+import { getConnectionStatusStyle, getConnectionStatusText } from '../utils/common';
 
 const ConnectionTab = ({ name, url }) => {
   const {
@@ -109,40 +110,7 @@ const ConnectionTab = ({ name, url }) => {
     }
   };
 
-  const getStatusStyles = () => {
-    const baseStyles = {
-      padding: THEME.spacing.sm,
-      marginBottom: THEME.spacing.md,
-      borderRadius: THEME.borderRadius,
-      color: THEME.colors.white,
-      fontWeight: THEME.fontWeight.bold,
-    };
 
-    switch (connectionStatus) {
-      case 'connected':
-        return { ...baseStyles, backgroundColor: THEME.colors.success };
-      case 'connecting':
-      case 'reconnecting':
-        return { ...baseStyles, backgroundColor: THEME.colors.warning };
-      case 'disconnected':
-      default:
-        return { ...baseStyles, backgroundColor: THEME.colors.danger };
-    }
-  };
-
-  const getStatusText = () => {
-    switch (connectionStatus) {
-      case 'connected':
-        return 'Connected';
-      case 'connecting':
-        return 'Connecting...';
-      case 'reconnecting':
-        return 'Reconnecting...';
-      case 'disconnected':
-      default:
-        return 'Disconnected';
-    }
-  };
 
   const errorStyles = {
     padding: THEME.spacing.sm,
@@ -154,8 +122,8 @@ const ConnectionTab = ({ name, url }) => {
 
   return (
     <div className="connection-tab">
-      <div style={getStatusStyles()}>
-        <strong>Connection:</strong> {name} ({url}) - Status: {getStatusText()}
+      <div style={getConnectionStatusStyle(connectionStatus, THEME)}>
+        <strong>Connection:</strong> {name} ({url}) - Status: {getConnectionStatusText(connectionStatus)}
       </div>
 
       {error && (
