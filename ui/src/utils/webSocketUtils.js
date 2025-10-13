@@ -15,15 +15,14 @@ export const parseWebSocketMessage = async (event) => {
     typeof data === 'string' ? JSON.parse(data) : data;
 
   try {
-    if (event.data instanceof Blob) {
-      return new Promise((resolve, reject) => {
+    return event.data instanceof Blob ?
+      new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(JSON.parse(reader.result));
         reader.onerror = () => reject(new Error('Failed to read blob data'));
         reader.readAsText(event.data);
-      });
-    }
-    return parseData(event.data);
+      }) :
+      parseData(event.data);
   } catch (error) {
     throw new Error(`WebSocket message parse error: ${error.message}`);
   }
@@ -41,8 +40,6 @@ export const createTask = (task) => ({
 
 export const sortTasksByPriority = (tasks) =>
   [...tasks].sort((a, b) => (b.priority || 0) - (a.priority || 0));
-
-// Message history management - optimized
 
 // Connection state management
 export const createConnectionManager = () => {
@@ -78,16 +75,9 @@ export const isValidWebSocketUrl = (url) => {
 
 // Safe message sending
 export const createSafeSend = (ws, isConnected) => (message) => {
-  if (ws && isConnected) {
-    try {
-      ws.send(JSON.stringify(message));
-      return true;
-    } catch (error) {
-      console.error('Error sending WebSocket message:', error);
-      return false;
-    }
-  }
-  return false;
+  return ws && isConnected ?
+    (() => { try { ws.send(JSON.stringify(message)); return true; } catch (error) { console.error('Error sending WebSocket message:', error); return false; } })() :
+    false;
 };
 
 // State update handlers
@@ -111,8 +101,6 @@ export const createStateUpdater = (setData) => (message) => {
 
   updateMap[message.type]?.(message.payload);
 };
-
-// WebSocket utilities - consolidated and deduplicated
 
 // Common WebSocket patterns abstraction
 export const createWebSocketHook = (WebSocketClass, config = {}) => {
@@ -174,9 +162,9 @@ export const createWebSocketHook = (WebSocketClass, config = {}) => {
   };
 };
 
-// Message history management - optimized
+// Message history management
 export const manageMessageHistory = (messages, maxMessages, messageRetention) =>
   messages.length > maxMessages ? messages.slice(-messageRetention) : messages;
 
-// Legacy compatibility exports - simplified
+// Legacy compatibility exports
 export const createStateMessageHandler = createStateUpdater;

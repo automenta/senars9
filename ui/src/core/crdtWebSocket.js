@@ -77,28 +77,20 @@ const useCrdtWebSocket = (url) => {
     return false;
   }, [provider]);
 
-  // Use consolidated WebSocket manager for task operations
-  const wsManager = useMemo(() => new WebSocketConnectionManager('', {
-    config: { enableMessageHistory: false }
-  }), []);
-
   const sortedTasks = useMemo(() =>
     sortTasksByPriority(tasks), [tasks]);
 
   const taskHandlers = useMemo(() => ({
     handleAddTask: (task) => {
-      wsManager.handleAddTask(task);
       sendMessage('add_task', task);
     },
     handleUpdateTask: (task) => {
-      wsManager.handleUpdateTask(task);
       sendMessage('update_task', task);
     },
     handleDeleteTask: (task) => {
-      wsManager.handleDeleteTask(task);
       sendMessage('delete_task', { id: task.id });
     }
-  }), [wsManager, sendMessage]);
+  }), [sendMessage]);
 
   return {
     isConnected: connectionStatus === 'connected',
