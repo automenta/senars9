@@ -58,7 +58,7 @@ export class RuleEngine {
    */
   getApplicableRules(task) {
     const triggerType = task.term.termType;
-    return this.rules.has(triggerType) ? this.rules.get(triggerType) : null;
+    return this.rules.get(triggerType) || null;
   }
 }
 
@@ -160,19 +160,11 @@ export class Reasoner {
           
           if (Array.isArray(newTasks)) {
             // Apply overlap checking if enabled
-            if (this.overlapCheckingEnabled) {
-              // Filter out tasks that would overlap with the original task that generated them
-              const filteredTasks = newTasks.filter(derivedTask => {
-                // Check if derived task overlaps with the original task that generated it
-                // This prevents cyclic reasoning by avoiding derivations where evidence overlaps
-                return !this._hasOverlap(derivedTask, originalTask);
-              });
-              
-              allNewTasks.push(...filteredTasks);
-            } else {
-              // If overlap checking is disabled, add all tasks
-              allNewTasks.push(...newTasks);
-            }
+            const tasksToAdd = this.overlapCheckingEnabled 
+              ? newTasks.filter(derivedTask => !this._hasOverlap(derivedTask, originalTask))
+              : newTasks;
+            
+            allNewTasks.push(...tasksToAdd);
           }
         } catch (error) {
           Logger.error(`Error applying rule: ${error.message}`);
@@ -190,10 +182,7 @@ export class Reasoner {
    * @returns {boolean} - True if tasks have overlapping stamps, false otherwise
    */
   _hasOverlap(taskA, taskB) {
-    if (!taskA || !taskB || !taskA.stamp || !taskB.stamp) {
-      return false;
-    }
-    return taskA.stamp.overlaps(taskB.stamp);
+    return taskA?.stamp?.overlaps(taskB?.stamp) || false;
   }
 
   /**

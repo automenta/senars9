@@ -10,9 +10,9 @@ export class TaskTable {
     if (this.tasks.size >= this.capacity) this._evictOldestTask();
     this.tasks.set(task.createdAt, task);
     this.accessTime.set(task.createdAt, Date.now());
-    if (!this.tasksByOccurrenceTime.has(task.occurrenceTime))
-      this.tasksByOccurrenceTime.set(task.occurrenceTime, new Set());
-    this.tasksByOccurrenceTime.get(task.occurrenceTime).add(task);
+    const timeSet = this.tasksByOccurrenceTime.get(task.occurrenceTime) || new Set();
+    timeSet.add(task);
+    this.tasksByOccurrenceTime.set(task.occurrenceTime, timeSet);
   }
 
   _evictOldestTask() {
@@ -59,53 +59,29 @@ export class TaskTable {
 
   _rankByWeights(tasks, timeWeight, confidenceWeight, timeImportance, referenceTime) {
     return tasks.sort((a, b) => {
-      const [scoreA, scoreB] = timeImportance === 'recency'
-        ? this._calculateRecencyScores(a, b, timeWeight, confidenceWeight, referenceTime)
-        : timeImportance === 'closest'
-          ? this._calculateClosestTimeScores(a, b, timeWeight, confidenceWeight, referenceTime)
-          : this._calculateRelevanceScores(a, b, timeWeight, confidenceWeight);
+      const [scoreA, scoreB] = this._calculateScores(a, b, timeWeight, confidenceWeight, timeImportance, referenceTime);
       return scoreB - scoreA;
     });
   }
 
-  _calculateRecencyScores(a, b, timeWeight, confidenceWeight, referenceTime) {
-    if (referenceTime !== Infinity) {
+  _calculateScores(a, b, timeWeight, confidenceWeight, timeImportance, referenceTime) {
+    const getConfScore = (task) => (task.truth?.confidence || 0) * confidenceWeight;
+    
+    if (timeImportance === 'closest' || (timeImportance === 'recency' && referenceTime !== Infinity)) {
+      // For 'closest' and 'recency' with referenceTime
       const timeDiffA = Math.abs(a.occurrenceTime - referenceTime);
       const timeDiffB = Math.abs(b.occurrenceTime - referenceTime);
       const maxDiff = Math.max(timeDiffA, timeDiffB, 1);
       const timeScoreA = (1 - timeDiffA / maxDiff) * timeWeight;
       const timeScoreB = (1 - timeDiffB / maxDiff) * timeWeight;
-      const confScoreA = (a.truth?.confidence || 0) * confidenceWeight;
-      const confScoreB = (b.truth?.confidence || 0) * confidenceWeight;
-      return [timeScoreA + confScoreA, timeScoreB + confScoreB];
+      return [timeScoreA + getConfScore(a), timeScoreB + getConfScore(b)];
     } else {
+      // For 'recency' with Infinity reference time and 'relevance'
       const maxTime = Math.max(a.occurrenceTime, b.occurrenceTime, 1);
-      const timeScoreA = (a.occurrenceTime / maxTime) * timeWeight;
-      const timeScoreB = (b.occurrenceTime / maxTime) * timeWeight;
-      const confScoreA = (a.truth?.confidence || 0) * confidenceWeight;
-      const confScoreB = (b.truth?.confidence || 0) * confidenceWeight;
-      return [timeScoreA + confScoreA, timeScoreB + confScoreB];
+      const timeScoreA = (timeImportance === 'recency' ? a.occurrenceTime / maxTime : 1 - a.occurrenceTime / maxTime) * timeWeight;
+      const timeScoreB = (timeImportance === 'recency' ? b.occurrenceTime / maxTime : 1 - b.occurrenceTime / maxTime) * timeWeight;
+      return [timeScoreA + getConfScore(a), timeScoreB + getConfScore(b)];
     }
-  }
-
-  _calculateClosestTimeScores(a, b, timeWeight, confidenceWeight, referenceTime) {
-    const timeDiffA = Math.abs(a.occurrenceTime - referenceTime);
-    const timeDiffB = Math.abs(b.occurrenceTime - referenceTime);
-    const maxDiff = Math.max(timeDiffA, timeDiffB, 1);
-    const timeScoreA = (1 - timeDiffA / maxDiff) * timeWeight;
-    const timeScoreB = (1 - timeDiffB / maxDiff) * timeWeight;
-    const confScoreA = (a.truth?.confidence || 0) * confidenceWeight;
-    const confScoreB = (b.truth?.confidence || 0) * confidenceWeight;
-    return [timeScoreA + confScoreA, timeScoreB + confScoreB];
-  }
-
-  _calculateRelevanceScores(a, b, timeWeight, confidenceWeight) {
-    const maxTime = Math.max(a.occurrenceTime, b.occurrenceTime, 1);
-    const timeScoreA = (a.occurrenceTime / maxTime) * timeWeight;
-    const timeScoreB = (b.occurrenceTime / maxTime) * timeWeight;
-    const confScoreA = (a.truth?.confidence || 0) * confidenceWeight;
-    const confScoreB = (b.truth?.confidence || 0) * confidenceWeight;
-    return [confScoreA + timeScoreA, confScoreB + timeScoreB];
   }
 
   getAllTasks() { return Array.from(this.tasks.values()); }

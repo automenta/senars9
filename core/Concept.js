@@ -25,71 +25,54 @@ export class Concept {
     this.activationLevel = Math.max(0.0, Math.min(1.0, newLevel));
   }
 
-  getActivationLevel() {
-    return this.activationLevel;
-  }
+  getActivationLevel() { return this.activationLevel; }
+  setAccessedAt(time) { this.accessedAt = time; }
+  getAccessedAt() { return this.accessedAt; }
 
-  setAccessedAt(time) {
-    this.accessedAt = time;
-  }
-
-  getAccessedAt() {
-    return this.accessedAt;
-  }
-
-  addTrigger(term) {
-    this.triggers.add(term);
-  }
-
-  addDerivation(term) {
-    this.derivations.add(term);
-  }
+  addTrigger(term) { this.triggers.add(term); }
+  addDerivation(term) { this.derivations.add(term); }
 
   addTask(task) {
-    const table = this._getTableForPunctuation(task.punctuation);
-    table.addTask(task);
+    this._getTableForPunctuation(task.punctuation).addTask(task);
   }
 
   _getTableForPunctuation(punctuation) {
-    const tableMap = { [Punctuation.BELIEF]: this.beliefTable, [Punctuation.GOAL]: this.goalTable, [Punctuation.QUESTION]: this.questionTable };
+    const tableMap = {
+      [Punctuation.BELIEF]: this.beliefTable,
+      [Punctuation.GOAL]: this.goalTable,
+      [Punctuation.QUESTION]: this.questionTable
+    };
+    
     const table = tableMap[punctuation];
     if (!table) throw new Error(`Unknown punctuation: ${punctuation}`);
     return table;
   }
 
   tasks(punctuation = Punctuation.BELIEF, time = Infinity, selectionCriteria = null, limit = 1) {
-    const table = this._getTableForPunctuation(punctuation);
-    return table.queryTasks(punctuation, time, selectionCriteria, limit);
+    return this._getTableForPunctuation(punctuation).queryTasks(punctuation, time, selectionCriteria, limit);
   }
 
   answer(answerSpec) {
     if (!(answerSpec instanceof Answer)) throw new Error('answerSpec must be an instance of Answer class');
     const criteria = answerSpec.getSelectionCriteria();
-    const table = this._getTableForPunctuation(answerSpec.punctuation);
-    return table.queryTasks(answerSpec.punctuation, Infinity, criteria, answerSpec.maxResults);
+    return this._getTableForPunctuation(answerSpec.punctuation)
+      .queryTasks(answerSpec.punctuation, Infinity, criteria, answerSpec.maxResults);
   }
 
   static truth(tasks, aggregationFunction = DefaultAggregationFunctions.weighted) {
-    return tasks.length > 0 && tasks[0].isQuestion() ? null : aggregationFunction(tasks);
+    return tasks.length > 0 && tasks[0]?.isQuestion() ? null : aggregationFunction(tasks);
   }
 
   truth(punctuation = Punctuation.BELIEF, time = Infinity, selectionCriteria = null, limit = 1, aggregationFunction = DefaultAggregationFunctions.weighted) {
-    const tasks = this.tasks(punctuation, time, selectionCriteria, limit);
-    return Concept.truth(tasks, aggregationFunction);
+    return Concept.truth(this.tasks(punctuation, time, selectionCriteria, limit), aggregationFunction);
   }
 
   truthFromAnswer(answerSpec, aggregationFunction = DefaultAggregationFunctions.weighted) {
-    const tasks = this.answer(answerSpec);
-    return Concept.truth(tasks, aggregationFunction);
+    return Concept.truth(this.answer(answerSpec), aggregationFunction);
   }
 
-  addResource(key, value) {
-    this.resources.set(key, value);
-  }
-
-  getResource(key) {
-    return this.resources.get(key);
-  }
+  addResource(key, value) { this.resources.set(key, value); }
+  getResource(key) { return this.resources.get(key); }
 
   toString() {
     return `[Concept: ${this.term.toString()}, activation=${this.activationLevel.toFixed(2)}, accessed=${this.accessedAt}]`;

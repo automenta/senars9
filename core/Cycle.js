@@ -34,28 +34,20 @@ export class CycleContext {
 export function runSingleCycle(memory, reasoner, selector, context) {
   // 1. Collect all tasks from memory.
   const allTasks = memory.getAllTasks();
-  if (allTasks.length === 0) {
-    return; // Nothing to do if memory is empty.
-  }
+  if (allTasks.length === 0) return; // Nothing to do if memory is empty.
 
   // 2. Use the selector to choose the focus set.
   const focusSet = selector.select(allTasks, context.currentTime);
-  if (focusSet.length === 0) {
-    return; // No tasks met the criteria for the focus set.
-  }
+  if (focusSet.length === 0) return; // No tasks met the criteria for the focus set.
 
   // 3. Update accessed_at for all tasks in the focus set.
-  for (const task of focusSet) {
-    task.setAccessedAt(context.currentTime);
-  }
+  focusSet.forEach(task => task.setAccessedAt(context.currentTime));
 
   // 4. Reason on the focus set to derive new knowledge.
   const derivedTasks = reasoner.reason(focusSet, memory, context);
 
   // 5. Add derived tasks back to memory.
-  for (const task of derivedTasks) {
-    memory.addTask(task, context.currentTime);
-  }
+  derivedTasks.forEach(task => memory.addTask(task, context.currentTime));
 
   // 6. Consolidate memory.
   memory.consolidate(context.currentTime);

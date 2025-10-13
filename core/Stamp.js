@@ -52,9 +52,8 @@ export class Stamp {
    * Check if two tasks have overlapping evidence (cyclic detection)
    */
   static overlap(taskA, taskB) {
-    const stampA = taskA.stamp ? taskA.stamp.stampArray : [];
-    const stampB = taskB.stamp ? taskB.stamp.stampArray : [];
-
+    const stampA = taskA.stamp?.stampArray || [];
+    const stampB = taskB.stamp?.stampArray || [];
     return Stamp.overlapsAny(stampA, stampB);
   }
 
@@ -62,8 +61,8 @@ export class Stamp {
    * Merge stamps from two parent tasks for a derived task
    */
   static zip(taskA, taskB, capacity = 8) {
-    const stampA = taskA.stamp ? taskA.stamp.stampArray : [];
-    const stampB = taskB.stamp ? taskB.stamp.stampArray : [];
+    const stampA = taskA.stamp?.stampArray || [];
+    const stampB = taskB.stamp?.stampArray || [];
 
     const sampleHash = TaskHash.hashTask(taskA) + TaskHash.hashTask(taskB);
     const mergedArray = Stamp.zipArrays(stampA, stampB, sampleHash, capacity);
@@ -86,8 +85,7 @@ export class Stamp {
    * Core stamp array merging logic
    */
   static zipArrays(a, b, sampleHash, capacity = 8) {
-    const aa = a.length;
-    const bb = b.length;
+    const [aa, bb] = [a.length, b.length];
 
     // Handle empty cases
     if (aa === 0) {
@@ -107,9 +105,7 @@ export class Stamp {
     // Calculate merged length
     const abLen = aa + bb - overlapCount;
     if (abLen <= capacity) {
-      return overlapCount > 0 ?
-        Stamp.zipFlat(a, b, abLen) :
-        Stamp.zipDirect(a, b);
+      return overlapCount > 0 ? Stamp.zipFlat(a, b, abLen) : Stamp.zipDirect(a, b);
     }
 
     return Stamp.zipSample(capacity, [a, b], sampleHash, abLen);
@@ -120,24 +116,18 @@ export class Stamp {
    */
   static zipFlat(a, b, abLen) {
     const merged = new Array(abLen);
-    let i = 0, j = 0, k = 0;
+    let [i, j, k] = [0, 0, 0];
 
     while (i < a.length && j < b.length) {
       if (a[i] < b[j]) {
-        if (k === 0 || merged[k - 1] !== a[i]) {
-          merged[k++] = a[i];
-        }
+        if (k === 0 || merged[k - 1] !== a[i]) merged[k++] = a[i];
         i++;
       } else if (b[j] < a[i]) {
-        if (k === 0 || merged[k - 1] !== b[j]) {
-          merged[k++] = b[j];
-        }
+        if (k === 0 || merged[k - 1] !== b[j]) merged[k++] = b[j];
         j++;
       } else {
         // Equal elements
-        if (k === 0 || merged[k - 1] !== a[i]) {
-          merged[k++] = a[i];
-        }
+        if (k === 0 || merged[k - 1] !== a[i]) merged[k++] = a[i];
         i++;
         j++;
       }
@@ -145,16 +135,12 @@ export class Stamp {
 
     // Add remaining elements
     while (i < a.length) {
-      if (k === 0 || merged[k - 1] !== a[i]) {
-        merged[k++] = a[i];
-      }
+      if (k === 0 || merged[k - 1] !== a[i]) merged[k++] = a[i];
       i++;
     }
 
     while (j < b.length) {
-      if (k === 0 || merged[k - 1] !== b[j]) {
-        merged[k++] = b[j];
-      }
+      if (k === 0 || merged[k - 1] !== b[j]) merged[k++] = b[j];
       j++;
     }
 
@@ -165,16 +151,13 @@ export class Stamp {
    * Simple direct merge for non-overlapping arrays
    */
   static zipDirect(a, b) {
-    const aa = a.length;
-    const bb = b.length;
+    const [aa, bb] = [a.length, b.length];
     const abLength = aa + bb;
     const ab = new Array(abLength);
 
-    let ia = 0, ib = 0;
+    let [ia, ib] = [0, 0];
     for (let i = 0; i < abLength; i++) {
-      const an = ia < aa ? a[ia] : Number.MAX_SAFE_INTEGER;
-      const bn = ib < bb ? b[ib] : Number.MAX_SAFE_INTEGER;
-
+      const [an, bn] = [ia < aa ? a[ia] : Number.MAX_SAFE_INTEGER, ib < bb ? b[ib] : Number.MAX_SAFE_INTEGER];
       if (an < bn) {
         ab[i] = an;
         ia++;
@@ -192,12 +175,7 @@ export class Stamp {
    */
   static zipSample(capacity, arrays, sampleHash, totalLength) {
     const flatArray = Stamp.zipFlatMultiple(arrays, totalLength);
-
-    if (flatArray.length <= capacity) {
-      return flatArray;
-    }
-
-    return Stamp.zipSampleWithHash(capacity, sampleHash, flatArray);
+    return flatArray.length <= capacity ? flatArray : Stamp.zipSampleWithHash(capacity, sampleHash, flatArray);
   }
 
   /**
@@ -247,13 +225,7 @@ export class Stamp {
     }
 
     // Collect non-skipped elements
-    const result = [];
-    for (let i = 0; i < array.length; i++) {
-      if (!skip.has(i)) {
-        result.push(array[i]);
-      }
-    }
-
+    const result = array.filter((_, i) => !skip.has(i));
     return result.sort((a, b) => a - b);
   }
 
@@ -261,8 +233,7 @@ export class Stamp {
    * Binary search for insertion point
    */
   static binarySearch(arr, value, start, end) {
-    let low = start;
-    let high = end;
+    let [low, high] = [start, end];
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
@@ -282,36 +253,25 @@ export class Stamp {
    * Check if arrays are equal
    */
   static arraysEqual(a, b) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (a[i] !== b[i]) return false;
-    }
-    return true;
+    return a.length === b.length && a.every((val, i) => val === b[i]);
   }
 
   /**
    * Check if arrays have any overlapping elements
    */
   static overlapsAny(a, b) {
-    if (a.length === 0 || b.length === 0) return false;
-    if (a.length === 1 && b.length === 1) return a[0] === b[0];
-
-    return Stamp.overlapExhaustive(a, b);
+    return a.length === 1 && b.length === 1 ? a[0] === b[0] : Stamp.overlapExhaustive(a, b);
   }
 
   /**
    * Exhaustive overlap check
    */
   static overlapExhaustive(a, b) {
-    let i = 0, j = 0;
+    let [i, j] = [0, 0];
     while (i < a.length && j < b.length) {
-      if (a[i] === b[j]) {
-        return true; // Found overlap
-      } else if (a[i] < b[j]) {
-        i++;
-      } else {
-        j++;
-      }
+      if (a[i] === b[j]) return true; // Found overlap
+      else if (a[i] < b[j]) i++;
+      else j++;
     }
     return false; // No overlap found
   }
@@ -320,8 +280,7 @@ export class Stamp {
    * Count overlapping elements
    */
   static overlapCount(a, b) {
-    let i = 0, j = 0;
-    let count = 0;
+    let [i, j, count] = [0, 0, 0];
 
     while (i < a.length && j < b.length) {
       if (a[i] === b[j]) {
@@ -343,16 +302,10 @@ export class Stamp {
    */
   static overlapFraction(a, b) {
     if (a.length === 0 || b.length === 0) return 0;
-
-    if (a.length === 1 && b.length === 1) {
-      return a[0] === b[0] ? 1 : 0;
-    }
+    if (a.length === 1 && b.length === 1) return a[0] === b[0] ? 1 : 0;
 
     const common = Stamp.overlapCount(a, b);
-    if (common === 0) return 0;
-
-    const denom = Math.min(a.length, b.length);
-    return common / denom;
+    return common === 0 ? 0 : common / Math.min(a.length, b.length);
   }
 
   /**
@@ -364,27 +317,14 @@ export class Stamp {
     const sorted = arr.slice().sort((a, b) => a - b);
     const deduplicated = Stamp.deduplicate(sorted);
 
-    if (outputLen && deduplicated.length > outputLen) {
-      return deduplicated.slice(0, outputLen);
-    }
-
-    return deduplicated;
+    return outputLen && deduplicated.length > outputLen ? deduplicated.slice(0, outputLen) : deduplicated;
   }
 
   /**
    * Remove duplicates from sorted array
    */
   static deduplicate(sorted) {
-    if (sorted.length === 0) return [];
-
-    const result = [sorted[0]];
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i] !== sorted[i - 1]) {
-        result.push(sorted[i]);
-      }
-    }
-
-    return result;
+    return sorted.length === 0 ? [] : [sorted[0], ...sorted.filter((val, i) => i > 0 && val !== sorted[i-1])];
   }
 
   /**
@@ -395,9 +335,7 @@ export class Stamp {
     if (stamp.length > 8) return false; // NAL.STAMP_CAPACITY equivalent
 
     for (let i = 1; i < stamp.length; i++) {
-      if (stamp[i - 1] >= stamp[i]) {
-        return false; // Out of order or duplicate
-      }
+      if (stamp[i - 1] >= stamp[i]) return false; // Out of order or duplicate
     }
 
     return true;
@@ -406,66 +344,47 @@ export class Stamp {
   /**
    * Get stamp array
    */
-  stamp() {
-    return this.stampArray;
-  }
+  stamp() { return this.stampArray; }
 
   /**
    * Get stamp length
    */
-  length() {
-    return this.stampArray.length;
-  }
+  length() { return this.stampArray.length; }
 
   /**
    * Calculate originality (decreases with evidence length)
    */
-  originality() {
-    return Stamp.originality(this.stampArray.length);
-  }
+  originality() { return Stamp.originality(this.stampArray.length); }
 
   /**
    * Calculate originality based on stamp length
    */
-  static originality(length) {
-    return 1.0 / (1.0 + length * 0.1); // Simplified version
-  }
+  static originality(length) { return 1.0 / (1.0 + length * 0.1); } // Simplified version
 
   /**
    * Check if this stamp overlaps with another
    */
-  overlaps(other) {
-    return Stamp.overlapsAny(this.stampArray, other.stampArray);
-  }
+  overlaps(other) { return Stamp.overlapsAny(this.stampArray, other.stampArray); }
 
   /**
    * Get overlap fraction with another stamp
    */
-  overlapFraction(other) {
-    return Stamp.overlapFraction(this.stampArray, other.stampArray);
-  }
+  overlapFraction(other) { return Stamp.overlapFraction(this.stampArray, other.stampArray); }
 
   /**
    * Create a copy of this stamp
    */
-  clone() {
-    return new Stamp(this.stampArray.slice());
-  }
+  clone() { return new Stamp(this.stampArray.slice()); }
 
   /**
    * Convert to string representation
    */
-  toString() {
-    return `Stamp[${this.stampArray.join(',')}]`;
-  }
+  toString() { return `Stamp[${this.stampArray.join(',')}]`; }
 
   /**
    * Check equality with another stamp
    */
-  equals(other) {
-    if (!(other instanceof Stamp)) return false;
-    return Stamp.arraysEqual(this.stampArray, other.stampArray);
-  }
+  equals(other) { return other instanceof Stamp && Stamp.arraysEqual(this.stampArray, other.stampArray); }
 
   /**
    * Get hash code for consistent hashing

@@ -60,10 +60,8 @@ class ObjectUtils {
   }
 
   static isEmpty(obj) {
-    return !obj ? true :
-           Array.isArray(obj) ? obj.length === 0 :
-           ObjectUtils.isObject(obj) ? Object.keys(obj).length === 0 :
-           false;
+    return !obj || (Array.isArray(obj) && obj.length === 0) || 
+           (ObjectUtils.isObject(obj) && Object.keys(obj).length === 0);
   }
 
   static pick(obj, keys) {
