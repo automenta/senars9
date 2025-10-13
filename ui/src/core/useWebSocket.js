@@ -11,7 +11,6 @@ const useWebSocket = (url, config = {}) => {
   const wsManagerRef = useRef(null);
   const configRef = useRef(createWebSocketConfig(config));
 
-  // Initialize WebSocket connection
   useEffect(() => {
     if (!wsManagerRef.current) {
       wsManagerRef.current = new WebSocketConnectionManager(url, {
@@ -21,7 +20,6 @@ const useWebSocket = (url, config = {}) => {
         setLastMessage,
         setMessages
       });
-
       wsManagerRef.current.connect();
     }
 
@@ -31,12 +29,9 @@ const useWebSocket = (url, config = {}) => {
     };
   }, []);
 
-  // Handle URL changes
   useEffect(() => {
-    if (wsManagerRef.current) {
-      wsManagerRef.current.disconnect();
-      setTimeout(() => wsManagerRef.current?.connect(), 100);
-    }
+    wsManagerRef.current?.disconnect();
+    setTimeout(() => wsManagerRef.current?.connect(), 100);
   }, [url]);
 
   const sendRawMessage = useCallback((message) =>
@@ -61,11 +56,9 @@ const useWebSocket = (url, config = {}) => {
     setTimeout(() => wsManagerRef.current?.connect(), 1000);
   }, []);
 
-  // Manage message history retention
   useEffect(() => {
-    if (configRef.current.enableMessageHistory && wsManagerRef.current) {
+    configRef.current.enableMessageHistory && wsManagerRef.current &&
       setMessages(prev => wsManagerRef.current.manageMessageHistory(prev));
-    }
   }, [messages]);
 
   const sortedTasks = useMemo(() =>

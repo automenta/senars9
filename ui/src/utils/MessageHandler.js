@@ -1,32 +1,22 @@
-import { parseWebSocketMessage, createStateUpdater } from './webSocketUtils';
+import { parseWebSocketMessage, createStateUpdater, manageMessageHistory } from './webSocketUtils';
 
 class MessageHandler {
-  constructor(setData, setError, setLastMessage, setMessages, config) {
-    this.setData = setData;
-    this.setError = setError;
-    this.setLastMessage = setLastMessage;
-    this.setMessages = setMessages;
-    this.config = config;
+  constructor(setData, setError, setLastMessage, setMessages, config, sendMessage) {
+    Object.assign(this, { setData, setError, setLastMessage, setMessages, config, sendMessage });
   }
 
   async handleMessage(event) {
     this.setLastMessage?.(event);
 
-    // Handle message history
     if (this.config.enableMessageHistory && this.setMessages) {
       try {
         const message = await parseWebSocketMessage(event);
-        this.setMessages(prev => [...prev, message]);
+        this.setMessages(prev => manageMessageHistory([...prev, message], this.config.maxMessages, this.config.messageRetention));
       } catch (parseError) {
-        this.setMessages?.(prev => [...prev, {
-          type: 'error',
-          data: event.data,
-          error: parseError.message
-        }]);
+        this.setMessages?.(prev => [...prev, { type: 'error', data: event.data, error: parseError.message }]);
       }
     }
 
-    // Handle state updates
     if (this.setData) {
       try {
         const message = await parseWebSocketMessage(event);
@@ -43,6 +33,7 @@ class MessageHandler {
 
   handleConnect() {
     this.setError?.(null);
+    this.config.autoRequestState && setTimeout(() => this.sendMessage?.({ type: 'request_state' }), 100);
   }
 
   handleError(error) {

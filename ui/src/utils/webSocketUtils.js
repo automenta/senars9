@@ -2,13 +2,12 @@ import { CONNECTION_STATUS, DEFAULT_WS_CONFIG, MESSAGE_TYPES } from '../constant
 
 export { CONNECTION_STATUS, DEFAULT_WS_CONFIG, MESSAGE_TYPES };
 
-// WebSocket configuration with defaults
+// WebSocket configuration
 export const createWebSocketConfig = (overrides = {}) => ({
   ...DEFAULT_WS_CONFIG,
   ...overrides
 });
 
-// Message parsing utilities
 export const parseWebSocketMessage = async (event) => {
   const parseData = (data) =>
     data instanceof ArrayBuffer ? JSON.parse(new TextDecoder().decode(data)) :
@@ -29,6 +28,7 @@ export const parseWebSocketMessage = async (event) => {
 };
 
 // Task management utilities
+// Task utilities
 export const createTask = (task) => ({
   ...task,
   id: task.id || `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -41,7 +41,6 @@ export const createTask = (task) => ({
 export const sortTasksByPriority = (tasks) =>
   [...tasks].sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
-// Connection state management
 export const createConnectionManager = () => {
   let status = CONNECTION_STATUS.DISCONNECTED;
   let reconnectAttempts = 0;
@@ -80,7 +79,6 @@ export const createSafeSend = (ws, isConnected) => (message) => {
     false;
 };
 
-// State update handlers
 export const createStateUpdater = (setData) => (message) => {
   const updateMap = {
     [MESSAGE_TYPES.STATE_UPDATE]: (payload) => {
@@ -102,7 +100,7 @@ export const createStateUpdater = (setData) => (message) => {
   updateMap[message.type]?.(message.payload);
 };
 
-// Common WebSocket patterns abstraction
+// WebSocket hook abstraction
 export const createWebSocketHook = (WebSocketClass, config = {}) => {
   const {
     onMessage,
@@ -166,5 +164,5 @@ export const createWebSocketHook = (WebSocketClass, config = {}) => {
 export const manageMessageHistory = (messages, maxMessages, messageRetention) =>
   messages.length > maxMessages ? messages.slice(-messageRetention) : messages;
 
-// Legacy compatibility exports
+// Legacy compatibility
 export const createStateMessageHandler = createStateUpdater;

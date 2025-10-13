@@ -7,7 +7,6 @@ import {
 } from './webSocketUtils';
 import TaskManager from './TaskManager';
 import MessageHandler from './MessageHandler';
-import StateManager from './StateManager';
 
 class WebSocketConnectionManager {
   constructor(url, options = {}) {
@@ -31,11 +30,9 @@ class WebSocketConnectionManager {
     this.connectionManager = createConnectionManager();
     this.connectionManager.subscribe(status => this.emit('statusChange', status));
 
-    // Initialize modular components
     this.taskManager = new TaskManager(setData, (type, command, payload) =>
       this.send({ type, command, payload }));
-    this.messageHandler = new MessageHandler(setData, setError, setLastMessage, setMessages, config);
-    this.stateManager = new StateManager(setData, setError, setLastMessage, setMessages, config, (message) => this.send(message));
+    this.messageHandler = new MessageHandler(setData, setError, setLastMessage, setMessages, config, (message) => this.send(message));
   }
 
   async connect() {
@@ -93,13 +90,15 @@ class WebSocketConnectionManager {
   }
 
   manageMessageHistory(messages) {
-    return this.stateManager.manageMessageHistory(messages);
+    return this.messageHandler.config.enableMessageHistory && messages.length > this.messageHandler.config.maxMessages
+      ? messages.slice(-this.messageHandler.config.messageRetention)
+      : messages;
   }
 
   send(message) {
     return this.isConnected && this.ws ?
       (() => { try { this.ws.send(JSON.stringify(message)); return true; } catch (error) { this.emit('error', error); return false; } })() :
-      (this.emit('error', new Error('WebSocket not connected')), false);
+      (this.emit('error', new Error('WebSocket not connected')) || false);
   }
 
   disconnect() {
@@ -146,7 +145,6 @@ class WebSocketConnectionManager {
     this.connectionManager = null;
     this.taskManager = null;
     this.messageHandler = null;
-    this.stateManager = null;
   }
 }
 

@@ -4,7 +4,7 @@ import { WebsocketProvider } from 'y-websocket';
 import WebSocketConnectionManager from '../utils/WebSocketConnectionManager';
 import { sortTasksByPriority } from '../utils/webSocketUtils';
 
-// Yjs utilities abstraction - simplified
+// Yjs observer abstraction
 const createYjsObservers = (ydoc, setters) => {
   const { setTasks, setLogs, setConcepts, setReasonerStats } = setters;
 
@@ -16,8 +16,7 @@ const createYjsObservers = (ydoc, setters) => {
 
       const observers = {
         tasks: () => setTasks(yTasks.toArray().map(task =>
-          task instanceof Y.Map ? task.toJSON() : task
-        )),
+          task instanceof Y.Map ? task.toJSON() : task)),
         logs: () => setLogs(yLogs.toArray()),
         concepts: () => setConcepts(yConcepts.toArray())
       };
@@ -53,7 +52,6 @@ const useCrdtWebSocket = (url) => {
 
     wsProvider.on('status', event => setConnectionStatus(event.status));
 
-    // Use abstracted Yjs observer pattern
     const observers = createYjsObservers(ydoc, { setTasks, setLogs, setConcepts, setReasonerStats });
     const cleanup = observers.setup(wsProvider);
 

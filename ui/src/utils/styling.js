@@ -1,12 +1,5 @@
-/**
- * Styling utilities for consistent theming across components
- */
-
 import { THEME } from '../constants';
 
-/**
- * Applies theme values to style objects
- */
 export const applyTheme = (baseStyles, themeOverrides = {}) => {
   const theme = { ...THEME, ...themeOverrides };
   
@@ -16,9 +9,6 @@ export const applyTheme = (baseStyles, themeOverrides = {}) => {
   };
 };
 
-/**
- * Creates a standard panel container style
- */
 export const panelContainerStyle = (overrides = {}) => ({
   padding: THEME.spacing.md,
   border: `1px solid ${THEME.colors.gray[300]}`,
@@ -27,9 +17,6 @@ export const panelContainerStyle = (overrides = {}) => ({
   ...overrides
 });
 
-/**
- * Creates a standard header style
- */
 export const headerStyle = (overrides = {}) => ({
   margin: '0 0 10px 0',
   color: THEME.colors.dark,
@@ -39,9 +26,6 @@ export const headerStyle = (overrides = {}) => ({
   ...overrides
 });
 
-/**
- * Creates a standard button style
- */
 export const buttonStyle = (type = 'primary', overrides = {}) => {
   const base = {
     padding: `${THEME.spacing.xs} ${THEME.spacing.md}`,
@@ -67,9 +51,6 @@ export const buttonStyle = (type = 'primary', overrides = {}) => {
   };
 };
 
-/**
- * Creates a standard input field style
- */
 export const inputStyle = (overrides = {}) => ({
   padding: THEME.spacing.xs,
   border: `1px solid ${THEME.colors.gray[400]}`,
@@ -77,9 +58,6 @@ export const inputStyle = (overrides = {}) => ({
   ...overrides
 });
 
-/**
- * Creates a standard stat box style
- */
 export const statBoxStyle = (overrides = {}) => ({
   padding: THEME.spacing.sm,
   backgroundColor: THEME.colors.gray[200],
@@ -88,9 +66,6 @@ export const statBoxStyle = (overrides = {}) => ({
   ...overrides
 });
 
-/**
- * Creates a standard label style
- */
 export const labelStyle = (overrides = {}) => ({
   display: 'block',
   marginBottom: THEME.spacing.xs,
@@ -99,9 +74,6 @@ export const labelStyle = (overrides = {}) => ({
   ...overrides
 });
 
-/**
- * Creates a standard status badge style
- */
 export const statusBadgeStyle = (status, overrides = {}) => {
   const statusColors = {
     connected: { bg: THEME.colors.success + '20', color: THEME.colors.success },
@@ -124,9 +96,6 @@ export const statusBadgeStyle = (status, overrides = {}) => {
   };
 };
 
-/**
- * Creates grid layout styles
- */
 export const gridStyle = (columns = 'repeat(auto-fit, minmax(200px, 1fr))', gap = THEME.spacing.md) => ({
   display: 'grid',
   gridTemplateColumns: columns,
