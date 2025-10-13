@@ -5,14 +5,13 @@ import useWebSocket from './core/useWebSocket';
 import CommandService from './services/CommandService';
 import { UIProvider } from './core/UIContext';
 import { NotificationProvider } from './core/NotificationSystem';
-import { CONNECTION_DEFAULTS } from './constants';
+import { WS_CONFIG } from './constants';
 import './App.css';
-import './Layout.css';
 
 const App = () => {
   // Create WebSocket URL using the same host as the page (for same-origin)
   const urlParams = new URLSearchParams(window.location.search);
-  const serverPort = urlParams.get('serverPort') || CONNECTION_DEFAULTS.defaultPort;
+  const serverPort = urlParams.get('serverPort') || WS_CONFIG.defaultPort;
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsHost = window.location.host.split(':')[0] || 'localhost'; // Get just the hostname part
   
@@ -44,36 +43,26 @@ const App = () => {
 
     // Request updated state after commands that might change system state
     if (['start', 'step', 'stop', 'reset'].includes(command)) {
-      setTimeout(() => {
-        requestState();
-      }, 300); // Small delay to allow server processing
+      setTimeout(requestState, 300);
     }
 
     // Request updated concepts after certain commands that might generate them
     if (['start', 'step', 'add_task'].includes(command)) {
       setTimeout(() => {
         requestConcepts();
-        requestTopTasks(); // Also request top tasks from Memory
-      }, 500); // Small delay to allow server processing
+        requestTopTasks();
+      }, 500);
     }
   };
 
   const handleAddTaskWithConcepts = (task) => {
     handleAddTask(task);
-
-    // Request concepts after adding a task that might generate new concepts
-    setTimeout(() => {
-      requestConcepts();
-    }, 300);
+    setTimeout(requestConcepts, 300);
   };
 
   const handleUpdateTaskWithConcepts = (task) => {
     handleUpdateTask(task);
-
-    // Request concepts after updating a task that might generate new concepts
-    setTimeout(() => {
-      requestConcepts();
-    }, 300);
+    setTimeout(requestConcepts, 300);
   };
 
   // Request initial concepts and top tasks when component mounts

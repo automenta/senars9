@@ -1,4 +1,4 @@
-export const getPriorityColor = (priority) => 
+export const getPriorityColor = (priority) =>
   priority > 0.8 ? '#dc3545' :  // High: Red
   priority > 0.5 ? '#ffc107' :  // Medium: Yellow
   priority > 0.2 ? '#28a745' :  // Low: Green

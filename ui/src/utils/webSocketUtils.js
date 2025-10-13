@@ -1,10 +1,10 @@
-import { CONNECTION_STATUS, DEFAULT_WS_CONFIG, MESSAGE_TYPES } from '../constants';
+import { CONNECTION_STATUS, WS_CONFIG, MESSAGE_TYPES } from '../constants';
 
-export { CONNECTION_STATUS, DEFAULT_WS_CONFIG, MESSAGE_TYPES };
+export { CONNECTION_STATUS, WS_CONFIG, MESSAGE_TYPES };
 
 // WebSocket configuration
 export const createWebSocketConfig = (overrides = {}) => ({
-  ...DEFAULT_WS_CONFIG,
+  ...WS_CONFIG,
   ...overrides
 });
 

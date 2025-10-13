@@ -28,6 +28,22 @@
   box-sizing: border-box;
 }
 
+/* Layout styles */
+.main-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.docking-layout-container {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;

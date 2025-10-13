@@ -1,6 +1,6 @@
 import {
   CONNECTION_STATUS,
-  DEFAULT_WS_CONFIG,
+  WS_CONFIG,
   MESSAGE_TYPES,
   isValidWebSocketUrl,
   createConnectionManager
@@ -15,7 +15,7 @@ class WebSocketConnectionManager {
     const { config = {}, setData, setError, setLastMessage, setMessages } = options;
 
     this.url = url;
-    this.config = { ...DEFAULT_WS_CONFIG, ...config };
+    this.config = { ...WS_CONFIG, ...config };
     this.setData = setData;
     this.setError = setError;
     this.setLastMessage = setLastMessage;

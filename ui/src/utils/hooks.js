@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { CONNECTION_DEFAULTS } from '../constants';
+import { WS_CONFIG } from '../constants';
 
-export const useCommandHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize) => {
+export const useCommandHistory = (maxSize = WS_CONFIG.maxHistorySize) => {
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
@@ -44,7 +44,7 @@ export const useCommandHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize) 
   };
 };
 
-export const useInputWithHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize) => {
+export const useInputWithHistory = (maxSize = WS_CONFIG.maxHistorySize) => {
   const [inputValue, setInputValue] = useState('');
   const {
     history,

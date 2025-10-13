@@ -42,19 +42,10 @@ export const CONNECTION_STATUS = {
   ERROR: 'error'
 };
 
-export const CONNECTION_DEFAULTS = {
+export const WS_CONFIG = {
   defaultPort: 8080,
   fallbackPort: 8081,
   maxHistorySize: 50,
-  maxReconnectAttempts: 10,
-  reconnectInterval: 3000,
-  messageRetention: 500,
-  maxMessages: 1000,
-  autoRequestState: true,
-  enableMessageHistory: true
-};
-
-export const DEFAULT_WS_CONFIG = {
   maxReconnectAttempts: 10,
   reconnectInterval: 3000,
   messageRetention: 500,
