@@ -6,7 +6,48 @@ import TasksPanel from './TasksPanel';
 import LogList from './LogList';
 import SystemStatusPanel from './SystemStatusPanel';
 
-const json = {
+// Component registry for better maintainability
+const COMPONENT_REGISTRY = {
+  'concept-map': {
+    component: ConceptMap,
+    props: (props) => ({ concepts: props.concepts, tasks: props.tasks })
+  },
+  'tasks-panel': {
+    component: TasksPanel,
+    props: (props) => ({
+      tasks: props.tasks,
+      memoryTasks: props.memoryTasks,
+      onUpdateTask: props.onUpdateTask,
+      onDeleteTask: props.onDeleteTask
+    })
+  },
+  'concepts-panel': {
+    component: React.lazy(() => import('./ConceptsPanel')),
+    props: (props) => ({
+      concepts: props.concepts,
+      onUpdateConcept: props.onUpdateTask,
+      onDeleteConcept: props.onDeleteTask
+    }),
+    isLazy: true,
+    fallback: 'Loading concepts...'
+  },
+  'log-list': {
+    component: LogList,
+    props: (props) => ({ logs: props.logs })
+  },
+  'system-status': {
+    component: SystemStatusPanel,
+    props: (props) => ({
+      stats: props.reasonerStats,
+      connectionStatus: props.connectionStatus,
+      tasks: props.tasks,
+      concepts: props.concepts
+    })
+  }
+};
+
+// Layout configuration
+const LAYOUT_CONFIG = {
   global: {
     tabEnableClose: false,
     tabEnableRename: false,
@@ -22,106 +63,68 @@ const json = {
         enableTabStrip: true,
         selected: 0,
         children: [
-          {
-            type: 'tab',
-            name: 'Tasks',
-            component: 'tasks-panel',
-          },
-          {
-            type: 'tab',
-            name: 'Concepts',
-            component: 'concepts-panel',
-          },
-        ],
+          { type: 'tab', name: 'Tasks', component: 'tasks-panel' },
+          { type: 'tab', name: 'Concepts', component: 'concepts-panel' }
+        ]
       },
       {
         type: 'row',
         weight: 75,
         children: [
-            {
-                type: 'tabset',
-                weight: 70,
-                children: [
-                    {
-                        type: 'tab',
-                        name: 'Concept Map',
-                        component: 'concept-map',
-                    },
-                ],
-            },
-            {
-                type: 'tabset',
-                weight: 30,
-                children: [
-                    {
-                        type: 'tab',
-                        name: 'Logs',
-                        component: 'log-list',
-                    },
-                    {
-                        type: 'tab',
-                        name: 'System',
-                        component: 'system-status',
-                    },
-                ],
-            },
-        ],
-      },
-    ],
-  },
+          {
+            type: 'tabset',
+            weight: 70,
+            children: [
+              { type: 'tab', name: 'Concept Map', component: 'concept-map' }
+            ]
+          },
+          {
+            type: 'tabset',
+            weight: 30,
+            children: [
+              { type: 'tab', name: 'Logs', component: 'log-list' },
+              { type: 'tab', name: 'System', component: 'system-status' }
+            ]
+          }
+        ]
+      }
+    ]
+  }
 };
 
-const model = Model.fromJson(json);
+// Component factory with error handling and lazy loading
+const createComponentFactory = (props) => (node) => {
+  const componentKey = node.getComponent();
 
-const DockingLayout = ({
-  logs,
-  tasks,
-  concepts,
-  memoryTasks,
-  reasonerStats,
-  connectionStatus,
-  onUpdateTask,
-  onDeleteTask,
-}) => {
-  const factory = (node) => {
-    const component = node.getComponent();
-    if (component === 'concept-map') {
-      return <ConceptMap concepts={concepts} tasks={tasks} />;
-    }
-    if (component === 'tasks-panel') {
+  if (!COMPONENT_REGISTRY[componentKey]) {
+    console.warn(`Unknown component type: ${componentKey}`);
+    return <div>Unknown component: {componentKey}</div>;
+  }
+
+  const { component: Component, props: propMapper, isLazy, fallback } = COMPONENT_REGISTRY[componentKey];
+
+  try {
+    const componentProps = propMapper ? propMapper(props) : props;
+
+    if (isLazy) {
+      const LazyComponent = Component;
       return (
-        <TasksPanel
-          tasks={tasks}
-          memoryTasks={memoryTasks}
-          onUpdateTask={onUpdateTask}
-          onDeleteTask={onDeleteTask}
-        />
-      );
-    }
-    if (component === 'concepts-panel') {
-      const ConceptsPanel = React.lazy(() => import('./ConceptsPanel'));
-      return (
-        <React.Suspense fallback={<div>Loading concepts...</div>}>
-          <ConceptsPanel
-            concepts={concepts}
-            onUpdateConcept={onUpdateTask}
-            onDeleteConcept={onDeleteTask}
-          />
+        <React.Suspense fallback={<div>{fallback}</div>}>
+          <LazyComponent {...componentProps} />
         </React.Suspense>
       );
     }
-    if (component === 'log-list') {
-        return <LogList logs={logs} />;
-    }
-    if (component === 'system-status') {
-      return <SystemStatusPanel 
-        stats={reasonerStats} 
-        connectionStatus={connectionStatus}
-        tasks={tasks}
-        concepts={concepts}
-      />;
-    }
-  };
+
+    return <Component {...componentProps} />;
+  } catch (error) {
+    console.error(`Error rendering component ${componentKey}:`, error);
+    return <div>Error loading {componentKey}</div>;
+  }
+};
+
+const DockingLayout = (props) => {
+  const model = Model.fromJson(LAYOUT_CONFIG);
+  const factory = createComponentFactory(props);
 
   return <Layout model={model} factory={factory} />;
 };

@@ -2,21 +2,15 @@ import React, { useEffect } from 'react';
 import DockingLayout from './components/DockingLayout';
 import ReasonerControlPanel from './components/ReasonerControlPanel';
 import useWebSocket from './core/useWebSocket';
+import { useCommandHandler } from './core/useCommandHandler';
+import { useWebSocketUrl } from './core/useWebSocketUrl';
 import CommandService from './services/CommandService';
 import { UIProvider } from './core/UIContext';
 import { NotificationProvider } from './core/NotificationSystem';
-import { WS_CONFIG } from './constants';
 import './App.css';
 
 const App = () => {
-  // Create WebSocket URL using the same host as the page (for same-origin)
-  const urlParams = new URLSearchParams(window.location.search);
-  const serverPort = urlParams.get('serverPort') || WS_CONFIG.defaultPort;
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsHost = window.location.host.split(':')[0] || 'localhost'; // Get just the hostname part
-  
-  // Use simple protocol by adding query parameter since browser WebSockets can't send custom headers
-  const wsUrl = `${wsProtocol}//${wsHost}:${serverPort}?protocol=simple`;
+  const wsUrl = useWebSocketUrl();
 
   const {
     tasks,
@@ -37,33 +31,13 @@ const App = () => {
   // Create command service instance
   const commandService = new CommandService(sendRawMessage);
 
-  const handleCommand = (command, payload = {}) => {
-    console.log(`Executing command: ${command}`, payload);
-    commandService.execute(command, payload);
-
-    // Request updated state after commands that might change system state
-    if (['start', 'step', 'stop', 'reset'].includes(command)) {
-      setTimeout(requestState, 300);
-    }
-
-    // Request updated concepts after certain commands that might generate them
-    if (['start', 'step', 'add_task'].includes(command)) {
-      setTimeout(() => {
-        requestConcepts();
-        requestTopTasks();
-      }, 500);
-    }
-  };
-
-  const handleAddTaskWithConcepts = (task) => {
-    handleAddTask(task);
-    setTimeout(requestConcepts, 300);
-  };
-
-  const handleUpdateTaskWithConcepts = (task) => {
-    handleUpdateTask(task);
-    setTimeout(requestConcepts, 300);
-  };
+  // Use extracted command handler hook
+  const { handleCommand, handleAddTaskWithConcepts, handleUpdateTaskWithConcepts } = useCommandHandler(
+    commandService,
+    requestState,
+    requestConcepts,
+    requestTopTasks
+  );
 
   // Request initial concepts and top tasks when component mounts
   useEffect(() => {

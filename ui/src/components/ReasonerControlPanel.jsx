@@ -5,6 +5,7 @@ import { useUI } from '../core/UIContext';
 import { useNotification } from '../core/NotificationSystem';
 import { useCommandHistory } from '../utils/hooks';
 import { panelContainerStyle, headerStyle, labelStyle, buttonStyle, inputStyle, statBoxStyle, statusBadgeStyle } from '../utils/styling';
+import { assessReasonerStatus, createStatusStyle, createMetricsGridStyle, createMetricBoxStyle, METRIC_COLORS } from '../utils/statusUtils';
 
 const NARSESE_SUGGESTIONS = [...new Set([
   '-->', '==>', '<=>',
@@ -225,33 +226,21 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
           <div>
             <label style={labelStyle()}>
               Status:
-              <span style={{
-                marginLeft: '10px',
-                padding: '2px 8px',
-                backgroundColor: stats?.running && !stats?.paused ? '#d4edda' : 
-                                stats?.paused ? '#fff3cd' : '#f8d7da',
-                color: stats?.running && !stats?.paused ? '#155724' : 
-                       stats?.paused ? '#856404' : '#721c24',
-                borderRadius: '12px',
-                fontSize: '12px',
-              }}>
-                {stats?.running && !stats?.paused ? 'Running' : 
-                 stats?.paused ? 'Paused' : 'Stopped'}
+              <span style={createStatusStyle(assessReasonerStatus(stats).level)}>
+                {assessReasonerStatus(stats).message}
               </span>
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '10px' }}>
-              <div style={{...statBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#007bff' }}>{stats?.concepts || 0}</div>
-                <div style={{ fontSize: '12px', color: '#666' }}>Concepts</div>
-              </div>
-              <div style={{...statBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#28a745' }}>{stats?.tasks || 0}</div>
-                <div style={{ fontSize: '12px', color: '#666' }}>Tasks</div>
-              </div>
-              <div style={{...statBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#ffc107' }}>{stats?.cycles || 0}</div>
-                <div style={{ fontSize: '12px', color: '#666' }}>Cycles</div>
-              </div>
+            <div style={createMetricsGridStyle(3, '10px')}>
+              {[
+                { key: 'concepts', value: stats?.concepts || 0, color: METRIC_COLORS.concepts },
+                { key: 'tasks', value: stats?.tasks || 0, color: METRIC_COLORS.tasks },
+                { key: 'cycles', value: stats?.cycles || 0, color: METRIC_COLORS.cycles }
+              ].map(({ key, value, color }) => (
+                <div key={key} style={createMetricBoxStyle(color, '#e9ecef')}>
+                  <div style={createMetricBoxStyle().value}>{value}</div>
+                  <div style={createMetricBoxStyle().label}>{key.charAt(0).toUpperCase() + key.slice(1)}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
