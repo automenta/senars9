@@ -7,7 +7,10 @@ import LogList from './LogList';
 import SystemStatusPanel from './SystemStatusPanel';
 
 const json = {
-  global: {},
+  global: {
+    tabEnableClose: false,
+    tabEnableRename: false,
+  },
   borders: [],
   layout: {
     type: 'row',
@@ -16,6 +19,8 @@ const json = {
       {
         type: 'tabset',
         weight: 25,
+        enableTabStrip: true,
+        selected: 0,
         children: [
           {
             type: 'tab',
@@ -94,11 +99,13 @@ const DockingLayout = ({
     if (component === 'concepts-panel') {
       const ConceptsPanel = React.lazy(() => import('./ConceptsPanel'));
       return (
-        <ConceptsPanel
-          concepts={concepts}
-          onUpdateConcept={onUpdateTask}  // Using same handler for now
-          onDeleteConcept={onDeleteTask}  // Using same handler for now
-        />
+        <React.Suspense fallback={<div>Loading concepts...</div>}>
+          <ConceptsPanel
+            concepts={concepts}
+            onUpdateConcept={onUpdateTask}
+            onDeleteConcept={onDeleteTask}
+          />
+        </React.Suspense>
       );
     }
     if (component === 'log-list') {

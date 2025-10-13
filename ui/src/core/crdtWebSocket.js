@@ -17,90 +17,41 @@ const useCrdtWebSocket = (url) => {
     const wsProvider = new WebsocketProvider(url, 'senars', ydoc);
     setProvider(wsProvider);
 
-    wsProvider.on('status', (event) => {
-      setConnectionStatus(event.status);
-    });
+    wsProvider.on('status', event => setConnectionStatus(event.status));
 
     const yTasks = ydoc.getArray('tasks');
     const yLogs = ydoc.getArray('logs');
     const yConcepts = ydoc.getArray('concepts');
 
-    const observeTasks = () => setTasks(yTasks.toArray().map(task => task instanceof Y.Map ? task.toJSON() : task));
-    const observeLogs = () => setLogs(yLogs.toArray());
-    const observeConcepts = () => setConcepts(yConcepts.toArray());
+    const observers = {
+      tasks: () => setTasks(yTasks.toArray().map(task => task instanceof Y.Map ? task.toJSON() : task)),
+      logs: () => setLogs(yLogs.toArray()),
+      concepts: () => setConcepts(yConcepts.toArray())
+    };
 
-    yTasks.observe(observeTasks);
-    yLogs.observe(observeLogs);
-    yConcepts.observe(observeConcepts);
+    Object.entries(observers).forEach(([key, observer]) => ydoc.getArray(key).observe(observer));
 
     wsProvider.awareness.on('change', () => {
-      const stats = Array.from(wsProvider.awareness.getStates().values()).find(state => state.reasonerStats)?.reasonerStats;
-      if (stats) {
-        setReasonerStats(stats);
-      }
+      setReasonerStats(Array.from(wsProvider.awareness.getStates().values())
+        .find(state => state.reasonerStats)?.reasonerStats || null);
     });
 
-    return () => {
-      wsProvider.disconnect();
-    };
+    return () => wsProvider.disconnect();
   }, [url, ydoc]);
 
   useEffect(() => {
-    if (connectionStatus === 'connected') {
-      const initialTasks = [
-        { content: '(a-->b).', priority: 0.9 },
-        { content: '(b-->c).', priority: 0.8 },
-      ];
-      initialTasks.forEach(task => {
-        if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
-          const message = {
-            type: 'control',
-            command: 'add_task',
-            payload: task
-          };
-          provider.ws.send(JSON.stringify(message));
-        }
-      });
+    if (connectionStatus === 'connected' && provider?.ws?.readyState === WebSocket.OPEN) {
+      [{ content: '(a-->b).', priority: 0.9 }, { content: '(b-->c).', priority: 0.8 }]
+        .forEach(task => sendMessage('add_task', task));
     }
   }, [connectionStatus, provider]);
 
-  const handleAddTask = useCallback((task) => {
-    // Send the add_task command to server instead of directly modifying Yjs document
-    if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
-      const message = {
-        type: 'control',
-        command: 'add_task',
-        payload: task
-      };
-      const encodedMessage = JSON.stringify(message);
-      provider.ws.send(encodedMessage);
-    }
-  }, [provider]);
-
-  const handleUpdateTask = useCallback((updatedTask) => {
-    // Send the update_task command to server instead of directly modifying Yjs document
-    if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
-      const message = {
-        type: 'control',
-        command: 'update_task',
-        payload: updatedTask
-      };
-      const encodedMessage = JSON.stringify(message);
-      provider.ws.send(encodedMessage);
-    }
-  }, [provider]);
-
-  const handleDeleteTask = useCallback((taskToDelete) => {
-    // Send the delete_task command to server instead of directly modifying Yjs document
-    if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
-      const message = {
-        type: 'control',
-        command: 'delete_task',
-        payload: { id: taskToDelete.id }
-      };
-      const encodedMessage = JSON.stringify(message);
-      provider.ws.send(encodedMessage);
-    }
+  const sendMessage = useCallback((command, payload = {}) => {
+    provider?.ws?.readyState === WebSocket.OPEN && provider.ws.send(JSON.stringify({
+      type: 'control',
+      command,
+      payload
+    }));
   }, [provider]);
 
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => (b.priority || 0) - (a.priority || 0)), [tasks]);
@@ -113,28 +64,11 @@ const useCrdtWebSocket = (url) => {
     logs,
     concepts,
     reasonerStats,
-    sendRawMessage: (message) => {
-      if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
-        // Properly encode and send message to WebSocket
-        const encodedMessage = JSON.stringify(message);
-        provider.ws.send(encodedMessage);
-      }
-    },
-    sendMessage: (command, payload = {}) => {
-      // Standardized method to send control commands
-      if (provider && provider.ws && provider.ws.readyState === WebSocket.OPEN) {
-        const message = {
-          type: 'control',
-          command,
-          payload
-        };
-        const encodedMessage = JSON.stringify(message);
-        provider.ws.send(encodedMessage);
-      }
-    },
-    handleAddTask,
-    handleUpdateTask,
-    handleDeleteTask,
+    sendRawMessage: message => provider?.ws?.readyState === WebSocket.OPEN && provider.ws.send(JSON.stringify(message)),
+    sendMessage,
+    handleAddTask: task => sendMessage('add_task', task),
+    handleUpdateTask: task => sendMessage('update_task', task),
+    handleDeleteTask: task => sendMessage('delete_task', { id: task.id }),
   };
 };
 

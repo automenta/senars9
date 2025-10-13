@@ -6,18 +6,29 @@ class CommandService {
   }
 
   execute(command, payload = {}) {
+    console.log(`CommandService: Executing command '${command}' with payload:`, payload);
+
     // Standardized command format
     const message = {
       type: 'control',
       command,
-      payload
+      payload,
+      timestamp: new Date().toISOString()
     };
-    
+
     if (this.sendRawMessage) {
-      this.sendRawMessage(message);
-      return Promise.resolve(true);
+      try {
+        this.sendRawMessage(message);
+        console.log(`CommandService: Command '${command}' sent successfully`);
+        return Promise.resolve(true);
+      } catch (error) {
+        console.error(`CommandService: Failed to send command '${command}':`, error);
+        return Promise.reject(error);
+      }
     } else {
-      return Promise.reject(new Error('sendRawMessage function not provided'));
+      const error = new Error('sendRawMessage function not provided');
+      console.error(`CommandService: ${error.message}`);
+      return Promise.reject(error);
     }
   }
 

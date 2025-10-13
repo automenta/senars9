@@ -2,161 +2,146 @@ import { useEffect, useState, useCallback } from 'react';
 
 const useWebSocket = (url) => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
-  const [tasks, setTasks] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [concepts, setConcepts] = useState([]);
-  const [reasonerStats, setReasonerStats] = useState(null);
+  const [data, setData] = useState({});
   const [ws, setWs] = useState(null);
 
   useEffect(() => {
     if (!url) return;
 
-    // Connect to the server with the appropriate protocol
     const websocket = new WebSocket(url);
     setWs(websocket);
 
     websocket.onopen = () => {
-      console.log('WebSocket connected, sending initial state request');
       setConnectionStatus('connected');
+      // Request initial state when connected
+      setTimeout(() => {
+        sendRawMessage({ type: 'request_state' });
+      }, 100);
     };
 
-    websocket.onclose = () => {
-      setConnectionStatus('disconnected');
-    };
+    websocket.onclose = () => setConnectionStatus('disconnected');
 
-    websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setConnectionStatus('error');
-    };
+    websocket.onerror = () => setConnectionStatus('error');
 
     websocket.onmessage = (event) => {
       try {
-        // Convert the message data to string if it isn't already
-        let data;
-        if (typeof event.data === 'string') {
-          data = event.data;
-        } else if (event.data instanceof ArrayBuffer) {
-          // Convert ArrayBuffer to string
-          const textDecoder = new TextDecoder();
-          data = textDecoder.decode(event.data);
-        } else {
-          // Handle as Blob
-          const reader = new FileReader();
-          reader.onload = () => {
-            try {
-              const text = reader.result;
-              const message = JSON.parse(text);
-              
-              if (message.type === 'state_update' && message.payload) {
-                const { tasks, concepts, logs, stats } = message.payload;
-                setTasks(tasks || []);
-                setConcepts(concepts || []);
-                setLogs(logs || []);
-                setReasonerStats(stats || null);
-              } else if (message.type === 'complete_state' && message.payload) {
-                const { tasks, concepts, stats } = message.payload;
-                setTasks(tasks || []);
-                setConcepts(concepts || []);
-                setReasonerStats(stats || null);
-              }
-            } catch (parseError) {
-              console.error('Error parsing WebSocket message:', parseError);
-            }
-          };
-          reader.readAsText(event.data);
-          return; // Return early, parsing happens in the callback
-        }
+        const data = event.data instanceof ArrayBuffer
+          ? new TextDecoder().decode(event.data)
+          : event.data instanceof Blob
+            ? (() => { const reader = new FileReader(); reader.onload = () => {
+                try {
+                  const message = JSON.parse(reader.result);
+                  // Handle server responses for state synchronization
+                  if (message.type === 'state_update' && message.payload) {
+                    const { tasks, concepts, logs, stats } = message.payload;
+                    setData(prev => ({
+                      ...prev,
+                      tasks: tasks || prev.tasks || [],
+                      concepts: concepts || prev.concepts || [],
+                      logs: logs || prev.logs || [],
+                      reasonerStats: stats || prev.reasonerStats
+                    }));
+                  }
+                } catch (parseError) {
+                  console.error('Error parsing WebSocket message:', parseError);
+                }
+              }; reader.readAsText(event.data); return; })()
+            : event.data;
 
-        // Parse the string data
-        const message = JSON.parse(data);
-        
-        if (message.type === 'state_update' && message.payload) {
-          const { tasks, concepts, logs, stats } = message.payload;
-          setTasks(tasks || []);
-          setConcepts(concepts || []);
-          setLogs(logs || []);
-          setReasonerStats(stats || null);
-        } else if (message.type === 'complete_state' && message.payload) {
-          const { tasks, concepts, stats } = message.payload;
-          setTasks(tasks || []);
-          setConcepts(concepts || []);
-          setReasonerStats(stats || null);
-        } else if (message.type === 'task_derived' && message.data) {
-          // Handle a newly derived task
-          setTasks(prevTasks => {
-            const newTask = { ...message.data, type: 'derived', createdAt: message.timestamp };
-            return [...prevTasks, newTask];
-          });
-        } else if (message.type === 'task_processed' && message.data) {
-          // Handle a processed task
-          setTasks(prevTasks => {
-            const processedTask = { ...message.data, type: 'processed', createdAt: message.timestamp };
-            return [...prevTasks, processedTask];
-          });
-        } else if (message.type === 'concept_updated' && message.data) {
-          // Handle a concept update
-          setConcepts(prevConcepts => {
-            const updatedConcept = { ...message.data, lastUpdated: message.timestamp };
-            return [...prevConcepts, updatedConcept];
-          });
-        } else {
-          // Handle other message types if needed
-          console.log('Received message:', message);
+        if (data) {
+          try {
+            const message = JSON.parse(data);
+            if (message.type === 'state_update' && message.payload) {
+              const { tasks, concepts, logs, stats } = message.payload;
+              setData(prev => ({
+                ...prev,
+                tasks: tasks || prev.tasks || [],
+                concepts: concepts || prev.concepts || [],
+                logs: logs || prev.logs || [],
+                reasonerStats: stats || prev.reasonerStats
+              }));
+            }
+          } catch (parseError) {
+            console.error('Error parsing WebSocket message:', parseError);
+          }
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        console.error('WebSocket message parse error:', error);
       }
     };
 
-    return () => {
-      websocket.close();
-    };
+    return () => websocket.close();
   }, [url]);
 
+
   const sendRawMessage = useCallback((message) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(message));
-    } else {
-      console.warn('WebSocket not connected, could not send message:', message);
-    }
+    ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(message));
   }, [ws]);
 
   const sendMessage = useCallback((command, payload = {}) => {
-    sendRawMessage({
-      type: 'control',
-      command,
-      payload
-    });
+    sendRawMessage({ type: 'control', command, payload });
   }, [sendRawMessage]);
 
   const handleAddTask = useCallback((task) => {
-    sendMessage('add_task', task);
+    // Optimistically add task to local state for immediate UI feedback
+    const newTask = {
+      ...task,
+      id: task.id || `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: task.createdAt || new Date().toISOString(),
+      type: task.type || 'input',
+      status: task.status || 'pending'
+    };
+
+    setData(prev => ({
+      ...prev,
+      tasks: [...(prev.tasks || []), newTask]
+    }));
+
+    // Send to server
+    sendMessage('add_task', newTask);
   }, [sendMessage]);
 
-  const handleUpdateTask = useCallback((updatedTask) => {
-    sendMessage('update_task', updatedTask);
+  const handleUpdateTask = useCallback((task) => {
+    setData(prev => ({
+      ...prev,
+      tasks: (prev.tasks || []).map(t => t.id === task.id ? { ...t, ...task, lastModified: Date.now() } : t)
+    }));
+    sendMessage('update_task', task);
   }, [sendMessage]);
 
-  const handleDeleteTask = useCallback((taskToDelete) => {
-    sendMessage('delete_task', { id: taskToDelete.id });
+  const handleDeleteTask = useCallback((task) => {
+    setData(prev => ({
+      ...prev,
+      tasks: (prev.tasks || []).filter(t => t.id !== task.id)
+    }));
+    sendMessage('delete_task', { id: task.id });
   }, [sendMessage]);
 
-  // Sort tasks by priority
-  const sortedTasks = [...tasks].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  const requestConcepts = useCallback(() => {
+    sendMessage('get_concepts');
+  }, [sendMessage]);
+
+  const requestState = useCallback(() => {
+    sendRawMessage({ type: 'request_state' });
+  }, [sendRawMessage]);
+
+  const sortedTasks = [...(data.tasks || [])].sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
   return {
     isConnected: connectionStatus === 'connected',
     connectionStatus,
     error: connectionStatus === 'error' ? 'WebSocket connection error' : null,
     tasks: sortedTasks,
-    logs,
-    concepts,
-    reasonerStats,
+    logs: data.logs || [],
+    concepts: data.concepts || [],
+    reasonerStats: data.reasonerStats || null,
     sendRawMessage,
     sendMessage,
     handleAddTask,
     handleUpdateTask,
     handleDeleteTask,
+    requestConcepts,
+    requestState,
   };
 };
 

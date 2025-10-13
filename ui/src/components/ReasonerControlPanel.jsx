@@ -70,11 +70,26 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
       } else {
         // This is a task, add it via onAddTask
         if (onAddTask) {
-          onAddTask({ content: inputValue, priority: 0.5 });
+          const taskData = {
+            content: inputValue,
+            priority: 0.5,
+            type: 'input',
+            status: 'pending',
+            id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            createdAt: new Date().toISOString()
+          };
+          onAddTask(taskData);
           addNotification(`Task added: ${inputValue.substring(0, 30)}${inputValue.length > 30 ? '...' : ''}`, 'success');
         } else {
           // Fallback to command if onAddTask is not provided
-          onCommand('add_task', { content: inputValue, priority: 0.5 });
+          onCommand('add_task', {
+            content: inputValue,
+            priority: 0.5,
+            type: 'input',
+            status: 'pending',
+            id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            createdAt: new Date().toISOString()
+          });
           addNotification(`Task added via command: ${inputValue.substring(0, 30)}${inputValue.length > 30 ? '...' : ''}`, 'success');
         }
       }
@@ -122,9 +137,14 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
               <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                 {controlConfig.showStartButton && (
                   <button
-                    onClick={() => {
-                      onCommand('start');
-                      addNotification('Reasoner started', 'success');
+                    onClick={async () => {
+                      try {
+                        await onCommand('start');
+                        addNotification('Reasoner started', 'success');
+                      } catch (error) {
+                        console.error('Start command failed:', error);
+                        addNotification('Start command failed', 'error');
+                      }
                     }}
                     style={{ ...buttonStyle('success'), padding: '5px 10px', borderRadius: '3px' }}
                   >
@@ -133,9 +153,14 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
                 )}
                 {controlConfig.showStopButton && (
                   <button
-                    onClick={() => {
-                      onCommand('stop');
-                      addNotification('Reasoner stopped', 'info');
+                    onClick={async () => {
+                      try {
+                        await onCommand('stop');
+                        addNotification('Reasoner stopped', 'info');
+                      } catch (error) {
+                        console.error('Stop command failed:', error);
+                        addNotification('Stop command failed', 'error');
+                      }
                     }}
                     style={{ ...buttonStyle('danger'), padding: '5px 10px', borderRadius: '3px' }}
                   >
@@ -144,9 +169,15 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
                 )}
                 {controlConfig.showStepButton && (
                   <button
-                    onClick={() => {
-                      onCommand('step');
-                      addNotification('Single cognitive cycle executed', 'info');
+                    onClick={async () => {
+                      try {
+                        console.log('Step button clicked');
+                        await onCommand('step');
+                        addNotification('Single cognitive cycle executed', 'info');
+                      } catch (error) {
+                        console.error('Step command failed:', error);
+                        addNotification('Step command failed', 'error');
+                      }
                     }}
                     style={{ ...buttonStyle('info'), padding: '5px 10px', borderRadius: '3px' }}
                   >
@@ -155,9 +186,14 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
                 )}
                 {controlConfig.showResetButton && (
                   <button
-                    onClick={() => {
-                      onCommand('reset');
-                      addNotification('System reset completed', 'info');
+                    onClick={async () => {
+                      try {
+                        await onCommand('reset');
+                        addNotification('System reset completed', 'info');
+                      } catch (error) {
+                        console.error('Reset command failed:', error);
+                        addNotification('Reset command failed', 'error');
+                      }
                     }}
                     style={{ ...buttonStyle('warning'), padding: '5px 10px', borderRadius: '3px' }}
                   >

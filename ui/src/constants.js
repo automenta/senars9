@@ -1,4 +1,3 @@
-// Style constants for consistent theming
 export const THEME = {
   colors: {
     primary: '#007bff',
@@ -21,28 +20,12 @@ export const THEME = {
       900: '#212529'
     }
   },
-  spacing: {
-    xs: '5px',
-    sm: '8px',
-    md: '10px',
-    lg: '15px',
-    xl: '20px'
-  },
+  spacing: { xs: '5px', sm: '8px', md: '10px', lg: '15px', xl: '20px' },
   borderRadius: '4px',
-  fontSize: {
-    xs: '12px',
-    sm: '14px',
-    md: '16px',
-    lg: '18px',
-    xl: '24px'
-  },
-  fontWeight: {
-    normal: 'normal',
-    bold: 'bold'
-  }
+  fontSize: { xs: '12px', sm: '14px', md: '16px', lg: '18px', xl: '24px' },
+  fontWeight: { normal: 'normal', bold: 'bold' }
 };
 
-// Layout constants
 export const LAYOUT = {
   headerHeight: '30px',
   panelMinHeight: '200px',
@@ -51,21 +34,18 @@ export const LAYOUT = {
   scrollbarWidth: '8px'
 };
 
-// Connection defaults
 export const CONNECTION_DEFAULTS = {
   defaultPort: 8080,
   fallbackPort: 8081,
   maxHistorySize: 50
 };
 
-// Panel configuration
 export const PANEL_CONFIG = {
   topPanel: { id: 'topPanel', name: 'Control & Input' },
   conceptMapPanel: { id: 'conceptMapPanel', name: 'Concept Map' },
   bottomPanel: { id: 'bottomPanel', name: 'Log & Tasks' }
 };
 
-// Message types
 export const MESSAGE_TYPES = {
   log: 'log',
   task: 'task',
