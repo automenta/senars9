@@ -1,7 +1,7 @@
 import React from 'react';
 import DockingLayout from './components/DockingLayout';
 import ReasonerControlPanel from './components/ReasonerControlPanel';
-import useCrdtWebSocket from './core/crdtWebSocket';
+import useSimpleWebSocket from './core/useSimpleWebSocket';
 import CommandService from './services/CommandService';
 import { UIProvider } from './core/UIContext';
 import { NotificationProvider } from './core/NotificationSystem';
@@ -10,12 +10,14 @@ import './App.css';
 import './Layout.css';
 
 const App = () => {
-  // Create WebSocket URL dynamically
+  // Create WebSocket URL using the same host as the page (for same-origin)
   const urlParams = new URLSearchParams(window.location.search);
   const serverPort = urlParams.get('serverPort') || CONNECTION_DEFAULTS.defaultPort;
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsHost = window.location.hostname;
-  const wsUrl = `${wsProtocol}//${wsHost}:${serverPort}`;
+  const wsHost = window.location.host.split(':')[0] || 'localhost'; // Get just the hostname part
+  
+  // Use simple protocol by adding query parameter since browser WebSockets can't send custom headers
+  const wsUrl = `${wsProtocol}//${wsHost}:${serverPort}?protocol=simple`;
 
   const {
     tasks,
@@ -27,7 +29,7 @@ const App = () => {
     handleAddTask,
     handleUpdateTask,
     handleDeleteTask,
-  } = useCrdtWebSocket(wsUrl);
+  } = useSimpleWebSocket(wsUrl);
 
   // Create command service instance
   const commandService = new CommandService(sendRawMessage);

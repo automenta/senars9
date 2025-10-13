@@ -103,7 +103,7 @@ const useCrdtWebSocket = (url) => {
     }
   }, [provider]);
 
-  const sortedTasks = useMemo(() => tasks.sort((a, b) => (b.priority || 0) - (a.priority || 0)), [tasks]);
+  const sortedTasks = useMemo(() => [...tasks].sort((a, b) => (b.priority || 0) - (a.priority || 0)), [tasks]);
 
   return {
     isConnected: connectionStatus === 'connected',

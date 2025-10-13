@@ -1,10 +1,10 @@
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
 import { Awareness } from 'y-protocols/awareness';
 import { setupWSConnection } from '@y/websocket-server/utils';
-import { initialTasks, initialConcepts, initialLogs } from '../ui/src/example-data.js';
+
 
 const doc = new Y.Doc();
 const yTasks = doc.getArray('tasks');
@@ -13,6 +13,11 @@ const yLogs = doc.getArray('logs');
 
 // Initialize awareness for sharing real-time stats
 const awareness = new Awareness(doc);
+
+// Simple message protocol support
+const simpleClients = new Set();
+
+// Add observer to Yjs arrays to automatically broadcast changes to simple protocol clients - will be set up in start()
 
 class SenarsServer {
   constructor(port = 8080) {
@@ -25,11 +30,152 @@ class SenarsServer {
     this.mockDataInterval = null;
   }
 
+  // Convert Yjs arrays to plain JavaScript objects for simple protocol
+  convertYjsToPlain() {
+    return {
+      tasks: yTasks.toArray().map(yTask => {
+        if (yTask instanceof Y.Map) {
+          const obj = {};
+          yTask.forEach((value, key) => {
+            obj[key] = value;
+          });
+          return obj;
+        }
+        return yTask;
+      }),
+      concepts: yConcepts.toArray().map(yConcept => {
+        if (yConcept instanceof Y.Map) {
+          const obj = {};
+          yConcept.forEach((value, key) => {
+            obj[key] = value;
+          });
+          return obj;
+        }
+        return yConcept;
+      }),
+      logs: yLogs.toArray().map(yLog => {
+        if (yLog instanceof Y.Map) {
+          const obj = {};
+          yLog.forEach((value, key) => {
+            obj[key] = value;
+          });
+          return obj;
+        }
+        return yLog;
+      })
+    };
+  }
+
+  // Broadcast state to all simple protocol clients
+  broadcastSimpleState() {
+    const state = this.convertYjsToPlain();
+    const stats = awareness.getLocalState()?.reasonerStats || {
+      isRunning: false,
+      isPaused: true,
+      cycles: 0,
+      tasks: yTasks.length,
+      concepts: yConcepts.length,
+      timestamp: Date.now()
+    };
+
+    // Update stats with current counts
+    stats.tasks = yTasks.length;
+    stats.concepts = yConcepts.length;
+
+    const message = {
+      type: 'state_update',
+      payload: {
+        ...state,
+        stats
+      }
+    };
+
+    const messageStr = JSON.stringify(message);
+    simpleClients.forEach(client => {
+      if (client.readyState === 1) { // WebSocket.OPEN = 1
+        client.send(messageStr);
+      }
+    });
+  }
+
   loadInitialData() {
     console.log('Loading initial data into Y.Doc...');
-    initialTasks.forEach(task => yTasks.push([new Y.Map(Object.entries(task))]));
-    initialConcepts.forEach(concept => yConcepts.push([new Y.Map(Object.entries(concept))]));
-    initialLogs.forEach(log => yLogs.push([new Y.Map(Object.entries(log))]));
+    
+    // Load specific initial tasks as requested
+    const initialTasksData = [
+      {
+        id: 'task-1',
+        content: '(a-->b).',
+        priority: 0.9,
+        status: 'Input',
+        type: 'Input',
+        createdAt: Date.now(),
+        lastModified: Date.now()
+      },
+      {
+        id: 'task-2', 
+        content: '(b-->c).',
+        priority: 0.8,
+        status: 'Input',
+        type: 'Input',
+        createdAt: Date.now(),
+        lastModified: Date.now()
+      }
+    ];
+    
+    console.log('Adding', initialTasksData.length, 'initial tasks to Yjs document');
+    initialTasksData.forEach(task => {
+      const taskMap = new Y.Map();
+      Object.entries(task).forEach(([key, value]) => {
+        taskMap.set(key, value);
+      });
+      yTasks.push([taskMap]);
+    });
+    
+    // Also load some initial concepts
+    const initialConceptsData = [
+      { id: 'concept-a', content: 'a', priority: 0.9 },
+      { id: 'concept-b', content: 'b', priority: 0.8 },
+      { id: 'concept-c', content: 'c', priority: 0.7 }
+    ];
+    
+    console.log('Adding', initialConceptsData.length, 'initial concepts to Yjs document');
+    initialConceptsData.forEach(concept => {
+      const conceptMap = new Y.Map();
+      Object.entries(concept).forEach(([key, value]) => {
+        conceptMap.set(key, value);
+      });
+      yConcepts.push([conceptMap]);
+    });
+    
+    // Load some initial logs
+    const initialLogsData = [
+      { id: 'log-1', message: 'System initialized', timestamp: Date.now() },
+      { id: 'log-2', message: 'Initial tasks loaded: (a-->b)., (b-->c).', timestamp: Date.now() }
+    ];
+    
+    console.log('Adding', initialLogsData.length, 'initial logs to Yjs document');
+    initialLogsData.forEach(log => {
+      const logMap = new Y.Map();
+      Object.entries(log).forEach(([key, value]) => {
+        logMap.set(key, value);
+      });
+      yLogs.push([logMap]);
+    });
+    
+    // Verify the data was added
+    console.log('Yjs tasks array size after loading:', yTasks.length);
+    console.log('Yjs concepts array size after loading:', yConcepts.length);
+    console.log('Yjs logs array size after loading:', yLogs.length);
+    
+    // Log first task if it exists
+    if (yTasks.length > 0) {
+      const firstTask = yTasks.get(0);
+      if (firstTask && firstTask instanceof Y.Map) {
+        console.log('First task content:', firstTask.get('content'));
+      }
+    }
+    
     console.log('Initial data loaded.');
   }
 
@@ -39,8 +185,8 @@ class SenarsServer {
       isRunning: false,
       isPaused: true,  // Start paused by default
       cycles: 0,
-      tasks: initialTasks.length,
-      concepts: initialConcepts.length,
+      tasks: 2,  // Updated to match our initial tasks
+      concepts: 3, // Updated to match our initial concepts
       timestamp: Date.now()
     });
 
@@ -61,7 +207,7 @@ class SenarsServer {
     }, 5000);
   }
 
-  async handleControlCommand(command, payload) {
+  async handleControlCommand(command, payload, isSimpleProtocol = false) {
     console.log(`Received command: ${command}`, payload);
     
     try {
@@ -76,6 +222,11 @@ class SenarsServer {
             isPaused: false,
             timestamp: Date.now()
           });
+          
+          // For simple protocol, we need to broadcast the updated state
+          if (isSimpleProtocol) {
+            this.broadcastSimpleState();
+          }
           break;
         case 'stop':
           console.log('Stop command received');
@@ -87,6 +238,11 @@ class SenarsServer {
             isPaused: true,
             timestamp: Date.now()
           });
+          
+          // For simple protocol, we need to broadcast the updated state
+          if (isSimpleProtocol) {
+            this.broadcastSimpleState();
+          }
           break;
         case 'step':
           console.log('Step command received - executing single cognitive cycle');
@@ -105,6 +261,11 @@ class SenarsServer {
             timestamp: Date.now()
           });
           
+          // For simple protocol, we need to broadcast the updated state
+          if (isSimpleProtocol) {
+            this.broadcastSimpleState();
+          }
+          
           console.log(`Cognitive cycle ${newCycleCount} completed`);
           break;
         case 'reset':
@@ -115,8 +276,8 @@ class SenarsServer {
             isRunning: false,
             isPaused: true,
             cycles: 0,
-            concepts: initialConcepts.length,
-            tasks: initialTasks.length,
+            concepts: 3, // Updated to match our initial concepts
+            tasks: 2,    // Updated to match our initial tasks
             timestamp: Date.now()
           });
           
@@ -124,9 +285,55 @@ class SenarsServer {
           yTasks.delete(0, yTasks.length);
           yConcepts.delete(0, yConcepts.length);
           
-          // Reinitialize with initial data
-          initialTasks.forEach(task => yTasks.push([new Y.Map(Object.entries(task))]));
-          initialConcepts.forEach(concept => yConcepts.push([new Y.Map(Object.entries(concept))]));
+          // Reinitialize with hardcoded initial data
+          const resetTasksData = [
+            {
+              id: 'task-1',
+              content: '(a-->b).',
+              priority: 0.9,
+              status: 'Input',
+              type: 'Input',
+              createdAt: Date.now(),
+              lastModified: Date.now()
+            },
+            {
+              id: 'task-2', 
+              content: '(b-->c).',
+              priority: 0.8,
+              status: 'Input',
+              type: 'Input',
+              createdAt: Date.now(),
+              lastModified: Date.now()
+            }
+          ];
+          
+          resetTasksData.forEach(task => {
+            const taskMap = new Y.Map();
+            Object.entries(task).forEach(([key, value]) => {
+              taskMap.set(key, value);
+            });
+            yTasks.push([taskMap]);
+          });
+          
+          // Also reset initial concepts
+          const resetConceptsData = [
+            { id: 'concept-a', content: 'a', priority: 0.9 },
+            { id: 'concept-b', content: 'b', priority: 0.8 },
+            { id: 'concept-c', content: 'c', priority: 0.7 }
+          ];
+          
+          resetConceptsData.forEach(concept => {
+            const conceptMap = new Y.Map();
+            Object.entries(concept).forEach(([key, value]) => {
+              conceptMap.set(key, value);
+            });
+            yConcepts.push([conceptMap]);
+          });
+          
+          // For simple protocol, we need to broadcast the updated state
+          if (isSimpleProtocol) {
+            this.broadcastSimpleState();
+          }
           break;
         case 'throttle':
           console.log(`Throttle command: ${payload.value}%`);
@@ -136,6 +343,11 @@ class SenarsServer {
             ...throttleState,
             timestamp: Date.now()
           });
+          
+          // For simple protocol, we need to broadcast the updated state
+          if (isSimpleProtocol) {
+            this.broadcastSimpleState();
+          }
           break;
         case 'add_task':
           console.log('Add task command received');
@@ -171,6 +383,11 @@ class SenarsServer {
             tasks: yTasks.length,
             timestamp: Date.now()
           });
+          
+          // For simple protocol, we need to broadcast the updated state
+          if (isSimpleProtocol) {
+            this.broadcastSimpleState();
+          }
           break;
         case 'update_task':
           console.log('Update task command received');
@@ -181,7 +398,7 @@ class SenarsServer {
             return;
           }
           
-          const yTasksArr = ydoc.getArray('tasks');
+          const yTasksArr = doc.getArray('tasks');
           const taskIndex = yTasksArr.toArray().findIndex(task => task.get('id') === taskId);
           if (taskIndex !== -1) {
             const taskMap = yTasksArr.get(taskIndex);
@@ -205,6 +422,11 @@ class SenarsServer {
               ...updateTaskState,
               timestamp: Date.now()
             });
+            
+            // For simple protocol, we need to broadcast the updated state
+            if (isSimpleProtocol) {
+              this.broadcastSimpleState();
+            }
           } else {
             console.error(`Update task command failed: task with ID ${taskId} not found`);
           }
@@ -218,7 +440,7 @@ class SenarsServer {
             return;
           }
           
-          const yTasksArr2 = ydoc.getArray('tasks');
+          const yTasksArr2 = doc.getArray('tasks');
           const deleteIndex = yTasksArr2.toArray().findIndex(task => task.get('id') === deleteTaskId);
           if (deleteIndex !== -1) {
             yTasksArr2.delete(deleteIndex, 1);
@@ -230,6 +452,11 @@ class SenarsServer {
               tasks: yTasksArr2.length,
               timestamp: Date.now()
             });
+            
+            // For simple protocol, we need to broadcast the updated state
+            if (isSimpleProtocol) {
+              this.broadcastSimpleState();
+            }
           } else {
             console.error(`Delete task command failed: task with ID ${deleteTaskId} not found`);
           }
@@ -249,6 +476,24 @@ class SenarsServer {
   start() {
     this.loadInitialData();
 
+    // Set up Yjs observers to automatically broadcast changes to simple protocol clients
+    yTasks.observe(() => {
+      this.broadcastSimpleState();
+    });
+    
+    yConcepts.observe(() => {
+      this.broadcastSimpleState();
+    });
+    
+    yLogs.observe(() => {
+      this.broadcastSimpleState();
+    });
+    
+    // Also observe awareness changes for stats updates
+    awareness.on('change', () => {
+      this.broadcastSimpleState();
+    });
+
     return new Promise((resolve, reject) => {
       this.httpServer.listen(this.port, '0.0.0.0', () => {
         console.log(`SeNARS server listening on port ${this.port} (0.0.0.0)`);
@@ -261,27 +506,97 @@ class SenarsServer {
       });
 
       this.wss.on('connection', (ws, req) => {
-        setupWSConnection(ws, req, { doc, awareness });
-        console.log('New client connected and attached to Y.Doc with awareness');
+        // Check if this is a simple protocol client by looking at the connection parameters or path
+        // If it's a simple protocol client, add it to the simple clients set and handle messages differently
+        // req.url includes the path and query string, e.g., "/?protocol=simple" or "?protocol=simple"
+        const fullUrl = req.url || '';
+        const queryString = fullUrl.split('?')[1] || '';
+        const urlParams = new URLSearchParams(queryString);
+        const isSimpleProtocol = fullUrl.includes('simple') || urlParams.get('protocol') === 'simple' || req.headers['x-protocol'] === 'simple';
 
-        // Handle messages for command control
-        ws.on('message', async (data) => {
-          try {
-            const message = JSON.parse(data.toString());
-            
-            if (message.type === 'control' && message.command) {
-              await this.handleControlCommand(message.command, message.payload || {});
-            } else if (message.type === 'command') {
-              // Handle legacy command format
-              const command = message.payload?.data;
-              if (command) {
-                await this.handleControlCommand(command, {});
-              }
+        if (isSimpleProtocol) {
+          // Simple protocol client - no Yjs synchronization, just message passing
+          simpleClients.add(ws);
+          console.log('New simple protocol client connected');
+          
+          // Send initial state to the new client
+          const state = this.convertYjsToPlain();
+          const stats = awareness.getLocalState()?.reasonerStats || {
+            isRunning: false,
+            isPaused: true,
+            cycles: 0,
+            tasks: yTasks.length,
+            concepts: yConcepts.length,
+            timestamp: Date.now()
+          };
+
+          // Update stats with current counts
+          stats.tasks = yTasks.length;
+          stats.concepts = yConcepts.length;
+
+          const message = {
+            type: 'state_update',
+            payload: {
+              ...state,
+              stats
             }
-          } catch (error) {
-            console.error('Error handling message:', error);
-          }
-        });
+          };
+
+          ws.send(JSON.stringify(message));
+          
+          // Handle simple protocol messages
+          ws.on('message', async (data) => {
+            try {
+              const message = JSON.parse(data.toString());
+              
+              if (message.type === 'control' && message.command) {
+                await this.handleControlCommand(message.command, message.payload || {}, true);
+              } else if (message.type === 'command') {
+                // Handle legacy command format
+                const command = message.payload?.data;
+                if (command) {
+                  await this.handleControlCommand(command, {}, true);
+                }
+              }
+            } catch (error) {
+              console.error('Error handling simple protocol message:', error);
+            }
+          });
+
+          // Remove client on close
+          ws.on('close', () => {
+            console.log('Simple protocol client disconnected');
+            simpleClients.delete(ws);
+          });
+          
+          ws.on('error', (error) => {
+            console.error('WebSocket simple protocol error:', error);
+            simpleClients.delete(ws);
+          });
+        } else {
+          // Yjs/CRDT protocol client - use setupWSConnection for synchronization
+          setupWSConnection(ws, req, { doc, awareness });
+          console.log('New Yjs/CRDT protocol client connected and attached to Y.Doc with awareness');
+
+          // Handle messages for command control for Yjs clients too
+          ws.on('message', async (data) => {
+            try {
+              const message = JSON.parse(data.toString());
+              
+              if (message.type === 'control' && message.command) {
+                await this.handleControlCommand(message.command, message.payload || {});
+              } else if (message.type === 'command') {
+                // Handle legacy command format
+                const command = message.payload?.data;
+                if (command) {
+                  await this.handleControlCommand(command, {});
+                }
+              }
+            } catch (error) {
+              console.error('Error handling message:', error);
+            }
+          });
+        }
       });
 
       this.startMockData();
@@ -292,6 +607,16 @@ class SenarsServer {
     if (this.mockDataInterval) {
       clearInterval(this.mockDataInterval);
     }
+
+    // Close all simple protocol connections
+    simpleClients.forEach(client => {
+      try {
+        client.close();
+      } catch (e) {
+        console.error('Error closing simple protocol client:', e);
+      }
+    });
+    simpleClients.clear();
 
     return new Promise((resolve) => {
       this.httpServer.close(() => {
