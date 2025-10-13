@@ -87,8 +87,8 @@ export const renderWithErrorDetection = (component) => {
 export const createWebSocketMock = (mockData = {}) => {
   const mockWebSocket = {
     readyState: mockData.readyState || WebSocket.OPEN,
-    send: jest.fn(),
-    close: jest.fn(),
+    send: vi.fn(),
+    close: vi.fn(),
     onopen: null,
     onclose: null,
     onmessage: null,
