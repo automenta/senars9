@@ -65,8 +65,16 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
         itemData = item.get('data');
       } else {
         // JSON format from Yjs conversion
-        itemType = item.type || 'task'; // Default to task for tasks array
-        itemData = item;
+        // Check if this item came from the tasks array (_isTask marker)
+        if (item._isTask) {
+          // Use 'task' type for items from the tasks array
+          itemType = 'task';
+          itemData = item;
+        } else {
+          // Use the original type for regular items
+          itemType = item.type || 'concept'; // Default to concept if no type specified
+          itemData = item;
+        }
       }
       
       if (itemType === 'concept') {
@@ -176,7 +184,7 @@ const ConceptMapContent = ({ concepts, tasks = [] }) => {
     // Combine concepts and tasks for processing
     const allEntities = [
       ...(concepts || []),
-      ...tasks.map(task => ({ type: 'task', ...task }))
+      ...tasks.map(task => ({ ...task, _isTask: true }))  // Add marker that this came from tasks
     ];
 
     const { nodes, links } = processEntities(allEntities);
