@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getLogLevelColor, getLogIcon, extractLogData, extractLogLevel } from '../utils/common';
 
 const LogList = ({ logs = [] }) => {
   const [displayLogs, setDisplayLogs] = useState([]);
@@ -26,31 +27,7 @@ const LogList = ({ logs = [] }) => {
     setDisplayLogs([]);
   };
 
-  const getLogLevelColor = (level) => {
-    // Determine color based on log level or content
-    if (level?.toLowerCase().includes('error')) return '#dc3545';
-    if (level?.toLowerCase().includes('warn')) return '#ffc107';
-    if (level?.toLowerCase().includes('info')) return '#17a2b8';
-    if (level?.toLowerCase().includes('debug')) return '#6c757d';
-    return '#28a745'; // Default success/good color
-  };
 
-  const getLogIcon = (message) => {
-    // Determine icon based on message content
-    if (typeof message === 'string') {
-      if (message.toLowerCase().includes('error')) return '❌';
-      if (message.toLowerCase().includes('warning') || message.toLowerCase().includes('warn')) return '⚠️';
-      if (message.toLowerCase().includes('info')) return 'ℹ️';
-      if (message.toLowerCase().includes('task')) return '📋';
-      if (message.toLowerCase().includes('concept')) return '🧠';
-      if (message.toLowerCase().includes('cycle')) return '🔄';
-      if (message.toLowerCase().includes('goal')) return '🎯';
-      if (message.toLowerCase().includes('question')) return '❓';
-      if (message.toLowerCase().includes('inference')) return '💭';
-      if (message.toLowerCase().includes('operation')) return '⚙️';
-    }
-    return '🔹'; // Default icon
-  };
 
   const handleLogClick = (log, index) => {
     setExpandedLog(expandedLog === index ? null : index);
@@ -129,10 +106,10 @@ const LogList = ({ logs = [] }) => {
               // Check if log is a Yjs object (has get method) or a regular object
               const isYjsObject = log && typeof log.get === 'function';
               
-              const logData = isYjsObject ? log.get('data') : (log.data || log.message || JSON.stringify(log));
+              const logData = extractLogData(log);
               const message = typeof logData === 'string' ? logData : JSON.stringify(logData);
               const icon = getLogIcon(message);
-              const level = isYjsObject ? (log.get('level') || message) : (log.level || 'info');
+              const level = isYjsObject ? (extractLogLevel(log) || message) : (log.level || 'info');
               const color = getLogLevelColor(level);
 
               return (
@@ -189,11 +166,11 @@ const LogList = ({ logs = [] }) => {
                         [{new Date(isYjsObject ? log.get('timestamp') : log.timestamp || Date.now()).toLocaleTimeString()}]
                       </span>
                       <span style={{ 
-                        color: getLogLevelColor(isYjsObject ? log.get('level') : log.level),
+                        color: getLogLevelColor(isYjsObject ? extractLogLevel(log) : log.level),
                         fontSize: '11px',
                         fontStyle: 'italic'
                       }}>
-                        {isYjsObject ? (log.get('level') || 'info') : (log.level || 'info')}
+                        {isYjsObject ? (extractLogLevel(log) || 'info') : (log.level || 'info')}
                       </span>
                     </div>
                     

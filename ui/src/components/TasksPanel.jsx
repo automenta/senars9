@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCorners } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { getPriorityColor, getItemIcon } from '../utils/common';
 
 // Sortable item component
 const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
@@ -22,22 +23,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const getTaskPriorityColor = (priority) => {
-    if (priority > 0.8) return '#dc3545'; // High: Red
-    if (priority > 0.5) return '#ffc107'; // Medium: Yellow
-    if (priority > 0.2) return '#28a745'; // Low: Green
-    return '#6c757d'; // Very low: Gray
-  };
 
-  const getTaskTypeIcon = (type) => {
-    if (type?.toLowerCase().includes('input')) return '📥';
-    if (type?.toLowerCase().includes('derived')) return '✨';
-    if (type?.toLowerCase().includes('goal')) return '🎯';
-    if (type?.toLowerCase().includes('question')) return '❓';
-    if (type?.toLowerCase().includes('operation')) return '⚙️';
-    if (type?.toLowerCase().includes('inference')) return '💭';
-    return '📋';
-  };
 
   const handleTaskClick = (e) => {
     e.stopPropagation();
@@ -74,12 +60,12 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
         width: '24px',
         height: '24px',
         borderRadius: '50%',
-        backgroundColor: `${getTaskPriorityColor(task.priority || 0.5)}20`, // Lighter background
+        backgroundColor: `${getPriorityColor(task.priority || 0.5)}20`, // Lighter background
         marginRight: '8px',
         fontSize: '12px',
-        color: getTaskPriorityColor(task.priority || 0.5)
+        color: getPriorityColor(task.priority || 0.5)
       }}>
-        {getTaskTypeIcon(task.type)}
+        {getItemIcon(task.type)}
       </span>
 
       {/* Task content - one line as specified */}
@@ -110,7 +96,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
         <span
           style={{
             fontWeight: 'bold',
-            color: getTaskPriorityColor(task.priority || 0.5),
+            color: getPriorityColor(task.priority || 0.5),
             fontSize: '11px',
             minWidth: '30px',
             textAlign: 'right'
