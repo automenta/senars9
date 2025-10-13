@@ -1,76 +1,101 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
-const useWebSocket = (url) => {
+const useWebSocket = (url, config = {}) => {
+  const [ws, setWs] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [lastMessage, setLastMessage] = useState(null);
+  const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [data, setData] = useState({});
-  const [ws, setWs] = useState(null);
 
-  useEffect(() => {
-    if (!url) return;
+  const reconnectTimeoutRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
+  const currentUrlRef = useRef(url);
 
-    const websocket = new WebSocket(url);
-    setWs(websocket);
+  const {
+    maxReconnectAttempts = 10,
+    reconnectInterval = 3000,
+    maxMessages = 1000,
+    messageRetention = 500,
+    autoRequestState = true,
+    enableMessageHistory = true
+  } = config;
+
+  const connect = useCallback(() => {
+    if (['connecting', 'connected'].includes(connectionStatus)) return;
+
+    setError(null);
+    setConnectionStatus('connecting');
+
+    const websocket = new WebSocket(currentUrlRef.current);
 
     websocket.onopen = () => {
+      setIsConnected(true);
       setConnectionStatus('connected');
+      setError(null);
+      setWs(websocket);
+      reconnectAttemptsRef.current = 0;
+
       // Request initial state when connected
-      setTimeout(() => {
-        sendRawMessage({ type: 'request_state' });
-      }, 100);
+      if (autoRequestState) {
+        setTimeout(() => {
+          sendRawMessage({ type: 'request_state' });
+        }, 100);
+      }
     };
 
-    websocket.onclose = () => setConnectionStatus('disconnected');
+    websocket.onclose = (event) => {
+      setIsConnected(false);
+      setConnectionStatus('disconnected');
 
-    websocket.onerror = () => setConnectionStatus('error');
+      !event.wasClean && reconnectAttemptsRef.current < maxReconnectAttempts && (
+        setConnectionStatus('reconnecting'),
+        reconnectAttemptsRef.current++,
+        reconnectTimeoutRef.current = setTimeout(connect, reconnectInterval)
+      );
+    };
+
+    websocket.onerror = () => {
+      setError({ message: 'Connection failed', timestamp: new Date().toISOString() });
+      setConnectionStatus('disconnected');
+    };
 
     websocket.onmessage = (event) => {
+      setLastMessage(event);
+
+      if (enableMessageHistory) {
+        event.data instanceof Blob
+          ? setMessages(prev => [...prev, { type: 'binary', data: event.data }])
+          : (() => {
+              try {
+                const data = JSON.parse(event.data);
+                setMessages(prev => [...prev, data]);
+              } catch (e) {
+                setMessages(prev => [...prev, { type: 'error', data: event.data, error: e.message }]);
+              }
+            })();
+      }
+
+      // Handle server responses for state synchronization
       try {
-        const data = event.data instanceof ArrayBuffer
+        const rawData = event.data instanceof ArrayBuffer
           ? new TextDecoder().decode(event.data)
           : event.data instanceof Blob
             ? (() => { const reader = new FileReader(); reader.onload = () => {
                 try {
                   const message = JSON.parse(reader.result);
-                  // Handle server responses for state synchronization
-                  if (message.type === 'state_update' && message.payload) {
-                    const { tasks, concepts, logs, stats } = message.payload;
-                    setData(prev => ({
-                      ...prev,
-                      tasks: tasks || prev.tasks || [],
-                      concepts: concepts || prev.concepts || [],
-                      logs: logs || prev.logs || [],
-                      reasonerStats: stats || prev.reasonerStats
-                    }));
-                  }
+                  handleServerMessage(message);
                 } catch (parseError) {
                   console.error('Error parsing WebSocket message:', parseError);
                 }
               }; reader.readAsText(event.data); return; })()
             : event.data;
 
-        if (data) {
+        if (rawData) {
           try {
-            const message = JSON.parse(data);
-            if (message.type === 'state_update' && message.payload) {
-              const { tasks, concepts, logs, stats } = message.payload;
-              setData(prev => ({
-                ...prev,
-                tasks: tasks || prev.tasks || [],
-                concepts: concepts || prev.concepts || [],
-                logs: logs || prev.logs || [],
-                reasonerStats: stats || prev.reasonerStats
-              }));
-            } else if (message.type === 'concepts_update' && message.payload) {
-              setData(prev => ({
-                ...prev,
-                concepts: message.payload || []
-              }));
-            } else if (message.type === 'top_tasks_update' && message.payload) {
-              setData(prev => ({
-                ...prev,
-                memoryTasks: message.payload || []
-              }));
-            }
+            const message = JSON.parse(rawData);
+            handleServerMessage(message);
           } catch (parseError) {
             console.error('Error parsing WebSocket message:', parseError);
           }
@@ -79,17 +104,46 @@ const useWebSocket = (url) => {
         console.error('WebSocket message parse error:', error);
       }
     };
+  }, [connectionStatus, maxReconnectAttempts, reconnectInterval, autoRequestState, enableMessageHistory]);
 
-    return () => websocket.close();
-  }, [url]);
-
+  const handleServerMessage = useCallback((message) => {
+    if (message.type === 'state_update' && message.payload) {
+      const { tasks, concepts, logs, stats } = message.payload;
+      setData(prev => ({
+        ...prev,
+        tasks: tasks || prev.tasks || [],
+        concepts: concepts || prev.concepts || [],
+        logs: logs || prev.logs || [],
+        reasonerStats: stats || prev.reasonerStats
+      }));
+    } else if (message.type === 'concepts_update' && message.payload) {
+      setData(prev => ({
+        ...prev,
+        concepts: message.payload || []
+      }));
+    } else if (message.type === 'top_tasks_update' && message.payload) {
+      setData(prev => ({
+        ...prev,
+        memoryTasks: message.payload || []
+      }));
+    }
+  }, []);
 
   const sendRawMessage = useCallback((message) => {
-    ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(message));
-  }, [ws]);
+    if (ws && isConnected) {
+      try {
+        ws.send(JSON.stringify(message));
+        return true;
+      } catch (error) {
+        console.error('Error sending raw message:', error);
+        return false;
+      }
+    }
+    return false;
+  }, [ws, isConnected]);
 
   const sendMessage = useCallback((command, payload = {}) => {
-    sendRawMessage({ type: 'control', command, payload });
+    return sendRawMessage({ type: 'control', command, payload });
   }, [sendRawMessage]);
 
   const handleAddTask = useCallback((task) => {
@@ -139,17 +193,61 @@ const useWebSocket = (url) => {
     sendRawMessage({ type: 'request_state' });
   }, [sendRawMessage]);
 
+  const disconnect = useCallback(() => {
+    reconnectTimeoutRef.current && clearTimeout(reconnectTimeoutRef.current);
+    ws?.close(1000, "Manual disconnect");
+    setError(null);
+    setConnectionStatus('disconnected');
+    setIsConnected(false);
+  }, [ws]);
+
+  const reconnect = useCallback(() => {
+    disconnect();
+    setTimeout(connect, 1000);
+  }, [connect, disconnect]);
+
+  useEffect(() => {
+    currentUrlRef.current = url;
+
+    if (isConnected && ws) {
+      disconnect();
+      setTimeout(connect, 100);
+    } else if (connectionStatus === 'disconnected') {
+      connect();
+    }
+
+    return () => {
+      reconnectTimeoutRef.current && clearTimeout(reconnectTimeoutRef.current);
+      disconnect();
+    };
+  }, [url]);
+
+  useEffect(() => {
+    if (enableMessageHistory) {
+      messages.length > maxMessages && setMessages(prev => prev.slice(-messageRetention));
+    }
+  }, [messages, maxMessages, messageRetention, enableMessageHistory]);
+
   const sortedTasks = [...(data.tasks || [])].sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
   return {
-    isConnected: connectionStatus === 'connected',
+    // Connection state
+    isConnected,
     connectionStatus,
-    error: connectionStatus === 'error' ? 'WebSocket connection error' : null,
+    error: error || (connectionStatus === 'error' ? 'WebSocket connection error' : null),
+
+    // Message history (if enabled)
+    messages: enableMessageHistory ? messages : [],
+    lastMessage,
+
+    // Application data
     tasks: sortedTasks,
     logs: data.logs || [],
     concepts: data.concepts || [],
     memoryTasks: data.memoryTasks || [], // Top tasks from Memory
     reasonerStats: data.reasonerStats || null,
+
+    // Actions
     sendRawMessage,
     sendMessage,
     handleAddTask,
@@ -158,6 +256,11 @@ const useWebSocket = (url) => {
     requestConcepts,
     requestTopTasks,
     requestState,
+    reconnect,
+    disconnect,
+
+    // Status
+    reconnectAttempts: reconnectAttemptsRef.current
   };
 };
 
