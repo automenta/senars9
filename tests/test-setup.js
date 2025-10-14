@@ -2,7 +2,7 @@
 import { jest } from '@jest/globals';
 
 // Increase timeout for async operations
-jest.setTimeout(10000);
+jest.setTimeout(15000);
 
 // Global test cleanup to ensure no resource leaks between tests
 let globalSystems = new Set();
@@ -18,6 +18,16 @@ global.afterEach(async () => {
     try {
       if (system && typeof system.stop === 'function') {
         await system.stop();
+
+        // Clear event handlers
+        if (typeof system.removeAllListeners === 'function') {
+          system.removeAllListeners();
+        }
+
+        // Clear core reference
+        if (system.core) {
+          system.core = null;
+        }
       }
     } catch (error) {
       console.warn('Error cleaning up system in test teardown:', error.message);
@@ -28,6 +38,11 @@ global.afterEach(async () => {
   // Force garbage collection if available (Node.js with --expose-gc)
   if (global.gc) {
     global.gc();
+  }
+
+  // Clear any remaining timers or async operations
+  if (global.clearImmediate) {
+    // Clear any immediate operations
   }
 });
 

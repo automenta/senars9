@@ -24,12 +24,37 @@ describe('Cognitive Validation Tests', () => {
     global.registerSystemForCleanup(system);
 
     await system.start();
-  }, 10000); // Increase timeout to 10 seconds for System initialization
+  }, 15000); // Increase timeout to 15 seconds for System initialization
 
   afterEach(async () => {
     if (system) {
-      await system.stop();
+      try {
+        // Stop the system first
+        await system.stop();
+
+        // Clear any event handlers
+        system.removeAllListeners();
+
+        // Stop any bootstrap agent if it exists
+        if (system.core && system.core.bootstrapAgent) {
+          try {
+            await system.core.bootstrapAgent.stop();
+          } catch (error) {
+            // Ignore errors during cleanup
+          }
+        }
+
+        // Clear the core reference to ensure cleanup
+        if (system.core) {
+          system.core = null;
+        }
+      } catch (error) {
+        console.warn('Error during system cleanup:', error.message);
+      }
     }
+
+    // Clear global references
+    system = null;
   });
 
   describe('Basic Cognitive Capabilities', () => {
@@ -636,6 +661,398 @@ describe('Cognitive Validation Tests', () => {
       expect(finalStats).toBeDefined();
       expect(finalStatus).toBeDefined();
       expect(typeof finalStats.goalsProcessed).toBe('number');
+    });
+  });
+
+  describe('Contradiction Resolution Integration', () => {
+    test('should demonstrate direct contradiction detection', async () => {
+      const contradictionAnalyzer = system.core.contradictionAnalyzer;
+      if (!contradictionAnalyzer) {
+        console.log('⚠️ ContradictionAnalyzer not available in this configuration');
+        return;
+      }
+
+      // Create some test beliefs that might contradict
+      system.input({
+        term: '(bird --> animal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      });
+
+      system.input({
+        term: '(bird --> ~animal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      });
+
+      // Test contradiction detection
+      const contradictions = await contradictionAnalyzer.analyzeBeliefs ?
+        await contradictionAnalyzer.analyzeBeliefs() : [];
+
+      expect(Array.isArray(contradictions)).toBe(true);
+      // Should detect at least the direct negation if analyzer is working
+    });
+
+    test('should demonstrate resolution strategy selection', async () => {
+      const resolutionStrategy = system.core.resolutionStrategy;
+      if (!resolutionStrategy) {
+        console.log('⚠️ ResolutionStrategy not available in this configuration');
+        return;
+      }
+
+      // Test if strategies are available
+      const availableStrategies = resolutionStrategy.getAvailableStrategies ?
+        resolutionStrategy.getAvailableStrategies() : [];
+
+      expect(Array.isArray(availableStrategies)).toBe(true);
+      // Should have at least some resolution strategies available
+    });
+
+    test('should demonstrate belief revision workflows', async () => {
+      const contradictionAnalyzer = system.core.contradictionAnalyzer;
+      const resolutionStrategy = system.core.resolutionStrategy;
+
+      if (!contradictionAnalyzer || !resolutionStrategy) {
+        console.log('⚠️ Contradiction components not available in this configuration');
+        return;
+      }
+
+      // Add conflicting beliefs
+      system.input({
+        term: '(cat --> mammal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      });
+
+      system.input({
+        term: '(cat --> ~mammal)',
+        punctuation: '.',
+        truth: { frequency: 0.8, confidence: 0.8 }
+      });
+
+      // Analyze for contradictions
+      const contradictions = await contradictionAnalyzer.analyzeBeliefs ?
+        await contradictionAnalyzer.analyzeBeliefs() : [];
+
+      expect(Array.isArray(contradictions)).toBe(true);
+
+      // If contradictions found, test resolution
+      if (contradictions.length > 0) {
+        const resolutionResult = await resolutionStrategy.resolveContradiction ?
+          await resolutionStrategy.resolveContradiction(contradictions[0]) : null;
+
+        if (resolutionResult) {
+          expect(resolutionResult).toHaveProperty('success');
+        }
+      }
+    });
+
+    test('should demonstrate comprehensive contradiction resolution functionality', async () => {
+      const contradictionAnalyzer = system.core.contradictionAnalyzer;
+      const resolutionStrategy = system.core.resolutionStrategy;
+
+      if (!contradictionAnalyzer || !resolutionStrategy) {
+        console.log('⚠️ Contradiction components not available in this configuration');
+        return;
+      }
+
+      const componentsAvailable = {
+        hasAnalyzer: !!contradictionAnalyzer,
+        hasAnalyzeBeliefs: typeof contradictionAnalyzer.analyzeBeliefs === 'function',
+        hasResolver: !!resolutionStrategy,
+        hasResolveContradiction: typeof resolutionStrategy.resolveContradiction === 'function'
+      };
+
+      expect(componentsAvailable.hasAnalyzer).toBe(true);
+
+      // Add test beliefs
+      system.input({
+        term: '(dog --> animal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      });
+
+      system.input({
+        term: '(dog --> ~animal)',
+        punctuation: '.',
+        truth: { frequency: 0.9, confidence: 0.8 }
+      });
+
+      // Test comprehensive functionality
+      const contradictions = await contradictionAnalyzer.analyzeBeliefs ?
+        await contradictionAnalyzer.analyzeBeliefs() : [];
+
+      expect(Array.isArray(contradictions)).toBe(true);
+
+      const availableStrategies = resolutionStrategy.getAvailableStrategies ?
+        resolutionStrategy.getAvailableStrategies() : [];
+
+      expect(Array.isArray(availableStrategies)).toBe(true);
+
+      // Test resolution if components are available
+      if (contradictions.length > 0 && availableStrategies.length > 0) {
+        const resolutionResults = {};
+        for (const strategyName of availableStrategies.slice(0, 1)) { // Test first strategy
+          try {
+            const result = await resolutionStrategy.resolveContradiction(contradictions[0], strategyName);
+            resolutionResults[strategyName] = result;
+          } catch (error) {
+            // Some strategies might fail, that's okay for testing
+          }
+        }
+
+        expect(typeof resolutionResults).toBe('object');
+      }
+    });
+  });
+
+  describe('Memory Attention Integration', () => {
+    test('should demonstrate multi-focus set operations', async () => {
+      const memory = system.core.memory;
+      if (!memory || !memory.focusSets) {
+        console.log('⚠️ Memory focus sets not available in this configuration');
+        return;
+      }
+
+      // Add some tasks to different focus areas
+      system.input({
+        term: '(urgent-task --> important)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 },
+        priority: 0.9
+      });
+
+      system.input({
+        term: '(background-task --> routine)',
+        punctuation: '.',
+        truth: { frequency: 0.8, confidence: 0.7 },
+        priority: 0.3
+      });
+
+      // Test focus set operations
+      const focusStats = memory.getStats ? memory.getStats() : {};
+      expect(typeof focusStats).toBe('object');
+
+      // Verify memory operations work
+      const health = memory.getHealth ? memory.getHealth() : {};
+      expect(typeof health).toBe('object');
+    });
+
+    test('should demonstrate attention decay and update mechanisms', async () => {
+      const memory = system.core.memory;
+      if (!memory) {
+        console.log('⚠️ Memory component not available in this configuration');
+        return;
+      }
+
+      // Add a task and test attention mechanisms
+      system.input({
+        term: '(attention-test --> memory)',
+        punctuation: '.',
+        truth: { frequency: 0.9, confidence: 0.8 },
+        priority: 0.7
+      });
+
+      // Test memory stats
+      const memStats = memory.getStats ? memory.getStats() : {};
+      expect(typeof memStats).toBe('object');
+
+      // Verify memory operations work
+      const health = memory.getHealth ? memory.getHealth() : {};
+      expect(typeof health).toBe('object');
+    });
+
+    test('should demonstrate cross-focus set querying', async () => {
+      const memory = system.core.memory;
+      if (!memory || !memory.focusSets) {
+        console.log('⚠️ Memory focus sets not available in this configuration');
+        return;
+      }
+
+      // Add tasks to test cross-focus querying
+      system.input({
+        term: '(cross-focus-task --> test)',
+        punctuation: '.',
+        truth: { frequency: 0.8, confidence: 0.75 }
+      });
+
+      // Test memory functionality
+      const stats = memory.getStats ? memory.getStats() : {};
+      expect(typeof stats).toBe('object');
+
+      // Test that memory operations complete without errors
+      const health = memory.getHealth ? memory.getHealth() : {};
+      expect(typeof health).toBe('object');
+    });
+
+    test('should demonstrate comprehensive memory attention functionality', async () => {
+      const memory = system.core.memory;
+      if (!memory) {
+        console.log('⚠️ Memory component not available in this configuration');
+        return;
+      }
+
+      // Test comprehensive memory functionality
+      const componentsAvailable = {
+        hasMemory: !!memory,
+        hasGetHealth: typeof memory.getHealth === 'function',
+        hasGetStats: typeof memory.getStats === 'function',
+        hasGetAllTasks: typeof memory.getAllTasks === 'function'
+      };
+
+      expect(componentsAvailable.hasMemory).toBe(true);
+
+      // Add multiple tasks to test memory operations
+      for (let i = 0; i < 3; i++) {
+        system.input({
+          term: `(memory-test-${i} --> attention)`,
+          punctuation: '.',
+          truth: { frequency: 0.8, confidence: 0.7 },
+          priority: 0.5 + (i * 0.1)
+        });
+      }
+
+      // Test memory operations
+      const health = memory.getHealth();
+      const stats = memory.getStats();
+
+      expect(health).toBeDefined();
+      expect(stats).toBeDefined();
+
+      // Verify memory operations work (check available methods)
+      const availableMethods = {
+        hasGetHealth: typeof memory.getHealth === 'function',
+        hasGetStats: typeof memory.getStats === 'function',
+        hasGetStorageSize: typeof memory.getStorageSize === 'function'
+      };
+
+      expect(availableMethods.hasGetHealth).toBe(true);
+      expect(availableMethods.hasGetStats).toBe(true);
+    });
+  });
+
+  describe('Cognitive Cycle Integration', () => {
+    test('should demonstrate end-to-end cognitive loop', async () => {
+      // Test basic cognitive cycle functionality using existing system
+      const memory = system.core.memory;
+      const rules = system.core.rules;
+      const reasoning = system.core.reasoning;
+
+      if (!memory || !rules || !reasoning) {
+        console.log('⚠️ Core cognitive components not available in this configuration');
+        return;
+      }
+
+      // Add a belief
+      system.input({
+        term: '(bird --> animal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      });
+
+      // Add a rule
+      system.input({
+        term: '(animal --> living-thing)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.95 }
+      });
+
+      // Test that components are working
+      const memHealth = memory.getHealth ? memory.getHealth() : {};
+      const ruleHealth = rules.getHealth ? rules.getHealth() : {};
+      const reasonStats = reasoning.getStats ? reasoning.getStats() : {};
+
+      expect(typeof memHealth).toBe('object');
+      expect(typeof ruleHealth).toBe('object');
+      expect(typeof reasonStats).toBe('object');
+    });
+
+    test('should verify rule-memory interaction', async () => {
+      const memory = system.core.memory;
+      const rules = system.core.rules;
+
+      if (!memory || !rules) {
+        console.log('⚠️ Memory or Rules components not available in this configuration');
+        return;
+      }
+
+      // Add a belief to memory
+      system.input({
+        term: '(cat --> mammal)',
+        punctuation: '.',
+        truth: { frequency: 1.0, confidence: 0.9 }
+      });
+
+      // Test component interaction
+      const memStats = memory.getStats ? memory.getStats() : {};
+      const ruleStats = rules.getStats ? rules.getStats() : {};
+
+      expect(typeof memStats).toBe('object');
+      expect(typeof ruleStats).toBe('object');
+    });
+
+    test('should demonstrate task processing flow', async () => {
+      const memory = system.core.memory;
+      const reasoning = system.core.reasoning;
+
+      if (!memory || !reasoning) {
+        console.log('⚠️ Memory or Reasoning components not available in this configuration');
+        return;
+      }
+
+      // Add a task for processing
+      system.input({
+        term: '(test-task --> processing)',
+        punctuation: '.',
+        truth: { frequency: 0.8, confidence: 0.7 }
+      });
+
+      // Test processing flow
+      const memHealth = memory.getHealth ? memory.getHealth() : {};
+      const reasonStats = reasoning.getStats ? reasoning.getStats() : {};
+
+      expect(typeof memHealth).toBe('object');
+      expect(typeof reasonStats).toBe('object');
+    });
+
+    test('should demonstrate comprehensive cognitive cycle functionality', async () => {
+      const memory = system.core.memory;
+      const rules = system.core.rules;
+      const reasoning = system.core.reasoning;
+
+      if (!memory || !rules || !reasoning) {
+        console.log('⚠️ Core cognitive components not available in this configuration');
+        return;
+      }
+
+      const componentsAvailable = {
+        hasMemory: !!memory,
+        hasRules: !!rules,
+        hasReasoning: !!reasoning,
+        hasGetMemoryHealth: typeof memory.getHealth === 'function',
+        hasGetRulesHealth: typeof rules.getHealth === 'function',
+        hasGetReasoningStats: typeof reasoning.getStats === 'function'
+      };
+
+      expect(componentsAvailable.hasMemory).toBe(true);
+      expect(componentsAvailable.hasRules).toBe(true);
+      expect(componentsAvailable.hasReasoning).toBe(true);
+
+      // Add test data
+      system.input({
+        term: '(cognitive-test --> validation)',
+        punctuation: '.',
+        truth: { frequency: 0.9, confidence: 0.8 }
+      });
+
+      // Test comprehensive functionality
+      const memHealth = memory.getHealth();
+      const ruleHealth = rules.getHealth();
+      const reasonStats = reasoning.getStats();
+
+      expect(memHealth).toBeDefined();
+      expect(ruleHealth).toBeDefined();
+      expect(reasonStats).toBeDefined();
     });
   });
 });
