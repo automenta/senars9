@@ -35,8 +35,7 @@ class WebSocketConnectionManager {
   }
 
   async connect() {
-    if (!this.connectionManager) return; // Early return if connectionManager is null
-    if (this.isConnected || this.connectionManager.status === CONNECTION_STATUS.CONNECTING) return;
+    if (!this._isConnectionValid()) return;
 
     this.connectionManager.setStatus(CONNECTION_STATUS.CONNECTING);
 
@@ -44,55 +43,68 @@ class WebSocketConnectionManager {
       const WebSocketClass = typeof window !== 'undefined' ? WebSocket : (await import('ws')).default;
       this.ws = new WebSocketClass(this.url);
 
-      // Consolidated event handlers - optimized
-      this.ws.onopen = () => {
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.connectionManager.setStatus(CONNECTION_STATUS.CONNECTED);
-        this.connectionManager.resetReconnectAttempts();
-        this.emit('connect');
-        this.handleConnect();
-      };
-
-      this.ws.onmessage = event => {
-        this.emit('message', event);
-        this.handleMessage(event);
-      };
-
-      this.ws.onclose = event => {
-        this.isConnected = false;
-        if (this.connectionManager) {
-          this.connectionManager.setStatus(CONNECTION_STATUS.DISCONNECTED);
-        }
-        this.emit('disconnect', event);
-
-        // Optimized reconnection logic
-        const shouldReconnect = !event.wasClean &&
-          this.reconnectAttempts < this.config.maxReconnectAttempts &&
-          this.connectionManager; // Ensure connectionManager exists
-
-        shouldReconnect && this.scheduleReconnect();
-      };
-
-      this.ws.onerror = error => {
-        this.isConnected = false;
-        if (this.connectionManager) {
-          this.connectionManager.setStatus(CONNECTION_STATUS.ERROR);
-        }
-        this.emit('error', error);
-        this.handleError(error);
-      };
+      this._setupEventHandlers();
 
     } catch (error) {
-      this.connectionManager.setStatus(CONNECTION_STATUS.ERROR);
-      this.emit('error', error);
-      this.handleError(error);
+      this._handleConnectionError(error);
     }
   }
 
+  _isConnectionValid() {
+    return this.connectionManager &&
+           !this.isConnected &&
+           this.connectionManager.status !== CONNECTION_STATUS.CONNECTING;
+  }
+
+  _setupEventHandlers() {
+    const handlers = {
+      open: () => this._handleOpen(),
+      message: (event) => this._handleIncomingMessage(event),
+      close: (event) => this._handleClose(event),
+      error: (error) => this._handleConnectionError(error)
+    };
+
+    Object.entries(handlers).forEach(([event, handler]) => {
+      this.ws[`on${event}`] = handler;
+    });
+  }
+
+  _handleOpen() {
+    this.isConnected = true;
+    this.reconnectAttempts = 0;
+    this.connectionManager.setStatus(CONNECTION_STATUS.CONNECTED);
+    this.connectionManager.resetReconnectAttempts();
+    this.emit('connect');
+    this.handleConnect();
+  }
+
+  _handleIncomingMessage(event) {
+    this.emit('message', event);
+    this.handleMessage(event);
+  }
+
+  _handleClose(event) {
+    this.isConnected = false;
+    this.connectionManager?.setStatus(CONNECTION_STATUS.DISCONNECTED);
+    this.emit('disconnect', event);
+
+    const shouldReconnect = !event.wasClean &&
+      this.reconnectAttempts < this.config.maxReconnectAttempts &&
+      this.connectionManager;
+
+    shouldReconnect && this.scheduleReconnect();
+  }
+
+  _handleConnectionError(error) {
+    this.isConnected = false;
+    this.connectionManager?.setStatus(CONNECTION_STATUS.ERROR);
+    this.emit('error', error);
+    this.handleError(error);
+  }
+
   scheduleReconnect() {
-    if (!this.connectionManager) return; // Early return if connectionManager is null
-    
+    if (!this.connectionManager) return;
+
     this.reconnectAttempts++;
     this.connectionManager.setStatus(CONNECTION_STATUS.RECONNECTING);
     this.connectionManager.incrementReconnectAttempts();
@@ -100,32 +112,33 @@ class WebSocketConnectionManager {
     this.reconnectTimeoutId = setTimeout(() => this.connect(), this.config.reconnectInterval);
   }
 
-  // Higher-level message and state management - optimized
+  // Higher-level message and state management - consolidated
   async handleMessage(event) {
     this.setLastMessage?.(event);
 
-    // Handle message history
-    if (this.config.enableMessageHistory && this.setMessages) {
-      try {
-        const message = await parseWebSocketMessage(event);
-        this.setMessages(prev => [...prev, message]);
-      } catch (parseError) {
+    const message = await this._parseMessageSafely(event);
+
+    if (this.config.enableMessageHistory && this.setMessages && message) {
+      this.setMessages(prev => [...prev, message]);
+    }
+
+    if (this.setData && message) {
+      this.handleStateUpdate(message);
+    }
+  }
+
+  async _parseMessageSafely(event) {
+    try {
+      return await parseWebSocketMessage(event);
+    } catch (parseError) {
+      if (this.config.enableMessageHistory && this.setMessages) {
         this.setMessages?.(prev => [...prev, {
           type: 'error',
           data: event.data,
           error: parseError.message
         }]);
       }
-    }
-
-    // Handle state updates
-    if (this.setData) {
-      try {
-        const message = await parseWebSocketMessage(event);
-        this.handleStateUpdate(message);
-      } catch (parseError) {
-        console.error('Error parsing WebSocket message:', parseError);
-      }
+      return null;
     }
   }
 
@@ -144,32 +157,51 @@ class WebSocketConnectionManager {
     this.setError?.({ message: error.message, timestamp: new Date().toISOString() });
   }
 
-  // Task management - terse syntax
-  handleAddTask(task) {
+  // Consolidated task management
+  handleTaskOperation(operation, task) {
+    const taskHandlers = {
+      add: (task) => this._handleAddTask(task),
+      update: (task) => this._handleUpdateTask(task),
+      delete: (task) => this._handleDeleteTask(task)
+    };
+
+    const handler = taskHandlers[operation];
+    handler?.(task);
+  }
+
+  _handleAddTask(task) {
     const newTask = createTask(task);
-    this.setData?.(prev => ({
+    this._updateTaskData(prev => ({
       ...prev,
       tasks: [...(prev.tasks || []), newTask]
     }));
-    this.send({ type: MESSAGE_TYPES.CONTROL, command: 'add_task', payload: newTask });
+    this._sendTaskCommand('add_task', newTask);
   }
 
-  handleUpdateTask(task) {
-    this.setData?.(prev => ({
+  _handleUpdateTask(task) {
+    this._updateTaskData(prev => ({
       ...prev,
       tasks: (prev.tasks || []).map(t =>
         t.id === task.id ? { ...t, ...task, lastModified: Date.now() } : t
       )
     }));
-    this.send({ type: MESSAGE_TYPES.CONTROL, command: 'update_task', payload: task });
+    this._sendTaskCommand('update_task', task);
   }
 
-  handleDeleteTask(task) {
-    this.setData?.(prev => ({
+  _handleDeleteTask(task) {
+    this._updateTaskData(prev => ({
       ...prev,
       tasks: (prev.tasks || []).filter(t => t.id !== task.id)
     }));
-    this.send({ type: MESSAGE_TYPES.CONTROL, command: 'delete_task', payload: { id: task.id } });
+    this._sendTaskCommand('delete_task', { id: task.id });
+  }
+
+  _updateTaskData(updater) {
+    this.setData?.(updater);
+  }
+
+  _sendTaskCommand(command, payload) {
+    this.send({ type: MESSAGE_TYPES.CONTROL, command, payload });
   }
 
   getSortedTasks(tasks) {
@@ -183,17 +215,18 @@ class WebSocketConnectionManager {
   }
 
   send(message) {
-    if (this.isConnected && this.ws) {
-      try {
-        this.ws.send(JSON.stringify(message));
-        return true;
-      } catch (error) {
-        this.emit('error', error);
-        return false;
-      }
+    if (!this.isConnected || !this.ws) {
+      this.emit('error', new Error('WebSocket not connected'));
+      return false;
     }
-    this.emit('error', new Error('WebSocket not connected'));
-    return false;
+
+    try {
+      this.ws.send(JSON.stringify(message));
+      return true;
+    } catch (error) {
+      this.emit('error', error);
+      return false;
+    }
   }
 
   disconnect() {

@@ -8,11 +8,13 @@ export const createWebSocketConfig = (overrides = {}) => ({
   ...overrides
 });
 
-// Message parsing utilities
+// Message parsing utilities - consolidated and optimized
 export const parseWebSocketMessage = async (event) => {
-  const parseData = (data) =>
-    data instanceof ArrayBuffer ? JSON.parse(new TextDecoder().decode(data)) :
-    typeof data === 'string' ? JSON.parse(data) : data;
+  const parseData = (data) => {
+    if (data instanceof ArrayBuffer) return JSON.parse(new TextDecoder().decode(data));
+    if (typeof data === 'string') return JSON.parse(data);
+    return data;
+  };
 
   try {
     if (event.data instanceof Blob) {
@@ -90,9 +92,9 @@ export const createSafeSend = (ws, isConnected) => (message) => {
   return false;
 };
 
-// State update handlers
+// State update handlers - consolidated and optimized
 export const createStateUpdater = (setData) => (message) => {
-  const updateMap = {
+  const updateStrategies = {
     [MESSAGE_TYPES.STATE_UPDATE]: (payload) => {
       const { tasks, concepts, logs, stats } = payload;
       setData(prev => ({
@@ -109,12 +111,12 @@ export const createStateUpdater = (setData) => (message) => {
       setData(prev => ({ ...prev, memoryTasks: payload || [] }))
   };
 
-  updateMap[message.type]?.(message.payload);
+  updateStrategies[message.type]?.(message.payload);
 };
 
 // WebSocket utilities - consolidated and deduplicated
 
-// Common WebSocket patterns abstraction
+// Common WebSocket patterns abstraction - consolidated
 export const createWebSocketHook = (WebSocketClass, config = {}) => {
   const {
     onMessage,
@@ -130,31 +132,36 @@ export const createWebSocketHook = (WebSocketClass, config = {}) => {
     messageRetention = 500
   } = config;
 
+  const processMessageSafely = (event, processor) => {
+    try {
+      return parseWebSocketMessage(event);
+    } catch (parseError) {
+      console.error('Error parsing WebSocket message:', parseError);
+      return null;
+    }
+  };
+
   return {
     handleMessage: (event) => {
       setLastMessage?.(event);
       onMessage?.(event);
 
       if (enableMessageHistory && setMessages) {
-        try {
-          const message = parseWebSocketMessage(event);
+        const message = processMessageSafely(event);
+        if (message) {
           setMessages(prev => manageMessageHistory([...prev, message], maxMessages, messageRetention));
-        } catch (parseError) {
+        } else {
           setMessages?.(prev => [...prev, {
             type: 'error',
             data: event.data,
-            error: parseError.message
+            error: 'Parse error'
           }]);
         }
       }
 
       if (setData) {
-        try {
-          const message = parseWebSocketMessage(event);
-          createStateUpdater(setData)(message);
-        } catch (parseError) {
-          console.error('Error parsing WebSocket message:', parseError);
-        }
+        const message = processMessageSafely(event);
+        if (message) createStateUpdater(setData)(message);
       }
     },
 
