@@ -2,7 +2,7 @@ import { WebSocketServer as WSServer } from 'ws';
 import { createServer } from 'http';
 import Component from '../base/Component.js';
 import { WebSocketUtils, DEFAULTS } from './WebSocketUtils.js';
-import MessageFactory from './MessageFactory.js';
+
 import MessageHandler from './MessageHandler.js';
 import ConnectionManager from './ConnectionManager.js';
 import StreamManager from './StreamManager.js';
@@ -98,7 +98,7 @@ class WebSocketServer extends Component {
     try {
       const state = WebSocketUtils.extractSystemState(this.core);
       WebSocketUtils.addSystemStatsToState(this.core, state);
-      this.broadcast(MessageFactory.createStateUpdateMessage(state));
+      this.broadcast(WebSocketUtils.createMessage(MESSAGE_TYPES.COMPLETE_STATE, state));
     } catch (error) {
       WebSocketUtils.handleError('broadcasting current state', error);
     }
@@ -145,7 +145,7 @@ class WebSocketServer extends Component {
   broadcast(message, excludeClients = []) {
     if (this.simpleMode && typeof message !== 'object') {
       // In simple mode, wrap primitive messages
-      message = MessageFactory.createSystemMessage('broadcast', message);
+      message = WebSocketUtils.createMessage('broadcast', { system: true, data: message });
     }
 
     const excludeSet = new Set(excludeClients);
@@ -170,10 +170,10 @@ class WebSocketServer extends Component {
 
     try {
       // Echo message back for testing
-      this.sendToClient(clientId, MessageFactory.createResponse('echo', message));
+      this.sendToClient(clientId, WebSocketUtils.createResponse('echo', 'success', message));
     } catch (error) {
       WebSocketUtils.handleError('handling simple message', error, clientId);
-      this.sendToClient(clientId, MessageFactory.createErrorResponse('echo', error));
+      this.sendToClient(clientId, WebSocketUtils.createResponse('echo', 'error', { message: error.message || error }));
     }
   }
 
@@ -230,7 +230,7 @@ class WebSocketServer extends Component {
   }
 
   broadcastTaskToNARS(task) {
-    this.broadcast(MessageFactory.createSystemMessage('nars_task', task));
+    this.broadcast(WebSocketUtils.createMessage('nars_task', { system: true, data: task }));
     return 1;
   }
 

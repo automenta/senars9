@@ -1,5 +1,5 @@
 import Logger from './Logger.js';
-import MessageFactory from './MessageFactory.js';
+
 
 const DEFAULTS = Object.freeze({
   PORT: 8080,
@@ -26,6 +26,7 @@ const getConfigManager = () => {
     // Dynamic import to avoid circular dependencies
     import('./ServerConfig.js').then(({ default: ServerConfig }) => {
       configManager = new ServerConfig();
+      configManager.initialize();
     });
   }
   return configManager;
@@ -160,16 +161,16 @@ class WebSocketUtils {
 
   static createResponse(command, status, data = {}) {
     return status === 'error'
-      ? MessageFactory.createErrorResponse(command, data)
-      : MessageFactory.createSuccessResponse(command, data);
+      ? WebSocketUtils.createErrorResponse(command, data)
+      : WebSocketUtils.createSuccessResponse(command, data);
   }
 
   static createErrorResponse(command, error) {
-    return MessageFactory.createErrorResponse(command, error);
+    return WebSocketUtils.createErrorResponse(command, error);
   }
 
   static createSuccessResponse(command, data = {}) {
-    return MessageFactory.createSuccessResponse(command, data);
+    return WebSocketUtils.createSuccessResponse(command, data);
   }
 
   static createWelcomeMessage(clientId, connectionId) {
