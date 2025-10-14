@@ -1,7 +1,7 @@
 import Config from '../config/Config.js';
 import Messages from '../messaging/Messages.js';
 import Rules from '../reasoning/Rules.js';
-import Memory from '../memory/Memory.js';
+import Memory, { Focus } from '../Memory.js';
 import Reasoning from '../reasoning/Reasoning.js';
 import LM from '../lm/LM.js'; // Add LM component import
 import AdjacencyBag from '../memory/AdjacencyBag.js';
@@ -15,7 +15,6 @@ import ReportGenerator from '../analysis/ReportGenerator.js';
 
 import PatternDetector from '../analysis/PatternDetector.js';
 import WebSocketServer from '../server/WebSocketServer.js';
-import { Focus } from '../memory/Memory.js';
 import { ContradictionAnalyzer } from '../reasoning/ContradictionAnalyzer.js';
 import { ResolutionStrategy } from '../reasoning/ResolutionStrategy.js';
 import { SystemContext } from '../components/SystemContext.js';

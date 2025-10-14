@@ -1,4 +1,4 @@
-import { Memory } from './Memory.js';
+import Memory from './Memory.js';
 import { Task, Punctuation, TruthValue } from './Task.js';
 import { Term } from './Term.js';
 import { Reasoner } from './Reasoner.js';

@@ -8,16 +8,433 @@
  */
 
 import { NAR } from '../core/NAR.js';  // The main Non-Axiomatic Reasoner
+import System from '../core/system/System.js';  // The main System with LM integration
 import blessed from 'blessed';
 
 // Default configuration
 const DEFAULT_INPUT = "Ensure Earth Happiness!";
+const DEFAULT_LM_PROVIDER = "xenova";
 
 // Global state
-let nar = null;  // The main NAR instance
+let system = null;  // The main System instance (with both NAR and LM)
+let nar = null;     // The NAR component within the system
 let isRunning = false;
 let taskSortMode = 'priority'; // priority, creationTime
 let taskUpdateInterval = null;
+let logLines = [];
+const MAX_LOG_LINES = 5000;
+
+// Neurosymbolic integration rules registry
+const integrationRules = [];
+
+/**
+ * Add a neurosymbolic integration rule
+ * @param {Object} rule - The integration rule
+ * @param {Function} rule.premiseCriteria - Function that determines if a task qualifies for this rule
+ * @param {Function} rule.lmPromptTemplate - Function that generates the prompt for the LM
+ * @param {Function} rule.lmOutputProcessor - Function that processes LM output
+ * @param {Function} rule.taskGenerator - Function that creates new tasks from processed output
+ */
+function addIntegrationRule(rule) {
+  integrationRules.push(rule);
+}
+
+/**
+ * Process tasks through neurosymbolic integration rules
+ */
+async function processNeurosymbolicRules() {
+  if (!system || !system.core) return;
+  
+  try {
+    // Access the NAR reasoning engine from the system's component architecture
+    let narEngine = null;
+    
+    // Look for the NAR engine in the componentMap
+    if (system.core.componentMap) {
+      // Common names for the reasoning engine component
+      const componentKeys = ['nar', 'reasoner', 'nars', 'engine', 'core'];
+      for (const key of componentKeys) {
+        if (system.core.componentMap[key]) {
+          narEngine = system.core.componentMap[key];
+          break;
+        }
+      }
+      
+      // If not found with common keys, try the first available component that might be the NAR
+      if (!narEngine) {
+        const components = Object.values(system.core.componentMap);
+        for (const comp of components) {
+          if (comp && typeof comp === 'object') {
+            // Look for components that have task-related methods
+            if (comp.getTasks || comp.focus || comp.memory) {
+              narEngine = comp;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    if (!narEngine) {
+      // Now I know the correct architecture from Core.js:
+      // The system.core has components accessible via properties or componentMap
+      // Key components are: memory, reasoning, focus, lm, rules
+      
+      // First, try to find the NAR component if it exists (the one with the proper task methods)
+      if (system.core.nar && typeof system.core.nar.getTasks === 'function') {
+        narEngine = system.core.nar;  // The actual NAR with getTasks, getAllTasks methods
+      } else if (system.core.memory) {
+        narEngine = system.core.memory;  // Component-based memory
+      } else if (system.core.focus) {
+        narEngine = system.core.focus;  // Focus component
+      } else if (system.core.reasoning) {
+        narEngine = system.core.reasoning;
+      } else {
+        console.warn('No expected NAR components found in system. Available core properties:', 
+                     Object.keys(system.core || {}));
+        console.warn('Component map keys:', Array.from(system.core.componentMap?.keys() || []));
+        return;
+      }
+    }
+    
+    // Get tasks from the focus (active attention/short-term memory) rather than full memory
+    // In NARchy, the Focus contains the tasks that form premises for reasoning
+    let focusTasks = [];
+    
+    // Try different ways to access focus tasks from the NAR engine
+    // Based on Core.js and the actual Memory.js implementation:
+    if (Object.keys(narEngine).includes('focusSets') && Object.keys(narEngine).includes('currentFocus')) {
+      // This is the Focus component itself - we need to get tasks from the memory component instead
+      if (system.core.memory && typeof system.core.memory === 'object') {
+        // Debug: log what's available in memory component
+        // console.log('Memory component properties (rules):', Object.keys(system.core.memory));
+        
+        // Access tasks from the main memory component
+        if (system.core.memory.getAllTasks && typeof system.core.memory.getAllTasks === 'function') {
+          focusTasks = system.core.memory.getAllTasks();
+        }
+        else if (system.core.memory.shortTermTasks && system.core.memory.shortTermTasks instanceof Map) {
+          focusTasks = Array.from(system.core.memory.shortTermTasks.values());
+        }
+        else if (system.core.memory.longTermTasks && system.core.memory.longTermTasks instanceof Map) {
+          focusTasks = Array.from(system.core.memory.longTermTasks.values());
+        }
+        else {
+          console.warn('Memory component found but no expected task access methods (rules). Available properties:', 
+                       Object.keys(system.core.memory));
+          return; // Nothing to process
+        }
+      }
+      else {
+        console.warn('Focus component selected but no memory component found');
+        return; // Nothing to process
+      }
+    }
+    // If narEngine is not the focus component, try other access methods
+    else if (narEngine.getAllTasks && typeof narEngine.getAllTasks === 'function') {
+      // This is the main memory with shortTermTasks and longTermTasks
+      focusTasks = narEngine.getAllTasks();
+    }
+    else if (narEngine.shortTermTasks && narEngine.shortTermTasks instanceof Map) {
+      // Direct access to short term tasks (which represent the focus/active tasks)
+      focusTasks = Array.from(narEngine.shortTermTasks.values());
+    }
+    else if (narEngine.longTermTasks && narEngine.longTermTasks instanceof Map) {
+      focusTasks = Array.from(narEngine.longTermTasks.values());
+    }
+    else if (narEngine.tasks && narEngine.tasks instanceof Map) {
+      focusTasks = Array.from(narEngine.tasks.values());
+    }
+    else {
+      console.warn('No available method to retrieve tasks from NAR engine. Available properties:', 
+                   Object.keys(narEngine));
+      return;
+    }
+    
+    // If focusTasks is not an array, try to make it one
+    if (!Array.isArray(focusTasks)) {
+      if (focusTasks instanceof Map) {
+        focusTasks = Array.from(focusTasks.values());
+      } else if (typeof focusTasks === 'object' && focusTasks !== null) {
+        // If it's an object with different task collections, combine them
+        focusTasks = Object.values(focusTasks).flat().filter(item => item !== undefined);
+      } else {
+        console.warn('Focus tasks is not an array or Map:', typeof focusTasks);
+        return;
+      }
+    }
+    
+    // Only process if we have focus tasks
+    if (focusTasks.length === 0) {
+      return;
+    }
+    
+    // Apply each integration rule to eligible focus tasks (premises)
+    for (const rule of integrationRules) {
+      for (const task of focusTasks) {
+        try {
+          // Check if the task meets the rule's criteria
+          if (rule.premiseCriteria && rule.premiseCriteria(task)) {
+            // Log that we're consulting the LM
+            addLogLine(`🤖 LM consulted for rule: ${rule.description || 'Neurosymbolic rule'}`);
+            
+            // Generate prompt for the LM
+            const prompt = rule.lmPromptTemplate(task);
+            
+            // Consult with the LM
+            const lmResponse = await system.lm.process(prompt);
+            
+            // Process the LM output
+            const processedOutput = rule.lmOutputProcessor(lmResponse, task);
+            
+            // Generate new tasks based on the processed output
+            if (rule.taskGenerator && processedOutput) {
+              const newTasks = rule.taskGenerator(processedOutput, task);
+              
+              // Add new tasks to the system
+              if (Array.isArray(newTasks)) {
+                for (const newTask of newTasks) {
+                  await system.input(newTask);
+                  addLogLine(`📝 New task added: ${newTask.term || newTask}`);
+                }
+              } else if (newTasks) {
+                await system.input(newTasks);
+                addLogLine(`📝 New task added: ${newTasks.term || newTask}`);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error in neurosymbolic rule processing:', error);
+          addLogLine(`⚠️  Rule processing error: ${error.message}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error processing neurosymbolic rules:', error);
+  }
+}
+
+/**
+ * Setup neurosymbolic integration rules based on experimental tests
+ */
+function setupNeurosymbolicRules() {
+  // Rule 1: Goal Decomposition - When there's an abstract high-level goal,
+  // use the LM to break it down into more concrete sub-goals
+  addIntegrationRule({
+    description: "Goal Decomposition Rule",
+    premiseCriteria: (task) => {
+      // Check if it's a goal task (not just abstract terms, any goal!)
+      const isGoal = task.punctuation === '!';
+      const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || task._priority || 0);
+      
+      return isGoal && priority > 0.05; // Very low threshold to catch all goals
+    },
+    lmPromptTemplate: (task) => {
+      // Enhanced prompt to make it more likely to get actionable results
+      const termStr = task.term ? task.term.toString() : task.toString ? task.toString() : String(task);
+      return `Decompose this goal into 3-5 concrete, actionable sub-goals that would help achieve it: "${termStr}". Provide them as a numbered list.`;
+    },
+    lmOutputProcessor: (lmResponse, originalTask) => {
+      try {
+        addLogLine(`🤖 LM processed goal: "${originalTask.term || originalTask}"`);
+        
+        // Process the LM response to extract sub-goals
+        const lines = lmResponse.split('\n');
+        const subGoals = [];
+        
+        for (const line of lines) {
+          // Look for numbered items or bullet points
+          const match = line.match(/\d+\.\s*(.+)/) || line.match(/[•*-]\s*(.+)/);
+          if (match) {
+            // Clean up the sub-goal text
+            let goal = match[1].trim();
+            // Remove any trailing punctuation
+            goal = goal.replace(/[.:;!]$/, '');
+            if (goal && goal.length > 2) { // Ensure it's meaningful
+              subGoals.push(goal);
+            }
+          }
+        }
+        
+        // If no structured format found, try simple extraction
+        if (subGoals.length === 0) {
+          // Extract any imperative sentences (starting with verbs)
+          const sentences = lmResponse.split(/[.!?]+/);
+          for (const sentence of sentences) {
+            const trimmed = sentence.trim();
+            // Look for potential action items
+            if (trimmed && trimmed.length > 5 && (trimmed.toLowerCase().startsWith('create') || 
+                trimmed.toLowerCase().startsWith('establish') || 
+                trimmed.toLowerCase().startsWith('implement') || 
+                trimmed.toLowerCase().startsWith('ensure') || 
+                trimmed.toLowerCase().startsWith('improve') ||
+                trimmed.toLowerCase().startsWith('develop') ||
+                trimmed.toLowerCase().startsWith('increase') ||
+                trimmed.toLowerCase().startsWith('reduce'))) {
+              subGoals.push(trimmed);
+            }
+          }
+        }
+        
+        addLogLine(`✅ Extracted ${subGoals.length} subgoals from LM response`);
+        return subGoals;
+      } catch (error) {
+        console.error('Error processing LM response:', error);
+        addLogLine(`❌ Error processing LM response: ${error.message}`);
+        return [];
+      }
+    },
+    taskGenerator: (processedOutput, originalTask) => {
+      const newTasks = [];
+      
+      if (Array.isArray(processedOutput) && processedOutput.length > 0) {
+        addLogLine(`📝 Generating ${processedOutput.length} new tasks from LM output`);
+        for (const subGoal of processedOutput) {
+          if (subGoal && subGoal.trim()) {
+            const trimmedGoal = subGoal.trim();
+            // Convert to a more formal Narsese format
+            const narseseGoal = trimmedGoal.toLowerCase()
+              .replace(/\s+/g, '_')
+              .replace(/[^\w!_]/g, '') + '!'; // Remove special characters, keep the goal mark
+              
+            const newTask = {
+              term: narseseGoal,
+              punctuation: '!',
+              truth: { frequency: 0.8, confidence: 0.7 },
+              parent: originalTask.term || originalTask
+            };
+            
+            newTasks.push(newTask);
+            addLogLine(`🎯 New goal task added: ${narseseGoal}`);
+            
+            // Also create a belief linking the sub-goal to the original goal
+            if (originalTask.term) {
+              const originalTerm = originalTask.term.toString ? originalTask.term.toString() : 
+                                  originalTask.term.replace ? originalTask.term.replace(/[!?]/g, '') : 
+                                  String(originalTask.term).replace(/[!?]/g, '');
+              const termForLink = trimmedGoal.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_]/g, '');
+              const linkTerm = `(${termForLink} ==> ${originalTerm.replace(/\s+/g, '_').replace(/[^\w_]/g, '')}).`;
+              
+              const beliefTask = {
+                term: linkTerm,
+                punctuation: '.',
+                truth: { frequency: 0.9, confidence: 0.8 }
+              };
+              
+              newTasks.push(beliefTask);
+              addLogLine(`🔗 Belief link added: ${linkTerm}`);
+            }
+          }
+        }
+      } else {
+        // Even if no specific output, add some logging
+        addLogLine(`ℹ️ No specific tasks generated from this LM response`);
+      }
+      
+      return newTasks;
+    }
+  });
+  
+  // Rule 2: Hypothesis Generation - When there's a belief that might need 
+  // more supporting evidence, use the LM to generate related hypotheses
+  addIntegrationRule({
+    description: "Hypothesis Generation Rule",
+    premiseCriteria: (task) => {
+      // Look for beliefs with low confidence that might benefit from additional hypotheses
+      const isBelief = task.punctuation === '.';
+      const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || task._priority || 0);
+      // For this demo, we'll trigger on any belief for demonstration purposes
+      return isBelief && priority > 0.1; // Lower threshold for demo
+    },
+    lmPromptTemplate: (task) => {
+      return `Based on the belief "${task.term}", what is a related hypothesis that could either support or challenge this belief? Express it as a causal relationship if possible.`;
+    },
+    lmOutputProcessor: (lmResponse, originalTask) => {
+      // Process the LM's hypothesis
+      return lmResponse.trim();
+    },
+    taskGenerator: (processedOutput, originalTask) => {
+      if (!processedOutput || !processedOutput.trim()) return null;
+      
+      // Convert the hypothesis to Narsese format
+      let narseseHypothesis = processedOutput.trim();
+      
+      // If it's not already in Narsese format, try to convert it
+      if (!narseseHypothesis.includes('==>') && !narseseHypothesis.includes('=') && !narseseHypothesis.includes('<=>')) {
+        // Simple conversion - assume it's a potential implication
+        narseseHypothesis = `(${originalTask.term.replace(/[.?]/g, '')} ==> ${narseseHypothesis.replace(/[.?]/g, '')}).`;
+      }
+      
+      return [{
+        term: narseseHypothesis,
+        punctuation: '.',
+        truth: { frequency: 0.6, confidence: 0.5 }  // Lower confidence for generated hypotheses
+      }];
+    }
+  });
+  
+  // Rule 3: Variable Grounding - When there are variables in tasks, 
+  // use the LM to suggest possible values
+  addIntegrationRule({
+    description: "Variable Grounding Rule",
+    premiseCriteria: (task) => {
+      // Check if the task contains a variable (indicated by ?X pattern)
+      return task.term && task.term.includes('?');
+    },
+    lmPromptTemplate: (task) => {
+      return `For the task "${task.term}", what are 3 plausible values for the variable? Provide them as a list.`;
+    },
+    lmOutputProcessor: (lmResponse, originalTask) => {
+      try {
+        const lines = lmResponse.split('\n');
+        const candidates = [];
+        
+        for (const line of lines) {
+          const match = line.match(/\d+\.\s*(.+)/) || line.match(/[•*-]\s*(.+)/);
+          if (match) {
+            candidates.push(match[1].trim());
+          }
+        }
+        
+        // If no structured format found, try simple extraction
+        if (candidates.length === 0) {
+          // Try simple sentence splitting
+          const sentences = lmResponse.split(/[.!?]+/);
+          for (const sentence of sentences) {
+            const trimmed = sentence.trim();
+            if (trimmed && trimmed.length > 3) {
+              candidates.push(trimmed);
+            }
+          }
+        }
+        
+        return candidates;
+      } catch (error) {
+        console.error('Error processing variable grounding:', error);
+        return [];
+      }
+    },
+    taskGenerator: (processedOutput, originalTask) => {
+      const newTasks = [];
+      
+      if (Array.isArray(processedOutput)) {
+        for (const candidate of processedOutput) {
+          if (candidate.trim()) {
+            // Replace the variable with the candidate value
+            const groundedTerm = originalTask.term.replace(/\?\w+/, candidate.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_]/g, ''));
+            newTasks.push({
+              term: groundedTerm,
+              punctuation: originalTask.punctuation,
+              truth: { frequency: 0.5, confidence: 0.4 }  // Lower confidence for generated values
+            });
+          }
+        }
+      }
+      
+      return newTasks;
+    }
+  });
+}
 
 // Color scheme
 const COLORS = {
@@ -35,40 +452,68 @@ const COLORS = {
 };
 
 /**
- * Initialize the SeNARS NAR (Non-Axiomatic Reasoner)
+ * Initialize the SeNARS System (with both NAR and LM integration)
  */
-function initializeNAR() {
-  console.log('🚀 Initializing SeNARS NAR (Non-Axiomatic Reasoner)...');
+async function initializeSystem(lmProvider = DEFAULT_LM_PROVIDER) {
+  console.log('🚀 Initializing SeNARS Neurosymbolic System...');
   
   try {
-    // Create the NAR instance with integrated memory and reasoning
-    nar = new NAR({
-      cycleInterval: 1000  // Update every 1 second for demo purposes
-    });
+    // Initialize with configuration that includes LM provider
+    const config = {
+      components: {
+        lm: {
+          provider: lmProvider
+        },
+        webSocketServer: {
+          enabled: false  // Disable WebSocket server for terminal UI
+        }
+      }
+    };
+
+    system = new System(config);
+
+    await system.start();
+    nar = system.core;  // Get the NAR component from the system
     
-    console.log('✅ NAR initialized with integrated memory and reasoning');
-    return nar;
+    console.log('✅ System initialized with integrated neural and symbolic components');
+    return system;
   } catch (error) {
-    console.error('❌ Failed to initialize NAR:', error);
+    console.error('❌ Failed to initialize system:', error);
     throw error;
   }
 }
 
 /**
- * Add initial input tasks to the NAR
+ * Add a line to the log with automatic cleanup
  */
-function addInitialTasks(nar, inputText) {
+function addLogLine(line) {
+  logLines.push(line);
+  if (logLines.length > MAX_LOG_LINES) {
+    logLines = logLines.slice(-MAX_LOG_LINES);
+  }
+}
+
+/**
+ * Get formatted log content
+ */
+function getFormattedLog() {
+  return logLines.join('\n');
+}
+
+/**
+ * Add initial input tasks to the system
+ */
+async function addInitialTasks(system, inputText) {
   console.log(`📥 Adding initial input: "${inputText}"`);
   
   try {
     // Parse and add the input as a task
-    const task = nar.input({
+    await system.input({
       term: inputText,
       punctuation: '!', // Goal
       truth: { frequency: 0.9, confidence: 0.9 }
     });
-    console.log('✅ Initial tasks added to NAR');
-    return task;
+    console.log('✅ Initial tasks added to system');
   } catch (error) {
     console.error('❌ Failed to add initial tasks:', error);
   }
@@ -266,30 +711,179 @@ Example inputs: "Ensure Earth Happiness!", "Ensure User's Wealth!", etc.`,
 }
 
 /**
- * Get tasks from the NAR and format them for display
+ * Get tasks from the system and format them for display
  */
 function getFormattedTasks() {
-  if (!nar) {
+  if (!system || !system.core) {
     return [];
   }
 
   try {
-    // Get tasks based on the selected sort mode
-    let allTasks = [];
+    // Access the NAR reasoning engine from the system's component architecture
+    let narEngine = null;
+    
+    // Look for the NAR engine in the componentMap
+    if (system.core.componentMap) {
+      // Common names for the reasoning engine component
+      const componentKeys = ['nar', 'reasoner', 'nars', 'engine', 'core'];
+      for (const key of componentKeys) {
+        if (system.core.componentMap[key]) {
+          narEngine = system.core.componentMap[key];
+          break;
+        }
+      }
+      
+      // If not found with common keys, try the first available component that might be the NAR
+      if (!narEngine) {
+        const components = Object.values(system.core.componentMap);
+        for (const comp of components) {
+          if (comp && typeof comp === 'object') {
+            // Look for components that have task-related methods
+            if (comp.getTasks || comp.focus || comp.memory) {
+              narEngine = comp;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    if (!narEngine) {
+      // Now I know the correct architecture from Core.js:
+      // The system.core has components accessible via properties or componentMap
+      // Key components are: memory, reasoning, focus, lm, rules
+      
+      // First, try to find the NAR component if it exists (the one with the proper task methods)
+      if (system.core.nar && typeof system.core.nar.getTasks === 'function') {
+        narEngine = system.core.nar;  // The actual NAR with getTasks, getAllTasks methods
+      } else if (system.core.memory) {
+        narEngine = system.core.memory;  // Component-based memory
+      } else if (system.core.focus) {
+        narEngine = system.core.focus;  // Focus component
+      } else if (system.core.reasoning) {
+        narEngine = system.core.reasoning;
+      } else {
+        console.warn('No expected NAR components found in system for task display. Available core properties:', 
+                     Object.keys(system.core || {}));
+        console.warn('Component map keys:', Array.from(system.core.componentMap?.keys() || []));
+        return [];
+      }
+    }
+
+    // In NARchy, the Focus is where active reasoning happens
+    // The Focus wraps a Bag of tasks that are probabilistically sampled based on priority
+    let focusTasks = [];
+
+    // Now I understand: if narEngine IS the focus component, we need to access the memory component separately to get tasks
+    if (Object.keys(narEngine).includes('focusSets') && Object.keys(narEngine).includes('currentFocus')) {
+      // This is the Focus component itself - we need to get tasks from the memory component instead
+      if (system.core.memory && typeof system.core.memory === 'object') {
+        // Debug: log what's available in memory component
+        console.log('Memory component properties:', Object.keys(system.core.memory));
+        
+        // Access tasks from the main memory component
+        if (system.core.memory.getAllTasks && typeof system.core.memory.getAllTasks === 'function') {
+          focusTasks = system.core.memory.getAllTasks();
+        }
+        else if (system.core.memory.shortTermTasks && system.core.memory.shortTermTasks instanceof Map) {
+          focusTasks = Array.from(system.core.memory.shortTermTasks.values());
+        }
+        else if (system.core.memory.longTermTasks && system.core.memory.longTermTasks instanceof Map) {
+          focusTasks = Array.from(system.core.memory.longTermTasks.values());
+        }
+        else {
+          console.warn('Memory component found but no expected task access methods. Available properties:', 
+                       Object.keys(system.core.memory));
+          focusTasks = [];
+        }
+      }
+      else {
+        console.warn('Focus component selected but no memory component found');
+        focusTasks = [];
+      }
+    }
+    // If narEngine is not the focus component, try other access methods
+    else if (narEngine.getAllTasks && typeof narEngine.getAllTasks === 'function') {
+      // This is the main memory with shortTermTasks and longTermTasks
+      focusTasks = narEngine.getAllTasks();
+    }
+    else if (narEngine.shortTermTasks && narEngine.shortTermTasks instanceof Map) {
+      // Direct access to short term tasks (which represent the focus/active tasks)
+      focusTasks = Array.from(narEngine.shortTermTasks.values());
+    }
+    else if (narEngine.longTermTasks && narEngine.longTermTasks instanceof Map) {
+      focusTasks = Array.from(narEngine.longTermTasks.values());
+    }
+    else if (narEngine.tasks && narEngine.tasks instanceof Map) {
+      focusTasks = Array.from(narEngine.tasks.values());
+    }
+    else {
+      console.warn('No available method to retrieve tasks from NAR engine. Available properties:', 
+                   Object.keys(narEngine));
+      return [];
+    }
+
+    // If focusTasks is not an array, try to make it one
+    if (!Array.isArray(focusTasks)) {
+      if (focusTasks instanceof Map) {
+        focusTasks = Array.from(focusTasks.values());
+      } else if (typeof focusTasks === 'object' && focusTasks !== null) {
+        // If it's an object with different task collections, combine them
+        focusTasks = Object.values(focusTasks).flat().filter(item => item !== undefined);
+      } else {
+        console.warn('Focus tasks is not an array or Map:', typeof focusTasks);
+        return [];
+      }
+    }
+
+    // Sort tasks based on the selected mode - this reflects the probabilistic sampling by priority in the Bag
+    let sortedTasks = [];
     if (taskSortMode === 'priority') {
-      allTasks = nar.getTasksByPriority();
+      sortedTasks = focusTasks.sort((a, b) => {
+        const aPriority = typeof a.getPriority === 'function' ? a.getPriority() : (a.priority || a._priority || 0);
+        const bPriority = typeof b.getPriority === 'function' ? b.getPriority() : (b.priority || b._priority || 0);
+        return bPriority - aPriority;  // Higher priority first
+      });
     } else if (taskSortMode === 'creationTime') {
-      allTasks = nar.getTasksByTime();
+      sortedTasks = focusTasks.sort((a, b) => {
+        const aTime = a.createdAt || a._accessedAt || Date.now();
+        const bTime = b.createdAt || b._accessedAt || Date.now();
+        return bTime - aTime;  // Newer first
+      });
     } else {
-      allTasks = nar.getTasks(); // default
+      sortedTasks = focusTasks; // default - no specific sorting
     }
 
     // Format tasks for display
-    return allTasks.map(task => {
+    return sortedTasks.map(task => {
       let color = COLORS.task.belief;
       let emoji = '💭';
+
+      // Extract punctuation and term from various possible formats
+      let punctuation = '.';
+      let term = 'Unknown task';
       
-      const punctuation = task.punctuation || (task.term && task.term.punctuation) || '.';
+      if (task.punctuation) {
+        punctuation = task.punctuation;
+      } else if (task.term && typeof task.term === 'object' && task.term.punctuation) {
+        punctuation = task.term.punctuation;
+      } else if (typeof task === 'string' && task.includes('!')) {
+        punctuation = '!';
+      } else if (typeof task === 'string' && task.includes('?')) {
+        punctuation = '?';
+      }
+      
+      // Extract term from various possible formats
+      if (typeof task === 'string') {
+        term = task;
+      } else if (task.term) {
+        term = typeof task.term === 'string' ? task.term : (typeof task.term.toString === 'function' ? task.term.toString() : JSON.stringify(task.term));
+      } else if (task.toString && typeof task.toString === 'function') {
+        term = task.toString();
+      } else {
+        term = JSON.stringify(task);
+      }
+
       if (punctuation === '!') {
         color = COLORS.task.goal;
         emoji = '🎯';
@@ -297,25 +891,18 @@ function getFormattedTasks() {
         color = COLORS.task.question;
         emoji = '❓';
       }
-      
+
       const priority = (typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || task._priority || 0)).toFixed(2);
       const createdAt = new Date(task.createdAt || task._accessedAt || Date.now()).toLocaleTimeString();
-      
-      // Get string representation
-      let taskStr = 'Unknown task';
-      if (typeof task.toString === 'function') {
-        taskStr = task.toString();
-      } else if (task.term) {
-        taskStr = typeof task.term === 'string' ? task.term : (typeof task.term.toString === 'function' ? task.term.toString() : JSON.stringify(task.term));
-      }
-      
+
       return {
-        content: `{${color}-fg}${emoji} ${taskStr} (Pri: ${priority}, Created: ${createdAt}){/}`,
+        content: `{${color}-fg}${emoji} ${term} (Pri: ${priority}, Created: ${createdAt}){/}`,
         priority: typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || task._priority || 0)
       };
     });
   } catch (error) {
     console.error('Error getting formatted tasks:', error);
+    console.error('Core structure:', system.core ? Object.keys(system.core) : 'No core');
     return [];
   }
 }
@@ -327,25 +914,50 @@ function getFormattedTasks() {
 /**
  * Main function to set up the demo
  */
-async function runDemo(inputText = DEFAULT_INPUT) {
+async function runDemo(inputText = DEFAULT_INPUT, lmProvider = DEFAULT_LM_PROVIDER) {
   try {
-    // Initialize the NAR
-    initializeNAR();
-    
+    // Initialize the system
+    await initializeSystem(lmProvider);
+
     // Add initial tasks
-    addInitialTasks(nar, inputText);
+    await addInitialTasks(system, inputText);
+
+    // Create neurosymbolic integration rules based on experimental tests
+    setupNeurosymbolicRules();
     
     // Create the TUI
     const { screen, taskBox, logBox, status } = createTUI();
     
     // Update tasks periodically
-    taskUpdateInterval = setInterval(() => {
+    taskUpdateInterval = setInterval(async () => {
       try {
+        // Process neurosymbolic integration rules periodically
+        await processNeurosymbolicRules();
+        // Add a periodic check to show system activity
+        addLogLine('🔍 Neurosymbolic rule check cycle');
+        
+        // The system's core components handle reasoning automatically
+        // When tasks are input and the system is running, reasoning cycles execute
+        // Just let the system's built-in mechanisms handle the reasoning process
+        if (system.core && system.core.messages) {
+          // Emit a periodic stats event to see system activity
+          const stats = system.core.getStats ? system.core.getStats() : {};
+          if (stats.components && stats.components.memory) {
+            const taskCount = stats.components.memory.itemCount || 
+                             stats.components.memory.storageSize || 
+                             (system.core.memory ? (system.core.memory.getAllTasks ? 
+                               system.core.memory.getAllTasks().length : 0) : 0);
+            if (taskCount > 0) {
+              addLogLine(`📊 Memory contains ${taskCount} items`);
+            }
+          }
+        }
+        
         const formattedTasks = getFormattedTasks();
         let taskContent = '';
         
         if (formattedTasks.length === 0) {
-          taskContent = '{white-fg}No tasks in NAR memory{/}';
+          taskContent = '{white-fg}No tasks in memory{/}';
         } else {
           taskContent = formattedTasks.map(t => t.content).join('\n');
         }
@@ -353,39 +965,86 @@ async function runDemo(inputText = DEFAULT_INPUT) {
         // Add spacing
         taskContent = '\n' + taskContent + '\n';
         taskBox.setContent(taskContent);
+        
+        // Update log as well
+        logBox.setContent(getFormattedLog());
         screen.render();
       } catch (error) {
         console.error('Error updating tasks:', error);
       }
     }, 1000); // Update every second
     
-    // Set up event listeners to log NAR events
-    // For this demo, we'll just log to the console and the UI log
-    console.log(`📥 Input received: "${inputText}"`);
-    logBox.pushLine(`📥 Input received: "${inputText}"`);
-    logBox.pushLine('🎯 Ready to start reasoning. Press R to run.');
-    screen.render();
-    
-    // Start the NAR in paused mode by default
-    // We won't start the continuous cycle automatically to prevent conflicts
-    // Instead, we'll start/stop based on user commands
-    
+    // Set up event listeners to log system events
+    if (system) {
+      // Listen to system events and add them to the log
+      system.on('task.input', (task) => {
+        const line = `📥 Task input: ${task.term} (${task.punctuation})`;
+        addLogLine(line);
+        logBox.setContent(getFormattedLog());
+        screen.render();
+      });
+
+      system.on('task.processed', (result) => {
+        const line = `✅ Task processed: ${result.content || 'Unknown'}`;
+        addLogLine(line);
+        logBox.setContent(getFormattedLog());
+        screen.render();
+      });
+
+      system.on('cycle.stats', (stats) => {
+        const line = `🔄 Cycle ${stats.cycles} executed at ${new Date(stats.timestamp).toLocaleTimeString()}`;
+        addLogLine(line);
+        logBox.setContent(getFormattedLog());
+        screen.render();
+      });
+
+      system.on('system.started', (data) => {
+        const line = `🚀 System started at ${new Date(data.timestamp).toLocaleTimeString()}`;
+        addLogLine(line);
+        logBox.setContent(getFormattedLog());
+        screen.render();
+      });
+
+      system.on('reasoning_error', (error) => {
+        const line = `⚠️  Reasoning error: ${error.message || error}`;
+        addLogLine(line);
+        logBox.setContent(getFormattedLog());
+        screen.render();
+      });
+
+      system.on('lm.consulted', (data) => {
+        const line = `🤖 LM consulted: ${data.purpose || 'Unknown purpose'}`;
+        addLogLine(line);
+        logBox.setContent(getFormattedLog());
+        screen.render();
+      });
+    }
+
     // Log some initial messages
-    logBox.pushLine('✅ NAR initialized with integrated memory and reasoning');
+    addLogLine('✅ System initialized');
+    addLogLine(`📥 Input received: "${inputText}"`);
+    addLogLine('🎯 Ready to start reasoning. Press R to run.');
+    logBox.setContent(getFormattedLog());
     screen.render();
+    
+    // Start the cycle in paused mode by default
+    if (system.core && system.core.cycle) {
+      // Initialize the cycle but keep it paused by default
+      await system.core.cycle.start(); // Start the cycle manager
+      await system.core.cycle.pause(); // Set to paused initially
+    }
     
     // Handle key events for run/pause
-    let narCycleInterval = null;
-    
-    // Update the key handlers to use NAR
     screen.key(['r', 'R'], () => {
-      if (nar) {
+      if (system) {
         isRunning = true;
         status.setContent('{center}▶️ RUNNING | [R] Run [P] Pause [S] Sort [Q] Quit{/center}');
         screen.render();
-        
-        // Start the NAR cycle
-        nar.start();
+
+        // Start the reasoning cycle via system
+        if (system.core && system.core.cycle) {
+          system.core.cycle.resume();
+        }
       }
     });
 
@@ -393,16 +1052,18 @@ async function runDemo(inputText = DEFAULT_INPUT) {
       isRunning = false;
       status.setContent('{center}⏸️ PAUSED | [R] Run [P] Pause [S] Sort [Q] Quit{/center}');
       screen.render();
-      
-      // Stop the NAR cycle
-      nar.stop();
+
+      // Pause the reasoning cycle via system
+      if (system.core && system.core.cycle) {
+        system.core.cycle.pause();
+      }
     });
     
     // Handle exit
     process.on('SIGINT', () => {
       clearInterval(taskUpdateInterval);
-      if (nar) {
-        nar.stop();
+      if (system) {
+        system.stop().catch(console.error);
       }
       process.exit(0);
     });
@@ -410,10 +1071,10 @@ async function runDemo(inputText = DEFAULT_INPUT) {
     // Catch uncaught exceptions
     process.on('uncaughtException', (err) => {
       clearInterval(taskUpdateInterval);
-      if (nar) {
-        nar.stop();
-      }
       console.error('Uncaught Exception:', err);
+      if (system) {
+        system.stop().catch(console.error);
+      }
       process.exit(1);
     });
     
@@ -428,18 +1089,22 @@ function parseArguments() {
   const args = process.argv.slice(2);
   const options = {
     input: DEFAULT_INPUT,
+    provider: DEFAULT_LM_PROVIDER
   };
-  
+
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--input' || args[i] === '-i') {
       options.input = args[i + 1];
       i++; // Skip next argument
+    } else if (args[i] === '--provider' || args[i] === '-p') {
+      options.provider = args[i + 1];
+      i++; // Skip next argument
     }
   }
-  
+
   return options;
 }
 
 // Run the demo with command line arguments
 const options = parseArguments();
-runDemo(options.input).catch(console.error);
+runDemo(options.input, options.provider).catch(console.error);
