@@ -244,6 +244,8 @@ class WebSocketServer extends Component {
     return {
       isRunning: this.isRunning,
       uptime: this.isRunning ? Date.now() - (this.startTime || Date.now()) : 0,
+      subscriptions: this.subscriptions.size,
+      taskStreams: this.streamManager.taskStreams.size,
       ...connectionStats,
       ...streamStats
     };
