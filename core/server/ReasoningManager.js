@@ -71,8 +71,12 @@ class ReasoningManager {
     try {
       if (!this.areComponentsReady()) return;
 
-      const context = new CycleContext(Date.now());
-      runSingleCycle(this.memory, this.reasoner, this.selector, context);
+      // Use the core cycle method if available
+      if (this.core?.cycle?.step) {
+        this.core.cycle.step();
+      } else {
+        WebSocketUtils.warn('Core cycle not available, cannot execute reasoning cycle');
+      }
 
       if (this.cycleCallback) {
         this.cycleCallback();
@@ -105,22 +109,18 @@ class ReasoningManager {
 
   createAndAddTask(taskData) {
     try {
-      const { term, truth } = this.parseTaskContent(taskData.content, taskData.truth);
-
-      const punctuation = taskData.punctuation ||
-        this.inferPunctuation(taskData.content);
-
-      const task = new Task(
-        term,
-        punctuation,
-        truth,
-        taskData.createdAt || Date.now(),
-        taskData.occurrenceTime || Date.now(),
-        taskData.priority || 0.5
-      );
-
-      task.id = taskData.id;
-      this.memory.addTask(task, Date.now());
+      // If we have access to core memory, use its task creation methods
+      if (this.core?.memory?.createTask) {
+        const task = this.core.memory.createTask(taskData);
+        this.core.memory.addTask(task, Date.now());
+      } else if (this.memory?.createTask) {
+        const task = this.memory.createTask(taskData);
+        this.memory.addTask(task, Date.now());
+      } else {
+        // Fallback: add task data directly to memory if it supports that
+        this.memory.addTask(taskData, Date.now());
+      }
+      
       WebSocketUtils.debug(`Loaded task: ${taskData.content}`);
     } catch (taskError) {
       WebSocketUtils.error('Error creating task:', taskError, taskData);
@@ -139,29 +139,99 @@ class ReasoningManager {
   }
 
   createInheritanceTerm(subject, predicate, truthValue) {
-    const subjTerm = Term.newAtom(subject);
-    const predTerm = Term.newAtom(predicate);
-    const term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
+    // If we have access to core memory, delegate to it
+    if (this.core?.memory?.createInheritanceTerm) {
+      return this.core.memory.createInheritanceTerm(subject, predicate, truthValue);
+    } else if (this.memory?.createInheritanceTerm) {
+      return this.memory.createInheritanceTerm(subject, predicate, truthValue);
+    }
+    
+    // Fallback handling for undefined Term objects
+    try {
+      // Check if Term and TermType are defined before using them
+      if (typeof Term !== 'undefined' && typeof TermType !== 'undefined') {
+        const subjTerm = Term.newAtom(subject);
+        const predTerm = Term.newAtom(predicate);
+        const term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
 
-    const truth = this.normalizeTruthValue(truthValue, 0.8, 0.8);
+        const truth = this.normalizeTruthValue(truthValue, 0.8, 0.8);
 
-    return { term, truth };
+        return { term, truth };
+      } else {
+        // Safe fallback if Term is not available
+        return { 
+          term: `(${subject}-->${predicate})`, 
+          truth: truthValue 
+        };
+      }
+    } catch (error) {
+      // Safe fallback if Term is not available or error occurs
+      return { 
+        term: `(${subject}-->${predicate})`, 
+        truth: truthValue 
+      };
+    }
   }
 
   createAtomicTerm(content, truthValue) {
-    const term = Term.newAtom(content);
-    const truth = this.normalizeTruthValue(truthValue, 0.5, 0.5);
+    // If we have access to core memory, delegate to it
+    if (this.core?.memory?.createAtomicTerm) {
+      return this.core.memory.createAtomicTerm(content, truthValue);
+    } else if (this.memory?.createAtomicTerm) {
+      return this.memory.createAtomicTerm(content, truthValue);
+    }
+    
+    // Fallback handling for undefined Term objects
+    try {
+      if (typeof Term !== 'undefined') {
+        const term = Term.newAtom(content);
+        const truth = this.normalizeTruthValue(truthValue, 0.5, 0.5);
 
-    return { term, truth };
+        return { term, truth };
+      } else {
+        // Safe fallback if Term is not available
+        return { 
+          term: content, 
+          truth: truthValue 
+        };
+      }
+    } catch (error) {
+      // Safe fallback if Term is not available or error occurs
+      return { 
+        term: content, 
+        truth: truthValue 
+      };
+    }
   }
 
   normalizeTruthValue(truthValue, defaultFreq, defaultConf) {
+    // If we have access to core memory, delegate to it
+    if (this.core?.memory?.normalizeTruthValue) {
+      return this.core.memory.normalizeTruthValue(truthValue, defaultFreq, defaultConf);
+    } else if (this.memory?.normalizeTruthValue) {
+      return this.memory.normalizeTruthValue(truthValue, defaultFreq, defaultConf);
+    }
+    
     if (!truthValue) {
-      return new TruthValue(defaultFreq, defaultConf);
+      // Check if TruthValue constructor is available
+      if (typeof TruthValue !== 'undefined') {
+        return new TruthValue(defaultFreq, defaultConf);
+      } else {
+        // Return a plain object as fallback
+        return { frequency: defaultFreq, confidence: defaultConf };
+      }
     }
 
     if (typeof truthValue === 'object' && !truthValue.hasOwnProperty('frequency')) {
-      return new TruthValue(truthValue.frequency || defaultFreq, truthValue.confidence || defaultConf);
+      if (typeof TruthValue !== 'undefined') {
+        return new TruthValue(truthValue.frequency || defaultFreq, truthValue.confidence || defaultConf);
+      } else {
+        // Return a plain object as fallback
+        return { 
+          frequency: truthValue.frequency || defaultFreq, 
+          confidence: truthValue.confidence || defaultConf 
+        };
+      }
     }
 
     return truthValue;
@@ -174,26 +244,15 @@ class ReasoningManager {
   }
 
   getInitialTasks() {
-    return [
-      {
-        id: 'task-1',
-        content: '(a-->b).',
-        priority: 0.9,
-        status: 'Input',
-        type: 'Input',
-        createdAt: Date.now(),
-        lastModified: Date.now()
-      },
-      {
-        id: 'task-2',
-        content: '(b-->c).',
-        priority: 0.8,
-        status: 'Input',
-        type: 'Input',
-        createdAt: Date.now(),
-        lastModified: Date.now()
-      }
-    ];
+    // If we have access to core memory, use its initial tasks
+    if (this.core?.memory?.getInitialTasks) {
+      return this.core.memory.getInitialTasks();
+    } else if (this.memory?.getInitialTasks) {
+      return this.memory.getInitialTasks();
+    }
+    
+    // Fallback to default tasks if available
+    return [];
   }
 
   stopReasoningCycle() {

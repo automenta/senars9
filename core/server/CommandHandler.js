@@ -50,6 +50,10 @@ class ServerCommandHandler {
   }
 
   async _handleStartCommand(isSimpleProtocol) {
+    if (this.wss.core?.cycle?.start) {
+      this.wss.core.cycle.start();
+    }
+    
     if (this.wss.yjsManager?.isEnabled()) {
       this.wss.yjsManager.setAwarenessState({
         isRunning: true,
@@ -63,6 +67,10 @@ class ServerCommandHandler {
   }
 
   async _handleStopCommand(isSimpleProtocol) {
+    if (this.wss.core?.cycle?.stop) {
+      this.wss.core.cycle.stop();
+    }
+    
     if (this.wss.yjsManager?.isEnabled()) {
       this.wss.yjsManager.setAwarenessState({
         isRunning: false,
@@ -76,8 +84,12 @@ class ServerCommandHandler {
   }
 
   async _handleStepCommand(isSimpleProtocol) {
-    const context = new CycleContext(Date.now());
-    runSingleCycle(memory, reasoner, selector, context);
+    if (this.wss.core?.cycle?.step) {
+      await this.wss.core.cycle.step();
+    } else {
+      WebSocketUtils.warn('Unable to execute step command: core.cycle.step not available');
+    }
+    
     this.wss.syncMemoryToClients();
 
     if (this.wss.yjsManager?.isEnabled()) {
@@ -99,44 +111,39 @@ class ServerCommandHandler {
   }
 
   async _handleResetCommand() {
-    // Reset memory and reasoning components
-    memory = new Memory();
-    reasoner = new Reasoner();
-    selector = new FocusSetSelector();
-    this.wss.taskDataManager.loadInitialTasksToMemory();
+    // Reset using core components
+    if (this.wss.core?.reset) {
+      this.wss.core.reset();
+    } else {
+      WebSocketUtils.warn('Unable to execute reset command: core.reset not available');
+    }
 
     if (this.wss.yjsManager?.isEnabled()) {
       this.wss.yjsManager.setAwarenessState({
         isRunning: false,
         isPaused: true,
         cycles: 0,
-        concepts: 3,
-        tasks: 2
+        concepts: 0,
+        tasks: 0
       });
 
       this.wss.yjsManager.resetYjsData();
-      // Re-populate Yjs with initial data
-      const resetTasksData = this.wss.taskDataManager.getInitialTasks();
-      resetTasksData.forEach(task => {
-        const taskMap = new this.wss.yjsManager.Y.Map();
-        Object.entries(task).forEach(([key, value]) => taskMap.set(key, value));
-        this.wss.yjsManager.yTasks.push([taskMap]);
-      });
-
-      const resetConceptsData = this.wss.taskDataManager.getInitialConcepts();
-      resetConceptsData.forEach(concept => {
-        const conceptMap = new this.wss.yjsManager.Y.Map();
-        Object.entries(concept).forEach(([key, value]) => conceptMap.set(key, value));
-        this.wss.yjsManager.yConcepts.push([conceptMap]);
-      });
+      // Yjs data will be repopulated from core state
     }
 
     this.wss.broadcastState();
   }
 
   async _handleThrottleCommand(payload, isSimpleProtocol) {
-    if (this.wss.yjsManager?.isEnabled()) {
-      this.wss.yjsManager.setAwarenessState({});
+    if (payload?.value && this.wss.core?.cycle?.throttle) {
+      this.wss.core.cycle.throttle(payload.value);
+      if (this.wss.yjsManager?.isEnabled()) {
+        this.wss.yjsManager.setAwarenessState({
+          throttleValue: payload.value
+        });
+      }
+    } else {
+      WebSocketUtils.warn('Throttle command requires a value and core.cycle.throttle method');
     }
 
     if (isSimpleProtocol) {
@@ -149,15 +156,17 @@ class ServerCommandHandler {
       throw new Error('Add task command failed: missing content');
     }
 
-    const taskId = this.wss.taskDataManager.addTask(payload);
+    if (this.wss.core?.memory?.addTask) {
+      this.wss.core.memory.addTask(payload);
+    } else {
+      WebSocketUtils.warn('Unable to add task: core.memory.addTask not available');
+    }
+    
     this.wss.syncMemoryToClients();
 
-    if (this.wss.yjsManager?.isEnabled()) {
-      const addTaskState = this.wss.yjsManager.getAwarenessState();
-      this.wss.yjsManager.setAwarenessState({
-        ...addTaskState,
-        tasks: this.wss.yjsManager.yTasks.length
-      });
+    if (this.wss.yjsManager?.isEnabled) {
+      const currentState = this.wss.yjsManager.getAwarenessState();
+      this.wss.yjsManager.setAwarenessState(currentState);
     }
   }
 
@@ -167,11 +176,17 @@ class ServerCommandHandler {
       throw new Error('Update task command failed: missing task ID');
     }
 
-    this.wss.taskDataManager.updateTask(taskId, payload);
+    if (this.wss.core?.memory?.updateTask) {
+      this.wss.core.memory.updateTask(taskId, payload);
+    } else {
+      WebSocketUtils.warn(`Unable to update task ${taskId}: core.memory.updateTask not available`);
+    }
+    
     this.wss.syncMemoryToClients();
 
-    if (this.wss.yjsManager?.isEnabled()) {
-      this.wss.yjsManager.setAwarenessState({});
+    if (this.wss.yjsManager?.isEnabled) {
+      const currentState = this.wss.yjsManager.getAwarenessState();
+      this.wss.yjsManager.setAwarenessState(currentState);
     }
   }
 
@@ -181,17 +196,22 @@ class ServerCommandHandler {
       throw new Error('Delete task command failed: missing task ID');
     }
 
-    const removed = this.wss.taskDataManager.deleteTask(taskId);
+    let removed = false;
+    if (this.wss.core?.memory?.deleteTask) {
+      removed = this.wss.core.memory.deleteTask(taskId);
+    } else {
+      WebSocketUtils.warn(`Unable to delete task ${taskId}: core.memory.deleteTask not available`);
+    }
+    
     if (!removed) {
-      throw new Error(`Task with ID ${taskId} not found`);
+      WebSocketUtils.warn(`Task with ID ${taskId} not found`);
     }
 
     this.wss.syncMemoryToClients();
 
-    if (this.wss.yjsManager?.isEnabled()) {
-      this.wss.yjsManager.setAwarenessState({
-        tasks: this.wss.yjsManager.yTasks.length
-      });
+    if (this.wss.yjsManager?.isEnabled) {
+      const currentState = this.wss.yjsManager.getAwarenessState();
+      this.wss.yjsManager.setAwarenessState(currentState);
     }
   }
 

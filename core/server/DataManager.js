@@ -37,21 +37,41 @@ class DataManager {
   }
 
   createTask(taskData) {
+    // If we have access to the core memory system, delegate task creation to it
+    if (this.memory?.createTask) {
+      return this.memory.createTask(taskData);
+    }
+    
+    // Otherwise, use the fallback method
     const { term, truth } = this.parseTaskContent(taskData.content, taskData.truth);
 
     const punctuation = taskData.punctuation || this.inferPunctuation(taskData.content);
 
-    const task = new Task(
-      term,
-      punctuation,
-      truth,
-      taskData.createdAt || Date.now(),
-      taskData.occurrenceTime || Date.now(),
-      taskData.priority || 0.5
-    );
-
-    task.id = taskData.id;
-    return task;
+    // If we have access to core memory, we can try to import these from there
+    if (this.memory?.createTaskFromData) {
+      return this.memory.createTaskFromData({
+        term,
+        punctuation,
+        truth,
+        createdAt: taskData.createdAt,
+        occurrenceTime: taskData.occurrenceTime,
+        priority: taskData.priority,
+        id: taskData.id
+      });
+    }
+    
+    // Fallback - return task data object instead of creating actual task
+    return {
+      id: taskData.id || randomUUID(),
+      content: taskData.content,
+      priority: taskData.priority || 0.5,
+      status: taskData.status || 'Input',
+      type: taskData.type || 'Input',
+      createdAt: taskData.createdAt || Date.now(),
+      lastModified: Date.now(),
+      punctuation: punctuation,
+      truth: truth
+    };
   }
 
   parseTaskContent(content, truthValue = null) {
@@ -66,29 +86,93 @@ class DataManager {
   }
 
   createInheritanceTerm(subject, predicate, truthValue) {
-    const subjTerm = Term.newAtom(subject);
-    const predTerm = Term.newAtom(predicate);
-    const term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
+    // If we have access to memory system, delegate to it
+    if (this.memory?.createInheritanceTerm) {
+      return this.memory.createInheritanceTerm(subject, predicate, truthValue);
+    }
+    
+    // Fallback handling for undefined Term objects
+    try {
+      // Check if Term and TermType are defined before using them
+      if (typeof Term !== 'undefined' && typeof TermType !== 'undefined') {
+        const subjTerm = Term.newAtom(subject);
+        const predTerm = Term.newAtom(predicate);
+        const term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
 
-    const truth = this.normalizeTruthValue(truthValue, 0.8, 0.8);
+        const truth = this.normalizeTruthValue(truthValue, 0.8, 0.8);
 
-    return { term, truth };
+        return { term, truth };
+      } else {
+        // Safe fallback if Term is not available
+        return { 
+          term: `(${subject}-->${predicate})`, 
+          truth: truthValue 
+        };
+      }
+    } catch (error) {
+      // Safe fallback if Term is not available or error occurs
+      return { 
+        term: `(${subject}-->${predicate})`, 
+        truth: truthValue 
+      };
+    }
   }
 
   createAtomicTerm(content, truthValue) {
-    const term = Term.newAtom(content);
-    const truth = this.normalizeTruthValue(truthValue, 0.5, 0.5);
+    // If we have access to memory system, delegate to it
+    if (this.memory?.createAtomicTerm) {
+      return this.memory.createAtomicTerm(content, truthValue);
+    }
+    
+    // Fallback handling for undefined Term objects
+    try {
+      if (typeof Term !== 'undefined') {
+        const term = Term.newAtom(content);
+        const truth = this.normalizeTruthValue(truthValue, 0.5, 0.5);
 
-    return { term, truth };
+        return { term, truth };
+      } else {
+        // Safe fallback if Term is not available
+        return { 
+          term: content, 
+          truth: truthValue 
+        };
+      }
+    } catch (error) {
+      // Safe fallback if Term is not available or error occurs
+      return { 
+        term: content, 
+        truth: truthValue 
+      };
+    }
   }
 
   normalizeTruthValue(truthValue, defaultFreq, defaultConf) {
+    // If we have access to memory system, delegate to it
+    if (this.memory?.normalizeTruthValue) {
+      return this.memory.normalizeTruthValue(truthValue, defaultFreq, defaultConf);
+    }
+    
     if (!truthValue) {
-      return new TruthValue(defaultFreq, defaultConf);
+      // Check if TruthValue constructor is available
+      if (typeof TruthValue !== 'undefined') {
+        return new TruthValue(defaultFreq, defaultConf);
+      } else {
+        // Return a plain object as fallback
+        return { frequency: defaultFreq, confidence: defaultConf };
+      }
     }
 
     if (typeof truthValue === 'object' && !truthValue.hasOwnProperty('frequency')) {
-      return new TruthValue(truthValue.frequency || defaultFreq, truthValue.confidence || defaultConf);
+      if (typeof TruthValue !== 'undefined') {
+        return new TruthValue(truthValue.frequency || defaultFreq, truthValue.confidence || defaultConf);
+      } else {
+        // Return a plain object as fallback
+        return { 
+          frequency: truthValue.frequency || defaultFreq, 
+          confidence: truthValue.confidence || defaultConf 
+        };
+      }
     }
 
     return truthValue;
@@ -227,41 +311,50 @@ class DataManager {
   }
 
   getInitialTasks() {
-    return [
-      {
-        id: 'task-1',
-        content: '(a-->b).',
-        priority: 0.9,
-        status: 'Input',
-        type: 'Input',
-        createdAt: Date.now(),
-        lastModified: Date.now()
-      },
-      {
-        id: 'task-2',
-        content: '(b-->c).',
-        priority: 0.8,
-        status: 'Input',
-        type: 'Input',
-        createdAt: Date.now(),
-        lastModified: Date.now()
-      }
-    ];
+    if (this.memory?.getInitialTasks) {
+      return this.memory.getInitialTasks();
+    } else if (this.memory?.getTopTasks) {
+      const topTasks = this.memory.getTopTasks(20);
+      return topTasks.map(task => ({
+        id: task.id || `task-${Date.now()}`,
+        content: task.toString ? task.toString() : (task.content || 'Unknown Task'),
+        priority: task.getPriority ? task.getPriority() : (task.priority || 0.5),
+        status: task.status || 'Derived',
+        type: task.isBelief ? (task.isBelief() ? 'Belief' : task.isGoal() ? 'Goal' : 'Question') : (task.type || 'Derived'),
+        createdAt: task.createdAt || Date.now(),
+        lastModified: task.getAccessedAt ? task.getAccessedAt() : Date.now(),
+        punctuation: task.punctuation || '.',
+        truth: task.truth || null,
+        occurrenceTime: task.occurrenceTime || Date.now(),
+        derivationPath: task.derivationPath || []
+      }));
+    }
+    return [];
   }
 
   getInitialConcepts() {
-    return [
-      { id: 'concept-a', content: 'a', priority: 0.9 },
-      { id: 'concept-b', content: 'b', priority: 0.8 },
-      { id: 'concept-c', content: 'c', priority: 0.7 }
-    ];
+    if (this.memory?.getInitialConcepts) {
+      return this.memory.getInitialConcepts();
+    } else if (this.memory?.getTopConcepts) {
+      const topConcepts = this.memory.getTopConcepts(20);
+      return topConcepts.map(concept => ({
+        id: concept.id || `concept-${Date.now()}`,
+        content: concept.term?.toString() || concept.concept?.term?.toString() || concept.term || 'Unknown Concept',
+        priority: concept.priority || 0,
+        name: concept.term?.toString() || concept.concept?.term?.toString() || concept.term || 'Unknown Concept',
+        type: concept.term?.termType || 'concept',
+        taskCount: concept.taskCount || 0,
+        createdAt: concept.createdAt || Date.now()
+      }));
+    }
+    return [];
   }
 
   getInitialLogs() {
-    return [
-      { id: 'log-1', message: 'System initialized', timestamp: Date.now() },
-      { id: 'log-2', message: 'Initial tasks loaded: (a-->b)., (b-->c).', timestamp: Date.now() }
-    ];
+    if (this.memory?.logs) {
+      return this.memory.logs.getRecentLogs ? this.memory.logs.getRecentLogs(20) : [];
+    }
+    return [];
   }
 
   // Cleanup

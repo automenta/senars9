@@ -1,13 +1,13 @@
 import { WebSocketServer as WSServer } from 'ws';
 import { createServer } from 'http';
-import Component from '../base/Component.js';
+import BaseServer from './BaseServer.js';
 import { WebSocketUtils, DEFAULTS } from './WebSocketUtils.js';
 
 import MessageHandler from './MessageHandler.js';
 import ConnectionManager from './ConnectionManager.js';
 import StreamManager from './StreamManager.js';
 
-class WebSocketServer extends Component {
+class WebSocketServer extends BaseServer {
   constructor(core, options = {}) {
     super();
     this.core = core;
@@ -70,10 +70,8 @@ class WebSocketServer extends Component {
           WebSocketUtils.handleError(`starting WebSocket server on ${host}:${port}`, error);
           reject(error);
         } else {
-          this.isRunning = true;
-          this.startTime = Date.now();
+          this.onServerStart(port, host); // Use parent class method
           this.connectionManager.startHeartbeat();
-          WebSocketUtils.debug(`WebSocket server running on ws://${host}:${port}`);
           resolve();
         }
       });
@@ -111,16 +109,10 @@ class WebSocketServer extends Component {
 
     return new Promise((resolve) => {
       try {
-        for (const [clientId, client] of this.clients) {
-          client.ws?.close(1000, 'Server shutting down');
-        }
-        this.clients.clear();
-
+        this.closeAllClients(); // Use parent class method
         this.wss.close(() => {
-          this.server.close(() => {
-            this.isRunning = false;
-            this.cleanup();
-            WebSocketUtils.debug('WebSocket server stopped');
+          this.closeServers(() => { // Use parent class method
+            this.onServerStop(); // Use parent class method
             resolve();
           });
         });
@@ -131,34 +123,16 @@ class WebSocketServer extends Component {
     });
   }
 
-  sendToClient(clientId, message) {
-    const client = this.clients.get(clientId);
-    if (WebSocketUtils.isValidClient(client)) {
-      try {
-        client.ws.send(JSON.stringify(message));
-      } catch (error) {
-        WebSocketUtils.handleError('sending message', error, clientId);
-      }
-    }
-  }
+
 
   broadcast(message, excludeClients = []) {
     if (this.simpleMode && typeof message !== 'object') {
-      // In simple mode, wrap primitive messages
+      // In simple mode, wrap primitive messages - specific to WebSocketServer
       message = WebSocketUtils.createMessage('broadcast', { system: true, data: message });
     }
 
-    const excludeSet = new Set(excludeClients);
-
-    for (const [clientId, client] of this.clients) {
-      if (!excludeSet.has(clientId) && WebSocketUtils.isValidClient(client)) {
-        try {
-          client.ws.send(JSON.stringify(message));
-        } catch (error) {
-          WebSocketUtils.handleError('broadcasting', error, clientId);
-        }
-      }
-    }
+    // Call parent broadcast method
+    super.broadcast(message, excludeClients);
   }
 
   // Simple mode message handler for basic echo functionality
@@ -170,24 +144,14 @@ class WebSocketServer extends Component {
 
     try {
       // Echo message back for testing
-      this.sendToClient(clientId, WebSocketUtils.createResponse('echo', 'success', message));
+      this.sendToClient(clientId, WebSocketUtils.createSuccessResponse('echo', message));
     } catch (error) {
       WebSocketUtils.handleError('handling simple message', error, clientId);
-      this.sendToClient(clientId, WebSocketUtils.createResponse('echo', 'error', { message: error.message || error }));
+      this.sendToClient(clientId, WebSocketUtils.createErrorResponse('echo', { message: error.message || error }));
     }
   }
 
-  sendToClientType(clientType, message) {
-    for (const [clientId, client] of this.clients) {
-      if (client.type === clientType && WebSocketUtils.isValidClient(client)) {
-        try {
-          client.ws.send(JSON.stringify(message));
-        } catch (error) {
-          WebSocketUtils.handleError(`sending to client type ${clientType}`, error, clientId);
-        }
-      }
-    }
-  }
+
 
   _handleConnection(ws, request) {
     const clientId = this.connectionManager.handleConnection(ws, request);
@@ -198,25 +162,35 @@ class WebSocketServer extends Component {
     this.connectionManager.sendCurrentState(clientId);
   }
 
-  // Delegation methods
+  // Delegation methods - these override the BaseServer implementations to use StreamManager
    subscribeToTaskStream(clientId, taskId) {
-     return this.streamManager.subscribeToTaskStream(clientId, taskId);
+     if (this.streamManager) {
+       return this.streamManager.subscribeToTaskStream(clientId, taskId);
+     }
+     // Fallback to parent implementation if no streamManager
+     return super.subscribeToTaskStream(clientId, taskId);
    }
 
    publishTaskUpdate(taskId, updateData) {
-     return this.streamManager.publishTaskUpdate(taskId, updateData);
+     if (this.streamManager) {
+       return this.streamManager.publishTaskUpdate(taskId, updateData);
+     }
+     // Fallback to parent implementation if no streamManager
+     return super.publishTaskUpdate(taskId, updateData);
    }
 
    publishEvent(eventType, data, filters = {}) {
-     return this.streamManager.publishEvent(eventType, data, filters);
+     if (this.streamManager) {
+       return this.streamManager.publishEvent(eventType, data, filters);
+     }
+     // Fallback to parent implementation if no streamManager
+     return super.publishEvent(eventType, data, filters);
    }
 
   cleanup() {
     this.connectionManager.cleanup();
     this.streamManager.cleanup();
-    if (this.simpleMode) {
-      this.simpleClients.clear();
-    }
+    super.cleanup(); // Call parent cleanup
   }
 
   // Factory method to create a simple WebSocket server

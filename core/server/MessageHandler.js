@@ -122,7 +122,7 @@ class MessageHandler {
   _handleTaskSubscription(clientId, message) {
     const success = this.wss.streamManager.subscribeToTaskStream(clientId, message.taskId);
     if (success) {
-      this.wss.sendToClient(clientId, MessageFactory.createResponse(
+      this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
         MESSAGE_TYPES.SUBSCRIPTION_SUCCESS,
         { taskId: message.taskId }
       ));

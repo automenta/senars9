@@ -172,7 +172,12 @@ class StreamManager {
     };
     stream.history.push(historyEntry);
 
-    const broadcastMessage = MessageFactory.createTaskUpdateMessage(taskId, data, clientId);
+    const broadcastMessage = WebSocketUtils.createTaskMessage(
+      MESSAGE_TYPES.TASK_UPDATE,
+      taskId,
+      data,
+      clientId
+    );
     this.wss.broadcast(broadcastMessage, [clientId]);
   }
 

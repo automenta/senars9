@@ -26,7 +26,7 @@ class FullFeaturedServer extends WebSocketServerBase {
 
   syncMemoryToClients() {
     try {
-      const allMemoryTasks = memory?.getAllTasks ? memory.getAllTasks() : [];
+      const allMemoryTasks = this.core?.memory?.getAllTasks ? this.core.memory.getAllTasks() : [];
       if (!Array.isArray(allMemoryTasks) || allMemoryTasks.length === 0) return;
 
       const tasksData = allMemoryTasks.map((task, index) => {
@@ -67,15 +67,32 @@ class FullFeaturedServer extends WebSocketServerBase {
 
 
   startReasoningCycle() {
-    memory = new Memory();
-    reasoner = new Reasoner();
-    selector = new FocusSetSelector();
+    // Use core components instead of creating new instances
+    if (this.core) {
+      this.memory = this.core.memory;
+      this.reasoner = this.core.reasoner;
+      this.selector = this.core.selector;
+    } else {
+      // Fallback for standalone operation
+      import('./reasoning/Memory.js').then(({ default: Memory }) => {
+        this.memory = new Memory();
+      }).catch(err => {
+        WebSocketUtils.error('Failed to import Memory:', err);
+      });
+      import('./reasoning/Reasoner.js').then(({ default: Reasoner }) => {
+        this.reasoner = new Reasoner();
+      }).catch(err => {
+        WebSocketUtils.error('Failed to import Reasoner:', err);
+      });
+    }
 
     import('./reasoning/SyllogisticRules.js').then(({ DeductiveSyllogism, Induction, Abduction }) => {
-      reasoner.addRule(new DeductiveSyllogism());
-      reasoner.addRule(new Induction());
-      reasoner.addRule(new Abduction());
-      WebSocketUtils.debug('Reasoning rules registered for task derivation');
+      if (this.reasoner) {
+        this.reasoner.addRule(new DeductiveSyllogism());
+        this.reasoner.addRule(new Induction());
+        this.reasoner.addRule(new Abduction());
+        WebSocketUtils.debug('Reasoning rules registered for task derivation');
+      }
     }).catch(err => {
       WebSocketUtils.error('Failed to import reasoning rules:', err);
     });
@@ -83,8 +100,11 @@ class FullFeaturedServer extends WebSocketServerBase {
     this.loadInitialTasksToMemory();
 
     reasoningInterval = setInterval(() => {
-      const context = new CycleContext(Date.now());
-      runSingleCycle(memory, reasoner, selector, context);
+      if (this.core?.cycle?.step) {
+        this.core.cycle.step();
+      } else {
+        WebSocketUtils.warn('Core cycle not available, cannot run reasoning cycle');
+      }
       this.syncMemoryToClients();
     }, 1000);
   }
@@ -108,38 +128,67 @@ class FullFeaturedServer extends WebSocketServerBase {
           if (impMatch) {
             const subject = impMatch[1].trim();
             const predicate = impMatch[2].trim();
-            const subjTerm = Term.newAtom(subject);
-            const predTerm = Term.newAtom(predicate);
-            term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
+            if (typeof Term !== 'undefined' && typeof TermType !== 'undefined') {
+              const subjTerm = Term.newAtom(subject);
+              const predTerm = Term.newAtom(predicate);
+              term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
+            } else {
+              term = `(${subject}-->${predicate})`;
+            }
 
             if (!truth) {
-              truth = new TruthValue(0.8, 0.8);
+              truth = typeof TruthValue !== 'undefined' ? new TruthValue(0.8, 0.8) : { frequency: 0.8, confidence: 0.8 };
             } else if (typeof truth === 'object' && !truth.hasOwnProperty('frequency')) {
-              truth = new TruthValue(truth.frequency || 0.8, truth.confidence || 0.8);
+              truth = typeof TruthValue !== 'undefined' 
+                ? new TruthValue(truth.frequency || 0.8, truth.confidence || 0.8)
+                : { frequency: truth.frequency || 0.8, confidence: truth.confidence || 0.8 };
             }
           } else {
-            term = Term.newAtom(content);
+            term = typeof Term !== 'undefined' ? Term.newAtom(content) : content;
             if (!truth) {
-              truth = new TruthValue(0.5, 0.5);
+              truth = typeof TruthValue !== 'undefined' ? new TruthValue(0.5, 0.5) : { frequency: 0.5, confidence: 0.5 };
             } else if (typeof truth === 'object' && !truth.hasOwnProperty('frequency')) {
-              truth = new TruthValue(truth.frequency || 0.5, truth.confidence || 0.5);
+              truth = typeof TruthValue !== 'undefined' 
+                ? new TruthValue(truth.frequency || 0.5, truth.confidence || 0.5)
+                : { frequency: truth.frequency || 0.5, confidence: truth.confidence || 0.5 };
             }
           }
 
           const punctuation = taskData.punctuation ||
             (taskData.content.endsWith('!') ? '!' : taskData.content.endsWith('?') ? '?' : '.');
 
-          const task = new Task(
-            term,
-            punctuation,
-            truth,
-            taskData.createdAt || Date.now(),
-            taskData.occurrenceTime || Date.now(),
-            taskData.priority || 0.5
-          );
+          const task = typeof Task !== 'undefined' 
+            ? new Task(
+                term,
+                punctuation,
+                truth,
+                taskData.createdAt || Date.now(),
+                taskData.occurrenceTime || Date.now(),
+                taskData.priority || 0.5
+              )
+            : {
+                id: taskData.id,
+                content: taskData.content,
+                priority: taskData.priority || 0.5,
+                status: taskData.status || 'Input',
+                type: taskData.type || 'Input',
+                createdAt: taskData.createdAt || Date.now(),
+                lastModified: Date.now(),
+                punctuation: punctuation,
+                truth: truth
+              };
 
           task.id = taskData.id;
-          memory.addTask(task, Date.now());
+          
+          // Use core memory instead of direct memory reference
+          if (this.core?.memory?.addTask) {
+            this.core.memory.addTask(task, Date.now());
+          } else if (this.memory?.addTask) {
+            this.memory.addTask(task, Date.now());
+          } else {
+            // Log warning if no memory available
+            WebSocketUtils.warn(`Could not add task: ${taskData.content} - no memory available`);
+          }
           WebSocketUtils.debug(`Loaded task into memory: ${taskData.content}`);
         } catch (taskError) {
           WebSocketUtils.error('Error creating task:', taskError, taskData);
@@ -178,45 +227,55 @@ class FullFeaturedServer extends WebSocketServerBase {
     });
   }
 
-  // Get initial tasks data
+  // Get initial tasks data from core memory
   getInitialTasks() {
-    return [
-      {
-        id: 'task-1',
-        content: '(a-->b).',
-        priority: 0.9,
-        status: 'Input',
-        type: 'Input',
-        createdAt: Date.now(),
-        lastModified: Date.now()
-      },
-      {
-        id: 'task-2',
-        content: '(b-->c).',
-        priority: 0.8,
-        status: 'Input',
-        type: 'Input',
-        createdAt: Date.now(),
-        lastModified: Date.now()
-      }
-    ];
+    if (this.core?.memory?.getInitialTasks) {
+      return this.core.memory.getInitialTasks();
+    } else if (this.core?.memory?.getTopTasks) {
+      const topTasks = this.core.memory.getTopTasks(20);
+      return topTasks.map(task => ({
+        id: task.id || `task-${Date.now()}`,
+        content: task.toString ? task.toString() : (task.content || 'Unknown Task'),
+        priority: task.getPriority ? task.getPriority() : (task.priority || 0.5),
+        status: task.status || 'Derived',
+        type: task.isBelief ? (task.isBelief() ? 'Belief' : task.isGoal() ? 'Goal' : 'Question') : (task.type || 'Derived'),
+        createdAt: task.createdAt || Date.now(),
+        lastModified: task.getAccessedAt ? task.getAccessedAt() : Date.now(),
+        punctuation: task.punctuation || '.',
+        truth: task.truth || null,
+        occurrenceTime: task.occurrenceTime || Date.now(),
+        derivationPath: task.derivationPath || []
+      }));
+    }
+    return [];
   }
 
-  // Get initial concepts data
+  // Get initial concepts data from core memory
   getInitialConcepts() {
-    return [
-      { id: 'concept-a', content: 'a', priority: 0.9 },
-      { id: 'concept-b', content: 'b', priority: 0.8 },
-      { id: 'concept-c', content: 'c', priority: 0.7 }
-    ];
+    if (this.core?.memory?.getInitialConcepts) {
+      return this.core.memory.getInitialConcepts();
+    } else if (this.core?.memory?.getTopConcepts) {
+      const topConcepts = this.core.memory.getTopConcepts(20);
+      return topConcepts.map(concept => ({
+        id: concept.id || `concept-${Date.now()}`,
+        content: concept.term?.toString() || concept.concept?.term?.toString() || concept.term || 'Unknown Concept',
+        priority: concept.priority || 0,
+        name: concept.term?.toString() || concept.concept?.term?.toString() || concept.term || 'Unknown Concept',
+        type: concept.term?.termType || 'concept',
+        taskCount: concept.taskCount || 0,
+        createdAt: concept.createdAt || Date.now()
+      }));
+    }
+    return [];
   }
 
   // Get initial logs data
   getInitialLogs() {
-    return [
-      { id: 'log-1', message: 'System initialized', timestamp: Date.now() },
-      { id: 'log-2', message: 'Initial tasks loaded: (a-->b)., (b-->c).', timestamp: Date.now() }
-    ];
+    // Return empty array or get from core if available
+    if (this.core?.logs) {
+      return this.core.logs.getRecentLogs ? this.core.logs.getRecentLogs(20) : [];
+    }
+    return [];
   }
 
   loadInitialData() {
@@ -237,6 +296,10 @@ class FullFeaturedServer extends WebSocketServerBase {
       switch (command) {
         case 'start':
           WebSocketUtils.debug('Start command received');
+          if (this.core?.cycle?.start) {
+            this.core.cycle.start();
+          }
+          
           if (this.yjsManager.isEnabled()) {
             this.yjsManager.setAwarenessState({
               isRunning: true,
@@ -250,6 +313,10 @@ class FullFeaturedServer extends WebSocketServerBase {
           break;
         case 'stop':
           WebSocketUtils.debug('Stop command received');
+          if (this.core?.cycle?.stop) {
+            this.core.cycle.stop();
+          }
+          
           if (this.yjsManager.isEnabled()) {
             this.yjsManager.setAwarenessState({
               isRunning: false,
@@ -263,8 +330,11 @@ class FullFeaturedServer extends WebSocketServerBase {
           break;
         case 'step':
           WebSocketUtils.debug('Step command received - executing single cognitive cycle');
-          const context = new CycleContext(Date.now());
-          runSingleCycle(memory, reasoner, selector, context);
+          if (this.core?.cycle?.step) {
+            this.core.cycle.step();
+          } else {
+            WebSocketUtils.warn('Unable to execute step: core.cycle.step not available');
+          }
           this.syncMemoryToClients();
 
           if (this.yjsManager.isEnabled()) {
@@ -286,9 +356,11 @@ class FullFeaturedServer extends WebSocketServerBase {
           break;
         case 'reset':
           WebSocketUtils.debug('Reset command received');
-          memory = new Memory();
-          reasoner = new Reasoner();
-          selector = new FocusSetSelector();
+          if (this.core?.reset) {
+            this.core.reset();
+          } else {
+            WebSocketUtils.warn('Unable to execute reset: core.reset not available');
+          }
           this.loadInitialTasksToMemory();
 
           if (this.yjsManager.isEnabled()) {
@@ -296,34 +368,12 @@ class FullFeaturedServer extends WebSocketServerBase {
               isRunning: false,
               isPaused: true,
               cycles: 0,
-              concepts: 3,
-              tasks: 2
+              concepts: 0,
+              tasks: 0
             });
 
             this.yjsManager.resetYjsData();
-
-            const resetTasksData = [
-              { id: 'task-1', content: '(a-->b).', priority: 0.9, status: 'Input', type: 'Input', createdAt: Date.now(), lastModified: Date.now() },
-              { id: 'task-2', content: '(b-->c).', priority: 0.8, status: 'Input', type: 'Input', createdAt: Date.now(), lastModified: Date.now() }
-            ];
-
-            resetTasksData.forEach(task => {
-              const taskMap = new this.yjsManager.Y.Map();
-              Object.entries(task).forEach(([key, value]) => taskMap.set(key, value));
-              this.yjsManager.yTasks.push([taskMap]);
-            });
-
-            const resetConceptsData = [
-              { id: 'concept-a', content: 'a', priority: 0.9 },
-              { id: 'concept-b', content: 'b', priority: 0.8 },
-              { id: 'concept-c', content: 'c', priority: 0.7 }
-            ];
-
-            resetConceptsData.forEach(concept => {
-              const conceptMap = new this.yjsManager.Y.Map();
-              Object.entries(concept).forEach(([key, value]) => conceptMap.set(key, value));
-              this.yjsManager.yConcepts.push([conceptMap]);
-            });
+            // Yjs data will be repopulated from core state
           }
 
           this.broadcastState();
@@ -349,48 +399,17 @@ class FullFeaturedServer extends WebSocketServerBase {
             return;
           }
 
-          const newTaskData = {
-            id: randomUUID(),
-            content: payload.content,
-            priority: typeof payload.priority === 'number' ? Math.max(0, Math.min(1, payload.priority)) : 0.5,
-            status: payload.status || 'Input',
-            type: payload.type || 'Input',
-            createdAt: Date.now(),
-            lastModified: Date.now(),
-            dependencies: Array.isArray(payload.dependencies) ? payload.dependencies : [],
-            metadata: typeof payload.metadata === 'object' ? payload.metadata : {}
-          };
+          if (this.core?.memory?.addTask) {
+            this.core.memory.addTask(payload);
+          } else {
+            WebSocketUtils.warn('Unable to add task: core.memory.addTask not available');
+          }
+          
+          this.syncMemoryToClients();
 
-          try {
-            let term;
-            let truth = new TruthValue(0.8, 0.8);
-            const content = newTaskData.content.replace(/[.!?:]+$/, '').trim();
-
-            const impMatch = content.match(/\(([^(]+)-->([^)]+)\)/);
-            if (impMatch) {
-              const subject = impMatch[1].trim();
-              const predicate = impMatch[2].trim();
-              const subjTerm = Term.newAtom(subject);
-              const predTerm = Term.newAtom(predicate);
-              term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
-            } else {
-              term = Term.newAtom(content);
-            }
-
-            const task = new Task(term, '.', truth, newTaskData.createdAt, newTaskData.createdAt, newTaskData.priority);
-            task.id = newTaskData.id;
-            memory.addTask(task, Date.now());
-            this.syncMemoryToClients();
-
-            if (this.yjsManager.isEnabled()) {
-              const addTaskState = this.yjsManager.getAwarenessState();
-              this.yjsManager.setAwarenessState({
-                ...addTaskState,
-                tasks: this.yjsManager.yTasks.length
-              });
-            }
-          } catch (error) {
-            WebSocketUtils.error('Error adding task to memory:', error);
+          if (this.yjsManager.isEnabled()) {
+            const currentState = this.yjsManager.getAwarenessState();
+            this.yjsManager.setAwarenessState(currentState);
           }
           break;
         case 'update_task':
@@ -401,33 +420,16 @@ class FullFeaturedServer extends WebSocketServerBase {
             return;
           }
 
-          const taskToUpdate = memory.getTask(updateTaskId);
-          if (taskToUpdate) {
-            const allowedFields = ['priority', 'status', 'type', 'content'];
-            for (const [key, value] of Object.entries(payload)) {
-              if (allowedFields.includes(key) && key !== 'id') {
-                if (key === 'priority') {
-                  taskToUpdate.priority = Math.max(0, Math.min(1, value));
-                } else {
-                  taskToUpdate[key] = value;
-                }
-              }
-            }
-
-            if (taskToUpdate.setAccessedAt) {
-              taskToUpdate.setAccessedAt(Date.now());
-            }
-
+          if (this.core?.memory?.updateTask) {
+            this.core.memory.updateTask(updateTaskId, payload);
             this.syncMemoryToClients();
 
             if (this.yjsManager.isEnabled()) {
               const updateTaskState = this.yjsManager.getAwarenessState();
-              this.yjsManager.setAwarenessState({
-                ...updateTaskState
-              });
+              this.yjsManager.setAwarenessState(updateTaskState);
             }
           } else {
-            WebSocketUtils.error(`Update task command failed: task with ID ${updateTaskId} not found`);
+            WebSocketUtils.warn(`Unable to update task ${updateTaskId}: core.memory.updateTask not available`);
           }
           break;
         case 'delete_task':
@@ -438,25 +440,28 @@ class FullFeaturedServer extends WebSocketServerBase {
             return;
           }
 
-          const removed = memory.removeTask(removeTaskId);
+          let removed = false;
+          if (this.core?.memory?.deleteTask) {
+            removed = this.core.memory.deleteTask(removeTaskId);
+          } else {
+            WebSocketUtils.warn(`Unable to delete task ${removeTaskId}: core.memory.deleteTask not available`);
+          }
+
           if (removed) {
             this.syncMemoryToClients();
 
             if (this.yjsManager.isEnabled()) {
               const deleteTaskState = this.yjsManager.getAwarenessState();
-              this.yjsManager.setAwarenessState({
-                ...deleteTaskState,
-                tasks: this.yjsManager.yTasks.length
-              });
+              this.yjsManager.setAwarenessState(deleteTaskState);
             }
           } else {
-            WebSocketUtils.error(`Delete task command failed: task with ID ${removeTaskId} not found`);
+            WebSocketUtils.warn(`Delete task command: task with ID ${removeTaskId} not found`);
           }
           break;
         case 'get_concepts':
           WebSocketUtils.debug('Get concepts command received');
-          if (memory && memory.getTopConcepts) {
-            const topConcepts = memory.getTopConcepts(20);
+          if (this.core?.memory?.getTopConcepts) {
+            const topConcepts = this.core.memory.getTopConcepts(20);
             const conceptsData = topConcepts.map((item, index) => ({
               id: item.id || `concept-${index}`,
               content: item.term?.name || item.concept?.term?.name || `Concept-${index}`,
@@ -480,8 +485,8 @@ class FullFeaturedServer extends WebSocketServerBase {
           break;
         case 'get_top_tasks':
           WebSocketUtils.debug('Get top tasks command received');
-          if (memory && memory.getTopTasks) {
-            const topTasks = memory.getTopTasks(20);
+          if (this.core?.memory?.getTopTasks) {
+            const topTasks = this.core.memory.getTopTasks(20);
             const tasksData = topTasks.map((task, index) => ({
               id: task.id || `task-${Date.now()}-${index}`,
               content: task.toString ? task.toString() : (task.content || `Task-${index}`),
