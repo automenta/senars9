@@ -1,13 +1,14 @@
 import { EventEmitter } from 'events';
+import { WebSocketUtils, DEFAULTS, MESSAGE_TYPES } from '../core/WebSocketUtils.js';
 
 class WebSocketClient extends EventEmitter {
   constructor(url, options = {}) {
     super();
     this.url = url;
     this.options = {
-      reconnectInterval: 3000,
+      reconnectInterval: DEFAULTS.HEARTBEAT_INTERVAL,
       maxReconnectAttempts: 10,
-      heartbeatInterval: 30000,
+      heartbeatInterval: DEFAULTS.HEARTBEAT_INTERVAL,
       ...options
     };
 
@@ -18,21 +19,15 @@ class WebSocketClient extends EventEmitter {
     this.heartbeatTimer = null;
     this.subscriptions = new Set();
     this.messageQueue = [];
+    this.clientId = null;
+    this.connectionId = null;
   }
 
   async connect() {
     if (this.isConnected || this.ws) return;
 
     try {
-      // Use WebSocket in browser, ws in Node.js
-      let WebSocketClass;
-      if (typeof window !== 'undefined') {
-        WebSocketClass = WebSocket;
-      } else {
-        const wsModule = await import('ws');
-        WebSocketClass = wsModule.default;
-      }
-
+      const WebSocketClass = await this._getWebSocketClass();
       this.ws = new WebSocketClass(this.url);
 
       this.ws.onopen = () => this._handleOpen();
@@ -45,14 +40,22 @@ class WebSocketClient extends EventEmitter {
     }
   }
 
+  async _getWebSocketClass() {
+    if (typeof window !== 'undefined') {
+      return WebSocket;
+    }
+
+    const wsModule = await import('ws');
+    return wsModule.default;
+  }
+
   _handleOpen() {
     this.isConnected = true;
     this.reconnectAttempts = 0;
     this.emit('connected');
 
     // Send queued messages
-    this.messageQueue.forEach(message => this.send(message));
-    this.messageQueue = [];
+    this._processMessageQueue();
 
     // Start heartbeat
     this._startHeartbeat();
@@ -60,16 +63,39 @@ class WebSocketClient extends EventEmitter {
 
   _handleMessage(event) {
     try {
-      const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      const message = WebSocketUtils.validateMessage(event.data);
       this.emit('message', message);
 
       // Handle specific message types
       if (message.type) {
-        this.emit(message.type, message);
+        this._handleMessageType(message);
       }
     } catch (error) {
       this.emit('error', new Error(`Failed to parse message: ${error.message}`));
     }
+  }
+
+  _handleMessageType(message) {
+    this.emit(message.type, message);
+
+    // Handle special message types
+    switch (message.type) {
+      case MESSAGE_TYPES.WELCOME:
+        this._handleWelcome(message);
+        break;
+      case MESSAGE_TYPES.HEARTBEAT:
+        this._handleHeartbeat(message);
+        break;
+    }
+  }
+
+  _handleWelcome(message) {
+    this.clientId = message.clientId;
+    this.connectionId = message.connectionId;
+  }
+
+  _handleHeartbeat(message) {
+    // Respond to heartbeat if needed
   }
 
   _handleClose(event) {
@@ -87,7 +113,17 @@ class WebSocketClient extends EventEmitter {
     this.emit('error', error);
   }
 
+  _processMessageQueue() {
+    this.messageQueue.forEach(message => this.send(message));
+    this.messageQueue = [];
+  }
+
   _scheduleReconnect() {
+    if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
+      this.emit('error', new Error('Max reconnection attempts reached'));
+      return;
+    }
+
     this.reconnectAttempts++;
     this.emit('reconnecting', this.reconnectAttempts);
 
@@ -97,9 +133,11 @@ class WebSocketClient extends EventEmitter {
   }
 
   _startHeartbeat() {
+    this._stopHeartbeat(); // Clear any existing timer
+
     this.heartbeatTimer = setInterval(() => {
       if (this.isConnected) {
-        this.send({ type: 'heartbeat' });
+        this.send(WebSocketUtils.createHeartbeatMessage());
       }
     }, this.options.heartbeatInterval);
   }
@@ -123,8 +161,13 @@ class WebSocketClient extends EventEmitter {
       }
     } else {
       // Queue message for when connection is established
-      this.messageQueue.push(message);
-      return false;
+      if (this.messageQueue.length < DEFAULTS.MESSAGE_QUEUE_LIMIT) {
+        this.messageQueue.push(message);
+        return false;
+      } else {
+        this.emit('error', new Error('Message queue limit reached'));
+        return false;
+      }
     }
   }
 
@@ -136,6 +179,38 @@ class WebSocketClient extends EventEmitter {
   unsubscribe(eventType, callback) {
     this.removeListener(eventType, callback);
     this.subscriptions.delete(eventType);
+  }
+
+  identify(clientType, version = '1.0.0', capabilities = []) {
+    this.send({
+      type: 'identify',
+      clientType,
+      version,
+      capabilities
+    });
+  }
+
+  subscribeToEvent(eventTypes, filters = {}) {
+    this.send({
+      type: 'subscribe',
+      eventTypes,
+      filters
+    });
+  }
+
+  unsubscribeFromEvent(eventTypes = []) {
+    this.send({
+      type: 'unsubscribe',
+      eventTypes
+    });
+  }
+
+  sendCommand(command, data = {}) {
+    this.send({
+      type: 'command',
+      command,
+      data
+    });
   }
 
   disconnect() {
@@ -154,12 +229,16 @@ class WebSocketClient extends EventEmitter {
     this.isConnected = false;
     this.subscriptions.clear();
     this.messageQueue = [];
+    this.clientId = null;
+    this.connectionId = null;
   }
 
   getStatus() {
     return {
       isConnected: this.isConnected,
       url: this.url,
+      clientId: this.clientId,
+      connectionId: this.connectionId,
       reconnectAttempts: this.reconnectAttempts,
       queuedMessages: this.messageQueue.length,
       subscriptions: Array.from(this.subscriptions)

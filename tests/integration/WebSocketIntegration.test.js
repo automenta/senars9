@@ -1,69 +1,85 @@
 import { describe, test, expect } from '@jest/globals';
-import { testWebSocketFunctionality } from '../../examples/shared/webSocketDemo.js';
+import WebSocketServer from '../../core/WebSocketServer.js';
+import WebSocketUtils from '../../core/WebSocketUtils.js';
+import MessageHandler from '../../core/MessageHandler.js';
+import ConnectionManager from '../../core/ConnectionManager.js';
+import StreamManager from '../../core/StreamManager.js';
 
 describe('WebSocket Integration Test', () => {
   test('should demonstrate WebSocket communication functionality and verify server methods', async () => {
-    const result = await testWebSocketFunctionality();
+    const wsServer = new WebSocketServer();
 
-    // Verify WebSocket server exists
-    expect(result.hasWebSocketServer).toBe(true);
+    // Verify WebSocket server exists and has expected properties
+    expect(wsServer).toBeDefined();
+    expect(wsServer.clients).toBeDefined();
+    expect(wsServer.subscriptions).toBeDefined();
+    expect(wsServer.isRunning).toBe(false);
 
-    // Verify all expected methods exist on the WebSocket server
-    const expectedMethods = [
-      '_handleNARSRegistration',
-      '_handleTaskSynchronization',
-      '_handleStatusRequest',
-      '_handleStatusBroadcast',
-      'broadcastTaskToNARS',
-      'getNARSInstanceStatus',
-      'sendRequestToNARS'
-    ];
+    // Verify component managers exist
+    expect(wsServer.connectionManager).toBeInstanceOf(ConnectionManager);
+    expect(wsServer.streamManager).toBeInstanceOf(StreamManager);
+    expect(wsServer.messageHandler).toBeInstanceOf(MessageHandler);
 
-    expectedMethods.forEach(method => {
-      expect(result.methodAvailability[method]).toBe(true);
-    });
+    // Test utility functions
+    expect(typeof WebSocketUtils.generateId).toBe('function');
+    expect(typeof WebSocketUtils.formatTaskData).toBe('function');
+    expect(typeof WebSocketUtils.createMessage).toBe('function');
 
-    // Verify stats are properly returned
-    expect(result.stats).toBeDefined();
-    expect(typeof result.stats.isRunning).toBe('boolean');
-    expect(typeof result.stats.clientCount).toBe('number');
-    expect(typeof result.stats.narsInstances).toBe('number');
-
-    // Verify NARS instances can be retrieved
-    expect(Array.isArray(result.narsInstances)).toBe(true);
+    // Test stats functionality
+    const stats = wsServer.getStats();
+    expect(stats).toBeDefined();
+    expect(typeof stats.isRunning).toBe('boolean');
+    expect(typeof stats.clientCount).toBe('number');
+    expect(typeof stats.subscriptions).toBe('number');
+    expect(typeof stats.taskStreams).toBe('number');
   });
 
-  test('should handle client connection lifecycle properly', async () => {
-    const result = await testWebSocketFunctionality();
+  test('should handle component initialization properly', async () => {
+    const wsServer = new WebSocketServer();
 
-    // Verify initial stats
-    expect(result.stats).toBeDefined();
+    // Test initialization with config
+    await wsServer.initialize({
+      port: 8080,
+      host: 'localhost',
+      maxConnectionsPerIP: 5
+    });
 
-    // Stats should include expected properties
-    expect(result.stats).toHaveProperty('isRunning');
-    expect(result.stats).toHaveProperty('clientCount');
-    expect(result.stats).toHaveProperty('narsInstances');
+    // Verify initialization worked
+    expect(wsServer.server).toBeDefined();
+    expect(wsServer.wss).toBeDefined();
   });
 
   test('should demonstrate real-time event broadcasting capabilities', async () => {
-    const result = await testWebSocketFunctionality();
+    const wsServer = new WebSocketServer();
 
-    // Verify the server can broadcast tasks to NARS instances
-    expect(typeof result.methodAvailability.broadcastTaskToNARS).toBe('boolean');
-    expect(result.methodAvailability.broadcastTaskToNARS).toBe(true);
+    // Test stream manager functionality
+    const stream = wsServer.streamManager.createTaskStream('test-task');
+    expect(stream).toBeDefined();
+    expect(stream.id).toBe('test-task');
+    expect(stream.participants).toBeInstanceOf(Set);
 
-    // Verify status methods exist for real-time monitoring
-    expect(result.methodAvailability._handleStatusBroadcast).toBe(true);
-    expect(result.methodAvailability.getNARSInstanceStatus).toBe(true);
+    // Test message handler registration
+    expect(wsServer.messageHandler.handlers).toBeInstanceOf(Map);
+    expect(wsServer.messageHandler.handlers.size).toBeGreaterThan(0);
   });
 
   test('should validate message routing and handling', async () => {
-    const result = await testWebSocketFunctionality();
+    const wsServer = new WebSocketServer();
 
-    // Verify message handling methods exist
-    expect(result.methodAvailability._handleNARSRegistration).toBe(true);
-    expect(result.methodAvailability._handleTaskSynchronization).toBe(true);
-    expect(result.methodAvailability._handleStatusRequest).toBe(true);
-    expect(result.methodAvailability.sendRequestToNARS).toBe(true);
+    // Test that message handler can process different message types
+    const testMessage = {
+      type: 'identify',
+      clientType: 'test',
+      version: '1.0.0'
+    };
+
+    // Mock client for testing
+    const mockClient = { id: 'test-client' };
+    wsServer.clients.set('test-client', mockClient);
+
+    // Test message handling
+    wsServer.messageHandler.handle('test-client', testMessage);
+    expect(mockClient.type).toBe('test');
+    expect(mockClient.version).toBe('1.0.0');
   });
 });
