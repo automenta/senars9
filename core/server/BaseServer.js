@@ -20,9 +20,18 @@ class BaseServer extends Component {
   }
 
   async initialize(config = {}) {
-    await super.initialize(config);
-    this.config = WebSocketUtils.mergeConfig(this.getDefaultConfig(), config);
-  }
+     await super.initialize(config);
+     this.config = this.mergeConfig(this.getDefaultConfig(), config);
+   }
+
+   // Standardized configuration access
+   mergeConfig(baseConfig, overrides) {
+     return WebSocketUtils.mergeConfig(baseConfig, overrides);
+   }
+
+   getConfig(key, defaultValue = null) {
+     return WebSocketUtils.getConfigValue(this.config, key, defaultValue);
+   }
 
   getDefaultConfig() {
     return {
@@ -43,12 +52,11 @@ class BaseServer extends Component {
       return;
     }
 
-    const { port, host, enabled } = this.config;
-    const isTestEnvironment = typeof process !== 'undefined' &&
-                            (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
+    const port = this.getConfig('port', DEFAULTS.PORT);
+    const host = this.getConfig('host', DEFAULTS.HOST);
+    const enabled = this.getConfig('enabled', DEFAULTS.ENABLED);
 
-    if (!enabled && !isTestEnvironment) {
-      WebSocketUtils.debug('Server is disabled, skipping start');
+    if (!this.shouldStartServer(enabled)) {
       return;
     }
 
@@ -58,13 +66,29 @@ class BaseServer extends Component {
           WebSocketUtils.handleError(`starting server on ${host}:${port}`, error);
           reject(error);
         } else {
-          this.isRunning = true;
-          this.startTime = Date.now();
-          WebSocketUtils.debug(`Server running on ws://${host}:${port}`);
+          this.onServerStart(port, host);
           resolve();
         }
       });
     });
+  }
+
+  shouldStartServer(enabled) {
+    const isTestEnvironment = typeof process !== 'undefined' &&
+                            (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
+
+    if (!enabled && !isTestEnvironment) {
+      WebSocketUtils.debug('Server is disabled, skipping start');
+      return false;
+    }
+    return true;
+  }
+
+  onServerStart(port, host) {
+    this.isRunning = true;
+    this.startTime = Date.now();
+    WebSocketUtils.debug(`Server running on ws://${host}:${port}`);
+    this.onStart?.();
   }
 
   async stop() {
@@ -72,42 +96,11 @@ class BaseServer extends Component {
 
     return new Promise((resolve) => {
       try {
-        // Close all client connections
-        for (const [clientId, client] of this.clients) {
-          if (client.ws) {
-            client.ws.close(1000, 'Server shutting down');
-          }
-        }
-        this.clients.clear();
-
-        // Close WebSocket and HTTP servers
-        if (this.wss) {
-          this.wss.close(() => {
-            if (this.server) {
-              this.server.close(() => {
-                this.isRunning = false;
-                this.cleanup();
-                WebSocketUtils.debug('Server stopped');
-                resolve();
-              });
-            } else {
-              this.isRunning = false;
-              this.cleanup();
-              resolve();
-            }
-          });
-        } else if (this.server) {
-          this.server.close(() => {
-            this.isRunning = false;
-            this.cleanup();
-            WebSocketUtils.debug('Server stopped');
-            resolve();
-          });
-        } else {
-          this.isRunning = false;
-          this.cleanup();
+        this.closeAllClients();
+        this.closeServers(() => {
+          this.onServerStop();
           resolve();
-        }
+        });
       } catch (error) {
         WebSocketUtils.handleError('stopping server', error);
         resolve(); // Don't block shutdown on errors
@@ -115,7 +108,43 @@ class BaseServer extends Component {
     });
   }
 
-  // Common client operations
+  closeAllClients() {
+    for (const [clientId, client] of this.clients) {
+      if (client.ws) {
+        client.ws.close(1000, 'Server shutting down');
+      }
+    }
+    this.clients.clear();
+  }
+
+  closeServers(callback) {
+    if (this.wss) {
+      this.wss.close(() => {
+        if (this.server) {
+          this.server.close(() => {
+            callback();
+          });
+        } else {
+          callback();
+        }
+      });
+    } else if (this.server) {
+      this.server.close(() => {
+        callback();
+      });
+    } else {
+      callback();
+    }
+  }
+
+  onServerStop() {
+    this.isRunning = false;
+    this.cleanup();
+    WebSocketUtils.debug('Server stopped');
+    this.onStop?.();
+  }
+
+  // Common client operations - consolidated for consistency
   sendToClient(clientId, message) {
     const client = this.clients.get(clientId);
     if (WebSocketUtils.isValidClient(client)) {
@@ -153,43 +182,63 @@ class BaseServer extends Component {
     }
   }
 
-  // Common stream operations
-  subscribeToTaskStream(clientId, taskId) {
-    if (!this.taskStreams.has(taskId)) {
-      this.taskStreams.set(taskId, {
-        id: taskId,
-        participants: new Set(),
-        history: [],
-        createdAt: new Date(),
-        isActive: true
-      });
-    }
+  // Abstract client operations for extensibility
+  getClient(clientId) {
+    return this.clients.get(clientId);
+  }
 
-    const stream = this.taskStreams.get(taskId);
-    stream.participants.add(clientId);
-    return true;
+  getClientsByType(clientType) {
+    return Array.from(this.clients.values()).filter(client => client.type === clientType);
+  }
+
+  getValidClients() {
+    return Array.from(this.clients.values()).filter(WebSocketUtils.isValidClient);
+  }
+
+  // Common stream operations - delegated to StreamManager for consistency
+  subscribeToTaskStream(clientId, taskId) {
+    if (!this.streamManager) {
+      // Fallback for servers without StreamManager
+      if (!this.taskStreams.has(taskId)) {
+        this.taskStreams.set(taskId, {
+          id: taskId,
+          participants: new Set(),
+          history: [],
+          createdAt: new Date(),
+          isActive: true
+        });
+      }
+      const stream = this.taskStreams.get(taskId);
+      stream.participants.add(clientId);
+      return true;
+    }
+    return this.streamManager.subscribeToTaskStream(clientId, taskId);
   }
 
   publishTaskUpdate(taskId, updateData) {
-    const stream = this.taskStreams.get(taskId);
-    if (!WebSocketUtils.isActiveStream(stream)) return false;
+    if (!this.streamManager) {
+      // Fallback for servers without StreamManager
+      const stream = this.taskStreams.get(taskId);
+      if (!WebSocketUtils.isActiveStream(stream)) return false;
 
-    const update = {
-      type: 'update',
-      data: updateData,
-      timestamp: new Date(),
-      action: updateData.action || 'update'
-    };
+      const update = {
+        type: 'update',
+        data: updateData,
+        timestamp: new Date(),
+        action: updateData.action || 'update'
+      };
 
-    stream.history.push(update);
+      stream.history.push(update);
 
-    if (stream.history.length > (stream.options?.bufferSize || DEFAULTS.TASK_STREAM_BUFFER_SIZE)) {
-      stream.history = stream.history.slice(-stream.history.length);
+      if (stream.history.length > (stream.options?.bufferSize || DEFAULTS.TASK_STREAM_BUFFER_SIZE)) {
+        stream.history = stream.history.slice(-stream.history.length);
+      }
+
+      const updateMessage = WebSocketUtils.createTaskMessage('task_stream_update', taskId, updateData);
+      WebSocketUtils.broadcastToParticipants(this, stream.participants, updateMessage);
+      return true;
     }
-
-    const updateMessage = WebSocketUtils.createTaskMessage('task_stream_update', taskId, updateData);
-    WebSocketUtils.broadcastToParticipants(this, stream.participants, updateMessage);
-    return true;
+    return this.streamManager.publishTaskUpdate(taskId, updateData);
   }
 
   // Common event publishing

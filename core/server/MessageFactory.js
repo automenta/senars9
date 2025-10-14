@@ -1,8 +1,12 @@
 import { WebSocketUtils, MESSAGE_TYPES } from './WebSocketUtils.js';
 
 class MessageFactory {
-  static createResponse(type, payload = {}, timestamp = null) {
+  static createMessage(type, payload = {}, timestamp = null) {
     return WebSocketUtils.createMessage(type, payload, timestamp);
+  }
+
+  static createResponse(type, payload = {}, timestamp = null) {
+    return this.createMessage(type, payload, timestamp);
   }
 
   static createSuccessResponse(operation, data = {}) {
@@ -19,6 +23,22 @@ class MessageFactory {
       status: 'error',
       message: error.message || error,
       details
+    });
+  }
+
+  static createCommandErrorResponse(command, error) {
+    return this.createResponse(MESSAGE_TYPES.COMMAND_RESPONSE, {
+      command,
+      status: 'error',
+      error: error.message || error
+    });
+  }
+
+  static createCommandSuccessResponse(command, data = {}) {
+    return this.createResponse(MESSAGE_TYPES.COMMAND_RESPONSE, {
+      command,
+      status: 'success',
+      ...data
     });
   }
 

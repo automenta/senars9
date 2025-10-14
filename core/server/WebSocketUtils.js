@@ -1,4 +1,5 @@
 import Logger from './Logger.js';
+import MessageFactory from './MessageFactory.js';
 
 const DEFAULTS = Object.freeze({
   PORT: 8080,
@@ -161,24 +162,16 @@ class WebSocketUtils {
 
   static createResponse(command, status, data = {}) {
     return status === 'error'
-      ? this.createErrorResponse(command, data)
-      : this.createSuccessResponse(command, data);
+      ? MessageFactory.createErrorResponse(command, data)
+      : MessageFactory.createSuccessResponse(command, data);
   }
 
   static createErrorResponse(command, error) {
-    return this.createMessage(MESSAGE_TYPES.COMMAND_RESPONSE, {
-      command,
-      status: 'error',
-      error: error.message || error
-    });
+    return MessageFactory.createCommandErrorResponse(command, error);
   }
 
   static createSuccessResponse(command, data = {}) {
-    return this.createMessage(MESSAGE_TYPES.COMMAND_RESPONSE, {
-      command,
-      status: 'success',
-      ...data
-    });
+    return MessageFactory.createCommandSuccessResponse(command, data);
   }
 
   static createWelcomeMessage(clientId, connectionId) {
@@ -307,6 +300,10 @@ class WebSocketUtils {
 
   static hasParticipants(stream) {
     return stream?.participants?.size > 0;
+  }
+
+  static isActiveStream(stream) {
+    return stream?.isActive && this.hasParticipants(stream);
   }
 
   // Common error handling patterns

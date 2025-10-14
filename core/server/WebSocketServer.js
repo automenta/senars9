@@ -51,13 +51,13 @@ class WebSocketServer extends Component {
       return;
     }
 
-    const port = WebSocketUtils.getConfigValue(this.config, 'port', DEFAULTS.PORT);
-    const host = WebSocketUtils.getConfigValue(this.config, 'host', DEFAULTS.HOST);
+    const port = this.getConfig('port', DEFAULTS.PORT);
+     const host = this.getConfig('host', DEFAULTS.HOST);
 
-    const isTestEnvironment = typeof process !== 'undefined' &&
-                            (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
+     const isTestEnvironment = typeof process !== 'undefined' &&
+                             (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
 
-    const enabled = WebSocketUtils.getConfigValue(this.config, 'enabled', DEFAULTS.ENABLED) ?? !isTestEnvironment;
+     const enabled = this.getConfig('enabled', DEFAULTS.ENABLED) ?? !isTestEnvironment;
 
     if (!enabled) {
       WebSocketUtils.debug('WebSocket server is disabled, skipping start');
@@ -82,6 +82,11 @@ class WebSocketServer extends Component {
 
   _extractSystemState() {
     return WebSocketUtils.extractSystemState(this.core);
+  }
+
+  // Standardized configuration access
+  getConfig(key, defaultValue = null) {
+    return WebSocketUtils.getConfigValue(this.config, key, defaultValue);
   }
 
   broadcastCurrentState() {

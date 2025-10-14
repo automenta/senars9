@@ -1,4 +1,5 @@
 import { WebSocketUtils } from './WebSocketUtils.js';
+import MessageFactory from './MessageFactory.js';
 
 class CommonServerUtils {
   static handleConnectionError(wss, clientId, operation, error) {
@@ -10,7 +11,8 @@ class CommonServerUtils {
     WebSocketUtils.error(errorMsg);
 
     if (wss && clientId) {
-      WebSocketUtils.sendError(wss, clientId, operation, { message: errorMsg, streamId });
+      const errorResponse = MessageFactory.createErrorResponse(operation, { message: errorMsg, streamId });
+      wss.sendToClient(clientId, errorResponse);
     }
     return errorMsg;
   }
@@ -20,7 +22,20 @@ class CommonServerUtils {
     WebSocketUtils.error(errorMsg);
 
     if (wss && clientId) {
-      WebSocketUtils.sendError(wss, clientId, operation, { message: errorMsg, taskId });
+      const errorResponse = MessageFactory.createErrorResponse(operation, { message: errorMsg, taskId });
+      wss.sendToClient(clientId, errorResponse);
+    }
+    return errorMsg;
+  }
+
+  static handleError(wss, clientId, operation, error, context = {}) {
+    const contextStr = Object.keys(context).length > 0 ? ` (${Object.entries(context).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '';
+    const errorMsg = `${operation} failed${contextStr}${clientId ? ` (client: ${clientId})` : ''}: ${error.message || error}`;
+    WebSocketUtils.error(errorMsg);
+
+    if (wss && clientId) {
+      const errorResponse = MessageFactory.createErrorResponse(operation, { message: errorMsg, ...context });
+      wss.sendToClient(clientId, errorResponse);
     }
     return errorMsg;
   }
@@ -38,23 +53,11 @@ class CommonServerUtils {
   }
 
   static createStandardResponse(type, data = {}) {
-    return {
-      type,
-      payload: data,
-      timestamp: new Date().toISOString()
-    };
+    return MessageFactory.createResponse(type, data);
   }
 
   static createErrorResponse(operation, error, details = {}) {
-    return {
-      type: 'error',
-      payload: {
-        operation,
-        message: error.message || error,
-        details,
-        timestamp: new Date().toISOString()
-      }
-    };
+    return MessageFactory.createErrorResponse(operation, error, details);
   }
 }
 
