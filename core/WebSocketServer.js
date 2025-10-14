@@ -1,18 +1,17 @@
 import { WebSocketServer as WSServer } from 'ws';
 import { createServer } from 'http';
-import Component from '../base/Component.js';
-import { Logger } from '../base/utilities.js';
+import Component from './base/Component.js';
+import { Logger } from './base/utilities.js';
 
 class WebSocketServer extends Component {
-  constructor() {
+  constructor(core) {
     super();
+    this.core = core; // Core is optional for testing
     this.wss = null;
     this.server = null;
     this.clients = new Map();
     this.heartbeatInterval = null;
     this.isRunning = false;
-
-    this.narsInstances = new Map();
     this.subscriptions = new Map();
     this.taskStreams = new Map();
   }
@@ -64,18 +63,21 @@ class WebSocketServer extends Component {
         } else {
           this.isRunning = true;
           this._startHeartbeat();
-          Logger.debug(`WebSocket server running on ws://${host}:${port}`);
+          Logger.debug(`WebSocket server running on ws://${host}:${port} for Core`);
           resolve();
         }
       });
     });
   }
-  
+
   // Extract current system state into standardized format
   _extractSystemState() {
     const state = { tasks: [], concepts: [], stats: {} };
 
-    if (!this.core?.memory) return state;
+    if (!this.core?.memory) {
+      // Return empty state if no core available (for testing)
+      return state;
+    }
 
     // Extract tasks with consistent formatting
     const allTasks = this.core.memory.getAllTasks?.() || [];
@@ -135,8 +137,8 @@ class WebSocketServer extends Component {
 
   // Broadcast full current state to all clients
   broadcastCurrentState() {
-    if (!this.core) {
-      Logger.warn('No core reference available for state broadcasting');
+    if (!this.core?.memory) {
+      Logger.warn('No core memory available for state broadcasting');
       return;
     }
 
@@ -163,7 +165,7 @@ class WebSocketServer extends Component {
       Logger.error('Error broadcasting current state', error);
     }
   }
-  
+
   // Helper to get task status
   _getTaskStatus(task) {
     if (!task) return 'Unknown';
@@ -172,7 +174,7 @@ class WebSocketServer extends Component {
     if (task.isQuestion && task.isQuestion()) return 'Question';
     return 'Derived';
   }
-  
+
   // Helper to get task type
   _getTaskType(task) {
     if (!task) return 'Unknown';
@@ -181,7 +183,7 @@ class WebSocketServer extends Component {
     if (task.punctuation === '?') return 'Question';
     return 'Derived';
   }
-  
+
   // Helper to get system stats
   _getSystemStats() {
     return {
@@ -314,17 +316,6 @@ class WebSocketServer extends Component {
 
     Logger.debug(`Client connected: ${clientId} from ${clientInfo.ip}`);
 
-    // Emit connection event for other components
-    if (this.core?.messages) {
-      this.core.messages.emit('websocket.client.connected', {
-        clientId,
-        ip: clientInfo.ip,
-        userAgent: clientInfo.userAgent,
-        connectedAt: clientInfo.connectedAt,
-        timestamp: new Date().toISOString()
-      });
-    }
-    
     // Send current state to the new client specifically
     setImmediate(() => {
       if (this.core) {
@@ -384,9 +375,6 @@ class WebSocketServer extends Component {
     return true;
   }
 
-  /**
-   * Track a new connection from an IP
-   */
   _trackConnection(ip) {
     if (!this.connectionTracker) {
       this.connectionTracker = new Map();
@@ -414,41 +402,6 @@ class WebSocketServer extends Component {
     return `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Utility method for consistent client message sending
-  _sendClientMessage(clientId, message) {
-    this.sendToClient(clientId, { ...message, timestamp: new Date().toISOString() });
-  }
-
-  // Utility method for consistent error responses
-  _sendErrorResponse(clientId, command, error) {
-    this._sendClientMessage(clientId, {
-      type: 'command_response',
-      command,
-      status: 'error',
-      error: error.message
-    });
-  }
-
-  // Utility method for consistent success responses
-  _sendSuccessResponse(clientId, command, data = {}) {
-    this._sendClientMessage(clientId, {
-      type: 'command_response',
-      command,
-      status: 'success',
-      ...data
-    });
-  }
-
-  // Utility method for NARS instance validation
-  _getNARSInstance(clientId) {
-    return this.narsInstances.get(clientId);
-  }
-
-  // Utility method for safe client lookup
-  _getClient(clientId) {
-    return this.clients.get(clientId);
-  }
-
   _handleMessage(clientId, data) {
     const client = this.clients.get(clientId);
     if (!client) return;
@@ -474,7 +427,6 @@ class WebSocketServer extends Component {
       heartbeat: () => null, // Heartbeat response - no action needed
       subscribe: this._handleSubscription,
       unsubscribe: this._handleUnsubscription,
-      nars_message: this._handleNARSMessage,
       task_stream: this._handleTaskStream,
       stream_request: this._handleStreaming,
       subscribe_to_task: (clientId, msg) => this._handleTaskSubscription(clientId, msg),
@@ -512,7 +464,8 @@ class WebSocketServer extends Component {
     const { command, data } = message;
 
     if (!this.core?.messages) {
-      Logger.error('Core messages component not available');
+      Logger.warn('Core messages component not available - command ignored');
+      this._sendErrorResponse(clientId, message.command || 'unknown', new Error('Core not available'));
       return;
     }
 
@@ -530,7 +483,7 @@ class WebSocketServer extends Component {
 
     if (!internalCommand) {
       Logger.warn(`Unknown command: ${command}`);
-      return this._sendErrorResponse(clientId, command, new Error('Unknown command'));
+      return;
     }
 
     try {
@@ -564,17 +517,8 @@ class WebSocketServer extends Component {
      client.version = message.version || 'unknown';
      client.capabilities = message.capabilities || [];
 
-     // Register NARS instances for inter-NARS communication
-     if (client.type === 'nars') {
-       this.narsInstances.set(clientId, {
-         ...client,
-         instanceId: message.instanceId || clientId,
-         registeredAt: new Date()
-       });
-     }
-
      Logger.debug(`Client ${clientId} identified as: ${client.type} (v${client.version})`);
-   }
+  }
 
   _handleSubscription(clientId, message) {
      const { eventTypes = [], filters = {} } = message;
@@ -597,7 +541,7 @@ class WebSocketServer extends Component {
        eventTypes: Array.from(subscription.eventTypes),
        timestamp: new Date().toISOString()
      });
-   }
+  }
 
   _handleUnsubscription(clientId, message) {
      const { eventTypes = [] } = message;
@@ -616,7 +560,7 @@ class WebSocketServer extends Component {
          }
        }
      }
-   }
+  }
 
   _handleTaskStream(clientId, message) {
      const { taskId, action, data, streamType = 'task' } = message;
@@ -652,11 +596,8 @@ class WebSocketServer extends Component {
        streamType,
        timestamp: new Date().toISOString()
      }, [clientId]);
-   }
+  }
 
-  /**
-   * Handle different types of streaming requests
-   */
   _handleStreaming(clientId, message) {
     const { streamId, action, data, streamType } = message;
 
@@ -783,7 +724,7 @@ class WebSocketServer extends Component {
     }
 
     // Also emit an internal event for other components
-    if (this.core?.messages) {
+    if (this.core?.messages && this.core.messages.emit) {
       this.core.messages.emit(`stream.broadcast.${streamType}`, {
         source: clientId,
         data,
@@ -793,9 +734,6 @@ class WebSocketServer extends Component {
     }
   }
 
-  /**
-   * Create a real-time task stream for a specific task
-   */
   createTaskStream(taskId, options = {}) {
     if (!this.taskStreams.has(taskId)) {
       this.taskStreams.set(taskId, {
@@ -815,9 +753,6 @@ class WebSocketServer extends Component {
     return this.taskStreams.get(taskId);
   }
 
-  /**
-   * Publish a task update to its stream
-   */
   publishTaskUpdate(taskId, updateData) {
     const stream = this.taskStreams.get(taskId);
     if (!stream || !stream.isActive) return false;
@@ -847,9 +782,6 @@ class WebSocketServer extends Component {
     return true;
   }
 
-  /**
-   * Subscribe to real-time task updates
-   */
   subscribeToTaskStream(clientId, taskId) {
     if (!this.taskStreams.has(taskId)) {
       this.createTaskStream(taskId);
@@ -871,268 +803,10 @@ class WebSocketServer extends Component {
     return true;
   }
 
-  /**
-   * Create a general event stream for real-time event broadcasting
-   */
-  createEventStream(eventType, options = {}) {
-    if (!this.streams) this.streams = new Map();
-
-    const streamId = `event:${eventType}`;
-
-    if (!this.streams.has(streamId)) {
-      this.streams.set(streamId, {
-        id: streamId,
-        type: 'event',
-        eventType,
-        participants: new Set(),
-        buffer: [],
-        bufferSize: options.bufferSize || 100,
-        createdAt: new Date(),
-        isActive: true
-      });
-    }
-
-    return this.streams.get(streamId);
-  }
-
-  /**
-   * Publish an event to the appropriate stream
-   */
-  publishEventToStream(eventType, eventData) {
-    if (!this.streams) this.streams = new Map();
-
-    const streamId = `event:${eventType}`;
-    let stream = this.streams.get(streamId);
-
-    if (!stream) {
-      stream = this.createEventStream(eventType);
-    }
-
-    // Add to buffer
-    stream.buffer.push({
-      type: eventType,
-      data: eventData,
-      timestamp: new Date()
-    });
-
-    // Maintain buffer size
-    if (stream.buffer.length > stream.bufferSize) {
-      stream.buffer = stream.buffer.slice(-stream.bufferSize);
-    }
-
-    // Broadcast to all subscribers
-    for (const participantId of stream.participants) {
-      this.sendToClient(participantId, {
-        type: 'event_stream_data',
-        eventType,
-        data: eventData,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    return true;
-  }
-
-  _handleNARSMessage(clientId, message) {
-    const client = this.clients.get(clientId);
-    if (!client) return;
-
-    const { target, data, protocol = 'standard', command } = message;
-
-    // Handle specific NARS commands
-    const commandHandlers = {
-      register_instance: (cid, data) => this._handleNARSRegistration(cid, data),
-      sync_task: (cid, data) => this._handleTaskSynchronization(cid, data),
-      request_status: (cid, target) => this._handleStatusRequest(cid, target),
-      broadcast_status: (cid, data) => this._handleStatusBroadcast(cid, data)
-    };
-
-    const handler = commandHandlers[command];
-    if (handler) return handler(clientId, command === 'request_status' ? target : data);
-
-    // Route general NARS messages
-    this._routeNARSMessage(clientId, client, { target, data, protocol });
-  }
-
-  _routeNARSMessage(clientId, client, { target, data, protocol }) {
-    const narsMessage = {
-      type: 'nars_message',
-      protocol,
-      source: clientId,
-      sourceInstance: client.type === 'nars' ? this._getNARSInstance(clientId)?.instanceId : null,
-      target,
-      data,
-      timestamp: new Date().toISOString()
-    };
-
-    if (target === 'all') {
-      this.sendToClientType('nars', narsMessage);
-    } else if (target && this.narsInstances.has(target)) {
-      this.sendToClient(target, narsMessage);
-    } else {
-      this.sendToClientType('nars', narsMessage, [clientId]);
-    }
-  }
-
-  _handleNARSRegistration(clientId, registrationData) {
-    const client = this.clients.get(clientId);
-    if (!client || client.type !== 'nars') return;
-
-    const instanceId = registrationData.instanceId || clientId;
-    const version = registrationData.version || 'unknown';
-    const capabilities = registrationData.capabilities || [];
-
-    // Register or update the NARS instance
-    this.narsInstances.set(clientId, {
-      ...client,
-      instanceId: instanceId,
-      version: version,
-      capabilities: capabilities,
-      registeredAt: new Date(),
-      lastSeen: new Date(),
-      status: 'active'
-    });
-
-    // Send registration confirmation
-    this.sendToClient(clientId, {
-      type: 'nars_registration',
-      status: 'success',
-      instanceId: instanceId,
-      registeredAt: new Date().toISOString(),
-      message: 'NARS instance registered successfully'
-    });
-
-    Logger.debug(`NARS instance registered: ${instanceId} (client: ${clientId})`);
-
-    // Emit registration event for other components to handle
-    if (this.core?.messages) {
-      this.core.messages.emit('nars.instance.registered', {
-        instanceId,
-        clientId,
-        version,
-        capabilities,
-        timestamp: new Date().toISOString()
-      });
-    }
-  }
-
-  _handleTaskSynchronization(sourceClientId, taskData) {
-    const sourceInstance = this.narsInstances.get(sourceClientId);
-    if (!sourceInstance) {
-      Logger.warn(`Task sync attempt from unregistered NARS instance: ${sourceClientId}`);
-      return;
-    }
-
-    // Create a synchronization message
-    const syncMessage = {
-      type: 'nars_task_sync',
-      sourceInstance: sourceInstance.instanceId,
-      task: taskData.task,
-      operation: taskData.operation || 'add', // add, update, delete
-      timestamp: new Date().toISOString()
-    };
-
-    // Broadcast to all other NARS instances except the source
-    for (const [clientId, instance] of this.narsInstances) {
-      if (clientId !== sourceClientId) {
-        this.sendToClient(clientId, syncMessage);
-      }
-    }
-
-    Logger.debug(`Task synchronized from ${sourceInstance.instanceId}: ${taskData.operation} ${taskData.task?.term || 'unknown'}`);
-
-    // Emit sync event for other components to handle
-    if (this.core?.messages) {
-      this.core.messages.emit('nars.task.sync', {
-        sourceInstance: sourceInstance.instanceId,
-        task: taskData.task,
-        operation: taskData.operation,
-        timestamp: new Date().toISOString()
-      });
-    }
-  }
-
-  _handleStatusRequest(sourceClientId, targetInstanceId) {
-    const sourceInstance = this.narsInstances.get(sourceClientId);
-    if (!sourceInstance) return;
-
-    if (targetInstanceId === 'all') {
-      // Send status of all instances
-      const allStatus = this.getNARSInstances().map(instance => ({
-        instanceId: instance.instanceId,
-        type: instance.type,
-        version: instance.version,
-        status: instance.status || 'active',
-        connectedAt: instance.connectedAt
-      }));
-
-      this.sendToClient(sourceClientId, {
-        type: 'nars_status_response',
-        status: 'all_instances',
-        data: allStatus,
-        timestamp: new Date().toISOString()
-      });
-    } else {
-      // Find specific target instance
-      let targetClient = null;
-      for (const [clientId, instance] of this.narsInstances) {
-        if (instance.instanceId === targetInstanceId) {
-          targetClient = clientId;
-          break;
-        }
-      }
-
-      if (targetClient) {
-        const targetInstance = this.narsInstances.get(targetClient);
-        this.sendToClient(sourceClientId, {
-          type: 'nars_status_response',
-          status: 'single_instance',
-          data: {
-            instanceId: targetInstance.instanceId,
-            type: targetInstance.type,
-            version: targetInstance.version,
-            status: targetInstance.status || 'active',
-            connectedAt: targetInstance.connectedAt
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-  }
-
-  _handleStatusBroadcast(sourceClientId, statusData) {
-    const sourceInstance = this.narsInstances.get(sourceClientId);
-    if (!sourceInstance) return;
-
-    const broadcastMessage = {
-      type: 'nars_status_broadcast',
-      sourceInstance: sourceInstance.instanceId,
-      status: statusData.status || 'active',
-      health: statusData.health,
-      metrics: statusData.metrics,
-      timestamp: new Date().toISOString()
-    };
-
-    // Send to all other NARS instances
-    for (const [clientId, instance] of this.narsInstances) {
-      if (clientId !== sourceClientId) {
-        this.sendToClient(clientId, broadcastMessage);
-      }
-    }
-
-    Logger.debug(`Status broadcast from ${sourceInstance.instanceId}: ${statusData.status}`);
-  }
-
   _handleDisconnection(clientId) {
     const client = this.clients.get(clientId);
     if (client) {
       Logger.debug(`Client disconnected: ${clientId} (${client.type})`);
-
-      // If it was a NARS instance, remove it from the registry
-      if (this.narsInstances.has(clientId)) {
-        this.removeNARSInstance(clientId);
-      }
-
       this.clients.delete(clientId);
     }
   }
@@ -1204,138 +878,29 @@ class WebSocketServer extends Component {
     return true;
   }
 
-  getNARSInstances() {
-    return Array.from(this.narsInstances.values()).map(instance => ({
-      id: instance.id,
-      instanceId: instance.instanceId,
-      type: instance.type,
-      version: instance.version,
-      connectedAt: instance.connectedAt,
-      registeredAt: instance.registeredAt,
-      status: instance.status || 'active',
-      lastSeen: instance.lastSeen,
-      capabilities: instance.capabilities
-    }));
+  // Utility method for consistent client message sending
+  _sendClientMessage(clientId, message) {
+    this.sendToClient(clientId, { ...message, timestamp: new Date().toISOString() });
   }
 
-  sendTaskToNARS(targetInstanceId, task) {
-    // Find the client ID for the target instance
-    for (const [clientId, instance] of this.narsInstances) {
-      if (instance.instanceId === targetInstanceId) {
-        this.sendToClient(clientId, {
-          type: 'nars_task',
-          task,
-          timestamp: new Date().toISOString()
-        });
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Send a task to all connected NARS instances
-   */
-  broadcastTaskToNARS(task) {
-    let sentCount = 0;
-
-    for (const [clientId, instance] of this.narsInstances) {
-      this.sendToClient(clientId, {
-        type: 'nars_task',
-        task,
-        timestamp: new Date().toISOString()
-      });
-      sentCount++;
-    }
-
-    return sentCount;
-  }
-
-  /**
-   * Send a request to a specific NARS instance and wait for response
-   */
-  async sendRequestToNARS(targetInstanceId, request, timeout = 5000) {
-    return new Promise((resolve, reject) => {
-      const requestId = this._generateRequestId();
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`Request to NARS instance ${targetInstanceId} timed out after ${timeout}ms`));
-      }, timeout);
-
-      // Set up response handler
-      const responseHandler = (data) => {
-        if (data.requestId === requestId && data.type === 'nars_response') {
-          clearTimeout(timeoutId);
-          this.off('nars_message', responseHandler); // Remove the handler after use
-          resolve(data.payload);
-        }
-      };
-
-      this.on('nars_message', responseHandler);
-
-      // Send the request
-      for (const [clientId, instance] of this.narsInstances) {
-        if (instance.instanceId === targetInstanceId) {
-          this.sendToClient(clientId, {
-            type: 'nars_request',
-            requestId: requestId,
-            request: request,
-            timestamp: new Date().toISOString()
-          });
-          return;
-        }
-      }
-
-      // If no target instance found
-      clearTimeout(timeoutId);
-      this.off('nars_message', responseHandler);
-      reject(new Error(`NARS instance ${targetInstanceId} not found`));
+  // Utility method for consistent error responses
+  _sendErrorResponse(clientId, command, error) {
+    this._sendClientMessage(clientId, {
+      type: 'command_response',
+      command,
+      status: 'error',
+      error: error.message
     });
   }
 
-  /**
-   * Get the status of a specific NARS instance
-   */
-  getNARSInstanceStatus(instanceId) {
-    for (const [clientId, instance] of this.narsInstances) {
-      if (instance.instanceId === instanceId) {
-        return {
-          instanceId: instance.instanceId,
-          status: instance.status || 'active',
-          version: instance.version,
-          connectedAt: instance.connectedAt,
-          registeredAt: instance.registeredAt,
-          lastSeen: instance.lastSeen,
-          capabilities: instance.capabilities,
-          clientId: clientId
-        };
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Remove a NARS instance from the registry
-   */
-  removeNARSInstance(clientId) {
-    if (this.narsInstances.has(clientId)) {
-      const instance = this.narsInstances.get(clientId);
-      Logger.debug(`Removing NARS instance: ${instance.instanceId} (client: ${clientId})`);
-
-      this.narsInstances.delete(clientId);
-
-      // Emit removal event
-      if (this.core?.messages) {
-        this.core.messages.emit('nars.instance.removed', {
-          instanceId: instance.instanceId,
-          clientId: clientId,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-  }
-
-  _generateRequestId() {
-    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  // Utility method for consistent success responses
+  _sendSuccessResponse(clientId, command, data = {}) {
+    this._sendClientMessage(clientId, {
+      type: 'command_response',
+      command,
+      status: 'success',
+      ...data
+    });
   }
 
   getStats() {
@@ -1352,7 +917,7 @@ class WebSocketServer extends Component {
       clientCount: this.clients.size,
       clientsByType: clientTypes,
       clientsByIP: clientIPs,
-      narsInstances: this.narsInstances.size,
+      narsInstances: 0, // Always 0 in 1:1 architecture
       subscriptions: this.subscriptions.size,
       subscriptionStats,
       taskStreams: this.taskStreams.size,
@@ -1381,6 +946,50 @@ class WebSocketServer extends Component {
         counts[eventType] = (counts[eventType] || 0) + 1;
         return counts;
       }, {});
+  }
+
+  // DEPRECATED Backward compatibility methods for existing tests and demos
+  getNARSInstances() {
+    // In the new 1:1 architecture, we don't manage multiple NARS instances
+    // Return empty array for backward compatibility
+    return [];
+  }
+
+  broadcastTaskToNARS(task) {
+    // In the new architecture, broadcast to all connected clients
+    this.broadcast({
+      type: 'nars_task',
+      task,
+      timestamp: new Date().toISOString()
+    });
+    return 1; // Return count of "instances" (clients)
+  }
+
+  getNARSInstanceStatus(instanceId) {
+    // In the new architecture, we don't track NARS instances separately
+    return null;
+  }
+
+  sendRequestToNARS(targetInstanceId, request, timeout = 5000) {
+    // In the new architecture, send to all clients
+    return Promise.resolve({ success: false, error: 'Not supported in 1:1 architecture' });
+  }
+
+  // Stub methods for backward compatibility
+  _handleNARSRegistration(clientId, registrationData) {
+    Logger.debug(`NARS registration attempt from ${clientId}: ${registrationData.instanceId}`);
+  }
+
+  _handleTaskSynchronization(sourceClientId, taskData) {
+    Logger.debug(`Task sync attempt from ${sourceClientId}: ${taskData.operation}`);
+  }
+
+  _handleStatusRequest(sourceClientId, targetInstanceId) {
+    Logger.debug(`Status request from ${sourceClientId} for ${targetInstanceId}`);
+  }
+
+  _handleStatusBroadcast(sourceClientId, statusData) {
+    Logger.debug(`Status broadcast from ${sourceClientId}: ${statusData.status}`);
   }
 }
 

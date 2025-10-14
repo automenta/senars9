@@ -75,3 +75,6 @@ export { StrategyRegistry } from './components/StrategyRegistry.js';
 export { SystemContext } from './components/SystemContext.js';
 export { UnifiedAnalysisEngine } from './components/UnifiedAnalysisEngine.js';
 export { PlanExecutor } from './components/PlanExecutor.js';
+
+// WebSocket Communication
+export { default as WebSocketServer } from './WebSocketServer.js';

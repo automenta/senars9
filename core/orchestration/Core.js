@@ -14,7 +14,7 @@ import DataIngestor from '../analysis/DataIngestor.js';
 import ReportGenerator from '../analysis/ReportGenerator.js';
 
 import PatternDetector from '../analysis/PatternDetector.js';
-import WebSocketServer from '../system/WebSocketServer.js';
+import WebSocketServer from '../WebSocketServer.js';
 import { Focus } from '../memory/Memory.js';
 import { ContradictionAnalyzer } from '../reasoning/ContradictionAnalyzer.js';
 import { ResolutionStrategy } from '../reasoning/ResolutionStrategy.js';
@@ -62,7 +62,7 @@ class Core {
     this.registerComponent('reports', new ReportGenerator()); // Register ReportGenerator component
 
     this.registerComponent('patternDetector', new PatternDetector()); // Register PatternDetector component
-    this.registerComponent('webSocketServer', new WebSocketServer()); // Register WebSocketServer component
+    this.registerComponent('webSocketServer', new WebSocketServer(this)); // Register WebSocketServer component
     this.registerComponent('cycle', new Cycle()); // Register Cycle component
 
     return new Proxy(this, {
