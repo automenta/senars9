@@ -116,10 +116,12 @@ class WebSocketConnectionManager {
 
     const message = await this._parseMessageSafely(event);
 
+    // Add to message history if enabled
     if (this.config.enableMessageHistory && this.setMessages && message) {
-      this.setMessages(prev => [...prev, message]);
+      this._addToMessageHistory(message);
     }
 
+    // Update state if message is valid
     if (this.setData && message) {
       this.handleStateUpdate(message);
     }
@@ -129,15 +131,26 @@ class WebSocketConnectionManager {
     try {
       return await parseWebSocketMessage(event);
     } catch (parseError) {
+      // Add error to message history if enabled
       if (this.config.enableMessageHistory && this.setMessages) {
-        this.setMessages?.(prev => [...prev, {
+        this._addToMessageHistory({
           type: 'error',
           data: event.data,
           error: parseError.message
-        }]);
+        });
       }
       return null;
     }
+  }
+  
+  _addToMessageHistory(message) {
+    this.setMessages?.(prev => this._manageHistory([...prev, message]));
+  }
+  
+  _manageHistory(messages) {
+    return this.config.enableMessageHistory && messages.length > this.config.maxMessages
+      ? messages.slice(-this.config.messageRetention)
+      : messages;
   }
 
   handleStateUpdate(message) {
@@ -169,7 +182,7 @@ class WebSocketConnectionManager {
 
   _handleAddTask(task) {
     const newTask = createTask(task);
-    this._updateTaskData(prev => ({
+    this._updateTaskState(prev => ({
       ...prev,
       tasks: [...(prev.tasks || []), newTask]
     }));
@@ -177,7 +190,7 @@ class WebSocketConnectionManager {
   }
 
   _handleUpdateTask(task) {
-    this._updateTaskData(prev => ({
+    this._updateTaskState(prev => ({
       ...prev,
       tasks: (prev.tasks || []).map(t =>
         t.id === task.id ? { ...t, ...task, lastModified: Date.now() } : t
@@ -187,14 +200,14 @@ class WebSocketConnectionManager {
   }
 
   _handleDeleteTask(task) {
-    this._updateTaskData(prev => ({
+    this._updateTaskState(prev => ({
       ...prev,
       tasks: (prev.tasks || []).filter(t => t.id !== task.id)
     }));
     this._sendTaskCommand('delete_task', { id: task.id });
   }
 
-  _updateTaskData(updater) {
+  _updateTaskState(updater) {
     this.setData?.(updater);
   }
 

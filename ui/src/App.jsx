@@ -44,9 +44,7 @@ const App = () => {
 
     // Request updated state after commands that might change system state
     if (['start', 'step', 'stop', 'reset'].includes(command)) {
-      setTimeout(() => {
-        requestState();
-      }, 300); // Small delay to allow server processing
+      _requestAfterDelay(requestState, 300);
     }
 
     // Request updated concepts after certain commands that might generate them
@@ -57,15 +55,18 @@ const App = () => {
       }, 500); // Small delay to allow server processing
     }
   };
+  
+  // Helper function to consolidate delayed request patterns
+  const _requestAfterDelay = (requestFn, delay) => {
+    setTimeout(() => {
+      requestFn();
+    }, delay);
+  };
 
   const handleAddTaskWithConcepts = (task) => {
     if (handleAddTask) {
       handleAddTask(task);
-
-      // Request concepts after adding a task that might generate new concepts
-      setTimeout(() => {
-        requestConcepts();
-      }, 300);
+      _requestAfterDelay(requestConcepts, 300);
     } else {
       console.error('Cannot add task: WebSocket connection not ready');
     }
@@ -74,14 +75,36 @@ const App = () => {
   const handleUpdateTaskWithConcepts = (task) => {
     if (handleUpdateTask) {
       handleUpdateTask(task);
-
-      // Request concepts after updating a task that might generate new concepts
-      setTimeout(() => {
-        requestConcepts();
-      }, 300);
+      _requestAfterDelay(requestConcepts, 300);
     } else {
       console.error('Cannot update task: WebSocket connection not ready');
     }
+  };
+  };
+
+  const handleAddTaskWithConcepts = (task) => {
+    if (handleAddTask) {
+      handleAddTask(task);
+      _requestAfterDelay(requestConcepts, 300);
+    } else {
+      console.error('Cannot add task: WebSocket connection not ready');
+    }
+  };
+
+  const handleUpdateTaskWithConcepts = (task) => {
+    if (handleUpdateTask) {
+      handleUpdateTask(task);
+      _requestAfterDelay(requestConcepts, 300);
+    } else {
+      console.error('Cannot update task: WebSocket connection not ready');
+    }
+  };
+  
+  // Helper function to consolidate delayed request patterns
+  const _requestAfterDelay = (requestFn, delay) => {
+    setTimeout(() => {
+      requestFn();
+    }, delay);
   };
 
   // Request initial concepts and top tasks when component mounts

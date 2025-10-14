@@ -77,7 +77,15 @@ class BaseServer extends Component {
     const isTestEnvironment = typeof process !== 'undefined' &&
                             (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
 
-    return enabled || isTestEnvironment || (WebSocketUtils.debug('Server is disabled, skipping start'), false);
+    // Allow override via enabled config or test environment
+    const shouldEnable = enabled ?? !isTestEnvironment;
+    
+    if (!shouldEnable) {
+      WebSocketUtils.debug('Server is disabled, skipping start');
+      return false;
+    }
+    
+    return true;
   }
 
   onServerStart(port, host) {
@@ -191,48 +199,57 @@ class BaseServer extends Component {
 
   // Common stream operations - delegated to StreamManager for consistency
   subscribeToTaskStream(clientId, taskId) {
-    if (!this.streamManager) {
-      // Fallback for servers without StreamManager
-      if (!this.taskStreams.has(taskId)) {
-        this.taskStreams.set(taskId, {
-          id: taskId,
-          participants: new Set(),
-          history: [],
-          createdAt: new Date(),
-          isActive: true
-        });
-      }
-      const stream = this.taskStreams.get(taskId);
-      stream.participants.add(clientId);
-      return true;
+    if (this.streamManager) {
+      return this.streamManager.subscribeToTaskStream(clientId, taskId);
     }
-    return this.streamManager.subscribeToTaskStream(clientId, taskId);
+    // Fallback for servers without StreamManager
+    return this._fallbackSubscribeToTaskStream(clientId, taskId);
   }
 
   publishTaskUpdate(taskId, updateData) {
-    if (!this.streamManager) {
-      // Fallback for servers without StreamManager
-      const stream = this.taskStreams.get(taskId);
-      if (!WebSocketUtils.isActiveStream(stream)) return false;
-
-      const update = {
-        type: 'update',
-        data: updateData,
-        timestamp: new Date(),
-        action: updateData.action || 'update'
-      };
-
-      stream.history.push(update);
-
-      if (stream.history.length > (stream.options?.bufferSize || DEFAULTS.TASK_STREAM_BUFFER_SIZE)) {
-        stream.history = stream.history.slice(-stream.history.length);
-      }
-
-      const updateMessage = WebSocketUtils.createTaskMessage('task_stream_update', taskId, updateData);
-      WebSocketUtils.broadcastToParticipants(this, stream.participants, updateMessage);
-      return true;
+    if (this.streamManager) {
+      return this.streamManager.publishTaskUpdate(taskId, updateData);
     }
-    return this.streamManager.publishTaskUpdate(taskId, updateData);
+    // Fallback for servers without StreamManager
+    return this._fallbackPublishTaskUpdate(taskId, updateData);
+  }
+  
+  // Private fallback implementations
+  _fallbackSubscribeToTaskStream(clientId, taskId) {
+    if (!this.taskStreams.has(taskId)) {
+      this.taskStreams.set(taskId, {
+        id: taskId,
+        participants: new Set(),
+        history: [],
+        createdAt: new Date(),
+        isActive: true
+      });
+    }
+    const stream = this.taskStreams.get(taskId);
+    stream.participants.add(clientId);
+    return true;
+  }
+
+  _fallbackPublishTaskUpdate(taskId, updateData) {
+    const stream = this.taskStreams.get(taskId);
+    if (!WebSocketUtils.isActiveStream(stream)) return false;
+
+    const update = {
+      type: 'update',
+      data: updateData,
+      timestamp: new Date(),
+      action: updateData.action || 'update'
+    };
+
+    stream.history.push(update);
+
+    if (stream.history.length > (stream.options?.bufferSize || DEFAULTS.TASK_STREAM_BUFFER_SIZE)) {
+      stream.history = stream.history.slice(-stream.history.length);
+    }
+
+    const updateMessage = WebSocketUtils.createTaskMessage('task_stream_update', taskId, updateData);
+    WebSocketUtils.broadcastToParticipants(this, stream.participants, updateMessage);
+    return true;
   }
 
   // Common event publishing

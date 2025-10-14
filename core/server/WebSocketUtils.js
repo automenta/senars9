@@ -166,11 +166,23 @@ class WebSocketUtils {
   }
 
   static createErrorResponse(command, error) {
-    return WebSocketUtils.createErrorResponse(command, error);
+    return {
+      type: 'response',
+      command,
+      status: 'error',
+      error: error.message || error || 'Unknown error',
+      timestamp: new Date().toISOString()
+    };
   }
 
   static createSuccessResponse(command, data = {}) {
-    return WebSocketUtils.createSuccessResponse(command, data);
+    return {
+      type: 'response',
+      command,
+      status: 'success',
+      data,
+      timestamp: new Date().toISOString()
+    };
   }
 
   static createWelcomeMessage(clientId, connectionId) {
@@ -198,6 +210,11 @@ class WebSocketUtils {
 
   static createEventMessage(eventType, data, filters = {}) {
     return this.createMessage(MESSAGE_TYPES.EVENT, { eventType, data, filters });
+  }
+  
+  // Unified message creation method with context
+  static createTypedMessage(messageType, payload, context = {}) {
+    return this.createMessage(messageType, { ...payload, ...context });
   }
 
   static validateMessage(data) {
@@ -325,35 +342,9 @@ class WebSocketUtils {
     return errorMsg;
   }
 
-  // Enhanced error handling for different contexts
-  static handleConnectionError(wss, clientId, operation, error) {
-    return this.handleAndSendError(wss, operation, error, clientId);
-  }
-
-  static handleStreamError(wss, clientId, streamId, operation, error) {
-    const errorMsg = `Stream ${operation} failed for ${streamId}${clientId ? ` (client: ${clientId})` : ''}: ${error.message || error}`;
-    this.error(errorMsg);
-
-    if (wss && clientId) {
-      const errorResponse = this.createErrorResponse(operation, { message: errorMsg, streamId });
-      wss.sendToClient(clientId, errorResponse);
-    }
-    return errorMsg;
-  }
-
-  static handleTaskError(wss, clientId, taskId, operation, error) {
-    const errorMsg = `Task ${operation} failed for ${taskId}${clientId ? ` (client: ${clientId})` : ''}: ${error.message || error}`;
-    this.error(errorMsg);
-
-    if (wss && clientId) {
-      const errorResponse = this.createErrorResponse(operation, { message: errorMsg, taskId });
-      wss.sendToClient(clientId, errorResponse);
-    }
-    return errorMsg;
-  }
-
-  static handleGenericError(wss, clientId, operation, error, context = {}) {
-    const contextStr = Object.keys(context).length > 0 ? ` (${Object.entries(context).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '';
+  // Enhanced error handling for different contexts using a generic pattern
+  static handleContextualError(wss, clientId, operation, error, context = {}) {
+    const contextStr = Object.keys(context).length > 0 ? ` for ${Object.entries(context).map(([k, v]) => `${k}: ${v}`).join(', ')}` : '';
     const errorMsg = `${operation} failed${contextStr}${clientId ? ` (client: ${clientId})` : ''}: ${error.message || error}`;
     this.error(errorMsg);
 
@@ -362,6 +353,23 @@ class WebSocketUtils {
       wss.sendToClient(clientId, errorResponse);
     }
     return errorMsg;
+  }
+
+  // Specific error handlers using the generic pattern
+  static handleConnectionError(wss, clientId, operation, error) {
+    return this.handleContextualError(wss, clientId, operation, error, {});
+  }
+
+  static handleStreamError(wss, clientId, streamId, operation, error) {
+    return this.handleContextualError(wss, clientId, operation, error, { streamId });
+  }
+
+  static handleTaskError(wss, clientId, taskId, operation, error) {
+    return this.handleContextualError(wss, clientId, operation, error, { taskId });
+  }
+
+  static handleGenericError(wss, clientId, operation, error, context = {}) {
+    return this.handleContextualError(wss, clientId, operation, error, context);
   }
 
   // Common stream operations

@@ -192,11 +192,9 @@ class StreamManager {
     };
 
     const handler = actionHandlers[action];
-    if (handler) {
-      handler();
-    } else {
-      WebSocketUtils.warn(`Unknown streaming action: ${action}`);
-    }
+    handler 
+      ? handler()
+      : WebSocketUtils.warn(`Unknown streaming action: ${action}`);
   }
 
   getStats() {
@@ -215,10 +213,10 @@ class StreamManager {
   getSubscriptionStats() {
     return Array.from(this.wss.subscriptions.values())
       .flatMap(sub => Array.from(sub.eventTypes))
-      .reduce((counts, eventType) => {
-        counts[eventType] = (counts[eventType] || 0) + 1;
-        return counts;
-      }, {});
+      .reduce((counts, eventType) => ({
+        ...counts,
+        [eventType]: (counts[eventType] || 0) + 1
+      }), {});
   }
 
   cleanup() {

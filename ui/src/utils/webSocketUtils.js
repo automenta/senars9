@@ -31,6 +31,16 @@ export const parseWebSocketMessage = async (event) => {
   }
 };
 
+// Enhanced message parsing with type checking
+export const parseWebSocketMessageSafe = async (event) => {
+  try {
+    return await parseWebSocketMessage(event);
+  } catch (error) {
+    console.error('Error parsing WebSocket message:', error);
+    return null;
+  }
+};
+
 // Task management utilities
 export const createTask = (task) => ({
   ...task,
@@ -42,7 +52,7 @@ export const createTask = (task) => ({
 });
 
 export const sortTasksByPriority = (tasks) =>
-  [...tasks].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  [...tasks].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
 // Message history management - optimized
 
@@ -108,10 +118,14 @@ export const createStateUpdater = (setData) => (message) => {
     [MESSAGE_TYPES.CONCEPTS_UPDATE]: (payload) =>
       setData(prev => ({ ...prev, concepts: payload || [] })),
     [MESSAGE_TYPES.TOP_TASKS_UPDATE]: (payload) =>
-      setData(prev => ({ ...prev, memoryTasks: payload || [] }))
+      setData(prev => ({ ...prev, memoryTasks: payload || [] })),
+    // Add a generic handler for other message types
+    default: (payload) => {
+      // Generic handler for any other message types that may need state updates  
+    }
   };
 
-  updateStrategies[message.type]?.(message.payload);
+  (updateStrategies[message.type] || updateStrategies.default)(message.payload);
 };
 
 // WebSocket utilities - consolidated and deduplicated
@@ -184,6 +198,10 @@ export const createWebSocketHook = (WebSocketClass, config = {}) => {
 // Message history management - optimized
 export const manageMessageHistory = (messages, maxMessages, messageRetention) =>
   messages.length > maxMessages ? messages.slice(-messageRetention) : messages;
+
+// Terse syntax utility functions
+export const safeArray = (arr) => Array.isArray(arr) ? arr : [];
+export const safeObject = (obj) => obj && typeof obj === 'object' ? obj : {};
 
 // Legacy compatibility exports - simplified
 export const createStateMessageHandler = createStateUpdater;

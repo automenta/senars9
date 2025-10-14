@@ -44,38 +44,15 @@ class WebSocketServer extends BaseServer {
   }
 
   async start() {
-    if (this.isRunning) return;
-
-    if (!this.server) {
-      WebSocketUtils.warn('WebSocket server not initialized, skipping start');
-      return;
+    // Use parent class start logic and add specific heartbeat functionality
+    const result = await super.start();
+    
+    // Only start heartbeat if the server started successfully
+    if (this.isRunning) {
+      this.connectionManager.startHeartbeat();
     }
-
-    const port = this.getConfig('port', DEFAULTS.PORT);
-     const host = this.getConfig('host', DEFAULTS.HOST);
-
-     const isTestEnvironment = typeof process !== 'undefined' &&
-                             (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
-
-     const enabled = this.getConfig('enabled', DEFAULTS.ENABLED) ?? !isTestEnvironment;
-
-    if (!enabled) {
-      WebSocketUtils.debug('WebSocket server is disabled, skipping start');
-      return;
-    }
-
-    return new Promise((resolve, reject) => {
-      this.server.listen(port, host, (error) => {
-        if (error) {
-          WebSocketUtils.handleError(`starting WebSocket server on ${host}:${port}`, error);
-          reject(error);
-        } else {
-          this.onServerStart(port, host); // Use parent class method
-          this.connectionManager.startHeartbeat();
-          resolve();
-        }
-      });
-    });
+    
+    return result;
   }
 
   _extractSystemState() {

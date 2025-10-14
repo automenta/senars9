@@ -112,11 +112,9 @@ class MessageHandler {
     };
 
     const handler = actionHandlers[action];
-    if (handler) {
-      handler();
-    } else {
-      WebSocketUtils.warn(`Unknown streaming action: ${action}`);
-    }
+    handler 
+      ? handler()
+      : WebSocketUtils.warn(`Unknown streaming action: ${action}`);
   }
 
   _handleTaskSubscription(clientId, message) {
