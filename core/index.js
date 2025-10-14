@@ -34,7 +34,7 @@ export { default as GraphTraversal } from './memory/GraphTraversal.js';
 export { FocusSetSelector } from './FocusSetSelector.js';
 export { Clock, IterativeClock, UnixTimeClock, HighResolutionClock } from './Clock.js';
 export { CycleContext, runSingleCycle } from './Cycle.js';
-export { Memory } from './Memory.js';
+export { default as Memory } from './Memory.js';
 export { Reasoner, InferenceRule, RuleEngine } from './Reasoner.js';
 
 // System Components

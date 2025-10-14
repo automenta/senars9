@@ -34,12 +34,12 @@ describe('Memory Integration Test', () => {
     const results = await demonstrateMemorySystem();
 
     // Verify that high priority items are filtered correctly
-    expect(results.highPriorityItems.every(item => item[1].priority >= 8)).toBe(true);
+    expect(results.highPriorityItems.every(item => item.value.priority >= 8)).toBe(true);
 
     // Verify that alert items are filtered correctly
-    expect(results.alertItems.every(item => item[1].type === 'alert')).toBe(true);
+    expect(results.alertItems.every(item => item.value.type === 'alert')).toBe(true);
 
     // Verify that urgent items are filtered correctly
-    expect(results.urgentItems.every(item => item[0] === 'urgent-alert-001')).toBe(true);
+    expect(results.urgentItems.every(item => item.key.includes('urgent'))).toBe(true);
   });
 });

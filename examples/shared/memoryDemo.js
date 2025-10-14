@@ -11,13 +11,13 @@ export async function demonstrateMemorySystem() {
 
   try {
     // 1. Create focus sets for different attention areas
-    core.memory.createFocusSet('working-memory', 5);
-    core.memory.createFocusSet('long-term-storage', 10);
-    core.memory.createFocusSet('attention-focus', 3);
-    core.memory.createFocusSet('pattern-buffer', 8);
+    core.memory.focus.createFocusSet('working-memory', 5);
+    core.memory.focus.createFocusSet('long-term-storage', 10);
+    core.memory.focus.createFocusSet('attention-focus', 3);
+    core.memory.focus.createFocusSet('pattern-buffer', 8);
 
     // 2. Set current focus to working memory
-    core.memory.setFocus('working-memory');
+    core.memory.focus.setFocus('working-memory');
 
     // 3. Add items with different priorities and metadata
     const items = [
@@ -85,20 +85,20 @@ export async function demonstrateMemorySystem() {
     });
 
     // 4. Demonstrate focus set management
-    core.memory._updateFocusSets('urgent-alert-001', { focusSet: 'working-memory' });
-    core.memory._updateFocusSets('task-meeting-0900', { focusSet: 'working-memory' });
-    core.memory._updateFocusSets('pattern-traffic-001', { focusSet: 'attention-focus' });
-    core.memory._updateFocusSets('reference-docs', { focusSet: 'long-term-storage' });
+    core.memory.focus.updateFocusSets('urgent-alert-001', { focusSet: 'working-memory' });
+    core.memory.focus.updateFocusSets('task-meeting-0900', { focusSet: 'working-memory' });
+    core.memory.focus.updateFocusSets('pattern-traffic-001', { focusSet: 'attention-focus' });
+    core.memory.focus.updateFocusSets('reference-docs', { focusSet: 'long-term-storage' });
 
     // Get items from current focus
-    const focusItems = core.memory.getFocusItems(3);
+    const focusItems = core.memory.focus.getFocusItems(3);
 
     // 5. Demonstrate attention mechanism
-    core.memory.updateFocusAttention('working-memory', 0.8);
-    core.memory.updateFocusAttention('attention-focus', 0.6);
-    core.memory.updateFocusAttention('long-term-storage', 0.2);
+    core.memory.focus.updateFocusAttention('working-memory', 0.8);
+    core.memory.focus.updateFocusAttention('attention-focus', 0.6);
+    core.memory.focus.updateFocusAttention('long-term-storage', 0.2);
 
-    const focusStats = core.memory.getFocusSetStats();
+    const focusStats = core.memory.focus.getFocusSetStats();
 
     // 6. Demonstrate query optimization
     const highPriorityItems = core.memory.query({
@@ -120,8 +120,8 @@ export async function demonstrateMemorySystem() {
     const memStats = core.memory.getStats();
 
     // 8. Demonstrate attention-based sorting
-    core.memory.setFocus('attention-focus');
-    const attentionItems = core.memory.getFocusItems(5);
+    core.memory.focus.setFocus('attention-focus');
+    const attentionItems = core.memory.focus.getFocusItems(5);
 
     // Return results for verification
     return {

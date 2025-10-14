@@ -13,12 +13,12 @@ export async function demonstrateCognitiveCycle() {
     await system.start();
 
     // 1. Set up the cognitive environment
-    system.core.memory.createFocusSet('perception-buffer', 10);
-    system.core.memory.createFocusSet('working-memory', 8);
-    system.core.memory.createFocusSet('reasoning-focus', 5);
-    system.core.memory.createFocusSet('learning-storage', 20);
+    system.core.memory.focus.createFocusSet('perception-buffer', 10);
+    system.core.memory.focus.createFocusSet('working-memory', 8);
+    system.core.memory.focus.createFocusSet('reasoning-focus', 5);
+    system.core.memory.focus.createFocusSet('learning-storage', 20);
 
-    system.core.memory.setFocus('perception-buffer');
+    system.core.memory.focus.setFocus('perception-buffer');
 
     // 2. Create cognitive rules for processing
     const cognitiveRules = [
@@ -175,8 +175,8 @@ export async function demonstrateCognitiveCycle() {
     const learningResult = await system.core.rules.evaluate(learningExperience);
 
     // 4. Demonstrate memory integration
-    system.core.memory.setFocus('working-memory');
-    const workingMemoryItems = system.core.memory.getFocusItems(5);
+    system.core.memory.focus.setFocus('working-memory');
+    const workingMemoryItems = system.core.memory.focus.getFocusItems(5);
 
     // Query for insights generated
     const insights = system.core.memory.query({
@@ -191,12 +191,12 @@ export async function demonstrateCognitiveCycle() {
     });
 
     // 5. Show attention dynamics
-    system.core.memory.updateFocusAttention('perception-buffer', 0.3);
-    system.core.memory.updateFocusAttention('working-memory', 0.8);
-    system.core.memory.updateFocusAttention('reasoning-focus', 0.7);
-    system.core.memory.updateFocusAttention('learning-storage', 0.5);
+    system.core.memory.focus.updateFocusAttention('perception-buffer', 0.3);
+    system.core.memory.focus.updateFocusAttention('working-memory', 0.8);
+    system.core.memory.focus.updateFocusAttention('reasoning-focus', 0.7);
+    system.core.memory.focus.updateFocusAttention('learning-storage', 0.5);
 
-    const attentionStats = system.core.memory.getFocusSetStats();
+    const attentionStats = system.core.memory.focus.getFocusSetStats();
 
     // 6. Performance summary
     const ruleStats = system.core.rules.getStats();
@@ -242,9 +242,9 @@ export async function testCognitiveCycleFunctionality() {
 
     // Set up focus sets for cognitive processing
     if (system.core.memory) {
-      system.core.memory.createFocusSet('cognitive-input', 5);
-      system.core.memory.createFocusSet('cognitive-output', 5);
-      system.core.memory.setFocus('cognitive-input');
+      system.core.memory.focus.createFocusSet('cognitive-input', 5);
+      system.core.memory.focus.createFocusSet('cognitive-output', 5);
+      system.core.memory.focus.setFocus('cognitive-input');
     }
 
     // Create and add a simple cognitive rule

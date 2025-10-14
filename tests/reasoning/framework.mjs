@@ -6,8 +6,8 @@
 
 import { Task, Punctuation, TruthValue } from '../../core/Task.js';
 import { Term, TermType } from '../../core/Term.js';
-import { Memory } from '../../core/Memory.js';
 import { CycleContext } from '../../core/Cycle.js';
+import { withCoreSetup } from '../unit/enhanced-test-utils.js';
 
 /**
  * A general-purpose reasoning test that takes inputs and expected output matchers
@@ -20,15 +20,15 @@ import { CycleContext } from '../../core/Cycle.js';
  * @param {string} config.description - Description of the test for logging
  * @returns {boolean} - Whether the test passed
  */
-export function runGeneralReasoningTest(config) {
-  const memory = new Memory();
+export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
+  const { memory } = core;
   const context = new CycleContext(Date.now());
   
   // Add input tasks to memory
-  config.inputs.forEach((input, index) => {
+  for (const [index, input] of config.inputs.entries()) {
     const task = createTaskFromInput(input);
     memory.addTask(task, Date.now() + index);
-  });
+  }
   
   // Run the reasoner for N cycles
   const allDerivedTasks = new Set(); // Use Set to avoid duplicates
@@ -128,7 +128,7 @@ export function runGeneralReasoningTest(config) {
   }
   
   return testPassed;
-}
+});
 
 // Convenience builder function for creating tests with minimal boilerplate
 export class ReasoningTestBuilder {
@@ -187,8 +187,8 @@ export class ReasoningTestBuilder {
   }
 
   // Run the test
-  run() {
-    return runGeneralReasoningTest(this.config);
+  async run() {
+    return await runGeneralReasoningTest(this.config);
   }
 }
 

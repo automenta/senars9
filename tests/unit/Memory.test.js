@@ -1,4 +1,4 @@
-import Memory from '../../core/memory/Memory.js';
+import Memory, { Focus } from '../../core/Memory.js';
 import {
   createTestComponent,
   testLifecycleTransitions,
@@ -12,7 +12,8 @@ import {
 } from './enhanced-test-utils.js';
 
 const createMemory = (config = {}) => {
-  const memory = new Memory();
+  const focus = new Focus();
+  const memory = new Memory(focus);
   return memory.initialize({ cacheSize: 3, ...config }).then(() => memory);
 };
 
@@ -74,7 +75,7 @@ describe('Memory', () => {
     const stats = memory.getStats();
     expect(stats.storageSize).toBeGreaterThan(0);
     expect(stats.cacheSize).toBeGreaterThanOrEqual(0);
-    expect(stats.focusSets).toBeDefined();
+    expect(memory.focus.getFocusSetStats()).toBeDefined();
   });
 
   describe('Performance', () => {

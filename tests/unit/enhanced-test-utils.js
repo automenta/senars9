@@ -180,10 +180,10 @@ export const teardownCore = async (core) => {
 };
 
 export const withCoreSetup = (testFn) => {
-  return async () => {
+  return async (...args) => {
     const { core } = await setupCore();
     try {
-      await testFn(core);
+      return await testFn(core, ...args);
     } finally {
       await teardownCore(core);
     }

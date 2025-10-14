@@ -11,12 +11,12 @@ export async function demonstrateCognitiveCycle() {
 
   try {
     // 1. Set up the cognitive environment
-    core.memory.createFocusSet('perception-buffer', 10);
-    core.memory.createFocusSet('working-memory', 8);
-    core.memory.createFocusSet('reasoning-focus', 5);
-    core.memory.createFocusSet('learning-storage', 20);
+    core.memory.focus.createFocusSet('perception-buffer', 10);
+    core.memory.focus.createFocusSet('working-memory', 8);
+    core.memory.focus.createFocusSet('reasoning-focus', 5);
+    core.memory.focus.createFocusSet('learning-storage', 20);
 
-    core.memory.setFocus('perception-buffer');
+    core.memory.focus.setFocus('perception-buffer');
 
     // 2. Create cognitive rules for processing
     const cognitiveRules = [
@@ -173,8 +173,8 @@ export async function demonstrateCognitiveCycle() {
     const learningResult = await core.rules.evaluate(learningExperience);
 
     // 4. Demonstrate memory integration
-    core.memory.setFocus('working-memory');
-    const workingMemoryItems = core.memory.getFocusItems(5);
+    core.memory.focus.setFocus('working-memory');
+    const workingMemoryItems = core.memory.focus.getFocusItems(5);
 
     // Query for insights generated
     const insights = core.memory.query({
@@ -189,12 +189,12 @@ export async function demonstrateCognitiveCycle() {
     });
 
     // 5. Show attention dynamics
-    core.memory.updateFocusAttention('perception-buffer', 0.3);
-    core.memory.updateFocusAttention('working-memory', 0.8);
-    core.memory.updateFocusAttention('reasoning-focus', 0.7);
-    core.memory.updateFocusAttention('learning-storage', 0.5);
+    core.memory.focus.updateFocusAttention('perception-buffer', 0.3);
+    core.memory.focus.updateFocusAttention('working-memory', 0.8);
+    core.memory.focus.updateFocusAttention('reasoning-focus', 0.7);
+    core.memory.focus.updateFocusAttention('learning-storage', 0.5);
 
-    const attentionStats = core.memory.getFocusSetStats();
+    const attentionStats = core.memory.focus.getFocusSetStats();
 
     // 6. Performance summary
     const ruleStats = core.rules.getStats();

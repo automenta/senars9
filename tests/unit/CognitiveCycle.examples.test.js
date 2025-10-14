@@ -12,16 +12,16 @@ describe('Cognitive Cycle Examples - Unit Tests', () => {
   describe('Cognitive Environment Setup', () => {
     test('should set up focus sets for cognitive processes', withCoreSetup(async (core) => {
       // Create focus sets for different cognitive processes
-      core.memory.createFocusSet('perception-buffer', 10);
-      core.memory.createFocusSet('working-memory', 8);
-      core.memory.createFocusSet('reasoning-focus', 5);
-      core.memory.createFocusSet('learning-storage', 20);
+      core.memory.focus.createFocusSet('perception-buffer', 10);
+      core.memory.focus.createFocusSet('working-memory', 8);
+      core.memory.focus.createFocusSet('reasoning-focus', 5);
+      core.memory.focus.createFocusSet('learning-storage', 20);
 
       // Set initial focus
-      core.memory.setFocus('perception-buffer');
+      core.memory.focus.setFocus('perception-buffer');
 
       // Verify setup
-      const currentFocus = core.memory.getCurrentFocus();
+      const currentFocus = core.memory.focus.getCurrentFocus();
       expect(currentFocus).toBe('perception-buffer');
     }));
 
@@ -147,19 +147,19 @@ describe('Cognitive Cycle Examples - Unit Tests', () => {
 
     test('should manage attention dynamics during cognitive cycle', withCoreSetup(async (core) => {
       // Create focus sets
-      core.memory.createFocusSet('perception-buffer', 10);
-      core.memory.createFocusSet('working-memory', 8);
-      core.memory.createFocusSet('reasoning-focus', 5);
-      core.memory.createFocusSet('learning-storage', 20);
+      core.memory.focus.createFocusSet('perception-buffer', 10);
+      core.memory.focus.createFocusSet('working-memory', 8);
+      core.memory.focus.createFocusSet('reasoning-focus', 5);
+      core.memory.focus.createFocusSet('learning-storage', 20);
 
       // Update attention based on cognitive activity
-      core.memory.updateFocusAttention('perception-buffer', 0.3);
-      core.memory.updateFocusAttention('working-memory', 0.8);
-      core.memory.updateFocusAttention('reasoning-focus', 0.7);
-      core.memory.updateFocusAttention('learning-storage', 0.5);
+      core.memory.focus.updateFocusAttention('perception-buffer', 0.3);
+      core.memory.focus.updateFocusAttention('working-memory', 0.8);
+      core.memory.focus.updateFocusAttention('reasoning-focus', 0.7);
+      core.memory.focus.updateFocusAttention('learning-storage', 0.5);
 
       // Get attention stats
-      const attentionStats = core.memory.getFocusSetStats();
+      const attentionStats = core.memory.focus.getFocusSetStats();
 
       // Verify attention distribution
       expect(attentionStats['working-memory']).toBeDefined();

@@ -6,8 +6,8 @@ import { ReasoningTestBuilder, createReasoner } from './framework.mjs';
 import { ModusPonens } from '../../core/reasoning/ModusPonensRule.js';
 
 describe('Modus Ponens Tests', () => {
-  test('should derive b from (a ==> b) and a', () => {
-    const success = new ReasoningTestBuilder("Modus Ponens: (a ==> b) and a should derive b")
+  test('should derive b from (a ==> b) and a', async () => {
+    const success = await new ReasoningTestBuilder("Modus Ponens: (a ==> b) and a should derive b")
       .input("(a ==> b)", undefined, 0.9, 0.9)
       .input("a", undefined, 0.8, 0.8)
       .using(createReasoner(ModusPonens))
@@ -19,8 +19,8 @@ describe('Modus Ponens Tests', () => {
     expect(success).toBe(true);
   });
 
-  test('should not derive without the antecedent', () => {
-    const success = new ReasoningTestBuilder("Modus Ponens: (a ==> b) without a should NOT derive b")
+  test('should not derive without the antecedent', async () => {
+    const success = await new ReasoningTestBuilder("Modus Ponens: (a ==> b) without a should NOT derive b")
       .input("(a ==> b)", undefined, 0.9, 0.9)
       // Missing: a
       .using(createReasoner(ModusPonens))
@@ -31,8 +31,8 @@ describe('Modus Ponens Tests', () => {
     expect(success).toBe(true);
   });
 
-  test('should work with complex terms', () => {
-    const success = new ReasoningTestBuilder("Modus Ponens with complex terms")
+  test('should work with complex terms', async () => {
+    const success = await new ReasoningTestBuilder("Modus Ponens with complex terms")
       .input("(sunny_day ==> good_mood)", undefined, 0.85, 0.9)
       .input("sunny_day", undefined, 0.9, 0.85)
       .using(createReasoner(ModusPonens))

@@ -8,6 +8,8 @@
  */
 
 import { NAR } from '../core/NAR.js';  // The main Non-Axiomatic Reasoner
+import { FocusSetSelector } from '../core/FocusSetSelector.js';
+import Bag from '../core/memory/Bag.js';
 import System from '../core/system/System.js';  // The main System with LM integration
 import blessed from 'blessed';
 
@@ -43,131 +45,26 @@ function addIntegrationRule(rule) {
  * Process tasks through neurosymbolic integration rules
  */
 async function processNeurosymbolicRules() {
-  if (!system || !system.core) return;
-  
+  if (!system || !system.core || !system.core.focus) return;
+
   try {
-    // Access the NAR reasoning engine from the system's component architecture
-    let narEngine = null;
-    
-    // Look for the NAR engine in the componentMap
-    if (system.core.componentMap) {
-      // Common names for the reasoning engine component
-      const componentKeys = ['nar', 'reasoner', 'nars', 'engine', 'core'];
-      for (const key of componentKeys) {
-        if (system.core.componentMap[key]) {
-          narEngine = system.core.componentMap[key];
-          break;
-        }
-      }
-      
-      // If not found with common keys, try the first available component that might be the NAR
-      if (!narEngine) {
-        const components = Object.values(system.core.componentMap);
-        for (const comp of components) {
-          if (comp && typeof comp === 'object') {
-            // Look for components that have task-related methods
-            if (comp.getTasks || comp.focus || comp.memory) {
-              narEngine = comp;
-              break;
-            }
-          }
-        }
-      }
-    }
-    
-    if (!narEngine) {
-      // Now I know the correct architecture from Core.js:
-      // The system.core has components accessible via properties or componentMap
-      // Key components are: memory, reasoning, focus, lm, rules
-      
-      // First, try to find the NAR component if it exists (the one with the proper task methods)
-      if (system.core.nar && typeof system.core.nar.getTasks === 'function') {
-        narEngine = system.core.nar;  // The actual NAR with getTasks, getAllTasks methods
-      } else if (system.core.memory) {
-        narEngine = system.core.memory;  // Component-based memory
-      } else if (system.core.focus) {
-        narEngine = system.core.focus;  // Focus component
-      } else if (system.core.reasoning) {
-        narEngine = system.core.reasoning;
-      } else {
-        console.warn('No expected NAR components found in system. Available core properties:', 
-                     Object.keys(system.core || {}));
-        console.warn('Component map keys:', Array.from(system.core.componentMap?.keys() || []));
-        return;
-      }
-    }
-    
-    // Get tasks from the focus (active attention/short-term memory) rather than full memory
-    // In NARchy, the Focus contains the tasks that form premises for reasoning
-    let focusTasks = [];
-    
-    // Try different ways to access focus tasks from the NAR engine
-    // Based on Core.js and the actual Memory.js implementation:
-    if (Object.keys(narEngine).includes('focusSets') && Object.keys(narEngine).includes('currentFocus')) {
-      // This is the Focus component itself - we need to get tasks from the memory component instead
-      if (system.core.memory && typeof system.core.memory === 'object') {
-        // Debug: log what's available in memory component
-        // console.log('Memory component properties (rules):', Object.keys(system.core.memory));
-        
-        // Access tasks from the main memory component
-        if (system.core.memory.getAllTasks && typeof system.core.memory.getAllTasks === 'function') {
-          focusTasks = system.core.memory.getAllTasks();
-        }
-        else if (system.core.memory.shortTermTasks && system.core.memory.shortTermTasks instanceof Map) {
-          focusTasks = Array.from(system.core.memory.shortTermTasks.values());
-        }
-        else if (system.core.memory.longTermTasks && system.core.memory.longTermTasks instanceof Map) {
-          focusTasks = Array.from(system.core.memory.longTermTasks.values());
-        }
-        else {
-          console.warn('Memory component found but no expected task access methods (rules). Available properties:', 
-                       Object.keys(system.core.memory));
-          return; // Nothing to process
-        }
-      }
-      else {
-        console.warn('Focus component selected but no memory component found');
-        return; // Nothing to process
-      }
-    }
-    // If narEngine is not the focus component, try other access methods
-    else if (narEngine.getAllTasks && typeof narEngine.getAllTasks === 'function') {
-      // This is the main memory with shortTermTasks and longTermTasks
-      focusTasks = narEngine.getAllTasks();
-    }
-    else if (narEngine.shortTermTasks && narEngine.shortTermTasks instanceof Map) {
-      // Direct access to short term tasks (which represent the focus/active tasks)
-      focusTasks = Array.from(narEngine.shortTermTasks.values());
-    }
-    else if (narEngine.longTermTasks && narEngine.longTermTasks instanceof Map) {
-      focusTasks = Array.from(narEngine.longTermTasks.values());
-    }
-    else if (narEngine.tasks && narEngine.tasks instanceof Map) {
-      focusTasks = Array.from(narEngine.tasks.values());
-    }
-    else {
-      console.warn('No available method to retrieve tasks from NAR engine. Available properties:', 
-                   Object.keys(narEngine));
+    // For reasoning, we use probabilistic sampling from a Bag.
+    const focusItems = system.core.focus.getFocusItems ? system.core.focus.getFocusItems() : [];
+    if (focusItems.length === 0) {
       return;
     }
-    
-    // If focusTasks is not an array, try to make it one
-    if (!Array.isArray(focusTasks)) {
-      if (focusTasks instanceof Map) {
-        focusTasks = Array.from(focusTasks.values());
-      } else if (typeof focusTasks === 'object' && focusTasks !== null) {
-        // If it's an object with different task collections, combine them
-        focusTasks = Object.values(focusTasks).flat().filter(item => item !== undefined);
-      } else {
-        console.warn('Focus tasks is not an array or Map:', typeof focusTasks);
-        return;
-      }
+
+    const taskBag = new Bag();
+    for (const [key, taskData] of focusItems) {
+      taskBag.put(key, taskData, taskData.priority);
     }
-    
-    // Only process if we have focus tasks
-    if (focusTasks.length === 0) {
+
+    // Sample one task to process for this cycle to simulate the NAR's single-premise reasoning.
+    const sampledTaskData = taskBag.sample();
+    if (!sampledTaskData) {
       return;
     }
+    const focusTasks = [sampledTaskData.item]; // Process one sampled task.
     
     // Apply each integration rule to eligible focus tasks (premises)
     for (const rule of integrationRules) {
@@ -714,129 +611,18 @@ Example inputs: "Ensure Earth Happiness!", "Ensure User's Wealth!", etc.`,
  * Get tasks from the system and format them for display
  */
 function getFormattedTasks() {
-  if (!system || !system.core) {
+  if (!system || !system.core || !system.core.focus) {
     return [];
   }
 
   try {
-    // Access the NAR reasoning engine from the system's component architecture
-    let narEngine = null;
-    
-    // Look for the NAR engine in the componentMap
-    if (system.core.componentMap) {
-      // Common names for the reasoning engine component
-      const componentKeys = ['nar', 'reasoner', 'nars', 'engine', 'core'];
-      for (const key of componentKeys) {
-        if (system.core.componentMap[key]) {
-          narEngine = system.core.componentMap[key];
-          break;
-        }
-      }
-      
-      // If not found with common keys, try the first available component that might be the NAR
-      if (!narEngine) {
-        const components = Object.values(system.core.componentMap);
-        for (const comp of components) {
-          if (comp && typeof comp === 'object') {
-            // Look for components that have task-related methods
-            if (comp.getTasks || comp.focus || comp.memory) {
-              narEngine = comp;
-              break;
-            }
-          }
-        }
-      }
-    }
-    
-    if (!narEngine) {
-      // Now I know the correct architecture from Core.js:
-      // The system.core has components accessible via properties or componentMap
-      // Key components are: memory, reasoning, focus, lm, rules
-      
-      // First, try to find the NAR component if it exists (the one with the proper task methods)
-      if (system.core.nar && typeof system.core.nar.getTasks === 'function') {
-        narEngine = system.core.nar;  // The actual NAR with getTasks, getAllTasks methods
-      } else if (system.core.memory) {
-        narEngine = system.core.memory;  // Component-based memory
-      } else if (system.core.focus) {
-        narEngine = system.core.focus;  // Focus component
-      } else if (system.core.reasoning) {
-        narEngine = system.core.reasoning;
-      } else {
-        console.warn('No expected NAR components found in system for task display. Available core properties:', 
-                     Object.keys(system.core || {}));
-        console.warn('Component map keys:', Array.from(system.core.componentMap?.keys() || []));
-        return [];
-      }
-    }
+    // For the UI, we display the highest-priority items deterministically.
+    const focusItems = system.core.focus.getFocusItems
+      ? system.core.focus.getFocusItems(system.core.focus.focusSize || 10)
+      : [];
+    const focusTasks = focusItems.map(item => item[1]); // Extract task data
 
-    // In NARchy, the Focus is where active reasoning happens
-    // The Focus wraps a Bag of tasks that are probabilistically sampled based on priority
-    let focusTasks = [];
-
-    // Now I understand: if narEngine IS the focus component, we need to access the memory component separately to get tasks
-    if (Object.keys(narEngine).includes('focusSets') && Object.keys(narEngine).includes('currentFocus')) {
-      // This is the Focus component itself - we need to get tasks from the memory component instead
-      if (system.core.memory && typeof system.core.memory === 'object') {
-        // Debug: log what's available in memory component
-        console.log('Memory component properties:', Object.keys(system.core.memory));
-        
-        // Access tasks from the main memory component
-        if (system.core.memory.getAllTasks && typeof system.core.memory.getAllTasks === 'function') {
-          focusTasks = system.core.memory.getAllTasks();
-        }
-        else if (system.core.memory.shortTermTasks && system.core.memory.shortTermTasks instanceof Map) {
-          focusTasks = Array.from(system.core.memory.shortTermTasks.values());
-        }
-        else if (system.core.memory.longTermTasks && system.core.memory.longTermTasks instanceof Map) {
-          focusTasks = Array.from(system.core.memory.longTermTasks.values());
-        }
-        else {
-          console.warn('Memory component found but no expected task access methods. Available properties:', 
-                       Object.keys(system.core.memory));
-          focusTasks = [];
-        }
-      }
-      else {
-        console.warn('Focus component selected but no memory component found');
-        focusTasks = [];
-      }
-    }
-    // If narEngine is not the focus component, try other access methods
-    else if (narEngine.getAllTasks && typeof narEngine.getAllTasks === 'function') {
-      // This is the main memory with shortTermTasks and longTermTasks
-      focusTasks = narEngine.getAllTasks();
-    }
-    else if (narEngine.shortTermTasks && narEngine.shortTermTasks instanceof Map) {
-      // Direct access to short term tasks (which represent the focus/active tasks)
-      focusTasks = Array.from(narEngine.shortTermTasks.values());
-    }
-    else if (narEngine.longTermTasks && narEngine.longTermTasks instanceof Map) {
-      focusTasks = Array.from(narEngine.longTermTasks.values());
-    }
-    else if (narEngine.tasks && narEngine.tasks instanceof Map) {
-      focusTasks = Array.from(narEngine.tasks.values());
-    }
-    else {
-      console.warn('No available method to retrieve tasks from NAR engine. Available properties:', 
-                   Object.keys(narEngine));
-      return [];
-    }
-
-    // If focusTasks is not an array, try to make it one
-    if (!Array.isArray(focusTasks)) {
-      if (focusTasks instanceof Map) {
-        focusTasks = Array.from(focusTasks.values());
-      } else if (typeof focusTasks === 'object' && focusTasks !== null) {
-        // If it's an object with different task collections, combine them
-        focusTasks = Object.values(focusTasks).flat().filter(item => item !== undefined);
-      } else {
-        console.warn('Focus tasks is not an array or Map:', typeof focusTasks);
-        return [];
-      }
-    }
-
-    // Sort tasks based on the selected mode - this reflects the probabilistic sampling by priority in the Bag
+    // Sort tasks based on the selected mode
     let sortedTasks = [];
     if (taskSortMode === 'priority') {
       sortedTasks = focusTasks.sort((a, b) => {

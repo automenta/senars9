@@ -430,6 +430,18 @@ class Memory extends Component {
     return existed;
   }
 
+  clear() {
+    this.storage.clear();
+    this.cache.clear();
+    this.indexes.clear();
+    this.shortTermTasks.clear();
+    this.longTermTasks.clear();
+    this.conceptStorage.clear();
+    if (this.focus) {
+      this.focus.clear();
+    }
+  }
+
   // Helper for indexing
   _updateIndex(indexName, key) {
     if (!this.indexes.has(indexName)) {
@@ -457,8 +469,17 @@ class Memory extends Component {
     }
     
     if (minPriority !== undefined) {
-      const priorityKey = `priority_${minPriority}`;
-      const priorityKeys = this.indexes.get(priorityKey) || new Set();
+      const priorityKeys = new Set();
+      for (const [indexName, keys] of this.indexes.entries()) {
+        if (indexName.startsWith('priority_')) {
+          const priority = parseInt(indexName.split('_')[1], 10);
+          if (priority >= minPriority) {
+            for (const key of keys) {
+              priorityKeys.add(key);
+            }
+          }
+        }
+      }
       candidates = new Set([...candidates].filter(key => priorityKeys.has(key)));
     }
     
@@ -479,7 +500,8 @@ class Memory extends Component {
       shortTermTasks: this.shortTermTasks.size,
       longTermTasks: this.longTermTasks.size,
       concepts: this.conceptStorage.size,
-      consolidationCount: this.consolidationCount
+      consolidationCount: this.consolidationCount,
+      focusSets: this.focus ? this.focus.getFocusSetStats() : {}
     };
   }
 }

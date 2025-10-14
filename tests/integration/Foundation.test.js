@@ -106,12 +106,12 @@ describe('Core Foundation Integration Test', () => {
 
   test('should demonstrate enhanced memory focus sets and attention', withCoreSetup(async (core) => {
     // Create focus sets for different attention areas
-    core.memory.createFocusSet('working-memory', 5);
-    core.memory.createFocusSet('long-term-storage', 10);
-    core.memory.createFocusSet('attention-focus', 3);
+    core.memory.focus.createFocusSet('working-memory', 5);
+    core.memory.focus.createFocusSet('long-term-storage', 10);
+    core.memory.focus.createFocusSet('attention-focus', 3);
 
     // Set current focus
-    core.memory.setFocus('working-memory');
+    core.memory.focus.setFocus('working-memory');
 
     // Add test memory items using consolidated utilities
     const taskItem1 = createTestMemoryItems.task('urgent task', 10);
@@ -123,21 +123,21 @@ describe('Core Foundation Integration Test', () => {
     core.memory.set(memoryItem1.key, memoryItem1.value, { ...memoryItem1.options, type: 'memory', tags: ['reference'] });
 
     // Update focus sets for items
-    core.memory._updateFocusSets(taskItem1.key, { focusSet: 'working-memory' });
-    core.memory._updateFocusSets(taskItem2.key, { focusSet: 'working-memory' });
-    core.memory._updateFocusSets(memoryItem1.key, { focusSet: 'long-term-storage' });
+    core.memory.focus.updateFocusSets(taskItem1.key, { focusSet: 'working-memory' });
+    core.memory.focus.updateFocusSets(taskItem2.key, { focusSet: 'working-memory' });
+    core.memory.focus.updateFocusSets(memoryItem1.key, { focusSet: 'long-term-storage' });
 
     // Test focus set retrieval with attention scoring
-    const focusItems = core.memory.getFocusItems(3);
+    const focusItems = core.memory.focus.getFocusItems(3);
     expect(focusItems.length).toBeGreaterThan(0);
 
     // Test attention mechanism
-    const stats = core.memory.getFocusSetStats();
+    const stats = core.memory.focus.getFocusSetStats();
     expect(stats['working-memory']).toBeDefined();
 
     // Update attention
-    core.memory.updateFocusAttention('working-memory', 0.5);
-    const updatedStats = core.memory.getFocusSetStats();
+    core.memory.focus.updateFocusAttention('working-memory', 0.5);
+    const updatedStats = core.memory.focus.getFocusSetStats();
     expect(updatedStats['working-memory'].attentionScore).toBe(0.5);
 
     // Test query optimization - search by priority

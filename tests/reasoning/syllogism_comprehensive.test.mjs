@@ -6,8 +6,8 @@ import { ReasoningTestBuilder, createReasoner } from './framework.mjs';
 import { DeductiveSyllogism } from '../../core/reasoning/SyllogisticRules.js';
 
 describe('Deductive Syllogism Tests', () => {
-  test('should not derive invalid conclusion from unrelated premises', () => {
-    const success = new ReasoningTestBuilder("Syllogistic Reasoning: (a --> b) and (c --> d) should NOT derive (a --> d)")
+  test('should not derive invalid conclusion from unrelated premises', async () => {
+    const success = await new ReasoningTestBuilder("Syllogistic Reasoning: (a --> b) and (c --> d) should NOT derive (a --> d)")
       .input("(a --> b)", undefined, 0.9, 0.9)
       .input("(c --> d)", undefined, 0.8, 0.8)
       .using(createReasoner(DeductiveSyllogism))
@@ -18,8 +18,8 @@ describe('Deductive Syllogism Tests', () => {
     expect(success).toBe(true);
   });
 
-  test('should handle multiple inference cycles correctly', () => {
-    const success = new ReasoningTestBuilder("Syllogistic Reasoning: Multi-step inference (a --> b), (b --> c), (c --> d) should derive (a --> d)")
+  test('should handle multiple inference cycles correctly', async () => {
+    const success = await new ReasoningTestBuilder("Syllogistic Reasoning: Multi-step inference (a --> b), (b --> c), (c --> d) should derive (a --> d)")
       .input("(a --> b)", undefined, 0.9, 0.9)
       .input("(b --> c)", undefined, 0.8, 0.8)
       .input("(c --> d)", undefined, 0.7, 0.7)
@@ -34,8 +34,8 @@ describe('Deductive Syllogism Tests', () => {
     expect(success).toBe(true);
   });
 
-  test('should handle complex multi-output scenarios', () => {
-    const success = new ReasoningTestBuilder("Complex Syllogistic Reasoning Test")
+  test('should handle complex multi-output scenarios', async () => {
+    const success = await new ReasoningTestBuilder("Complex Syllogistic Reasoning Test")
       .input("(bird --> animal)", undefined, 0.9, 0.9)
       .input("(robin --> bird)", undefined, 0.95, 0.85)
       .input("(animal --> living_thing)", undefined, 0.8, 0.85)

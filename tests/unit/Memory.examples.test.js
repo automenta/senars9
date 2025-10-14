@@ -23,11 +23,11 @@ describe('Memory Examples', () => {
       ];
 
       focusSets.forEach(({ name, capacity }) => {
-        core.memory.createFocusSet(name, capacity);
+        core.memory.focus.createFocusSet(name, capacity);
       });
 
-      core.memory.setFocus('working-memory');
-      expect(core.memory.getCurrentFocus()).toBe('working-memory');
+      core.memory.focus.setFocus('working-memory');
+      expect(core.memory.focus.getCurrentFocus()).toBe('working-memory');
     });
 
     test('add items with metadata', () => {
@@ -63,34 +63,35 @@ describe('Memory Examples', () => {
     });
 
     test('manage focus set assignments', () => {
+      core.memory.focus.createFocusSet('working-memory', 5);
       core.memory.set('test-item', { content: 'test' }, { priority: 5 });
-      core.memory._updateFocusSets('test-item', { focusSet: 'working-memory' });
+      core.memory.focus.updateFocusSets('test-item', { focusSet: 'working-memory' });
 
-      const focusItems = core.memory.getFocusItems(10);
+      const focusItems = core.memory.focus.getFocusItems(10);
       expect(Array.isArray(focusItems)).toBe(true);
     });
   });
 
   describe('Attention Mechanism', () => {
     test('update focus attention', () => {
-      core.memory.createFocusSet('working-memory', 5);
-      core.memory.createFocusSet('attention-focus', 3);
+      core.memory.focus.createFocusSet('working-memory', 5);
+      core.memory.focus.createFocusSet('attention-focus', 3);
 
-      core.memory.updateFocusAttention('working-memory', 0.8);
-      core.memory.updateFocusAttention('attention-focus', 0.6);
+      core.memory.focus.updateFocusAttention('working-memory', 0.8);
+      core.memory.focus.updateFocusAttention('attention-focus', 0.6);
 
-      const stats = core.memory.getFocusSetStats();
+      const stats = core.memory.focus.getFocusSetStats();
       expect(stats['working-memory']).toBeDefined();
       expect(stats['attention-focus']).toBeDefined();
     });
 
     test('retrieve items by attention focus', () => {
-      core.memory.createFocusSet('test-focus', 5);
+      core.memory.focus.createFocusSet('test-focus', 5);
       core.memory.set('attention-item', { content: 'test', priority: 8 });
-      core.memory._updateFocusSets('attention-item', { focusSet: 'test-focus' });
+      core.memory.focus.updateFocusSets('attention-item', { focusSet: 'test-focus' });
 
-      core.memory.setFocus('test-focus');
-      const items = core.memory.getFocusItems(5);
+      core.memory.focus.setFocus('test-focus');
+      const items = core.memory.focus.getFocusItems(5);
       expect(Array.isArray(items)).toBe(true);
     });
   });
