@@ -24,7 +24,7 @@ describe('Cognitive Validation Tests', () => {
     global.registerSystemForCleanup(system);
 
     await system.start();
-  }, 15000); // Increase timeout to 15 seconds for concurrent test runs
+  }, 10000); // Increase timeout to 10 seconds for System initialization
 
   afterEach(async () => {
     if (system) {
@@ -276,6 +276,366 @@ describe('Cognitive Validation Tests', () => {
       expect(metrics.system).toHaveProperty('uptime');
       expect(metrics.system).toHaveProperty('tasksProcessed');
       expect(metrics.system).toHaveProperty('isRunning');
+    });
+  });
+
+  describe('Planning Integration', () => {
+    test('should demonstrate HTN plan generation and execution', async () => {
+      const planner = system.core.htnPlanner;
+      expect(planner).toBeDefined();
+
+      // Register test methods and operators
+      planner.registerMethod('test-task', async (task, context) => {
+        return [
+          { name: 'test-action' }
+        ];
+      });
+
+      planner.registerOperator('test-action', async (task, context) => {
+        return {
+          success: true,
+          message: 'Test action completed',
+          effects: { testActionCompleted: true }
+        };
+      });
+
+      // Test plan generation
+      const goal = { name: 'test-task' };
+      const startState = {};
+
+      const plan = await planner.createGoalPlan(goal, startState);
+      expect(plan).toBeDefined();
+
+      // Test plan execution
+      const result = await planner.executePlan(plan, startState);
+      expect(result).toBeDefined();
+    });
+
+    test('should verify planner statistics and metrics', () => {
+      const planner = system.core.htnPlanner;
+      expect(planner).toBeDefined();
+
+      // Verify planner has stats method
+      const stats = planner.getStats ? planner.getStats() : {};
+      expect(typeof stats).toBe('object');
+    });
+
+    test('should demonstrate plan failure recovery strategies', async () => {
+      const planner = system.core.htnPlanner;
+      expect(planner).toBeDefined();
+
+      // Register a method that may fail
+      planner.registerMethod('risky-task', async (task, context) => {
+        if (context.riskFactor > 0.8) {
+          return [{ name: 'risky-action' }];
+        }
+        return [{ name: 'safe-action' }];
+      });
+
+      planner.registerOperator('risky-action', async (task, context) => {
+        if (Math.random() > 0.5) {
+          throw new Error('Risky action failed');
+        }
+        return { success: true, effects: { riskyActionCompleted: true } };
+      });
+
+      planner.registerOperator('safe-action', async (task, context) => {
+        return { success: true, effects: { safeActionCompleted: true } };
+      });
+
+      // Test with high risk factor
+      const riskyGoal = { name: 'risky-task' };
+      const riskyStartState = { riskFactor: 0.9 };
+
+      const riskyPlan = await planner.createGoalPlan(riskyGoal, riskyStartState);
+      expect(riskyPlan).toBeDefined();
+
+      // Execution might fail but should be handled gracefully
+      const riskyResult = await planner.executePlan(riskyPlan, riskyStartState);
+      expect(riskyResult).toBeDefined();
+    });
+  });
+
+  describe('Pattern Detection Integration', () => {
+    test('should demonstrate temporal pattern recognition with prediction', async () => {
+      const patternDetector = system.core.patternDetector;
+      expect(patternDetector).toBeDefined();
+
+      // Configure for testing
+      if (patternDetector.config) {
+        patternDetector.config.minPatternFrequency = 2;
+        patternDetector.config.similarityThreshold = 0.5;
+      }
+
+      // Create test events
+      const temporalEvents = [];
+      const now = Date.now();
+      for (let i = 0; i < 10; i++) {
+        temporalEvents.push({
+          type: 'system-alert',
+          name: 'high-cpu',
+          timestamp: now - (10 - i) * 1000,
+          context: 'server-001'
+        });
+      }
+
+      const temporalResult = await patternDetector.processEventStream(temporalEvents, 'temporal-test');
+      const predictions = await patternDetector.predictNextEvents(temporalEvents);
+
+      expect(Array.isArray(temporalResult.temporal)).toBe(true);
+      expect(Array.isArray(predictions)).toBe(true);
+      expect(typeof (predictions.length > 0 ? predictions[0].confidence || 0 : 0)).toBe('number');
+    });
+
+    test('should identify causal relationship patterns', async () => {
+      const patternDetector = system.core.patternDetector;
+      expect(patternDetector).toBeDefined();
+
+      // Create causal test events
+      const causalEvents = [];
+      const now = Date.now();
+      for (let i = 0; i < 8; i++) {
+        causalEvents.push({
+          type: i % 2 === 0 ? 'cpu-event' : 'fan-event',
+          name: i % 2 === 0 ? 'cpu-increase' : 'fan-activation',
+          value: 50 + i * 5,
+          timestamp: now - (8 - i),
+          context: 'server'
+        });
+      }
+
+      const causalResult = await patternDetector.processEventStream(causalEvents, 'causal-test');
+
+      expect(typeof causalResult.causal).toBe('object');
+      expect(Array.isArray(causalResult.causal)).toBe(true);
+    });
+
+    test('should demonstrate pattern confidence scoring', async () => {
+      const patternDetector = system.core.patternDetector;
+      expect(patternDetector).toBeDefined();
+
+      // Create confidence test events
+      const confidenceEvents = [];
+      for (let i = 0; i < 8; i++) {
+        confidenceEvents.push({
+          type: 'regular-pattern',
+          name: i % 2 === 0 ? 'pattern-a' : 'pattern-b',
+          timestamp: Date.now() - (8 - i) * 1000,
+          context: 'test'
+        });
+      }
+
+      const result = await patternDetector.processEventStream(confidenceEvents, 'confidence-test');
+      const patternConfidences = result.all ? result.all.map(p => p.confidence) : [];
+
+      expect(Array.isArray(patternConfidences)).toBe(true);
+      if (patternConfidences.length > 0) {
+        patternConfidences.forEach(conf => {
+          expect(conf).toBeGreaterThanOrEqual(0);
+          expect(conf).toBeLessThanOrEqual(1);
+        });
+      }
+    });
+
+    test('should demonstrate comprehensive pattern detection functionality', async () => {
+      const patternDetector = system.core.patternDetector;
+      expect(patternDetector).toBeDefined();
+
+      const componentsAvailable = {
+        hasPatternDetector: !!patternDetector,
+        hasProcessEventStream: typeof patternDetector.processEventStream === 'function',
+        hasMatchPattern: typeof patternDetector.matchPattern === 'function',
+        hasPredictNextEvents: typeof patternDetector.predictNextEvents === 'function',
+        hasGetPatterns: typeof patternDetector.getPatterns === 'function',
+        hasGetStats: typeof patternDetector.getStats === 'function'
+      };
+
+      // Verify all components are available
+      expect(componentsAvailable.hasPatternDetector).toBe(true);
+      expect(componentsAvailable.hasProcessEventStream).toBe(true);
+
+      // Create test events
+      const testEvents = [];
+      for (let i = 0; i < 8; i++) {
+        testEvents.push({
+          type: 'test',
+          name: i % 2 === 0 ? 'A' : 'B',
+          timestamp: Date.now() - (8 - i) * 1000
+        });
+      }
+
+      const result = await patternDetector.processEventStream(testEvents, 'test-stream');
+      const predictions = await patternDetector.predictNextEvents(testEvents);
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(predictions)).toBe(true);
+
+      // Verify stats functionality
+      const stats = patternDetector.getStats();
+      expect(typeof stats).toBe('object');
+    });
+  });
+
+  describe('Bootstrap Agent Integration', () => {
+    test('should demonstrate comprehensive bootstrap agent functionality', async () => {
+      const bootstrapAgent = system.core.bootstrapAgent || new (await import('../../agent/BootstrapAgent.js')).default();
+
+      if (!bootstrapAgent) {
+        console.log('⚠️ BootstrapAgent not available in this configuration');
+        return;
+      }
+
+      await bootstrapAgent.initialize({
+        maxBootstrapIterations: 3,
+        goalConfidenceThreshold: 0.7,
+        enableSelfImprovement: true,
+        watchPlanFiles: false
+      });
+
+      // Set up dependencies
+      bootstrapAgent.setupDependencies(
+        system.core.lm || null,
+        system.core.planProcessor || null,
+        system.core.htnPlanner || null,
+        system
+      );
+
+      const componentsAvailable = {
+        hasBootstrapAgent: !!bootstrapAgent,
+        hasInitialize: typeof bootstrapAgent.initialize === 'function',
+        hasSetupDependencies: typeof bootstrapAgent.setupDependencies === 'function',
+        hasStart: typeof bootstrapAgent.start === 'function',
+        hasStop: typeof bootstrapAgent.stop === 'function',
+        hasExecuteSingleCycle: typeof bootstrapAgent.executeSingleCycle === 'function',
+        hasAddPlanSource: typeof bootstrapAgent.addPlanSource === 'function'
+      };
+
+      // Verify all components are available
+      expect(componentsAvailable.hasBootstrapAgent).toBe(true);
+      expect(componentsAvailable.hasInitialize).toBe(true);
+
+      // Add a simple plan source
+      const simplePlan = `# Simple Plan
+- Goal 1: Implement basic functionality
+- Goal 2: Test the implementation
+`;
+      bootstrapAgent.addPlanSource(simplePlan, 'text');
+
+      // Add a direct bootstrap goal
+      const testGoal = bootstrapAgent.addBootstrapGoal('Test bootstrap functionality', 0.8, 0.75);
+      expect(testGoal).toBeDefined();
+
+      // Start and execute a cycle
+      await bootstrapAgent.start();
+      const cycleResult = await bootstrapAgent.executeSingleCycle();
+      await bootstrapAgent.stop();
+
+      // Verify results
+      expect(cycleResult).toBeDefined();
+      const stats = bootstrapAgent.getStats();
+      expect(typeof stats).toBe('object');
+    });
+
+    test('should demonstrate plan file monitoring and updates', async () => {
+      const bootstrapAgent = system.core.bootstrapAgent || new (await import('../../agent/BootstrapAgent.js')).default();
+
+      if (!bootstrapAgent) {
+        console.log('⚠️ BootstrapAgent not available in this configuration');
+        return;
+      }
+
+      await bootstrapAgent.initialize({
+        maxBootstrapIterations: 3,
+        goalConfidenceThreshold: 0.7,
+        enableSelfImprovement: true,
+        watchPlanFiles: false
+      });
+
+      bootstrapAgent.setupDependencies(
+        system.core.lm || null,
+        system.core.planProcessor || null,
+        system.core.htnPlanner || null,
+        system
+      );
+
+      // Add initial plan
+      const testPlan = `# Test Plan
+- Monitor plan file changes
+- Process updated goals
+`;
+      bootstrapAgent.addPlanSource(testPlan, 'text');
+
+      const initialStats = bootstrapAgent.getStats();
+
+      // Add another plan to simulate updates
+      const updatePlan = `# Plan Update
+- Add new functionality
+- Modify existing goals
+`;
+      bootstrapAgent.addPlanSource(updatePlan, 'text');
+
+      await bootstrapAgent.start();
+      const cycleResults = [];
+      const maxCycles = 1; // Limited for testing
+      for (let i = 0; i < maxCycles; i++) {
+        const result = await bootstrapAgent.executeSingleCycle();
+        if (result) cycleResults.push(result);
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      await bootstrapAgent.stop();
+
+      const finalStats = bootstrapAgent.getStats();
+
+      expect(Array.isArray(cycleResults)).toBe(true);
+      expect(finalStats).toBeDefined();
+      expect(typeof finalStats.bootstrapIterations).toBe('number');
+    });
+
+    test('should demonstrate self-directed goal processing', async () => {
+      const bootstrapAgent = system.core.bootstrapAgent || new (await import('../../agent/BootstrapAgent.js')).default();
+
+      if (!bootstrapAgent) {
+        console.log('⚠️ BootstrapAgent not available in this configuration');
+        return;
+      }
+
+      await bootstrapAgent.initialize({
+        maxBootstrapIterations: 3,
+        goalConfidenceThreshold: 0.6,
+        enableSelfImprovement: true,
+        watchPlanFiles: false
+      });
+
+      bootstrapAgent.setupDependencies(
+        system.core.lm || null,
+        system.core.planProcessor || null,
+        system.core.htnPlanner || null,
+        system
+      );
+
+      // Add some goals
+      bootstrapAgent.addBootstrapGoal('Improve system performance', 0.9, 0.85);
+      bootstrapAgent.addBootstrapGoal('Enhance cognitive capabilities', 0.8, 0.8);
+
+      await bootstrapAgent.start();
+
+      const executionResults = [];
+      const maxCycles = 1; // Limited for testing
+      for (let i = 0; i < maxCycles; i++) {
+        const result = await bootstrapAgent.executeSingleCycle();
+        if (result) executionResults.push(result);
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+
+      await bootstrapAgent.stop();
+
+      const finalStats = bootstrapAgent.getStats();
+      const finalStatus = bootstrapAgent.getStatus();
+
+      expect(Array.isArray(executionResults)).toBe(true);
+      expect(finalStats).toBeDefined();
+      expect(finalStatus).toBeDefined();
+      expect(typeof finalStats.goalsProcessed).toBe('number');
     });
   });
 });

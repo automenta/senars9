@@ -2,7 +2,7 @@
 import { jest } from '@jest/globals';
 
 // Increase timeout for async operations
-jest.setTimeout(15000);
+jest.setTimeout(10000);
 
 // Global test cleanup to ensure no resource leaks between tests
 let globalSystems = new Set();
