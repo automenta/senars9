@@ -8,5 +8,5 @@ export default {
     '/tests/experimental2/',
     '/ui/'
   ],
-  testMatch: ['**/*.test.js', '**/*.spec.js']
+  testMatch: ['**/*.test.js', '**/*.spec.js', '**/*.test.mjs', '**/*.spec.mjs']
 };
