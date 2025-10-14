@@ -25,6 +25,7 @@ export { Task, Punctuation, TruthValue } from './Task.js';
 export { Concept } from './Concept.js';
 export { TaskTable, SelectionCriteria, DefaultAggregationFunctions } from './TaskTable.js';
 export { Answer } from './Answer.js';
+export { NAR } from './NAR.js';
 
 // Memory & Cognitive Architecture
 export { default as Bag } from './memory/Bag.js';
