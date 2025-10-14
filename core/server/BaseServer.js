@@ -74,18 +74,8 @@ class BaseServer extends Component {
   }
 
   shouldStartServer(enabled) {
-    const isTestEnvironment = typeof process !== 'undefined' &&
-                            (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
-
-    // Allow override via enabled config or test environment
-    const shouldEnable = enabled ?? !isTestEnvironment;
-    
-    if (!shouldEnable) {
-      WebSocketUtils.debug('Server is disabled, skipping start');
-      return false;
-    }
-    
-    return true;
+    const isTestEnvironment = typeof process !== 'undefined' && (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
+    return (enabled ?? !isTestEnvironment) ? true : (WebSocketUtils.debug('Server is disabled, skipping start'), false);
   }
 
   onServerStart(port, host) {

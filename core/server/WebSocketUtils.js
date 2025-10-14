@@ -1,11 +1,3 @@
-/**
- * WebSocket Utilities Facade
- * Provides backward compatibility while using specialized modules internally
- *
- * This file now serves as a clean API surface that delegates to specialized
- * modules for better maintainability and following Single Responsibility Principle
- */
-
 import { DEFAULTS, MESSAGE_TYPES, CLIENT_STATUS, STREAM_TYPES } from './constants.js';
 import ErrorHandler from './errorHandler.js';
 import MessageUtils from './messageUtils.js';
@@ -14,19 +6,9 @@ import StreamUtils from './streamUtils.js';
 import ConfigUtils from './configUtils.js';
 import Logger from './Logger.js';
 
-// Global config manager instance - will be initialized when needed
+// Lazy config manager initialization
 let configManager = null;
-
-const getConfigManager = () => {
-  if (!configManager) {
-    // Dynamic import to avoid circular dependencies
-    import('./ServerConfig.js').then(({ default: ServerConfig }) => {
-      configManager = new ServerConfig();
-      configManager.initialize();
-    });
-  }
-  return configManager;
-};
+const getConfigManager = () => configManager ??= import('./ServerConfig.js').then(({ default: ServerConfig }) => (configManager = new ServerConfig()).initialize() && configManager);
 
 /**
  * Main WebSocketUtils class - now acts as a facade

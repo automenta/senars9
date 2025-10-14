@@ -3,32 +3,25 @@ import { DndContext, closestCorners } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { getPriorityColor, getItemIcon } from '../utils/common';
+import { createButtonStyle, createFlexLayout } from '../utils/uiHelpers';
 
 const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id || index });
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const baseStyle = {
+  const priorityColor = getPriorityColor(task.priority || 0.5);
+  const baseStyle = createFlexLayout('row', 'flex-start', 'center', {
     padding: '6px 8px',
     margin: '2px 0',
     borderRadius: '4px',
-    display: 'flex',
-    alignItems: 'center',
     fontSize: '12px',
     cursor: 'grab',
     transition: 'all 0.2s ease',
     minHeight: '36px'
-  };
+  });
 
-  const expandedStyle = {
-    backgroundColor: '#e7f1ff',
-    border: '1px solid #0d6efd'
-  };
-
-  const collapsedStyle = {
-    backgroundColor: '#f8f9fa',
-    border: '1px solid #ced4da'
-  };
+  const expandedStyle = { backgroundColor: '#e7f1ff', border: '1px solid #0d6efd' };
+  const collapsedStyle = { backgroundColor: '#f8f9fa', border: '1px solid #ced4da' };
 
   return (
     <div
@@ -44,18 +37,15 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
       {...listeners}
       onClick={() => setIsExpanded(!isExpanded)}
     >
-      <span style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+      <span style={createFlexLayout('row', 'center', 'center', {
         width: '24px',
         height: '24px',
         borderRadius: '50%',
-        backgroundColor: `${getPriorityColor(task.priority || 0.5)}20`,
+        backgroundColor: `${priorityColor}20`,
         marginRight: '8px',
         fontSize: '12px',
-        color: getPriorityColor(task.priority || 0.5)
-      }}>
+        color: priorityColor
+      })}>
         {getItemIcon(task.type)}
       </span>
 
@@ -65,10 +55,10 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '120px', justifyContent: 'flex-end' }}>
+      <div style={createFlexLayout('row', 'flex-end', 'center', { gap: '6px', minWidth: '120px' })}>
         <span style={{
           fontWeight: 'bold',
-          color: getPriorityColor(task.priority || 0.5),
+          color: priorityColor,
           fontSize: '11px',
           minWidth: '30px',
           textAlign: 'right'
@@ -89,15 +79,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
 
         <button
           onClick={e => (e.stopPropagation(), setIsExpanded(!isExpanded))}
-          style={{
-            padding: '2px 6px',
-            backgroundColor: isExpanded ? '#0d6efd' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '3px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          }}
+          style={createButtonStyle(isExpanded ? 'primary' : 'secondary', { padding: '2px 6px', fontSize: '12px', borderRadius: '3px' })}
         >
           ⋯
         </button>
@@ -118,7 +100,7 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
           boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
           fontSize: '11px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={createFlexLayout('row', 'space-between', 'center', { marginBottom: '8px' })}>
             <h4 style={{ margin: 0, color: '#0d6efd' }}>Task Details</h4>
             <button
               onClick={() => setIsExpanded(false)}
@@ -137,21 +119,21 @@ const SortableTaskItem = ({ task, index, onPriorityChange, onDeleteTask }) => {
             <div><strong>Content:</strong> {task.content || 'N/A'}</div>
           </div>
 
-          <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+          <div style={createFlexLayout('row', 'flex-start', 'center', { gap: '8px', marginTop: '10px' })}>
             <button
-              style={{ padding: '4px 8px', fontSize: '10px', border: '1px solid #ccc', borderRadius: '3px', cursor: 'pointer', backgroundColor: '#e9ecef' }}
+              style={createButtonStyle('secondary', { padding: '4px 8px', fontSize: '10px', borderRadius: '3px' })}
               onClick={() => console.log('Execute task:', task.id)}
             >
               ▶️ Execute
             </button>
             <button
-              style={{ padding: '4px 8px', fontSize: '10px', border: '1px solid #ccc', borderRadius: '3px', cursor: 'pointer', backgroundColor: '#e9ecef' }}
+              style={createButtonStyle('danger', { padding: '4px 8px', fontSize: '10px', borderRadius: '3px' })}
               onClick={() => onDeleteTask(task)}
             >
               🗑️ Delete
             </button>
             <button
-              style={{ padding: '4px 8px', fontSize: '10px', border: '1px solid #ccc', borderRadius: '3px', cursor: 'pointer', backgroundColor: '#e9ecef' }}
+              style={createButtonStyle('success', { padding: '4px 8px', fontSize: '10px', borderRadius: '3px' })}
               onClick={() => onPriorityChange(task, Math.min(1, (task.priority || 0) + 0.1))}
             >
               ⬆️ Up Priority
@@ -193,16 +175,13 @@ const TasksPanel = ({ tasks = [], memoryTasks = [], onUpdateTask, onDeleteTask }
 
   return (
     <div className="tasks-tree" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{
+      <div style={createFlexLayout('row', 'space-between', 'center', {
         padding: '5px 10px',
         backgroundColor: '#e9ecef',
         borderBottom: '1px solid #ccc',
         fontSize: '12px',
-        fontWeight: 'bold',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
+        fontWeight: 'bold'
+      })}>
         <div>
           {memoryTasks.length > 0 ? 'Derivations' : 'Active Tasks'} ({displayTasks.length})
         </div>
@@ -223,16 +202,12 @@ const TasksPanel = ({ tasks = [], memoryTasks = [], onUpdateTask, onDeleteTask }
                 </div>
               ))
             ) : (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
+              <div style={createFlexLayout('column', 'center', 'center', {
                 height: '100%',
                 color: '#999',
                 fontStyle: 'italic',
                 textAlign: 'center'
-              }}>
+              })}>
                 <div style={{ fontSize: '24px', marginBottom: '10px' }}>📋</div>
                 <div>{memoryTasks.length > 0 ? 'No derivations available' : 'No active tasks'}</div>
                 <div style={{ fontSize: '10px', marginTop: '5px' }}>

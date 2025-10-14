@@ -15,9 +15,7 @@ export class MessageUtils {
   }
 
   static createResponse(command, status, data = {}) {
-    return status === 'error'
-      ? this.createErrorResponse(command, data)
-      : this.createSuccessResponse(command, data);
+    return status === 'error' ? this.createErrorResponse(command, data) : this.createSuccessResponse(command, data);
   }
 
   static createErrorResponse(command, error) {
@@ -110,13 +108,11 @@ export class MessageUtils {
   }
 
   static getTaskStatus(task) {
-    if (!task) return 'Unknown';
-    return task.isBelief?.() ? 'Belief' : task.isGoal?.() ? 'Goal' : task.isQuestion?.() ? 'Question' : 'Derived';
+    return !task ? 'Unknown' : task.isBelief?.() ? 'Belief' : task.isGoal?.() ? 'Goal' : task.isQuestion?.() ? 'Question' : 'Derived';
   }
 
   static getTaskType(task) {
-    if (!task) return 'Unknown';
-    return task.punctuation === '.' ? 'Belief' : task.punctuation === '!' ? 'Goal' : task.punctuation === '?' ? 'Question' : 'Derived';
+    return !task ? 'Unknown' : task.punctuation === '.' ? 'Belief' : task.punctuation === '!' ? 'Goal' : task.punctuation === '?' ? 'Question' : 'Derived';
   }
 
   static generateId(prefix = 'id') {
