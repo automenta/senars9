@@ -1,7 +1,4 @@
 import {
-  CONNECTION_STATUS,
-  DEFAULT_WS_CONFIG,
-  MESSAGE_TYPES,
   isValidWebSocketUrl,
   createConnectionManager,
   parseWebSocketMessage,
@@ -9,6 +6,7 @@ import {
   sortTasksByPriority,
   createStateUpdater
 } from './webSocketUtils';
+import { CONNECTION_STATUS, CLIENT_WS_CONFIG as DEFAULT_WS_CONFIG, MESSAGE_TYPES } from '../../core/shared/ClientConstants.js';
 
 // Unified WebSocket manager - handles both connection and state management
 class WebSocketConnectionManager {

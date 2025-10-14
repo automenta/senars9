@@ -1,6 +1,6 @@
-import { CONNECTION_STATUS, DEFAULT_WS_CONFIG, MESSAGE_TYPES } from '../constants';
+import { CLIENT_WS_CONFIG as DEFAULT_WS_CONFIG } from '../../core/shared/ClientConstants.js';
 
-export { CONNECTION_STATUS, DEFAULT_WS_CONFIG, MESSAGE_TYPES };
+export { DEFAULT_WS_CONFIG };
 
 // WebSocket configuration with defaults
 export const createWebSocketConfig = (overrides = {}) => ({

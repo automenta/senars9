@@ -5,7 +5,7 @@ import useWebSocket from './core/useWebSocket';
 import CommandService from './services/CommandService';
 import { UIProvider } from './core/UIContext';
 import { NotificationProvider } from './core/NotificationSystem';
-import { CONNECTION_DEFAULTS } from './constants';
+import { CONNECTION_DEFAULTS } from '../core/shared/ClientConstants.js';
 import './App.css';
 import './Layout.css';
 

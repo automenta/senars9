@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { CONNECTION_DEFAULTS } from '../constants';
+import { CONNECTION_DEFAULTS } from '../core/shared/ClientConstants.js';
 
 export const useCommandHistory = (maxSize = CONNECTION_DEFAULTS.maxHistorySize) => {
   const [history, setHistory] = useState([]);

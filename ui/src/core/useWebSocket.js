@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import WebSocketConnectionManager from '../utils/WebSocketConnectionManager';
-import { createWebSocketConfig, MESSAGE_TYPES } from '../utils/webSocketUtils';
+import { createWebSocketConfig } from '../utils/webSocketUtils';
+import { MESSAGE_TYPES } from '../../core/shared/ClientConstants.js';
 
 const useWebSocket = (url, config = {}) => {
   const [messages, setMessages] = useState([]);

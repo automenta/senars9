@@ -476,6 +476,15 @@ class WebSocketUtils {
       lastUpdated: new Date()
     };
   }
+  
+  // Utility to wrap operations with consistent error handling
+  static withErrorHandling(operation, wss, operationName, clientId = null) {
+    try {
+      return operation();
+    } catch (error) {
+      return this.handleAndSendError(wss, operationName, error, clientId);
+    }
+  }
 }
 
 export { DEFAULTS, MESSAGE_TYPES, CLIENT_STATUS, STREAM_TYPES, WebSocketUtils };
