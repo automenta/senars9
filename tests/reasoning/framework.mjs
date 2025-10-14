@@ -86,14 +86,14 @@ export function runGeneralReasoningTest(config) {
     console.log(`📋 Input tasks: ${config.inputs.length}`);
     config.inputs.forEach((input, index) => {
       const task = createTaskFromInput(input);
-      console.log(`  ${index + 1}. ${task.toString()} [priority: ${task.getPriority()}]`);
+      console.log(`  ${index + 1}. ${formatTaskWithRoundedTruth(task)} [priority: ${task.getPriority()}]`);
     });
     console.log(`📊 Total derived tasks: ${allDerivedTasksArray.length}`);
     
     if (allDerivedTasksArray.length > 0) {
       console.log('🎉 Derived tasks:');
       allDerivedTasksArray.forEach((task, i) => {
-        console.log(`  ${i + 1}. ${task.toString()} [priority: ${task.getPriority()}]`);
+        console.log(`  ${i + 1}. ${formatTaskWithRoundedTruth(task)} [priority: ${task.getPriority()}]`);
       });
     }
     
@@ -117,7 +117,7 @@ export function runGeneralReasoningTest(config) {
         const foundMatch = allDerivedTasksArray.some(task => matcher(task));
         if (foundMatch) {
           const matchingTask = allDerivedTasksArray.find(task => matcher(task));
-          console.log(`  ❌ Not-expected output condition ${i + 1} FAILED - found matching task: ${matchingTask.toString()}`);
+          console.log(`  ❌ Not-expected output condition ${i + 1} FAILED - found matching task: ${formatTaskWithRoundedTruth(matchingTask)}`);
         } else {
           console.log(`  ✅ Not-expected output condition ${i + 1} PASSED`);
         }

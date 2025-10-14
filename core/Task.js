@@ -14,7 +14,7 @@ export class TruthValue {
   }
 
   toString() {
-    return `%${this.frequency};${this.confidence}%`;
+    return `%${this.frequency.toFixed(2)};${this.confidence.toFixed(2)}%`;
   }
 
   static deduction(t1, t2) {
@@ -118,7 +118,7 @@ export class Task {
   toString() {
     const termStr = this.term.toString();
     const puncStr = this.punctuation;
-    return this.truth ? `${termStr}${puncStr} ${this.truth}` : `${termStr}${puncStr}`;
+    return this.truth ? `${termStr}${puncStr} ${this.truth.toString()}` : `${termStr}${puncStr}`;
   }
 
   _createTaskWithProps(props) {
