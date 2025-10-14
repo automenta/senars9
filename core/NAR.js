@@ -16,16 +16,24 @@ export class NAR {
   /**
    * Creates a new Non-Axiomatic Reasoner instance
    * @param {Object} config - Configuration for the reasoner
+   * @param {number} config.cycleInterval - Interval for continuous reasoning (ms)
+   * @param {number} config.focusSize - Maximum number of tasks in focus set
+   * @param {number} config.priorityThreshold - Minimum priority threshold for tasks to be considered
    */
   constructor(config = {}) {
     // Core NARS components
     this.memory = new Memory();
     this.reasoner = new Reasoner();
-    this.focusSetSelector = new FocusSetSelector();
+    this.focusSetSelector = new FocusSetSelector(
+      config.focusSize || 5,
+      config.priorityThreshold || 0.1,
+      config.urgencyWeight || 0.2,
+      config.diversityFactor || 0.1
+    );
     
     // System state
     this.config = config;
-    this.isRunning = false;
+    this._isRunning = false;
     this.cycleInterval = config.cycleInterval || 100; // ms
     this.cycleTimer = null;
     
@@ -34,7 +42,7 @@ export class NAR {
       cycles: 0,
       inputTasks: 0,
       derivedTasks: 0,
-      startTime: null
+      birthdate: null
     };
     
     Logger.debug('NAR initialized with integrated memory and reasoning components');
@@ -55,10 +63,19 @@ export class NAR {
       // If taskData is a string, parse it
       if (typeof taskData === 'string') {
         // Simple parsing for now - in a full system, use proper parser
-        const punctuation = taskData.endsWith('!') ? Punctuation.GOAL : 
-                           taskData.endsWith('?') ? Punctuation.QUESTION : 
-                           Punctuation.BELIEF;
-        const term = taskData.slice(0, -1) || taskData; // Remove punctuation
+        let term, punctuation;
+        if (taskData.endsWith('!')) {
+          punctuation = Punctuation.GOAL;
+          term = taskData.slice(0, -1);
+        } else if (taskData.endsWith('?')) {
+          punctuation = Punctuation.QUESTION;
+          term = taskData.slice(0, -1);
+        } else {
+          punctuation = Punctuation.BELIEF;
+          term = taskData.endsWith('.') ? taskData.slice(0, -1) : taskData;
+        }
+        
+        term = term.trim();
         
         task = Task.createInput(
           Term.newAtom(term),
@@ -131,6 +148,59 @@ export class NAR {
   }
 
   /**
+   * Get beliefs from memory
+   * @returns {Array} - Array of belief tasks
+   */
+  getBeliefs() {
+    return this.memory.getAllTasks().filter(task => task.isBelief());
+  }
+
+  /**
+   * Get goals from memory
+   * @returns {Array} - Array of goal tasks
+   */
+  getGoals() {
+    return this.memory.getAllTasks().filter(task => task.isGoal());
+  }
+
+  /**
+   * Get questions from memory
+   * @returns {Array} - Array of question tasks
+   */
+  getQuestions() {
+    return this.memory.getAllTasks().filter(task => task.isQuestion());
+  }
+
+  /**
+   * Find tasks matching a specific term pattern
+   * @param {string} termPattern - Pattern to match in task terms
+   * @returns {Array} - Array of matching tasks
+   */
+  findTasksByTerm(termPattern) {
+    return this.memory.getAllTasks().filter(task => {
+      return task.term && task.term.name && task.term.name.includes(termPattern);
+    });
+  }
+
+  /**
+   * Get task by its hash (unique identifier)
+   * @param {string} taskHash - The hash of the task to retrieve
+   * @returns {Task|null} - The task if found, null otherwise
+   */
+  getTaskByHash(taskHash) {
+    return this.memory.getTask(taskHash);
+  }
+
+  /**
+   * Remove a task from memory
+   * @param {string} taskHash - The hash of the task to remove
+   * @returns {boolean} - True if task was removed, false if not found
+   */
+  removeTask(taskHash) {
+    return this.memory.removeTask(taskHash);
+  }
+
+  /**
    * Run a single cognitive cycle
    */
   runCycle() {
@@ -166,16 +236,16 @@ export class NAR {
    * Start the continuous reasoning cycle
    */
   start() {
-    if (this.isRunning) {
+    if (this._isRunning) {
       Logger.warn('NAR is already running');
       return;
     }
     
-    this.isRunning = true;
-    this.stats.startTime = Date.now();
+    this._isRunning = true;
+    this.stats.birthdate = Date.now();
     
     const runCycle = () => {
-      if (this.isRunning) {
+      if (this._isRunning) {
         try {
           this.runCycle();
         } catch (error) {
@@ -193,12 +263,12 @@ export class NAR {
    * Stop the continuous reasoning cycle
    */
   stop() {
-    if (!this.isRunning) {
+    if (!this._isRunning) {
       Logger.warn('NAR is not running');
       return;
     }
     
-    this.isRunning = false;
+    this._isRunning = false;
     if (this.cycleTimer) {
       clearTimeout(this.cycleTimer);
       this.cycleTimer = null;
@@ -216,7 +286,8 @@ export class NAR {
       ...this.stats,
       taskCount: this.memory.getAllTasks().length,
       conceptCount: this.memory.conceptStorage.size,
-      uptime: this.stats.startTime ? Date.now() - this.stats.startTime : 0
+      uptime: this.stats.birthdate ? Date.now() - this.stats.birthdate : 0,
+      memoryState: this.getMemoryState()
     };
   }
 
@@ -242,17 +313,65 @@ export class NAR {
   }
 
   /**
+   * Get the highest priority task
+   * @returns {Task|null} - The highest priority task, or null if no tasks exist
+   */
+  getHighestPriorityTask() {
+    const tasks = this.getTasksByPriority();
+    return tasks.length > 0 ? tasks[0] : null;
+  }
+
+  /**
+   * Get concepts from memory
+   * @returns {Array} - Array of concepts in memory
+   */
+  getConcepts() {
+    return Array.from(this.memory.conceptStorage.values());
+  }
+
+  /**
+   * Get concept by term
+   * @param {string} termName - Name of the concept term
+   * @returns {Object|null} - The concept if found, null otherwise
+   */
+  getConceptByTerm(termName) {
+    // Find concept by term hash
+    for (const [hash, concept] of this.memory.conceptStorage) {
+      if (concept.term && concept.term.name === termName) {
+        return concept;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Reset the reasoner to initial state
    */
   reset() {
     this.memory = new Memory();
+    this.reasoner = new Reasoner(); // Reset reasoner as well
+    this.focusSetSelector = new FocusSetSelector( // Reset focus selector
+      this.config.focusSize || 5,
+      this.config.priorityThreshold || 0.1,
+      this.config.urgencyWeight || 0.2,
+      this.config.diversityFactor || 0.1
+    );
+    
     this.stats = {
       cycles: 0,
       inputTasks: 0,
       derivedTasks: 0,
-      startTime: null
+      birthdate: null
     };
     
     Logger.debug('NAR reset to initial state');
+  }
+  
+  /**
+   * Check if the NAR is currently running
+   * @returns {boolean} - True if running, false otherwise
+   */
+  isRunning() {
+    return this.isRunning;
   }
 }
