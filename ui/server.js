@@ -14,7 +14,7 @@ async function startServer() {
   console.log('Starting SeNARS simple WebSocket server...');
 
   // Spawn the actual server as a subprocess from the project root
-  const serverProcess = spawn('node', ['--no-warnings', 'core/simple-websocket-server.mjs', PORT.toString()], {
+  const serverProcess = spawn('node', ['--no-warnings', 'core/server.mjs', PORT.toString()], {
     stdio: 'inherit',
     cwd: join(__dirname, '..'), // Set working directory to project root
     env: { ...process.env }

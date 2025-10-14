@@ -30,24 +30,34 @@ const GraphicsEngine = ({ children }) => {
     mountRef.current.appendChild(renderer.domElement);
 
     // Animation loop
+    let animationFrameId;
     const animate = () => {
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
       renderer.render(scene, camera);
     };
     animate();
 
     // Handle resize
     const handleResize = () => {
-      camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+      if (mountRef.current) {
+        camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+      }
     };
     window.addEventListener('resize', handleResize);
 
     return () => {
+      cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
+      }
+      if (renderer) {
+        renderer.dispose();
+        if (renderer.forceContextLoss) {
+          renderer.forceContextLoss();
+        }
       }
     };
   }, []);
