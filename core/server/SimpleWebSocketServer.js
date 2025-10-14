@@ -1,60 +1,27 @@
 import WebSocketServer from './WebSocketServer.js';
 import { WebSocketUtils } from './WebSocketUtils.js';
 
-// Simple WebSocket server wrapper that extends the main WebSocketServer
-class SimpleWebSocketServer extends WebSocketServer {
-  constructor(port = 8080) {
-    super(null); // No core needed for simple server
-    this.port = port;
-    this.simpleClients = new Set();
-  }
+// Factory function for creating simple WebSocket servers - eliminates need for separate class
+const createSimpleServer = (port = 8080) => {
+  const server = new WebSocketServer(null, { simpleMode: true, port });
 
-  async initialize(config = {}) {
-    await super.initialize({ ...config, port: this.port, enabled: true });
-  }
-
-  async start() {
-    await this.initialize();
-    await super.start();
-    WebSocketUtils.debug(`Simple WebSocket server started on port ${this.port}`);
-  }
-
-  async stop() {
-    await super.stop();
-    WebSocketUtils.debug('Simple WebSocket server stopped');
-  }
-
-  // Simple message handler for basic echo functionality
-  handleSimpleMessage(clientId, message) {
-    const client = this.clients.get(clientId);
-    if (!client || !WebSocketUtils.isValidClient(client)) return;
-
-    try {
-      // Echo message back for testing
-      this.sendToClient(clientId, {
-        type: 'echo',
-        payload: message,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      WebSocketUtils.error('Error handling simple message:', error);
-      this.sendToClient(clientId, {
-        type: 'error',
-        payload: { message: 'Invalid message format' },
-        timestamp: new Date().toISOString()
-      });
+  // Add simple message handling capability
+  const originalHandler = server.messageHandler.handle.bind(server.messageHandler);
+  server.messageHandler.handle = (clientId, message) => {
+    if (server.simpleMode && message.type === 'message') {
+      server.handleSimpleMessage(clientId, message);
+    } else {
+      originalHandler(clientId, message);
     }
-  }
+  };
 
-  broadcast(message) {
-    super.broadcast(WebSocketUtils.createMessage('broadcast', message));
-  }
-}
+  return server;
+};
 
 // If running this file directly, start the server
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === new URL(import.meta.url).pathname) {
   const port = process.argv[2] ? parseInt(process.argv[2]) : 8080;
-  const server = new SimpleWebSocketServer(port);
+  const server = createSimpleServer(port);
 
   server.start()
     .then(() => {

@@ -24,8 +24,8 @@ let configManager = null;
 const getConfigManager = () => {
   if (!configManager) {
     // Dynamic import to avoid circular dependencies
-    import('./ServerConfig.js').then(({ default: ServerConfig }) => {
-      configManager = new ServerConfig();
+    import('./ConfigManager.js').then(({ default: ConfigManager }) => {
+      configManager = new ConfigManager();
     });
   }
   return configManager;
@@ -165,11 +165,11 @@ class WebSocketUtils {
   }
 
   static createErrorResponse(command, error) {
-    return MessageFactory.createErrorResponse(command, error);
+    return MessageFactory.createCommandErrorResponse(command, error);
   }
 
   static createSuccessResponse(command, data = {}) {
-    return MessageFactory.createSuccessResponse(command, data);
+    return MessageFactory.createCommandSuccessResponse(command, data);
   }
 
   static createWelcomeMessage(clientId, connectionId) {

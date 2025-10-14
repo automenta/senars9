@@ -1,44 +1,92 @@
 import { WebSocketUtils } from './WebSocketUtils.js';
 
 /**
- * Manages cognitive reasoning cycles and memory operations.
- * Extracted from FullFeaturedServer to improve modularity.
+ * Unified reasoning cycle management with consolidated functionality.
+ * Combines patterns from ReasoningManager and ReasoningCycleManager for DRY compliance.
  */
 class ReasoningManager {
-  constructor(core) {
+  constructor(core = null) {
     this.core = core;
+    this.memory = null;
+    this.reasoner = null;
+    this.selector = null;
     this.reasoningInterval = null;
+    this.cycleCallback = null;
   }
 
-  initialize() {
-    this.memory = this.core?.memory;
-    this.reasoner = this.core?.reasoner;
-    this.selector = this.core?.selector;
+  async initialize() {
+    // Support both external core injection and internal initialization
+    if (this.core) {
+      this.memory = this.core.memory;
+      this.reasoner = this.core.reasoner;
+      this.selector = this.core.selector;
+    } else {
+      await this.initializeInternalComponents();
+    }
   }
 
-  startReasoningCycle() {
-    if (!this.memory || !this.reasoner || !this.selector) {
-      WebSocketUtils.warn('Core components not available for reasoning cycle');
-      return;
+  async initializeInternalComponents() {
+    try {
+      // Dynamic imports to avoid circular dependencies
+      const { default: Memory } = await import('../Memory.js');
+      const { default: Reasoner } = await import('../Reasoner.js');
+      const { default: FocusSetSelector } = await import('../FocusSetSelector.js');
+
+      this.memory = new Memory();
+      this.reasoner = new Reasoner();
+      this.selector = new FocusSetSelector();
+
+      // Register reasoning rules
+      const { DeductiveSyllogism, Induction, Abduction } = await import('./reasoning/SyllogisticRules.js');
+      this.reasoner.addRule(new DeductiveSyllogism());
+      this.reasoner.addRule(new Induction());
+      this.reasoner.addRule(new Abduction());
+
+      WebSocketUtils.debug('Reasoning components initialized');
+    } catch (error) {
+      WebSocketUtils.error('Failed to initialize reasoning components:', error);
+      throw error;
+    }
+  }
+
+  startReasoningCycle(interval = 1000, callback = null) {
+    if (!this.areComponentsReady()) {
+      WebSocketUtils.warn('Reasoning components not ready');
+      return false;
     }
 
-    this.loadInitialTasksToMemory();
+    this.stopReasoningCycle(); // Clear any existing interval
+    this.cycleCallback = callback;
+
+    this.loadInitialTasks();
 
     this.reasoningInterval = setInterval(() => {
-      this.runCognitiveCycle();
-    }, 1000);
+      this.executeReasoningCycle();
+    }, interval);
+
+    return true;
   }
 
-  runCognitiveCycle() {
+  executeReasoningCycle() {
     try {
+      if (!this.areComponentsReady()) return;
+
       const context = new CycleContext(Date.now());
       runSingleCycle(this.memory, this.reasoner, this.selector, context);
+
+      if (this.cycleCallback) {
+        this.cycleCallback();
+      }
     } catch (error) {
-      WebSocketUtils.handleError('running cognitive cycle', error);
+      WebSocketUtils.error('Error in reasoning cycle:', error);
     }
   }
 
-  loadInitialTasksToMemory() {
+  areComponentsReady() {
+    return this.memory && this.reasoner && this.selector;
+  }
+
+  loadInitialTasks() {
     try {
       const initialTasks = this.getInitialTasks();
 
@@ -51,40 +99,16 @@ class ReasoningManager {
         this.createAndAddTask(taskData);
       }
     } catch (error) {
-      WebSocketUtils.handleError('loading initial tasks to memory', error);
+      WebSocketUtils.error('Error loading initial tasks:', error);
     }
   }
 
   createAndAddTask(taskData) {
     try {
-      let term;
-      let truth = taskData.truth || null;
-      const content = taskData.content.replace(/[.!?:]+$/, '').trim();
-
-      const impMatch = content.match(/\(([^(]+)-->([^)]+)\)/);
-      if (impMatch) {
-        const subject = impMatch[1].trim();
-        const predicate = impMatch[2].trim();
-        const subjTerm = Term.newAtom(subject);
-        const predTerm = Term.newAtom(predicate);
-        term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
-
-        if (!truth) {
-          truth = new TruthValue(0.8, 0.8);
-        } else if (typeof truth === 'object' && !truth.hasOwnProperty('frequency')) {
-          truth = new TruthValue(truth.frequency || 0.8, truth.confidence || 0.8);
-        }
-      } else {
-        term = Term.newAtom(content);
-        if (!truth) {
-          truth = new TruthValue(0.5, 0.5);
-        } else if (typeof truth === 'object' && !truth.hasOwnProperty('frequency')) {
-          truth = new TruthValue(truth.frequency || 0.5, truth.confidence || 0.5);
-        }
-      }
+      const { term, truth } = this.parseTaskContent(taskData.content, taskData.truth);
 
       const punctuation = taskData.punctuation ||
-        (taskData.content.endsWith('!') ? '!' : taskData.content.endsWith('?') ? '?' : '.');
+        this.inferPunctuation(taskData.content);
 
       const task = new Task(
         term,
@@ -97,10 +121,56 @@ class ReasoningManager {
 
       task.id = taskData.id;
       this.memory.addTask(task, Date.now());
-      WebSocketUtils.debug(`Loaded task into memory: ${taskData.content}`);
+      WebSocketUtils.debug(`Loaded task: ${taskData.content}`);
     } catch (taskError) {
-      WebSocketUtils.handleError('creating task', taskError, taskData);
+      WebSocketUtils.error('Error creating task:', taskError, taskData);
     }
+  }
+
+  parseTaskContent(content, truthValue = null) {
+    const cleanContent = content.replace(/[.!?:]+$/, '').trim();
+
+    const impMatch = cleanContent.match(/\(([^(]+)-->([^)]+)\)/);
+    if (impMatch) {
+      return this.createInheritanceTerm(impMatch[1].trim(), impMatch[2].trim(), truthValue);
+    }
+
+    return this.createAtomicTerm(cleanContent, truthValue);
+  }
+
+  createInheritanceTerm(subject, predicate, truthValue) {
+    const subjTerm = Term.newAtom(subject);
+    const predTerm = Term.newAtom(predicate);
+    const term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
+
+    const truth = this.normalizeTruthValue(truthValue, 0.8, 0.8);
+
+    return { term, truth };
+  }
+
+  createAtomicTerm(content, truthValue) {
+    const term = Term.newAtom(content);
+    const truth = this.normalizeTruthValue(truthValue, 0.5, 0.5);
+
+    return { term, truth };
+  }
+
+  normalizeTruthValue(truthValue, defaultFreq, defaultConf) {
+    if (!truthValue) {
+      return new TruthValue(defaultFreq, defaultConf);
+    }
+
+    if (typeof truthValue === 'object' && !truthValue.hasOwnProperty('frequency')) {
+      return new TruthValue(truthValue.frequency || defaultFreq, truthValue.confidence || defaultConf);
+    }
+
+    return truthValue;
+  }
+
+  inferPunctuation(content) {
+    if (content.endsWith('!')) return '!';
+    if (content.endsWith('?')) return '?';
+    return '.';
   }
 
   getInitialTasks() {
@@ -135,11 +205,19 @@ class ReasoningManager {
 
   reset() {
     this.stopReasoningCycle();
-    if (this.memory) {
-      // Reset memory state if method available
-      this.memory.reset?.();
+    if (this.memory?.reset) {
+      this.memory.reset();
     }
-    this.loadInitialTasksToMemory();
+    this.loadInitialTasks();
+  }
+
+  getStats() {
+    return {
+      isRunning: !!this.reasoningInterval,
+      interval: this.reasoningInterval ? 1000 : null,
+      hasCallback: !!this.cycleCallback,
+      componentsReady: this.areComponentsReady()
+    };
   }
 }
 
