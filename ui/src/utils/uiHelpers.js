@@ -1,8 +1,3 @@
-/**
- * Consolidated UI helper utilities
- * Eliminates duplication and provides consistent styling and formatting
- */
-
 import { THEME } from '../constants';
 
 // Color and styling utilities

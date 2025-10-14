@@ -1,10 +1,6 @@
 import Component from '../base/Component.js';
 import { WebSocketUtils, DEFAULTS } from './WebSocketUtils.js';
 
-/**
- * Base server class providing common WebSocket server functionality.
- * Consolidates shared patterns for connection management, error handling, and lifecycle.
- */
 class BaseServer extends Component {
   constructor(core = null) {
     super();
@@ -24,7 +20,6 @@ class BaseServer extends Component {
      this.config = this.mergeConfig(this.getDefaultConfig(), config);
    }
 
-   // Standardized configuration access
    mergeConfig(baseConfig, overrides) {
      return WebSocketUtils.mergeConfig(baseConfig, overrides);
    }
@@ -136,7 +131,6 @@ class BaseServer extends Component {
     this.onStop?.();
   }
 
-  // Client operations
   sendToClient(clientId, message) {
     const client = this.clients.get(clientId);
     if (WebSocketUtils.isValidClient(client)) {
@@ -174,7 +168,6 @@ class BaseServer extends Component {
     }
   }
 
-  // Abstract client operations for extensibility
   getClient(clientId) {
     return this.clients.get(clientId);
   }
@@ -187,7 +180,6 @@ class BaseServer extends Component {
     return Array.from(this.clients.values()).filter(WebSocketUtils.isValidClient);
   }
 
-  // Common stream operations - delegated to StreamManager for consistency
   subscribeToTaskStream(clientId, taskId) {
     if (this.streamManager) {
       return this.streamManager.subscribeToTaskStream(clientId, taskId);
@@ -204,7 +196,6 @@ class BaseServer extends Component {
     return this._fallbackPublishTaskUpdate(taskId, updateData);
   }
   
-  // Private fallback implementations
   _fallbackSubscribeToTaskStream(clientId, taskId) {
     if (!this.taskStreams.has(taskId)) {
       this.taskStreams.set(taskId, {
@@ -242,7 +233,6 @@ class BaseServer extends Component {
     return true;
   }
 
-  // Common event publishing
   publishEvent(eventType, data, filters = {}) {
     const eventMessage = WebSocketUtils.createEventMessage(eventType, data, filters);
 
@@ -261,7 +251,6 @@ class BaseServer extends Component {
     return WebSocketUtils.checkEventFilters(subscription.filters || {}, eventFilters);
   }
 
-  // Common stats and monitoring
   getStats() {
     return {
       isRunning: this.isRunning,

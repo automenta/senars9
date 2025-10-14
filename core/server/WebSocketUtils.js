@@ -9,19 +9,12 @@ import Logger from './Logger.js';
 // Lazy config manager initialization
 let configManager = null;
 const getConfigManager = () => configManager ??= import('./ServerConfig.js').then(({ default: ServerConfig }) => (configManager = new ServerConfig()).initialize() && configManager);
-
-/**
- * Main WebSocketUtils class - now acts as a facade
- * Delegates to specialized modules for specific functionality
- */
 class WebSocketUtils {
-  // Re-export constants for backward compatibility
   static get DEFAULTS() { return DEFAULTS; }
   static get MESSAGE_TYPES() { return MESSAGE_TYPES; }
   static get CLIENT_STATUS() { return CLIENT_STATUS; }
   static get STREAM_TYPES() { return STREAM_TYPES; }
 
-  // ID generation - delegate to ClientUtils
   static generateId(prefix = 'id') {
     return ClientUtils.generateId(prefix);
   }
@@ -34,7 +27,6 @@ class WebSocketUtils {
     return ClientUtils.generateConnectionId();
   }
 
-  // Client operations - delegate to ClientUtils
   static getClientIP(request) {
     return ClientUtils.getClientIP(request);
   }
@@ -67,7 +59,6 @@ class WebSocketUtils {
     return ClientUtils.countByProperty(collection, property);
   }
 
-  // Message operations - delegate to MessageUtils
   static createMessage(type, payload = {}, timestamp = null) {
     return MessageUtils.createMessage(type, payload, timestamp);
   }
@@ -128,7 +119,6 @@ class WebSocketUtils {
     return MessageUtils.getTaskType(task);
   }
 
-  // Stream operations - delegate to StreamUtils
   static hasParticipants(stream) {
     return StreamUtils.hasParticipants(stream);
   }
@@ -153,7 +143,6 @@ class WebSocketUtils {
     return StreamUtils.createTaskStream(taskId, options);
   }
 
-  // Error handling - delegate to ErrorHandler
   static handleError(operation, error, clientId = null) {
     return ErrorHandler.handleError(operation, error, clientId);
   }
@@ -190,7 +179,6 @@ class WebSocketUtils {
     return ErrorHandler.withErrorHandling(operation, wss, operationName, clientId);
   }
 
-  // Configuration - delegate to ConfigUtils
   static getConfigValue(config, key, defaultValue) {
     return ConfigUtils.getConfigValue(config, key, defaultValue);
   }
@@ -223,7 +211,6 @@ class WebSocketUtils {
     return ConfigUtils.isFeatureEnabled(getConfigManager(), feature);
   }
 
-  // Legacy data extraction methods - keeping for backward compatibility
   static extractLegacyConcepts(core) {
     if (!core?.memory?.conceptStorage) return [];
 
@@ -289,7 +276,6 @@ class WebSocketUtils {
     return this.createMessage(MESSAGE_TYPES.COMPLETE_STATE, state);
   }
 
-  // Logging - delegate to Logger
   static log(level, message, ...args) {
     Logger.log(level, message, ...args);
   }

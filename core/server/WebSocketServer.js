@@ -32,7 +32,6 @@ class WebSocketServer extends BaseServer {
 
     const port = WebSocketUtils.getConfigValue(config, 'port', DEFAULTS.PORT);
     const host = WebSocketUtils.getConfigValue(config, 'host', DEFAULTS.HOST);
-    const enabled = WebSocketUtils.getConfigValue(config, 'enabled', DEFAULTS.ENABLED);
 
     this.server = createServer();
     this.wss = new WSServer({ server: this.server });
@@ -44,14 +43,12 @@ class WebSocketServer extends BaseServer {
   }
 
   async start() {
-    // Use parent class start logic and add specific heartbeat functionality
     const result = await super.start();
-    
-    // Only start heartbeat if the server started successfully
+
     if (this.isRunning) {
       this.connectionManager.startHeartbeat();
     }
-    
+
     return result;
   }
 
@@ -59,7 +56,6 @@ class WebSocketServer extends BaseServer {
     return WebSocketUtils.extractSystemState(this.core);
   }
 
-  // Standardized configuration access
   getConfig(key, defaultValue = null) {
     return WebSocketUtils.getConfigValue(this.config, key, defaultValue);
   }
@@ -104,15 +100,12 @@ class WebSocketServer extends BaseServer {
 
   broadcast(message, excludeClients = []) {
     if (this.simpleMode && typeof message !== 'object') {
-      // In simple mode, wrap primitive messages - specific to WebSocketServer
       message = WebSocketUtils.createMessage('broadcast', { system: true, data: message });
     }
 
-    // Call parent broadcast method
     super.broadcast(message, excludeClients);
   }
 
-  // Simple mode message handler for basic echo functionality
   handleSimpleMessage(clientId, message) {
     if (!this.simpleMode) return;
 
@@ -120,7 +113,6 @@ class WebSocketServer extends BaseServer {
     if (!client || !WebSocketUtils.isValidClient(client)) return;
 
     try {
-      // Echo message back for testing
       this.sendToClient(clientId, WebSocketUtils.createSuccessResponse('echo', message));
     } catch (error) {
       WebSocketUtils.handleError('handling simple message', error, clientId);
@@ -139,14 +131,12 @@ class WebSocketServer extends BaseServer {
     this.connectionManager.sendCurrentState(clientId);
   }
 
-  // Delegation methods - these override the BaseServer implementations to use StreamManager
-   subscribeToTaskStream(clientId, taskId) {
-     if (this.streamManager) {
-       return this.streamManager.subscribeToTaskStream(clientId, taskId);
-     }
-     // Fallback to parent implementation if no streamManager
-     return super.subscribeToTaskStream(clientId, taskId);
-   }
+    subscribeToTaskStream(clientId, taskId) {
+      if (this.streamManager) {
+        return this.streamManager.subscribeToTaskStream(clientId, taskId);
+      }
+      return super.subscribeToTaskStream(clientId, taskId);
+    }
 
    publishTaskUpdate(taskId, updateData) {
      if (this.streamManager) {
@@ -170,12 +160,10 @@ class WebSocketServer extends BaseServer {
     super.cleanup(); // Call parent cleanup
   }
 
-  // Factory method to create a simple WebSocket server
   static createSimpleServer(port = 8080) {
     return new WebSocketServer(null, { simpleMode: true, port });
   }
 
-  // Backward compatibility methods
   getNARSInstances() {
     return [];
   }

@@ -35,16 +35,13 @@ const App = () => {
     off
   );
 
-  const requestAfterDelay = (fn, delay) => setTimeout(fn, delay);
-
   const handleTaskWithConcepts = (handler, task) => {
-    handler?.(task) ? requestAfterDelay(requestConcepts, 300) : console.error(`Cannot ${handler.name}: WebSocket connection not ready`);
+    handler?.(task) && setTimeout(requestConcepts, 300);
   };
 
   const handleAddTaskWithConcepts = (task) => handleTaskWithConcepts(handleAddTask, task);
   const handleUpdateTaskWithConcepts = (task) => handleTaskWithConcepts(handleUpdateTask, task);
 
-  // Request initial concepts and top tasks when component mounts
   useEffect(() => {
     if (connectionStatus === 'connected') {
       setTimeout(() => {
