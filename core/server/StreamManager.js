@@ -1,4 +1,5 @@
 import { WebSocketUtils, DEFAULTS, MESSAGE_TYPES, STREAM_TYPES } from './WebSocketUtils.js';
+import CommonServerUtils from './CommonServerUtils.js';
 
 class StreamManager {
   constructor(webSocketServer) {
@@ -116,7 +117,7 @@ class StreamManager {
     try {
       const stream = this.streams.get(streamId);
       if (!WebSocketUtils.isActiveStream(stream)) {
-        WebSocketUtils.sendError(this.wss, clientId, 'publish', 'Stream not found or inactive');
+        CommonServerUtils.handleStreamError(this.wss, clientId, streamId, 'publish', 'Stream not found or inactive');
         return false;
       }
 
@@ -132,7 +133,7 @@ class StreamManager {
       WebSocketUtils.broadcastToParticipants(this.wss, stream.participants, dataMessage, clientId);
       return true;
     } catch (error) {
-      WebSocketUtils.handleError('publishing to stream', error, clientId);
+      CommonServerUtils.handleStreamError(this.wss, clientId, streamId, 'publish', error);
       return false;
     }
   }
@@ -154,7 +155,7 @@ class StreamManager {
         });
       }
     } catch (error) {
-      WebSocketUtils.error(`Error broadcasting to stream type ${streamType} for client ${clientId}:`, error);
+      CommonServerUtils.handleStreamError(this.wss, clientId, streamType, 'broadcast', error);
     }
   }
 
@@ -172,7 +173,7 @@ class StreamManager {
     };
     stream.history.push(historyEntry);
 
-    const broadcastMessage = WebSocketUtils.createTaskMessage(MESSAGE_TYPES.TASK_UPDATE, taskId, data, clientId);
+    const broadcastMessage = MessageFactory.createTaskUpdateMessage(taskId, data, clientId);
     this.wss.broadcast(broadcastMessage, [clientId]);
   }
 
@@ -237,7 +238,7 @@ class StreamManager {
         }
       }
     } catch (error) {
-      WebSocketUtils.error(`Error publishing event ${eventType}:`, error);
+      CommonServerUtils.handleStreamError(this.wss, null, eventType, 'publishEvent', error);
     }
   }
 

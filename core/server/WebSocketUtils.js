@@ -1,4 +1,4 @@
-import { Logger } from '../base/utilities.js';
+import Logger from './Logger.js';
 
 const DEFAULTS = Object.freeze({
   PORT: 8080,
@@ -14,9 +14,21 @@ const DEFAULTS = Object.freeze({
   RETENTION_TIME: 3600000,
   CLIENT_TIMEOUT_MULTIPLIER: 2,
   MESSAGE_QUEUE_LIMIT: 1000,
-  ENABLED: true,
-  MAX_CONNECTION_RATE: 10
+  ENABLED: true
 });
+
+// Global config manager instance - will be initialized when needed
+let configManager = null;
+
+const getConfigManager = () => {
+  if (!configManager) {
+    // Dynamic import to avoid circular dependencies
+    import('./ConfigManager.js').then(({ default: ConfigManager }) => {
+      configManager = new ConfigManager();
+    });
+  }
+  return configManager;
+};
 
 const MESSAGE_TYPES = Object.freeze({
   WELCOME: 'welcome',
@@ -67,10 +79,6 @@ class WebSocketUtils {
            request.socket?.remoteAddress ||
            request.connection?.socket?.remoteAddress ||
            'unknown';
-  }
-
-  static isValidClient(client) {
-    return client?.ws?.readyState === 1;
   }
 
   static formatTaskData(task) {
@@ -281,24 +289,20 @@ class WebSocketUtils {
   }
 
   static debug(message, ...args) {
-    this.log('debug', message, ...args);
+    Logger.debug(message, ...args);
   }
 
   static warn(message, ...args) {
-    this.log('warn', message, ...args);
+    Logger.warn(message, ...args);
   }
 
   static error(message, ...args) {
-    this.log('error', message, ...args);
+    Logger.error(message, ...args);
   }
 
   // Common validation and checking utilities
   static isValidClient(client) {
     return client?.ws?.readyState === 1;
-  }
-
-  static isActiveStream(stream) {
-    return stream?.isActive !== false;
   }
 
   static hasParticipants(stream) {
@@ -315,6 +319,14 @@ class WebSocketUtils {
   static sendError(wss, clientId, operation, error) {
     const errorResponse = this.createErrorResponse(operation, error);
     wss.sendToClient(clientId, errorResponse);
+  }
+
+  static handleAndSendError(wss, operation, error, clientId = null) {
+    const errorMsg = this.handleError(operation, error, clientId);
+    if (wss && clientId) {
+      this.sendError(wss, clientId, operation, error);
+    }
+    return errorMsg;
   }
 
   // Common stream operations
@@ -337,13 +349,46 @@ class WebSocketUtils {
   }
 
   // Common configuration helpers
-  static getConfigValue(config, key, defaultValue) {
-    return config?.[key] ?? defaultValue;
-  }
+   static getConfigValue(config, key, defaultValue) {
+     return config?.[key] ?? defaultValue;
+   }
 
-  static mergeConfig(baseConfig, overrides) {
-    return { ...baseConfig, ...overrides };
-  }
+   static mergeConfig(baseConfig, overrides) {
+     return { ...baseConfig, ...overrides };
+   }
+
+   // Configuration-aware helpers using ConfigManager
+   static getServerPort() {
+     return getConfigManager()?.getServerConfig().port ?? DEFAULTS.PORT;
+   }
+
+   static getServerHost() {
+     return getConfigManager()?.getServerConfig().host ?? DEFAULTS.HOST;
+   }
+
+   static getHeartbeatInterval() {
+     return getConfigManager()?.getWebSocketConfig().heartbeatInterval ?? DEFAULTS.HEARTBEAT_INTERVAL;
+   }
+
+   static getConnectionLimits() {
+     return getConfigManager()?.getConnectionLimits() ?? {
+       maxPerIP: DEFAULTS.MAX_CONNECTIONS_PER_IP,
+       maxTotal: DEFAULTS.MAX_TOTAL_CONNECTIONS
+     };
+   }
+
+   static getStreamSettings() {
+     return getConfigManager()?.getStreamSettings() ?? {
+       bufferSize: DEFAULTS.STREAM_BUFFER_SIZE,
+       taskBufferSize: DEFAULTS.TASK_STREAM_BUFFER_SIZE,
+       historyLimit: DEFAULTS.TASK_HISTORY_LIMIT,
+       retentionTime: DEFAULTS.RETENTION_TIME
+     };
+   }
+
+   static isFeatureEnabled(feature) {
+     return getConfigManager()?.isFeatureEnabled(feature) ?? false;
+   }
 
   // Factory functions for common objects
   static createClientInfo(clientId, ws, request, clientIP) {

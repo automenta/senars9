@@ -1,13 +1,9 @@
-import { WebSocketUtils, MESSAGE_TYPES } from './WebSocketUtils.js';
+import { WebSocketUtils } from './WebSocketUtils.js';
+import CommonServerUtils from './CommonServerUtils.js';
 
-/**
- * Handles WebSocket commands for server control and task management.
- * Extracted from FullFeaturedServer for better organization.
- */
-class CommandHandler {
+class ServerCommandHandler {
   constructor(webSocketServer) {
     this.wss = webSocketServer;
-    this.core = webSocketServer.core;
   }
 
   async handleCommand(command, payload, isSimpleProtocol = false, ws = null) {
@@ -16,193 +12,193 @@ class CommandHandler {
     try {
       switch (command) {
         case 'start':
-          return this.handleStartCommand(isSimpleProtocol);
+          await this._handleStartCommand(isSimpleProtocol);
+          break;
         case 'stop':
-          return this.handleStopCommand(isSimpleProtocol);
+          await this._handleStopCommand(isSimpleProtocol);
+          break;
         case 'step':
-          return this.handleStepCommand(isSimpleProtocol);
+          await this._handleStepCommand(isSimpleProtocol);
+          break;
         case 'reset':
-          return this.handleResetCommand(isSimpleProtocol);
+          await this._handleResetCommand();
+          break;
         case 'throttle':
-          return this.handleThrottleCommand(payload, isSimpleProtocol);
+          await this._handleThrottleCommand(payload, isSimpleProtocol);
+          break;
         case 'add_task':
-          return this.handleAddTaskCommand(payload);
+          await this._handleAddTaskCommand(payload);
+          break;
         case 'update_task':
-          return this.handleUpdateTaskCommand(payload);
+          await this._handleUpdateTaskCommand(payload);
+          break;
         case 'delete_task':
-          return this.handleDeleteTaskCommand(payload);
+          await this._handleDeleteTaskCommand(payload);
+          break;
         case 'get_concepts':
-          return this.handleGetConceptsCommand(isSimpleProtocol, ws);
+          await this._handleGetConceptsCommand(isSimpleProtocol, ws);
+          break;
         case 'get_top_tasks':
-          return this.handleGetTopTasksCommand(isSimpleProtocol, ws);
+          await this._handleGetTopTasksCommand(isSimpleProtocol, ws);
+          break;
         default:
           WebSocketUtils.debug(`Unknown command: ${command}`);
-          return false;
+          break;
       }
     } catch (error) {
-      WebSocketUtils.handleError(`handling command ${command}`, error);
-      return false;
+      WebSocketUtils.error(`Error handling command ${command}:`, error);
     }
   }
 
-  handleStartCommand(isSimpleProtocol) {
+  async _handleStartCommand(isSimpleProtocol) {
+    if (this.wss.yjsManager?.isEnabled()) {
+      this.wss.yjsManager.setAwarenessState({
+        isRunning: true,
+        isPaused: false
+      });
+    }
+
     if (isSimpleProtocol) {
       this.wss.broadcastState();
     }
-    return true;
   }
 
-  handleStopCommand(isSimpleProtocol) {
+  async _handleStopCommand(isSimpleProtocol) {
+    if (this.wss.yjsManager?.isEnabled()) {
+      this.wss.yjsManager.setAwarenessState({
+        isRunning: false,
+        isPaused: true
+      });
+    }
+
     if (isSimpleProtocol) {
       this.wss.broadcastState();
     }
-    return true;
   }
 
-  handleStepCommand(isSimpleProtocol) {
-    try {
-      const context = new CycleContext(Date.now());
-      runSingleCycle(this.core.memory, this.core.reasoner, this.core.selector, context);
+  async _handleStepCommand(isSimpleProtocol) {
+    const context = new CycleContext(Date.now());
+    runSingleCycle(memory, reasoner, selector, context);
+    this.wss.syncMemoryToClients();
 
-      if (isSimpleProtocol) {
-        this.wss.broadcastState();
-      }
-
-      WebSocketUtils.debug('Cognitive cycle completed');
-      return true;
-    } catch (error) {
-      WebSocketUtils.handleError('executing step command', error);
-      return false;
+    if (this.wss.yjsManager?.isEnabled()) {
+      const currentState = this.wss.yjsManager.getAwarenessState();
+      const newCycleCount = (currentState.cycles || 0) + 1;
+      this.wss.yjsManager.setAwarenessState({
+        ...currentState,
+        cycles: newCycleCount,
+        isRunning: false,
+        isPaused: true
+      });
     }
-  }
 
-  handleResetCommand(isSimpleProtocol) {
-    try {
-      // Reset core components if available
-      if (this.core.memory) this.core.memory.reset?.();
-      if (this.core.reasoner) this.core.reasoner.reset?.();
-      if (this.core.cycle) this.core.cycle.cycleCount = 0;
-
-      this.wss.broadcastState();
-      return true;
-    } catch (error) {
-      WebSocketUtils.handleError('executing reset command', error);
-      return false;
-    }
-  }
-
-  handleThrottleCommand(payload, isSimpleProtocol) {
-    WebSocketUtils.debug(`Throttle command: ${payload?.value}%`);
     if (isSimpleProtocol) {
       this.wss.broadcastState();
     }
-    return true;
+
+    WebSocketUtils.debug('Cognitive cycle completed');
   }
 
-  handleAddTaskCommand(payload) {
-    if (!payload?.content) {
-      WebSocketUtils.error('Add task command failed: missing content');
-      return false;
+  async _handleResetCommand() {
+    // Reset memory and reasoning components
+    memory = new Memory();
+    reasoner = new Reasoner();
+    selector = new FocusSetSelector();
+    this.wss.taskDataManager.loadInitialTasksToMemory();
+
+    if (this.wss.yjsManager?.isEnabled()) {
+      this.wss.yjsManager.setAwarenessState({
+        isRunning: false,
+        isPaused: true,
+        cycles: 0,
+        concepts: 3,
+        tasks: 2
+      });
+
+      this.wss.yjsManager.resetYjsData();
+      // Re-populate Yjs with initial data
+      const resetTasksData = this.wss.taskDataManager.getInitialTasks();
+      resetTasksData.forEach(task => {
+        const taskMap = new this.wss.yjsManager.Y.Map();
+        Object.entries(task).forEach(([key, value]) => taskMap.set(key, value));
+        this.wss.yjsManager.yTasks.push([taskMap]);
+      });
+
+      const resetConceptsData = this.wss.taskDataManager.getInitialConcepts();
+      resetConceptsData.forEach(concept => {
+        const conceptMap = new this.wss.yjsManager.Y.Map();
+        Object.entries(concept).forEach(([key, value]) => conceptMap.set(key, value));
+        this.wss.yjsManager.yConcepts.push([conceptMap]);
+      });
     }
 
-    try {
-      const newTaskData = {
-        id: WebSocketUtils.generateId('task'),
-        content: payload.content,
-        priority: typeof payload.priority === 'number' ? Math.max(0, Math.min(1, payload.priority)) : 0.5,
-        status: payload.status || 'Input',
-        type: payload.type || 'Input',
-        createdAt: Date.now(),
-        lastModified: Date.now(),
-        dependencies: Array.isArray(payload.dependencies) ? payload.dependencies : [],
-        metadata: typeof payload.metadata === 'object' ? payload.metadata : {}
-      };
+    this.wss.broadcastState();
+  }
 
-      let term;
-      let truth = new TruthValue(0.8, 0.8);
-      const content = newTaskData.content.replace(/[.!?:]+$/, '').trim();
+  async _handleThrottleCommand(payload, isSimpleProtocol) {
+    if (this.wss.yjsManager?.isEnabled()) {
+      this.wss.yjsManager.setAwarenessState({});
+    }
 
-      const impMatch = content.match(/\(([^(]+)-->([^)]+)\)/);
-      if (impMatch) {
-        const subject = impMatch[1].trim();
-        const predicate = impMatch[2].trim();
-        const subjTerm = Term.newAtom(subject);
-        const predTerm = Term.newAtom(predicate);
-        term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
-      } else {
-        term = Term.newAtom(content);
-      }
-
-      const task = new Task(term, '.', truth, newTaskData.createdAt, newTaskData.createdAt, newTaskData.priority);
-      task.id = newTaskData.id;
-
-      if (this.core.memory) {
-        this.core.memory.addTask(task, Date.now());
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      WebSocketUtils.handleError('adding task', error);
-      return false;
+    if (isSimpleProtocol) {
+      this.wss.broadcastState();
     }
   }
 
-  handleUpdateTaskCommand(payload) {
-    const updateTaskId = payload?.id;
-    if (!updateTaskId) {
-      WebSocketUtils.error('Update task command failed: missing task ID');
-      return false;
+  async _handleAddTaskCommand(payload) {
+    if (!payload.content) {
+      throw new Error('Add task command failed: missing content');
     }
 
-    const taskToUpdate = this.core.memory?.getTask(updateTaskId);
-    if (!taskToUpdate) {
-      WebSocketUtils.error(`Update task command failed: task with ID ${updateTaskId} not found`);
-      return false;
-    }
+    const taskId = this.wss.taskDataManager.addTask(payload);
+    this.wss.syncMemoryToClients();
 
-    const allowedFields = ['priority', 'status', 'type', 'content'];
-    for (const [key, value] of Object.entries(payload)) {
-      if (allowedFields.includes(key) && key !== 'id') {
-        if (key === 'priority') {
-          taskToUpdate.priority = Math.max(0, Math.min(1, value));
-        } else {
-          taskToUpdate[key] = value;
-        }
-      }
+    if (this.wss.yjsManager?.isEnabled()) {
+      const addTaskState = this.wss.yjsManager.getAwarenessState();
+      this.wss.yjsManager.setAwarenessState({
+        ...addTaskState,
+        tasks: this.wss.yjsManager.yTasks.length
+      });
     }
-
-    if (taskToUpdate.setAccessedAt) {
-      taskToUpdate.setAccessedAt(Date.now());
-    }
-
-    return true;
   }
 
-  handleDeleteTaskCommand(payload) {
-    const removeTaskId = payload?.id;
-    if (!removeTaskId) {
-      WebSocketUtils.error('Delete task command failed: missing task ID');
-      return false;
+  async _handleUpdateTaskCommand(payload) {
+    const taskId = payload.id;
+    if (!taskId) {
+      throw new Error('Update task command failed: missing task ID');
     }
 
-    const removed = this.core.memory?.removeTask(removeTaskId);
+    this.wss.taskDataManager.updateTask(taskId, payload);
+    this.wss.syncMemoryToClients();
+
+    if (this.wss.yjsManager?.isEnabled()) {
+      this.wss.yjsManager.setAwarenessState({});
+    }
+  }
+
+  async _handleDeleteTaskCommand(payload) {
+    const taskId = payload.id;
+    if (!taskId) {
+      throw new Error('Delete task command failed: missing task ID');
+    }
+
+    const removed = this.wss.taskDataManager.deleteTask(taskId);
     if (!removed) {
-      WebSocketUtils.error(`Delete task command failed: task with ID ${removeTaskId} not found`);
-      return false;
+      throw new Error(`Task with ID ${taskId} not found`);
     }
 
-    return true;
+    this.wss.syncMemoryToClients();
+
+    if (this.wss.yjsManager?.isEnabled()) {
+      this.wss.yjsManager.setAwarenessState({
+        tasks: this.wss.yjsManager.yTasks.length
+      });
+    }
   }
 
-  handleGetConceptsCommand(isSimpleProtocol, ws) {
-    if (!this.core.memory?.getTopConcepts) {
-      WebSocketUtils.warn('Memory not initialized or getTopConcepts method not available');
-      return false;
-    }
-
-    try {
-      const topConcepts = this.core.memory.getTopConcepts(20);
+  async _handleGetConceptsCommand(isSimpleProtocol, ws) {
+    if (this.wss.memory && this.wss.memory.getTopConcepts) {
+      const topConcepts = this.wss.memory.getTopConcepts(20);
       const conceptsData = topConcepts.map((item, index) => ({
         id: item.id || `concept-${index}`,
         content: item.term?.name || item.concept?.term?.name || `Concept-${index}`,
@@ -214,25 +210,20 @@ class CommandHandler {
       }));
 
       if (isSimpleProtocol && ws) {
-        const response = WebSocketUtils.createMessage('concepts_update', conceptsData);
+        const response = {
+          type: 'concepts_update',
+          payload: conceptsData
+        };
         ws.send(JSON.stringify(response));
       }
-
-      return true;
-    } catch (error) {
-      WebSocketUtils.handleError('getting concepts', error);
-      return false;
+    } else {
+      WebSocketUtils.warn('Memory not initialized or getTopConcepts method not available');
     }
   }
 
-  handleGetTopTasksCommand(isSimpleProtocol, ws) {
-    if (!this.core.memory?.getTopTasks) {
-      WebSocketUtils.warn('Memory not initialized or getTopTasks method not available');
-      return false;
-    }
-
-    try {
-      const topTasks = this.core.memory.getTopTasks(20);
+  async _handleGetTopTasksCommand(isSimpleProtocol, ws) {
+    if (this.wss.memory && this.wss.memory.getTopTasks) {
+      const topTasks = this.wss.memory.getTopTasks(20);
       const tasksData = topTasks.map((task, index) => ({
         id: task.id || `task-${Date.now()}-${index}`,
         content: task.toString ? task.toString() : (task.content || `Task-${index}`),
@@ -248,16 +239,16 @@ class CommandHandler {
       }));
 
       if (isSimpleProtocol && ws) {
-        const response = WebSocketUtils.createMessage('top_tasks_update', tasksData);
+        const response = {
+          type: 'top_tasks_update',
+          payload: tasksData
+        };
         ws.send(JSON.stringify(response));
       }
-
-      return true;
-    } catch (error) {
-      WebSocketUtils.handleError('getting top tasks', error);
-      return false;
+    } else {
+      WebSocketUtils.warn('Memory not initialized or getTopTasks method not available');
     }
   }
 }
 
-export default CommandHandler;
+export default ServerCommandHandler;

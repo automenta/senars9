@@ -1,4 +1,5 @@
 import { WebSocketUtils, MESSAGE_TYPES } from './WebSocketUtils.js';
+import CommonServerUtils from './CommonServerUtils.js';
 
 class MessageHandler {
   constructor(webSocketServer) {
@@ -96,33 +97,13 @@ class MessageHandler {
   _handleTaskStream(clientId, message) {
     const { taskId, action, data, streamType = 'task' } = message;
 
-    if (!this.wss.taskStreams.has(taskId)) {
-      this.wss.taskStreams.set(taskId, {
-        id: taskId,
-        streamType,
-        participants: new Set(),
-        history: [],
-        createdAt: new Date(),
-        isActive: true
-      });
-    }
-
-    const stream = this.wss.taskStreams.get(taskId);
-    stream.participants.add(clientId);
-    stream.history.push({
-      clientId,
-      action,
-      data,
-      timestamp: new Date()
-    });
-
-    this.wss.broadcast(WebSocketUtils.createMessage(MESSAGE_TYPES.TASK_UPDATE, {
+    // Delegate to StreamManager for consistent stream handling
+    this.wss.streamManager.handleTaskStreamMessage(clientId, {
       taskId,
-      source: clientId,
       action,
       data,
       streamType
-    }), [clientId]);
+    });
   }
 
   _handleStreaming(clientId, message) {
@@ -144,16 +125,17 @@ class MessageHandler {
   }
 
   _handleTaskSubscription(clientId, message) {
-    this.wss.subscribeToTaskStream(clientId, message.taskId);
-    this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
-      MESSAGE_TYPES.SUBSCRIPTION_SUCCESS,
-      { taskId: message.taskId }
-    ));
+    const success = this.wss.streamManager.subscribeToTaskStream(clientId, message.taskId);
+    if (success) {
+      this.wss.sendToClient(clientId, MessageFactory.createResponse(
+        MESSAGE_TYPES.SUBSCRIPTION_SUCCESS,
+        { taskId: message.taskId }
+      ));
+    }
   }
 
   _handleTaskUnsubscription(clientId, message) {
-    const stream = this.wss.taskStreams.get(message.taskId);
-    if (stream) stream.participants.delete(clientId);
+    this.wss.streamManager.unsubscribeFromTaskStream(clientId, message.taskId);
   }
 
   _handleCommand(clientId, message) {
@@ -161,7 +143,7 @@ class MessageHandler {
 
     if (!this.wss.core?.messages) {
       WebSocketUtils.warn('Core messages component not available - command ignored');
-      WebSocketUtils.sendError(this.wss, clientId, message.command || 'unknown', 'Core not available');
+      CommonServerUtils.handleConnectionError(this.wss, clientId, message.command || 'unknown', 'Core not available');
       return;
     }
 
@@ -186,8 +168,7 @@ class MessageHandler {
       this._executeCommand(internalCommand, data);
       this.wss.sendToClient(clientId, WebSocketUtils.createSuccessResponse(command));
     } catch (error) {
-      WebSocketUtils.handleError(`executing command ${internalCommand}`, error, clientId);
-      WebSocketUtils.sendError(this.wss, clientId, command, error);
+      CommonServerUtils.handleConnectionError(this.wss, clientId, command, error);
     }
   }
 
@@ -212,89 +193,25 @@ class MessageHandler {
 
   _handleStreamSubscription(clientId, streamId, streamType, options = {}) {
     try {
-      if (!this.wss.streams) this.wss.streams = new Map();
-
-      const fullStreamId = `${streamType}:${streamId}`;
-
-      if (!this.wss.streams.has(fullStreamId)) {
-        this.wss.streams.set(fullStreamId, {
-          id: fullStreamId,
-          type: streamType,
-          participants: new Set(),
-          buffer: [],
-          bufferSize: options.bufferSize || 100,
-          createdAt: new Date(),
-          isActive: true
-        });
-      }
-
-      const stream = this.wss.streams.get(fullStreamId);
-      stream.participants.add(clientId);
-
-      this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
-        MESSAGE_TYPES.STREAM_SUBSCRIPTION_CONFIRMED,
-        { streamId: fullStreamId, status: 'success' }
-      ));
-
-      WebSocketUtils.debug(`Client ${clientId} subscribed to stream ${fullStreamId}`);
+      this.wss.streamManager.subscribeToStream(clientId, streamId, streamType, options);
     } catch (error) {
-      WebSocketUtils.error(`Error subscribing client ${clientId} to stream ${streamId}:`, error);
+      CommonServerUtils.handleStreamError(this.wss, clientId, streamId, 'subscribe', error);
     }
   }
 
   _handleStreamUnsubscription(clientId, streamId) {
-    if (!this.wss.streams) return;
-
-    for (const [fullStreamId, stream] of this.wss.streams) {
-      if (stream.participants.has(clientId)) {
-        stream.participants.delete(clientId);
-        if (stream.participants.size === 0 && stream.id === streamId) {
-          this.wss.streams.delete(fullStreamId);
-        }
-      }
+    try {
+      this.wss.streamManager.unsubscribeFromStream(clientId, streamId);
+    } catch (error) {
+      CommonServerUtils.handleStreamError(this.wss, clientId, streamId, 'unsubscribe', error);
     }
-
-    this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
-      MESSAGE_TYPES.STREAM_UNSUBSCRIBED,
-      { streamId, status: 'success' }
-    ));
-
-    WebSocketUtils.debug(`Client ${clientId} unsubscribed from stream ${streamId}`);
   }
 
   _handleStreamPublish(clientId, streamId, data) {
     try {
-      if (!this.wss.streams) return;
-
-      const stream = this.wss.streams.get(streamId);
-      if (!stream || !stream.isActive) {
-        this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
-          MESSAGE_TYPES.STREAM_ERROR,
-          { streamId, error: 'Stream not found or inactive' }
-        ));
-        return;
-      }
-
-      stream.buffer.push({
-        source: clientId,
-        data,
-        timestamp: new Date()
-      });
-
-      if (stream.buffer.length > stream.bufferSize) {
-        stream.buffer = stream.buffer.slice(-stream.bufferSize);
-      }
-
-      for (const participantId of stream.participants) {
-        if (participantId !== clientId) {
-          this.wss.sendToClient(participantId, WebSocketUtils.createMessage(
-            MESSAGE_TYPES.STREAM_DATA,
-            { streamId, data, source: clientId }
-          ));
-        }
-      }
+      this.wss.streamManager.publishToStream(clientId, streamId, data);
     } catch (error) {
-      WebSocketUtils.error(`Error publishing to stream ${streamId} for client ${clientId}:`, error);
+      CommonServerUtils.handleStreamError(this.wss, clientId, streamId, 'publish', error);
     }
   }
 

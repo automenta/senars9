@@ -2,22 +2,24 @@ import { WebSocketServer as WSServer } from 'ws';
 import { createServer } from 'http';
 import Component from '../base/Component.js';
 import { WebSocketUtils, DEFAULTS } from './WebSocketUtils.js';
+import MessageFactory from './MessageFactory.js';
 import MessageHandler from './MessageHandler.js';
 import ConnectionManager from './ConnectionManager.js';
 import StreamManager from './StreamManager.js';
 
 class WebSocketServer extends Component {
-  constructor(core) {
+  constructor(core, options = {}) {
     super();
     this.core = core;
     this.wss = null;
     this.server = null;
-    this.clients = new Map();
-    this.subscriptions = new Map();
-    this.taskStreams = new Map();
-    this.streams = new Map();
     this.isRunning = false;
     this.startTime = null;
+    this.simpleMode = options.simpleMode || false;
+
+    // Initialize core data structures
+    this.clients = new Map();
+    this.subscriptions = new Map();
 
     // Initialize component managers
     this.connectionManager = new ConnectionManager(this);
@@ -91,7 +93,7 @@ class WebSocketServer extends Component {
     try {
       const state = WebSocketUtils.extractSystemState(this.core);
       WebSocketUtils.addSystemStatsToState(this.core, state);
-      this.broadcast(WebSocketUtils.createMessage(MESSAGE_TYPES.COMPLETE_STATE, state));
+      this.broadcast(MessageFactory.createStateUpdateMessage(state));
     } catch (error) {
       WebSocketUtils.handleError('broadcasting current state', error);
     }
@@ -136,6 +138,11 @@ class WebSocketServer extends Component {
   }
 
   broadcast(message, excludeClients = []) {
+    if (this.simpleMode && typeof message !== 'object') {
+      // In simple mode, wrap primitive messages
+      message = MessageFactory.createSystemMessage('broadcast', message);
+    }
+
     const excludeSet = new Set(excludeClients);
 
     for (const [clientId, client] of this.clients) {
@@ -146,6 +153,22 @@ class WebSocketServer extends Component {
           WebSocketUtils.handleError('broadcasting', error, clientId);
         }
       }
+    }
+  }
+
+  // Simple mode message handler for basic echo functionality
+  handleSimpleMessage(clientId, message) {
+    if (!this.simpleMode) return;
+
+    const client = this.clients.get(clientId);
+    if (!client || !WebSocketUtils.isValidClient(client)) return;
+
+    try {
+      // Echo message back for testing
+      this.sendToClient(clientId, MessageFactory.createResponse('echo', message));
+    } catch (error) {
+      WebSocketUtils.handleError('handling simple message', error, clientId);
+      this.sendToClient(clientId, MessageFactory.createErrorResponse('echo', error));
     }
   }
 
@@ -170,26 +193,30 @@ class WebSocketServer extends Component {
     this.connectionManager.sendCurrentState(clientId);
   }
 
-  // Component delegation methods
-  subscribeToTaskStream(clientId, taskId) {
-    return this.streamManager.subscribeToTaskStream(clientId, taskId);
-  }
+  // Component delegation methods - streamlined to avoid duplication
+   subscribeToTaskStream(clientId, taskId) {
+     return this.streamManager.subscribeToTaskStream(clientId, taskId);
+   }
 
-  publishTaskUpdate(taskId, updateData) {
-    return this.streamManager.publishTaskUpdate(taskId, updateData);
-  }
+   publishTaskUpdate(taskId, updateData) {
+     return this.streamManager.publishTaskUpdate(taskId, updateData);
+   }
 
-  publishEvent(eventType, data, filters = {}) {
-    return this.streamManager.publishEvent(eventType, data, filters);
-  }
-
-  createTaskStream(taskId, options = {}) {
-    return this.streamManager.createTaskStream(taskId, options);
-  }
+   publishEvent(eventType, data, filters = {}) {
+     return this.streamManager.publishEvent(eventType, data, filters);
+   }
 
   cleanup() {
     this.connectionManager.cleanup();
     this.streamManager.cleanup();
+    if (this.simpleMode) {
+      this.simpleClients.clear();
+    }
+  }
+
+  // Factory method to create a simple WebSocket server
+  static createSimpleServer(port = 8080) {
+    return new WebSocketServer(null, { simpleMode: true, port });
   }
 
   // DEPRECATED: Backward compatibility methods for existing tests and demos
@@ -198,7 +225,7 @@ class WebSocketServer extends Component {
   }
 
   broadcastTaskToNARS(task) {
-    this.broadcast(WebSocketUtils.createMessage('nars_task', task));
+    this.broadcast(MessageFactory.createSystemMessage('nars_task', task));
     return 1;
   }
 
@@ -216,7 +243,6 @@ class WebSocketServer extends Component {
 
     return {
       isRunning: this.isRunning,
-      subscriptions: this.subscriptions.size,
       uptime: this.isRunning ? Date.now() - (this.startTime || Date.now()) : 0,
       ...connectionStats,
       ...streamStats

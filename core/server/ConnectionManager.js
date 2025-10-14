@@ -1,4 +1,5 @@
 import { WebSocketUtils, DEFAULTS, CLIENT_STATUS } from './WebSocketUtils.js';
+import MessageFactory from './MessageFactory.js';
 
 class ConnectionManager {
   constructor(webSocketServer) {
@@ -137,7 +138,7 @@ class ConnectionManager {
           client.ws.close(1000, 'Heartbeat timeout');
           this.handleDisconnection(clientId);
         } else if (WebSocketUtils.isValidClient(client)) {
-          client.ws.send(JSON.stringify(WebSocketUtils.createHeartbeatMessage()));
+          client.ws.send(JSON.stringify(MessageFactory.createHeartbeatMessage()));
         }
       } catch (error) {
         WebSocketUtils.handleError('heartbeat processing', error, clientId);
@@ -157,7 +158,7 @@ class ConnectionManager {
     const client = this.wss.clients.get(clientId);
     if (!client) return;
 
-    const welcomeMessage = WebSocketUtils.createWelcomeMessage(clientId, client.connectionId);
+    const welcomeMessage = MessageFactory.createWelcomeMessage(clientId, client.connectionId);
     this.wss.sendToClient(clientId, welcomeMessage);
   }
 
@@ -166,7 +167,9 @@ class ConnectionManager {
 
     setImmediate(() => {
       try {
-        const stateMessage = WebSocketUtils.createCompleteStateMessage(this.wss.core);
+        const state = WebSocketUtils.extractSystemState(this.wss.core);
+        WebSocketUtils.addSystemStatsToState(this.wss.core, state);
+        const stateMessage = MessageFactory.createStateUpdateMessage(state);
         this.wss.sendToClient(clientId, stateMessage);
       } catch (error) {
         WebSocketUtils.handleError('sending current state', error, clientId);

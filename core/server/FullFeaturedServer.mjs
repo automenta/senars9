@@ -3,40 +3,10 @@ import { Server } from 'http';
 import { randomUUID } from 'crypto';
 import WebSocketServerBase from './WebSocketServer.js';
 import { WebSocketUtils } from './WebSocketUtils.js';
+import YjsManager from './YjsManager.js';
 
-// Optional Yjs CRDT support - can be enabled via environment variable or config
-const useYjs = process.env.ENABLE_YJS === 'true' || process.env.YJS_CRDT === 'true';
-
-let yClients = new Set();
 let simpleClients = new Set();
 const clients = new Set();
-
-// Import Yjs components only if enabled
-let Y, Awareness, setupWSConnection, doc, yTasks, yConcepts, yLogs, awareness;
-
-if (useYjs) {
-  try {
-    Y = (await import('yjs')).default;
-    const awarenessModule = await import('y-protocols/awareness');
-    Awareness = awarenessModule.Awareness;
-    const wsModule = await import('y/websocket-server/utils');
-    setupWSConnection = wsModule.setupWSConnection;
-
-    // Initialize Yjs document and arrays
-    doc = new Y.Doc();
-    yTasks = doc.getArray('tasks');
-    yConcepts = doc.getArray('concepts');
-    yLogs = doc.getArray('logs');
-    awareness = new Awareness(doc);
-
-    WebSocketUtils.debug('Yjs CRDT support enabled');
-  } catch (error) {
-    WebSocketUtils.error('Failed to load Yjs modules:', error.message);
-    WebSocketUtils.debug('Falling back to simple protocol only');
-  }
-} else {
-  WebSocketUtils.debug('Running with simple WebSocket protocol only');
-}
 
 // Reasoning system components
 let memory, reasoner, selector;
@@ -51,6 +21,7 @@ class FullFeaturedServer extends WebSocketServerBase {
       res.end('okay');
     });
     this.mockDataInterval = null;
+    this.yjsManager = new YjsManager();
   }
 
   syncMemoryToClients() {
@@ -83,8 +54,8 @@ class FullFeaturedServer extends WebSocketServerBase {
         }
       }).filter(task => task !== null);
 
-      if (useYjs && yTasks) {
-        this.syncMemoryToYjs(tasksData);
+      if (this.yjsManager.isEnabled()) {
+        this.yjsManager.syncMemoryToYjs(tasksData);
       }
 
       this.broadcastState();
@@ -94,36 +65,6 @@ class FullFeaturedServer extends WebSocketServerBase {
     }
   }
 
-  syncMemoryToYjs(tasksData) {
-    if (!useYjs || !yTasks) return;
-
-    try {
-      const yTaskIds = new Set();
-      yTasks.forEach(yTask => {
-        if (yTask instanceof Y.Map) {
-          const id = yTask.get('id');
-          if (id) yTaskIds.add(id);
-        }
-      });
-
-      for (const taskObj of tasksData) {
-        if (!taskObj || yTaskIds.has(taskObj.id)) continue;
-
-        try {
-          const taskMap = new Y.Map();
-          Object.entries(taskObj).forEach(([key, value]) => {
-            taskMap.set(key, value);
-          });
-          yTasks.push([taskMap]);
-          WebSocketUtils.debug(`Added derived task to Yjs: ${taskObj.content}`);
-        } catch (taskError) {
-          WebSocketUtils.error('Error converting task for Yjs sync:', taskError, taskObj);
-        }
-      }
-    } catch (error) {
-      WebSocketUtils.error('Error in syncMemoryToYjs:', error);
-    }
-  }
 
   startReasoningCycle() {
     memory = new Memory();
@@ -210,63 +151,19 @@ class FullFeaturedServer extends WebSocketServerBase {
   }
 
   getCurrentState() {
-    return useYjs && yTasks ? this.convertYjsToPlain() : {
+    return this.yjsManager.isEnabled() ? this.yjsManager.convertYjsToPlain() : {
       tasks: this.getInitialTasks(),
       concepts: this.getInitialConcepts(),
       logs: this.getInitialLogs()
     };
   }
 
-  convertYjsToPlain() {
-    if (!useYjs || !yTasks) {
-      return {
-        tasks: this.getInitialTasks(),
-        concepts: this.getInitialConcepts(),
-        logs: this.getInitialLogs()
-      };
-    }
-
-    const convertYjsMap = (yItem) => {
-      if (yItem instanceof Y.Map) {
-        const obj = {};
-        yItem.forEach((value, key) => obj[key] = value);
-        return obj;
-      }
-      return yItem;
-    };
-
-    return {
-      tasks: yTasks.toArray().map(convertYjsMap),
-      concepts: yConcepts.toArray().map(convertYjsMap),
-      logs: yLogs.toArray().map(convertYjsMap)
-    };
-  }
 
   broadcastState() {
     const state = this.getCurrentState();
-
-    let stats;
-    if (useYjs && awareness) {
-      stats = awareness.getLocalState()?.reasonerStats || {
-        isRunning: false,
-        isPaused: true,
-        cycles: 0,
-        tasks: yTasks.length,
-        concepts: yConcepts.length,
-        timestamp: Date.now()
-      };
-      stats.tasks = yTasks.length;
-      stats.concepts = yConcepts.length;
-    } else {
-      stats = {
-        isRunning: false,
-        isPaused: true,
-        cycles: 0,
-        tasks: state.tasks.length,
-        concepts: state.concepts.length,
-        timestamp: Date.now()
-      };
-    }
+    const stats = this.yjsManager.getAwarenessState();
+    stats.tasks = state.tasks.length;
+    stats.concepts = state.concepts.length;
 
     const message = {
       type: 'state_update',
@@ -340,13 +237,10 @@ class FullFeaturedServer extends WebSocketServerBase {
       switch (command) {
         case 'start':
           WebSocketUtils.debug('Start command received');
-          if (useYjs && awareness) {
-            const startState = awareness.getLocalState()?.reasonerStats || {};
-            awareness.setLocalStateField('reasonerStats', {
-              ...startState,
+          if (this.yjsManager.isEnabled()) {
+            this.yjsManager.setAwarenessState({
               isRunning: true,
-              isPaused: false,
-              timestamp: Date.now()
+              isPaused: false
             });
           }
 
@@ -356,13 +250,10 @@ class FullFeaturedServer extends WebSocketServerBase {
           break;
         case 'stop':
           WebSocketUtils.debug('Stop command received');
-          if (useYjs && awareness) {
-            const stopState = awareness.getLocalState()?.reasonerStats || {};
-            awareness.setLocalStateField('reasonerStats', {
-              ...stopState,
+          if (this.yjsManager.isEnabled()) {
+            this.yjsManager.setAwarenessState({
               isRunning: false,
-              isPaused: true,
-              timestamp: Date.now()
+              isPaused: true
             });
           }
 
@@ -376,17 +267,14 @@ class FullFeaturedServer extends WebSocketServerBase {
           runSingleCycle(memory, reasoner, selector, context);
           this.syncMemoryToClients();
 
-          if (useYjs && awareness) {
-            const currentState = awareness.getLocalState()?.reasonerStats || {};
+          if (this.yjsManager.isEnabled()) {
+            const currentState = this.yjsManager.getAwarenessState();
             const newCycleCount = (currentState.cycles || 0) + 1;
-            awareness.setLocalStateField('reasonerStats', {
+            this.yjsManager.setAwarenessState({
               ...currentState,
               cycles: newCycleCount,
               isRunning: false,
-              isPaused: true,
-              concepts: yConcepts.length,
-              tasks: yTasks.length,
-              timestamp: Date.now()
+              isPaused: true
             });
           }
 
@@ -403,18 +291,16 @@ class FullFeaturedServer extends WebSocketServerBase {
           selector = new FocusSetSelector();
           this.loadInitialTasksToMemory();
 
-          if (useYjs && awareness) {
-            awareness.setLocalStateField('reasonerStats', {
+          if (this.yjsManager.isEnabled()) {
+            this.yjsManager.setAwarenessState({
               isRunning: false,
               isPaused: true,
               cycles: 0,
               concepts: 3,
-              tasks: 2,
-              timestamp: Date.now()
+              tasks: 2
             });
 
-            yTasks.delete(0, yTasks.length);
-            yConcepts.delete(0, yConcepts.length);
+            this.yjsManager.resetYjsData();
 
             const resetTasksData = [
               { id: 'task-1', content: '(a-->b).', priority: 0.9, status: 'Input', type: 'Input', createdAt: Date.now(), lastModified: Date.now() },
@@ -422,9 +308,9 @@ class FullFeaturedServer extends WebSocketServerBase {
             ];
 
             resetTasksData.forEach(task => {
-              const taskMap = new Y.Map();
+              const taskMap = new this.yjsManager.Y.Map();
               Object.entries(task).forEach(([key, value]) => taskMap.set(key, value));
-              yTasks.push([taskMap]);
+              this.yjsManager.yTasks.push([taskMap]);
             });
 
             const resetConceptsData = [
@@ -434,9 +320,9 @@ class FullFeaturedServer extends WebSocketServerBase {
             ];
 
             resetConceptsData.forEach(concept => {
-              const conceptMap = new Y.Map();
+              const conceptMap = new this.yjsManager.Y.Map();
               Object.entries(concept).forEach(([key, value]) => conceptMap.set(key, value));
-              yConcepts.push([conceptMap]);
+              this.yjsManager.yConcepts.push([conceptMap]);
             });
           }
 
@@ -496,12 +382,11 @@ class FullFeaturedServer extends WebSocketServerBase {
             memory.addTask(task, Date.now());
             this.syncMemoryToClients();
 
-            if (useYjs && awareness) {
-              const addTaskState = awareness.getLocalState()?.reasonerStats || {};
-              awareness.setLocalStateField('reasonerStats', {
+            if (this.yjsManager.isEnabled()) {
+              const addTaskState = this.yjsManager.getAwarenessState();
+              this.yjsManager.setAwarenessState({
                 ...addTaskState,
-                tasks: yTasks.length,
-                timestamp: Date.now()
+                tasks: this.yjsManager.yTasks.length
               });
             }
           } catch (error) {
@@ -535,11 +420,10 @@ class FullFeaturedServer extends WebSocketServerBase {
 
             this.syncMemoryToClients();
 
-            if (useYjs && awareness) {
-              const updateTaskState = awareness.getLocalState()?.reasonerStats || {};
-              awareness.setLocalStateField('reasonerStats', {
-                ...updateTaskState,
-                timestamp: Date.now()
+            if (this.yjsManager.isEnabled()) {
+              const updateTaskState = this.yjsManager.getAwarenessState();
+              this.yjsManager.setAwarenessState({
+                ...updateTaskState
               });
             }
           } else {
@@ -558,12 +442,11 @@ class FullFeaturedServer extends WebSocketServerBase {
           if (removed) {
             this.syncMemoryToClients();
 
-            if (useYjs && awareness) {
-              const deleteTaskState = awareness.getLocalState()?.reasonerStats || {};
-              awareness.setLocalStateField('reasonerStats', {
+            if (this.yjsManager.isEnabled()) {
+              const deleteTaskState = this.yjsManager.getAwarenessState();
+              this.yjsManager.setAwarenessState({
                 ...deleteTaskState,
-                tasks: yTasks.length,
-                timestamp: Date.now()
+                tasks: this.yjsManager.yTasks.length
               });
             }
           } else {
@@ -636,13 +519,11 @@ class FullFeaturedServer extends WebSocketServerBase {
 
   async start() {
     await super.start();
+    await this.yjsManager.initialize();
     this.loadInitialData();
 
-    if (useYjs && yTasks && awareness) {
-      yTasks.observe(() => this.broadcastState());
-      yConcepts.observe(() => this.broadcastState());
-      yLogs.observe(() => this.broadcastState());
-      awareness.on('change', () => this.broadcastState());
+    if (this.yjsManager.isEnabled()) {
+      this.yjsManager.observeChanges(() => this.broadcastState());
       WebSocketUtils.debug('Yjs observers set up for automatic state broadcasting');
     }
 
@@ -653,7 +534,7 @@ class FullFeaturedServer extends WebSocketServerBase {
           reject(error);
         } else {
           WebSocketUtils.debug(`FullFeatured server listening on port ${this.port}`);
-          if (useYjs) {
+          if (this.yjsManager.isEnabled()) {
             WebSocketUtils.debug('Yjs CRDT support enabled - both protocols supported');
           } else {
             WebSocketUtils.debug('Simple WebSocket protocol only');
@@ -688,8 +569,8 @@ class FullFeaturedServer extends WebSocketServerBase {
     clients.clear();
 
     simpleClients.clear();
-    if (useYjs) {
-      yClients.clear();
+    if (this.yjsManager.isEnabled()) {
+      this.yjsManager.cleanup();
     }
 
     return new Promise((resolve) => {
