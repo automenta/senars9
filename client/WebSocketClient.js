@@ -2,6 +2,10 @@ import { System } from './core/index.js';
 import { Task, TruthValue } from './core/Task.js';
 import { Term } from './core/Term.js';
 
+/**
+ * WebSocketClient for external applications to connect to the SeNARS core system
+ * This is used by the UI and other non-UI WebSocket client applications
+ */
 class WebSocketClient {
   constructor() {
     this.system = null;
@@ -29,65 +33,11 @@ class WebSocketClient {
       
       console.log('WebSocketClient: Connected to SeNARS system');
       
-      // Set up event listeners to forward system events to WebSocket server
-      this.setupEventListeners();
-      
       return true;
     } catch (error) {
       console.error('WebSocketClient: Failed to connect to SeNARS system:', error);
       return false;
     }
-  }
-
-  setupEventListeners() {
-    if (!this.system) return;
-
-    // Listen for various system events and forward them appropriately
-    this.system.on('task.input', (task) => {
-      console.log('Task input event:', task);
-      this.forwardTaskEvent('task_input', task);
-    });
-
-    this.system.on('task.derived', (task) => {
-      console.log('Task derived event:', task);
-      this.forwardTaskEvent('task_derived', task);
-    });
-
-    this.system.on('concept.updated', (concept) => {
-      console.log('Concept updated event:', concept);
-      this.forwardConceptEvent('concept_updated', concept);
-    });
-
-    this.system.on('cycle.start', () => {
-      console.log('Cycle started');
-      this.forwardSystemEvent('cycle_started');
-    });
-
-    this.system.on('cycle.end', () => {
-      console.log('Cycle ended');
-      this.forwardSystemEvent('cycle_ended');
-    });
-
-    this.system.on('reasoning_error', (error) => {
-      console.error('Reasoning error:', error);
-      this.forwardSystemEvent('reasoning_error', { error: error.message });
-    });
-  }
-
-  forwardTaskEvent(eventType, task) {
-    // This would forward to the WebSocket server when one is connected
-    // In a real implementation, you'd emit this to a WebSocket connection
-    console.log(`Forwarding ${eventType}:`, task);
-  }
-
-  forwardConceptEvent(eventType, concept) {
-    // This would forward to the WebSocket server when one is connected
-    console.log(`Forwarding ${eventType}:`, concept);
-  }
-
-  forwardSystemEvent(eventType, data = {}) {
-    // This would forward to the WebSocket server when one is connected
-    console.log(`Forwarding ${eventType}:`, data);
   }
 
   async addTask(content, priority = 0.5) {
@@ -96,35 +46,11 @@ class WebSocketClient {
     }
 
     try {
-      // Parse the content to create a proper task
-      let term;
-      let truth = new TruthValue(0.8, 0.8);
-      
-      // Simplified parsing for NARS-style content
-      const cleanContent = content.replace(/[.!?:]+$/, '').trim();
-      
-      // Try to identify if it's an inheritance statement like (a-->b)
-      const inheritanceMatch = cleanContent.match(/\(([^(]+)-->([^)]+)\)/);
-      if (inheritanceMatch) {
-        const subject = inheritanceMatch[1].trim();
-        const predicate = inheritanceMatch[2].trim();
-        const subjTerm = Term.newAtom(subject);
-        const predTerm = Term.newAtom(predicate);
-        term = Term.createCompound(0, [subjTerm, predTerm]); // 0 likely corresponds to inheritance
-      } else {
-        term = Term.newAtom(cleanContent);
-      }
-
-      // Determine punctuation based on original content
-      let punctuation = '.';
-      if (content.endsWith('!')) punctuation = '!';
-      else if (content.endsWith('?')) punctuation = '?';
-
       // Create task using the system's input method which handles the format properly
       const taskData = {
         term: content, // Pass the original content as term
-        punctuation: punctuation,
-        truth: truth,
+        punctuation: content.endsWith('!') ? '!' : content.endsWith('?') ? '?' : '.',
+        truth: new TruthValue(0.8, 0.8),
         priority: priority
       };
 
@@ -225,5 +151,5 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   console.log('WebSocketClient module loaded');
   
   // Example usage would go here
-  // This module is intended to be imported by the WebSocket server
+  // This module is intended to be imported by WebSocket clients
 }
