@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { WebSocketUtils, DEFAULTS, MESSAGE_TYPES } from '../core/WebSocketUtils.js';
+import { WebSocketUtils, DEFAULTS, MESSAGE_TYPES } from '../core/server/WebSocketUtils.js';
 
 class WebSocketClient extends EventEmitter {
   constructor(url, options = {}) {

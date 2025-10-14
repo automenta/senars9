@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import Core from '../../core/orchestration/Core.js';
-import WebSocketServer from '../../core/WebSocketServer.js';
+import WebSocketServer from '../../core/server/WebSocketServer.js';
 
 import Messages from '../../core/messaging/Messages.js';
 

@@ -1,9 +1,9 @@
 import { describe, test, expect } from '@jest/globals';
-import WebSocketServer from '../../core/WebSocketServer.js';
-import WebSocketUtils from '../../core/WebSocketUtils.js';
-import MessageHandler from '../../core/MessageHandler.js';
-import ConnectionManager from '../../core/ConnectionManager.js';
-import StreamManager from '../../core/StreamManager.js';
+import WebSocketServer from '../../core/server/WebSocketServer.js';
+import WebSocketUtils from '../../core/server/WebSocketUtils.js';
+import MessageHandler from '../../core/server/MessageHandler.js';
+import ConnectionManager from '../../core/server/ConnectionManager.js';
+import StreamManager from '../../core/server/StreamManager.js';
 
 describe('WebSocket Integration Test', () => {
   test('should demonstrate WebSocket communication functionality and verify server methods', async () => {

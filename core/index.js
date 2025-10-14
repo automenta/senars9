@@ -77,4 +77,4 @@ export { UnifiedAnalysisEngine } from './components/UnifiedAnalysisEngine.js';
 export { PlanExecutor } from './components/PlanExecutor.js';
 
 // WebSocket Communication
-export { default as WebSocketServer } from './WebSocketServer.js';
+export { default as WebSocketServer } from './server/WebSocketServer.js';

@@ -1,5 +1,5 @@
 // WebSocket utility functions and constants
-import { Logger } from './base/utilities.js';
+import { Logger } from '../base/utilities.js';
 
 const DEFAULTS = {
   PORT: 8080,

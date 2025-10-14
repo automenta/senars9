@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import Messages from '../../core/messaging/Messages.js';
-import WebSocketServer from '../../core/WebSocketServer.js';
+import WebSocketServer from '../../core/server/WebSocketServer.js';
 import { CommonMiddleware } from '../../core/messaging/Middleware.js';
 
 describe('WebSocketServer Integration with Messages', () => {

@@ -1,6 +1,6 @@
 import { WebSocketServer as WSServer } from 'ws';
 import { createServer } from 'http';
-import Component from './base/Component.js';
+import Component from '../base/Component.js';
 import { WebSocketUtils, DEFAULTS } from './WebSocketUtils.js';
 import MessageHandler from './MessageHandler.js';
 import ConnectionManager from './ConnectionManager.js';

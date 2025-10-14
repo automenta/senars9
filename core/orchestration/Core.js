@@ -14,7 +14,7 @@ import DataIngestor from '../analysis/DataIngestor.js';
 import ReportGenerator from '../analysis/ReportGenerator.js';
 
 import PatternDetector from '../analysis/PatternDetector.js';
-import WebSocketServer from '../WebSocketServer.js';
+import WebSocketServer from '../server/WebSocketServer.js';
 import { Focus } from '../memory/Memory.js';
 import { ContradictionAnalyzer } from '../reasoning/ContradictionAnalyzer.js';
 import { ResolutionStrategy } from '../reasoning/ResolutionStrategy.js';
