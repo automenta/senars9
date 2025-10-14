@@ -35,6 +35,7 @@ class WebSocketConnectionManager {
   }
 
   async connect() {
+    if (!this.connectionManager) return; // Early return if connectionManager is null
     if (this.isConnected || this.connectionManager.status === CONNECTION_STATUS.CONNECTING) return;
 
     this.connectionManager.setStatus(CONNECTION_STATUS.CONNECTING);
@@ -60,19 +61,24 @@ class WebSocketConnectionManager {
 
       this.ws.onclose = event => {
         this.isConnected = false;
-        this.connectionManager.setStatus(CONNECTION_STATUS.DISCONNECTED);
+        if (this.connectionManager) {
+          this.connectionManager.setStatus(CONNECTION_STATUS.DISCONNECTED);
+        }
         this.emit('disconnect', event);
 
         // Optimized reconnection logic
         const shouldReconnect = !event.wasClean &&
-          this.reconnectAttempts < this.config.maxReconnectAttempts;
+          this.reconnectAttempts < this.config.maxReconnectAttempts &&
+          this.connectionManager; // Ensure connectionManager exists
 
         shouldReconnect && this.scheduleReconnect();
       };
 
       this.ws.onerror = error => {
         this.isConnected = false;
-        this.connectionManager.setStatus(CONNECTION_STATUS.ERROR);
+        if (this.connectionManager) {
+          this.connectionManager.setStatus(CONNECTION_STATUS.ERROR);
+        }
         this.emit('error', error);
         this.handleError(error);
       };
@@ -85,6 +91,8 @@ class WebSocketConnectionManager {
   }
 
   scheduleReconnect() {
+    if (!this.connectionManager) return; // Early return if connectionManager is null
+    
     this.reconnectAttempts++;
     this.connectionManager.setStatus(CONNECTION_STATUS.RECONNECTING);
     this.connectionManager.incrementReconnectAttempts();

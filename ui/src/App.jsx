@@ -59,21 +59,29 @@ const App = () => {
   };
 
   const handleAddTaskWithConcepts = (task) => {
-    handleAddTask(task);
+    if (handleAddTask) {
+      handleAddTask(task);
 
-    // Request concepts after adding a task that might generate new concepts
-    setTimeout(() => {
-      requestConcepts();
-    }, 300);
+      // Request concepts after adding a task that might generate new concepts
+      setTimeout(() => {
+        requestConcepts();
+      }, 300);
+    } else {
+      console.error('Cannot add task: WebSocket connection not ready');
+    }
   };
 
   const handleUpdateTaskWithConcepts = (task) => {
-    handleUpdateTask(task);
+    if (handleUpdateTask) {
+      handleUpdateTask(task);
 
-    // Request concepts after updating a task that might generate new concepts
-    setTimeout(() => {
-      requestConcepts();
-    }, 300);
+      // Request concepts after updating a task that might generate new concepts
+      setTimeout(() => {
+        requestConcepts();
+      }, 300);
+    } else {
+      console.error('Cannot update task: WebSocket connection not ready');
+    }
   };
 
   // Request initial concepts and top tasks when component mounts

@@ -29,7 +29,7 @@ const useWebSocket = (url, config = {}) => {
       wsManagerRef.current?.destroy();
       wsManagerRef.current = null;
     };
-  }, []);
+  }, [url]); // Added url as dependency to handle reconnections properly
 
   // Handle URL changes
   useEffect(() => {
@@ -45,7 +45,13 @@ const useWebSocket = (url, config = {}) => {
   const sendMessage = useCallback((command, payload = {}) =>
     sendRawMessage({ type: MESSAGE_TYPES.CONTROL, command, payload }), [sendRawMessage]);
 
-  const taskHandlers = useMemo(() => wsManagerRef.current?.getTaskHandlers() || {}, []);
+  const taskHandlers = useMemo(() => {
+    return wsManagerRef.current?.getTaskHandlers() || {
+      handleAddTask: () => console.error('WebSocket not ready: handleAddTask'),
+      handleUpdateTask: () => console.error('WebSocket not ready: handleUpdateTask'),
+      handleDeleteTask: () => console.error('WebSocket not ready: handleDeleteTask')
+    };
+  }, []);
 
   const requestConcepts = useCallback(() => sendMessage('get_concepts'), [sendMessage]);
   const requestTopTasks = useCallback(() => sendMessage('get_top_tasks'), [sendMessage]);
