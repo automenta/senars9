@@ -24,7 +24,7 @@ export async function demonstrateSystemHealthMonitoring() {
       contradictionAnalyzer: system.core.contradictionAnalyzer,
       resolutionStrategy: system.core.resolutionStrategy,
       patternDetector: system.core.patternDetector,
-      webSocketServer: system.core.wss || system.core.webSocketServer
+      webSocketServer: system.core.webSocketServer || system.core.wss
     };
 
     console.log('\\n📊 System Component Health Overview:');
@@ -173,7 +173,7 @@ export async function testSystemHealthMonitoringFunctionality() {
       contradictionAnalyzer: system.core.contradictionAnalyzer,
       resolutionStrategy: system.core.resolutionStrategy,
       patternDetector: system.core.patternDetector,
-      webSocketServer: system.core.wss || system.core.webSocketServer
+      webSocketServer: system.core.webSocketServer || system.core.wss
     };
 
     // Health monitoring capabilities

@@ -10,6 +10,7 @@ class Component {
   }
 
   async initialize(config = {}) {
+    this._setState(STATES.INITIALIZING);
     this.config = { ...this.getDefaultConfig(), ...config };
     await this._safeExecute(async () => await this._doInitialize(this.config), 'initialize');
     this._setState(STATES.INITIALIZED, { initialized: true });
@@ -60,7 +61,13 @@ class Component {
   }
 
   _requireMessages() {
-    if (!this.core?.messages) throw new Error(`${this.constructor.name}: Messages component not available on core.`);
+    if (!this.core?.messages) {
+      // During initialization, messages might not be available yet
+      if (this.status === STATES.UNINITIALIZED || this.status === STATES.INITIALIZING) {
+        throw new Error(`${this.constructor.name}: Cannot access messages during initialization. Component may not be fully initialized yet.`);
+      }
+      throw new Error(`${this.constructor.name}: Messages component not available on core.`);
+    }
     return this.core.messages;
   }
 
@@ -70,11 +77,11 @@ class Component {
   }
 
   async _safeExecute(operation, operationName) {
-    return ErrorHandler.withErrorHandling(
-      operation,
-      { component: this.constructor.name, operation: operationName },
-      this.core?.messages
-    );
+    try {
+      return await operation();
+    } catch (error) {
+      return ErrorHandler.handle(error, `${this.constructor.name}:${operationName}`, this.core?.messages);
+    }
   }
 
   registerCommand(command, handler) {

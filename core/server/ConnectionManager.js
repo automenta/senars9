@@ -14,8 +14,8 @@ class ConnectionManager {
 
   initialize(config = {}) {
     this.connectionLimits = {
-      maxPerIP: config.maxConnectionsPerIP || DEFAULTS.MAX_CONNECTIONS_PER_IP,
-      maxTotal: config.maxTotalConnections || DEFAULTS.MAX_TOTAL_CONNECTIONS
+      maxPerIP: WebSocketUtils.getConfigValue(config, 'maxConnectionsPerIP', DEFAULTS.MAX_CONNECTIONS_PER_IP),
+      maxTotal: WebSocketUtils.getConfigValue(config, 'maxTotalConnections', DEFAULTS.MAX_TOTAL_CONNECTIONS)
     };
   }
 
@@ -48,18 +48,7 @@ class ConnectionManager {
   }
 
   createClientInfo(clientId, ws, request, clientIP) {
-    return {
-      id: clientId,
-      type: 'unknown',
-      connectedAt: new Date(),
-      lastSeen: new Date(),
-      ws: ws,
-      ip: clientIP,
-      userAgent: request.headers['user-agent'] || 'unknown',
-      connectionAttempts: 1,
-      status: CLIENT_STATUS.CONNECTED,
-      connectionId: WebSocketUtils.generateConnectionId()
-    };
+    return WebSocketUtils.createClientInfo(clientId, ws, request, clientIP);
   }
 
   setupClientHandlers(clientId, ws) {
@@ -78,7 +67,7 @@ class ConnectionManager {
       const message = WebSocketUtils.validateMessage(data);
       this.wss.messageHandler.handle(clientId, message);
     } catch (error) {
-      WebSocketUtils.error(`Error parsing message from client ${clientId}`, error);
+      WebSocketUtils.handleError('parsing message', error, clientId);
     }
   }
 
@@ -88,7 +77,7 @@ class ConnectionManager {
   }
 
   handleError(clientId, error) {
-    WebSocketUtils.error(`WebSocket error for client ${clientId}`, error);
+    WebSocketUtils.handleError('WebSocket', error, clientId);
 
     const client = this.wss.clients.get(clientId);
     if (client) {
@@ -105,7 +94,7 @@ class ConnectionManager {
   isConnectionRateAllowed(clientIP) {
     const now = Date.now();
     const windowMs = DEFAULTS.CONNECTION_RATE_WINDOW;
-    const maxPerWindow = this.wss.config?.maxConnectionRate || DEFAULTS.MAX_CONNECTION_RATE;
+    const maxPerWindow = WebSocketUtils.getConfigValue(this.wss.config, 'maxConnectionRate', DEFAULTS.MAX_CONNECTION_RATE);
 
     const attempts = this.connectionRateTracker.get(clientIP) || [];
     const recentAttempts = attempts.filter(time => now - time < windowMs);
@@ -131,7 +120,7 @@ class ConnectionManager {
       clearInterval(this.heartbeatInterval);
     }
 
-    const interval = this.wss.config?.heartbeatInterval || DEFAULTS.HEARTBEAT_INTERVAL;
+    const interval = this.wss.config?.heartbeatInterval ?? DEFAULTS.HEARTBEAT_INTERVAL;
     this.heartbeatInterval = setInterval(() => {
       this.processHeartbeat();
     }, interval);
@@ -139,15 +128,20 @@ class ConnectionManager {
 
   processHeartbeat() {
     const now = new Date();
-    const timeout = (this.wss.config?.heartbeatInterval || DEFAULTS.HEARTBEAT_INTERVAL) * DEFAULTS.CLIENT_TIMEOUT_MULTIPLIER;
+    const timeout = (WebSocketUtils.getConfigValue(this.wss.config, 'heartbeatInterval', DEFAULTS.HEARTBEAT_INTERVAL)) * DEFAULTS.CLIENT_TIMEOUT_MULTIPLIER;
 
     for (const [clientId, client] of this.wss.clients) {
-      if (now - client.lastSeen > timeout) {
-        WebSocketUtils.debug(`Client ${clientId} timed out`);
-        client.ws.close(1000, 'Heartbeat timeout');
+      try {
+        if (now - client.lastSeen > timeout) {
+          WebSocketUtils.debug(`Client ${clientId} timed out`);
+          client.ws.close(1000, 'Heartbeat timeout');
+          this.handleDisconnection(clientId);
+        } else if (WebSocketUtils.isValidClient(client)) {
+          client.ws.send(JSON.stringify(WebSocketUtils.createHeartbeatMessage()));
+        }
+      } catch (error) {
+        WebSocketUtils.handleError('heartbeat processing', error, clientId);
         this.handleDisconnection(clientId);
-      } else if (WebSocketUtils.isValidClient(client)) {
-        client.ws.send(JSON.stringify(WebSocketUtils.createHeartbeatMessage()));
       }
     }
   }
@@ -175,14 +169,15 @@ class ConnectionManager {
         const stateMessage = WebSocketUtils.createCompleteStateMessage(this.wss.core);
         this.wss.sendToClient(clientId, stateMessage);
       } catch (error) {
-        WebSocketUtils.error('Error sending current state to new client', error);
+        WebSocketUtils.handleError('sending current state', error, clientId);
       }
     });
   }
 
   getStats() {
-    const clientTypes = WebSocketUtils.countByProperty(this.wss.clients.values(), 'type');
-    const clientIPs = WebSocketUtils.countByProperty(this.wss.clients.values(), 'ip');
+    const clients = Array.from(this.wss.clients.values());
+    const clientTypes = WebSocketUtils.countByProperty(clients, 'type');
+    const clientIPs = WebSocketUtils.countByProperty(clients, 'ip');
 
     return {
       clientCount: this.wss.clients.size,

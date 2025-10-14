@@ -12,19 +12,7 @@ class StreamManager {
       return this.taskStreams.get(taskId);
     }
 
-    const stream = {
-      id: taskId,
-      participants: new Set(),
-      history: [],
-      options: {
-        bufferSize: options.bufferSize || DEFAULTS.TASK_STREAM_BUFFER_SIZE,
-        retentionTime: options.retentionTime || DEFAULTS.RETENTION_TIME,
-        streamType: options.streamType || STREAM_TYPES.TASK
-      },
-      createdAt: new Date(),
-      isActive: true
-    };
-
+    const stream = WebSocketUtils.createTaskStream(taskId, options);
     this.taskStreams.set(taskId, stream);
     return stream;
   }
@@ -34,12 +22,10 @@ class StreamManager {
     stream.participants.add(clientId);
 
     if (stream.history.length > 0) {
-      const historyMessage = WebSocketUtils.createMessage(
+      const historyMessage = WebSocketUtils.createTaskMessage(
         MESSAGE_TYPES.TASK_STREAM_HISTORY,
-        {
-          taskId,
-          history: stream.history.slice(-DEFAULTS.TASK_HISTORY_LIMIT)
-        }
+        taskId,
+        { history: stream.history.slice(-DEFAULTS.TASK_HISTORY_LIMIT) }
       );
       this.wss.sendToClient(clientId, historyMessage);
     }
@@ -49,7 +35,7 @@ class StreamManager {
 
   publishTaskUpdate(taskId, updateData) {
     const stream = this.taskStreams.get(taskId);
-    if (!stream?.isActive) return false;
+    if (!WebSocketUtils.isActiveStream(stream)) return false;
 
     const update = {
       type: 'update',
@@ -64,15 +50,13 @@ class StreamManager {
       stream.history = stream.history.slice(-stream.options.bufferSize);
     }
 
-    const updateMessage = WebSocketUtils.createMessage(
+    const updateMessage = WebSocketUtils.createTaskMessage(
       MESSAGE_TYPES.TASK_STREAM_UPDATE,
-      { taskId, update: updateData }
+      taskId,
+      updateData
     );
 
-    for (const participantId of stream.participants) {
-      this.wss.sendToClient(participantId, updateMessage);
-    }
-
+    WebSocketUtils.broadcastToParticipants(this.wss, stream.participants, updateMessage);
     return true;
   }
 
@@ -88,16 +72,7 @@ class StreamManager {
       return this.streams.get(streamId);
     }
 
-    const stream = {
-      id: streamId,
-      type: streamType,
-      participants: new Set(),
-      buffer: [],
-      bufferSize: options.bufferSize || DEFAULTS.STREAM_BUFFER_SIZE,
-      createdAt: new Date(),
-      isActive: true
-    };
-
+    const stream = WebSocketUtils.createStream(streamId, streamType, options);
     this.streams.set(streamId, stream);
     return stream;
   }
@@ -138,56 +113,48 @@ class StreamManager {
   }
 
   publishToStream(clientId, streamId, data) {
-    const stream = this.streams.get(streamId);
-    if (!stream?.isActive) {
-      const errorMessage = WebSocketUtils.createMessage(
-        MESSAGE_TYPES.STREAM_ERROR,
-        { streamId, error: 'Stream not found or inactive' }
+    try {
+      const stream = this.streams.get(streamId);
+      if (!WebSocketUtils.isActiveStream(stream)) {
+        WebSocketUtils.sendError(this.wss, clientId, 'publish', 'Stream not found or inactive');
+        return false;
+      }
+
+      WebSocketUtils.addToStreamBuffer(stream, data, clientId, stream.bufferSize);
+
+      const dataMessage = WebSocketUtils.createStreamMessage(
+        MESSAGE_TYPES.STREAM_DATA,
+        streamId,
+        data,
+        clientId
       );
-      this.wss.sendToClient(clientId, errorMessage);
+
+      WebSocketUtils.broadcastToParticipants(this.wss, stream.participants, dataMessage, clientId);
+      return true;
+    } catch (error) {
+      WebSocketUtils.handleError('publishing to stream', error, clientId);
       return false;
     }
-
-    const streamData = {
-      source: clientId,
-      data,
-      timestamp: new Date()
-    };
-
-    stream.buffer.push(streamData);
-
-    if (stream.buffer.length > stream.bufferSize) {
-      stream.buffer = stream.buffer.slice(-stream.bufferSize);
-    }
-
-    const dataMessage = WebSocketUtils.createMessage(
-      MESSAGE_TYPES.STREAM_DATA,
-      { streamId, data, source: clientId }
-    );
-
-    for (const participantId of stream.participants) {
-      if (participantId !== clientId) {
-        this.wss.sendToClient(participantId, dataMessage);
-      }
-    }
-
-    return true;
   }
 
   broadcastToStreamType(clientId, streamType, data) {
-    for (const [fullStreamId, stream] of this.streams) {
-      if (stream.type === streamType && stream.isActive) {
-        this.publishToStream(clientId, stream.id, data);
+    try {
+      for (const [fullStreamId, stream] of this.streams) {
+        if (stream.type === streamType && stream.isActive) {
+          this.publishToStream(clientId, stream.id, data);
+        }
       }
-    }
 
-    if (this.wss.core?.messages?.emit) {
-      this.wss.core.messages.emit(`stream.broadcast.${streamType}`, {
-        source: clientId,
-        data,
-        streamType,
-        timestamp: new Date().toISOString()
-      });
+      if (this.wss.core?.messages?.emit) {
+        this.wss.core.messages.emit(`stream.broadcast.${streamType}`, {
+          source: clientId,
+          data,
+          streamType,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      WebSocketUtils.error(`Error broadcasting to stream type ${streamType} for client ${clientId}:`, error);
     }
   }
 
@@ -205,14 +172,7 @@ class StreamManager {
     };
     stream.history.push(historyEntry);
 
-    const broadcastMessage = WebSocketUtils.createMessage(MESSAGE_TYPES.TASK_UPDATE, {
-      taskId,
-      source: clientId,
-      action,
-      data,
-      streamType
-    });
-
+    const broadcastMessage = WebSocketUtils.createTaskMessage(MESSAGE_TYPES.TASK_UPDATE, taskId, data, clientId);
     this.wss.broadcast(broadcastMessage, [clientId]);
   }
 
@@ -263,17 +223,21 @@ class StreamManager {
 
   // Event publishing for external components
   publishEvent(eventType, data, filters = {}) {
-    const eventMessage = WebSocketUtils.createMessage(MESSAGE_TYPES.EVENT, {
-      eventType,
-      data,
-      filters
-    });
+    try {
+      const eventMessage = WebSocketUtils.createMessage(MESSAGE_TYPES.EVENT, {
+        eventType,
+        data,
+        filters
+      });
 
-    for (const [clientId, subscription] of this.wss.subscriptions) {
-      if (this.matchesSubscription(subscription, eventType, filters) &&
-          this.wss.clients.has(clientId)) {
-        this.wss.sendToClient(clientId, eventMessage);
+      for (const [clientId, subscription] of this.wss.subscriptions) {
+        if (this.matchesSubscription(subscription, eventType, filters) &&
+            this.wss.clients.has(clientId)) {
+          this.wss.sendToClient(clientId, eventMessage);
+        }
       }
+    } catch (error) {
+      WebSocketUtils.error(`Error publishing event ${eventType}:`, error);
     }
   }
 

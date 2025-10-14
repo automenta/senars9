@@ -12,4 +12,5 @@ lerna-debug.log*
 # Build artifacts
 /dist
 /build
-/coverage
+/coverage.vscode
+.vscode/

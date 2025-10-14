@@ -14,7 +14,10 @@ class WebSocketServer extends Component {
     this.server = null;
     this.clients = new Map();
     this.subscriptions = new Map();
+    this.taskStreams = new Map();
+    this.streams = new Map();
     this.isRunning = false;
+    this.startTime = null;
 
     // Initialize component managers
     this.connectionManager = new ConnectionManager(this);
@@ -25,14 +28,15 @@ class WebSocketServer extends Component {
   async initialize(config = {}) {
     await super.initialize(config);
 
-    const port = config.port || DEFAULTS.PORT;
-    const host = config.host || DEFAULTS.HOST;
+    const port = WebSocketUtils.getConfigValue(config, 'port', DEFAULTS.PORT);
+    const host = WebSocketUtils.getConfigValue(config, 'host', DEFAULTS.HOST);
+    const enabled = WebSocketUtils.getConfigValue(config, 'enabled', DEFAULTS.ENABLED);
 
     this.server = createServer();
     this.wss = new WSServer({ server: this.server });
 
     this.wss.on('connection', (ws, request) => this._handleConnection(ws, request));
-    this.wss.on('error', (error) => WebSocketUtils.error('WebSocket server error', error));
+    this.wss.on('error', (error) => WebSocketUtils.handleError('WebSocket server', error));
 
     this.connectionManager.initialize(config);
   }
@@ -45,13 +49,13 @@ class WebSocketServer extends Component {
       return;
     }
 
-    const port = this.config?.port || DEFAULTS.PORT;
-    const host = this.config?.host || DEFAULTS.HOST;
+    const port = WebSocketUtils.getConfigValue(this.config, 'port', DEFAULTS.PORT);
+    const host = WebSocketUtils.getConfigValue(this.config, 'host', DEFAULTS.HOST);
 
     const isTestEnvironment = typeof process !== 'undefined' &&
-                             (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
+                            (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
 
-    const enabled = this.config?.enabled ?? !isTestEnvironment;
+    const enabled = WebSocketUtils.getConfigValue(this.config, 'enabled', DEFAULTS.ENABLED) ?? !isTestEnvironment;
 
     if (!enabled) {
       WebSocketUtils.debug('WebSocket server is disabled, skipping start');
@@ -61,23 +65,23 @@ class WebSocketServer extends Component {
     return new Promise((resolve, reject) => {
       this.server.listen(port, host, (error) => {
         if (error) {
+          WebSocketUtils.handleError(`starting WebSocket server on ${host}:${port}`, error);
           reject(error);
         } else {
           this.isRunning = true;
+          this.startTime = Date.now();
           this.connectionManager.startHeartbeat();
-          WebSocketUtils.debug(`WebSocket server running on ws://${host}:${port} for Core`);
+          WebSocketUtils.debug(`WebSocket server running on ws://${host}:${port}`);
           resolve();
         }
       });
     });
   }
 
-  // Extract current system state into standardized format
   _extractSystemState() {
     return WebSocketUtils.extractSystemState(this.core);
   }
 
-  // Broadcast full current state to all clients
   broadcastCurrentState() {
     if (!this.core?.memory) {
       WebSocketUtils.warn('No core memory available for state broadcasting');
@@ -87,10 +91,9 @@ class WebSocketServer extends Component {
     try {
       const state = WebSocketUtils.extractSystemState(this.core);
       WebSocketUtils.addSystemStatsToState(this.core, state);
-
-      this.broadcast(WebSocketUtils.createMessage('complete_state', state));
+      this.broadcast(WebSocketUtils.createMessage(MESSAGE_TYPES.COMPLETE_STATE, state));
     } catch (error) {
-      WebSocketUtils.error('Error broadcasting current state', error);
+      WebSocketUtils.handleError('broadcasting current state', error);
     }
   }
 
@@ -100,26 +103,35 @@ class WebSocketServer extends Component {
     this.connectionManager.stopHeartbeat();
 
     return new Promise((resolve) => {
-      for (const [clientId, client] of this.clients) {
-        client.ws.close(1000, 'Server shutting down');
-      }
-      this.clients.clear();
+      try {
+        for (const [clientId, client] of this.clients) {
+          client.ws.close(1000, 'Server shutting down');
+        }
+        this.clients.clear();
 
-      this.wss.close(() => {
-        this.server.close(() => {
-          this.isRunning = false;
-          this.cleanup();
-          WebSocketUtils.debug('WebSocket server stopped');
-          resolve();
+        this.wss.close(() => {
+          this.server.close(() => {
+            this.isRunning = false;
+            this.cleanup();
+            WebSocketUtils.debug('WebSocket server stopped');
+            resolve();
+          });
         });
-      });
+      } catch (error) {
+        WebSocketUtils.error('Error during server shutdown:', error);
+        resolve(); // Don't block shutdown on errors
+      }
     });
   }
 
   sendToClient(clientId, message) {
     const client = this.clients.get(clientId);
     if (WebSocketUtils.isValidClient(client)) {
-      client.ws.send(JSON.stringify(message));
+      try {
+        client.ws.send(JSON.stringify(message));
+      } catch (error) {
+        WebSocketUtils.handleError('sending message', error, clientId);
+      }
     }
   }
 
@@ -128,7 +140,11 @@ class WebSocketServer extends Component {
 
     for (const [clientId, client] of this.clients) {
       if (!excludeSet.has(clientId) && WebSocketUtils.isValidClient(client)) {
-        client.ws.send(JSON.stringify(message));
+        try {
+          client.ws.send(JSON.stringify(message));
+        } catch (error) {
+          WebSocketUtils.handleError('broadcasting', error, clientId);
+        }
       }
     }
   }
@@ -136,7 +152,11 @@ class WebSocketServer extends Component {
   sendToClientType(clientType, message) {
     for (const [clientId, client] of this.clients) {
       if (client.type === clientType && WebSocketUtils.isValidClient(client)) {
-        client.ws.send(JSON.stringify(message));
+        try {
+          client.ws.send(JSON.stringify(message));
+        } catch (error) {
+          WebSocketUtils.handleError(`sending to client type ${clientType}`, error, clientId);
+        }
       }
     }
   }
@@ -178,11 +198,7 @@ class WebSocketServer extends Component {
   }
 
   broadcastTaskToNARS(task) {
-    this.broadcast({
-      type: 'nars_task',
-      task,
-      timestamp: new Date().toISOString()
-    });
+    this.broadcast(WebSocketUtils.createMessage('nars_task', task));
     return 1;
   }
 
@@ -200,10 +216,10 @@ class WebSocketServer extends Component {
 
     return {
       isRunning: this.isRunning,
-      ...connectionStats,
-      ...streamStats,
       subscriptions: this.subscriptions.size,
-      uptime: this.isRunning ? Date.now() - (this.startTime || Date.now()) : 0
+      uptime: this.isRunning ? Date.now() - (this.startTime || Date.now()) : 0,
+      ...connectionStats,
+      ...streamStats
     };
   }
 

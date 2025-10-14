@@ -1,105 +1,64 @@
-import WebSocket from 'ws';
-import { Server } from 'http';
+import WebSocketServer from './WebSocketServer.js';
+import { WebSocketUtils } from './WebSocketUtils.js';
 
-// Simple WebSocket server for SeNARS
-class SenarsServer {
+// Simple WebSocket server wrapper that extends the main WebSocketServer
+class SimpleWebSocketServer extends WebSocketServer {
   constructor(port = 8080) {
+    super(null); // No core needed for simple server
     this.port = port;
-    this.httpServer = new Server();
-    this.wss = new WebSocket.Server({ server: this.httpServer });
-    this.clients = new Set();
+    this.simpleClients = new Set();
   }
 
-  start() {
-    return new Promise((resolve, reject) => {
-      this.httpServer.listen(this.port, () => {
-        console.log(`SeNARS server listening on port ${this.port}`);
-        resolve();
-      });
-
-      this.httpServer.on('error', (err) => {
-        console.error('Server error:', err);
-        reject(err);
-      });
-
-      this.wss.on('connection', (ws) => {
-        console.log('New client connected');
-        this.clients.add(ws);
-
-        // Send initial connection confirmation
-        ws.send(JSON.stringify({
-          type: 'connection',
-          data: { status: 'connected', timestamp: Date.now() }
-        }));
-
-        ws.on('message', (message) => {
-          try {
-            const parsedMessage = JSON.parse(message);
-            console.log('Received message:', parsedMessage);
-
-            // Echo the message back to the client (for testing)
-            // In a real implementation, this would process the command
-            ws.send(JSON.stringify({
-              type: 'echo',
-              data: parsedMessage
-            }));
-          } catch (error) {
-            console.error('Error parsing message:', error);
-            ws.send(JSON.stringify({
-              type: 'error',
-              data: { message: 'Invalid message format' }
-            }));
-          }
-        });
-
-        ws.on('close', () => {
-          console.log('Client disconnected');
-          this.clients.delete(ws);
-        });
-
-        ws.on('error', (error) => {
-          console.error('WebSocket error:', error);
-          this.clients.delete(ws);
-        });
-      });
-    });
+  async initialize(config = {}) {
+    await super.initialize({ ...config, port: this.port, enabled: true });
   }
 
-  stop() {
-    // Close all client connections
-    this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.close();
-      }
-    });
+  async start() {
+    await this.initialize();
+    await super.start();
+    WebSocketUtils.debug(`Simple WebSocket server started on port ${this.port}`);
+  }
 
-    // Close the server
-    return new Promise((resolve) => {
-      this.httpServer.close(() => {
-        console.log('SeNARS server closed');
-        resolve();
+  async stop() {
+    await super.stop();
+    WebSocketUtils.debug('Simple WebSocket server stopped');
+  }
+
+  // Simple message handler for basic echo functionality
+  handleSimpleMessage(clientId, message) {
+    const client = this.clients.get(clientId);
+    if (!client || !WebSocketUtils.isValidClient(client)) return;
+
+    try {
+      // Echo message back for testing
+      this.sendToClient(clientId, {
+        type: 'echo',
+        payload: message,
+        timestamp: new Date().toISOString()
       });
-    });
+    } catch (error) {
+      WebSocketUtils.error('Error handling simple message:', error);
+      this.sendToClient(clientId, {
+        type: 'error',
+        payload: { message: 'Invalid message format' },
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 
   broadcast(message) {
-    // Send message to all connected clients
-    this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    });
+    super.broadcast(WebSocketUtils.createMessage('broadcast', message));
   }
 }
 
 // If running this file directly, start the server
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === new URL(import.meta.url).pathname) {
   const port = process.argv[2] ? parseInt(process.argv[2]) : 8080;
-  const server = new SenarsServer(port);
+  const server = new SimpleWebSocketServer(port);
 
   server.start()
     .then(() => {
-      console.log(`Server initialized on port ${port}`);
+      console.log(`Simple WebSocket server initialized on port ${port}`);
     })
     .catch((error) => {
       console.error('Failed to start server:', error);
@@ -118,6 +77,6 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === new U
     await server.stop();
     process.exit(0);
   });
-} else {
-  export default SenarsServer;
 }
+
+export default SimpleWebSocketServer;

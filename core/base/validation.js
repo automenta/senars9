@@ -124,6 +124,7 @@ class ErrorHandler {
     return IdGenerator.generateErrorId();
   }
 
+
   static createErrorBoundary(componentName, messagesComponent = null) {
     return {
       wrap: (fn) => async (...args) => {

@@ -33,6 +33,7 @@ export const DEFAULTS = {
 
 export const STATES = {
   UNINITIALIZED: 'uninitialized',
+  INITIALIZING: 'initializing',
   INITIALIZED: 'initialized',
   RUNNING: 'running',
   STOPPED: 'stopped',

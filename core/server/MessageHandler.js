@@ -47,7 +47,7 @@ class MessageHandler {
       capabilities: message.capabilities || []
     });
 
-    WebSocketUtils.debug(`Client ${clientId} identified as: ${client.type} (v${client.version})`);
+    WebSocketUtils.debug(`Client ${clientId} identified as: ${client.type} v${client.version}`);
   }
 
   _handleHeartbeat(clientId, message) {
@@ -161,10 +161,7 @@ class MessageHandler {
 
     if (!this.wss.core?.messages) {
       WebSocketUtils.warn('Core messages component not available - command ignored');
-      this.wss.sendToClient(clientId, WebSocketUtils.createErrorResponse(
-        message.command || 'unknown',
-        new Error('Core not available')
-      ));
+      WebSocketUtils.sendError(this.wss, clientId, message.command || 'unknown', 'Core not available');
       return;
     }
 
@@ -189,51 +186,60 @@ class MessageHandler {
       this._executeCommand(internalCommand, data);
       this.wss.sendToClient(clientId, WebSocketUtils.createSuccessResponse(command));
     } catch (error) {
-      WebSocketUtils.error(`Error executing command ${internalCommand}:`, error);
-      this.wss.sendToClient(clientId, WebSocketUtils.createErrorResponse(command, error));
+      WebSocketUtils.handleError(`executing command ${internalCommand}`, error, clientId);
+      WebSocketUtils.sendError(this.wss, clientId, command, error);
     }
   }
 
   _executeCommand(command, data) {
-    if (command === 'cycle.throttle' && data && this.wss.core.cycle) {
-      WebSocketUtils.debug(`Throttle request: ${data.value}%`);
-    } else if (command === 'cycle.reset' && this.wss.core.cycle) {
-      this.wss.core.cycle.cycleCount = 0;
-      this.wss.core.messages.emit('cycle.stats', {
-        cycles: this.wss.core.cycle.cycleCount,
-        timestamp: Date.now()
-      });
-    } else {
-      this.wss.core.messages.execute(command, data);
+    try {
+      if (command === 'cycle.throttle' && data && this.wss.core.cycle) {
+        WebSocketUtils.debug(`Throttle request: ${data.value}%`);
+      } else if (command === 'cycle.reset' && this.wss.core.cycle) {
+        this.wss.core.cycle.cycleCount = 0;
+        this.wss.core.messages.emit('cycle.stats', {
+          cycles: this.wss.core.cycle.cycleCount,
+          timestamp: Date.now()
+        });
+      } else {
+        this.wss.core.messages.execute(command, data);
+      }
+    } catch (error) {
+      WebSocketUtils.error(`Error executing internal command ${command}:`, error);
+      throw error;
     }
   }
 
   _handleStreamSubscription(clientId, streamId, streamType, options = {}) {
-    if (!this.wss.streams) this.wss.streams = new Map();
+    try {
+      if (!this.wss.streams) this.wss.streams = new Map();
 
-    const fullStreamId = `${streamType}:${streamId}`;
+      const fullStreamId = `${streamType}:${streamId}`;
 
-    if (!this.wss.streams.has(fullStreamId)) {
-      this.wss.streams.set(fullStreamId, {
-        id: fullStreamId,
-        type: streamType,
-        participants: new Set(),
-        buffer: [],
-        bufferSize: options.bufferSize || 100,
-        createdAt: new Date(),
-        isActive: true
-      });
+      if (!this.wss.streams.has(fullStreamId)) {
+        this.wss.streams.set(fullStreamId, {
+          id: fullStreamId,
+          type: streamType,
+          participants: new Set(),
+          buffer: [],
+          bufferSize: options.bufferSize || 100,
+          createdAt: new Date(),
+          isActive: true
+        });
+      }
+
+      const stream = this.wss.streams.get(fullStreamId);
+      stream.participants.add(clientId);
+
+      this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
+        MESSAGE_TYPES.STREAM_SUBSCRIPTION_CONFIRMED,
+        { streamId: fullStreamId, status: 'success' }
+      ));
+
+      WebSocketUtils.debug(`Client ${clientId} subscribed to stream ${fullStreamId}`);
+    } catch (error) {
+      WebSocketUtils.error(`Error subscribing client ${clientId} to stream ${streamId}:`, error);
     }
-
-    const stream = this.wss.streams.get(fullStreamId);
-    stream.participants.add(clientId);
-
-    this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
-      MESSAGE_TYPES.STREAM_SUBSCRIPTION_CONFIRMED,
-      { streamId: fullStreamId, status: 'success' }
-    ));
-
-    WebSocketUtils.debug(`Client ${clientId} subscribed to stream ${fullStreamId}`);
   }
 
   _handleStreamUnsubscription(clientId, streamId) {
@@ -257,34 +263,38 @@ class MessageHandler {
   }
 
   _handleStreamPublish(clientId, streamId, data) {
-    if (!this.wss.streams) return;
+    try {
+      if (!this.wss.streams) return;
 
-    const stream = this.wss.streams.get(streamId);
-    if (!stream || !stream.isActive) {
-      this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
-        MESSAGE_TYPES.STREAM_ERROR,
-        { streamId, error: 'Stream not found or inactive' }
-      ));
-      return;
-    }
-
-    stream.buffer.push({
-      source: clientId,
-      data,
-      timestamp: new Date()
-    });
-
-    if (stream.buffer.length > stream.bufferSize) {
-      stream.buffer = stream.buffer.slice(-stream.bufferSize);
-    }
-
-    for (const participantId of stream.participants) {
-      if (participantId !== clientId) {
-        this.wss.sendToClient(participantId, WebSocketUtils.createMessage(
-          MESSAGE_TYPES.STREAM_DATA,
-          { streamId, data, source: clientId }
+      const stream = this.wss.streams.get(streamId);
+      if (!stream || !stream.isActive) {
+        this.wss.sendToClient(clientId, WebSocketUtils.createMessage(
+          MESSAGE_TYPES.STREAM_ERROR,
+          { streamId, error: 'Stream not found or inactive' }
         ));
+        return;
       }
+
+      stream.buffer.push({
+        source: clientId,
+        data,
+        timestamp: new Date()
+      });
+
+      if (stream.buffer.length > stream.bufferSize) {
+        stream.buffer = stream.buffer.slice(-stream.bufferSize);
+      }
+
+      for (const participantId of stream.participants) {
+        if (participantId !== clientId) {
+          this.wss.sendToClient(participantId, WebSocketUtils.createMessage(
+            MESSAGE_TYPES.STREAM_DATA,
+            { streamId, data, source: clientId }
+          ));
+        }
+      }
+    } catch (error) {
+      WebSocketUtils.error(`Error publishing to stream ${streamId} for client ${clientId}:`, error);
     }
   }
 

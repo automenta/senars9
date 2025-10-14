@@ -1,7 +1,6 @@
-// WebSocket utility functions and constants
 import { Logger } from '../base/utilities.js';
 
-const DEFAULTS = {
+const DEFAULTS = Object.freeze({
   PORT: 8080,
   HOST: 'localhost',
   HEARTBEAT_INTERVAL: 30000,
@@ -14,10 +13,12 @@ const DEFAULTS = {
   TASK_HISTORY_LIMIT: 10,
   RETENTION_TIME: 3600000,
   CLIENT_TIMEOUT_MULTIPLIER: 2,
-  MESSAGE_QUEUE_LIMIT: 1000
-};
+  MESSAGE_QUEUE_LIMIT: 1000,
+  ENABLED: true,
+  MAX_CONNECTION_RATE: 10
+});
 
-const MESSAGE_TYPES = {
+const MESSAGE_TYPES = Object.freeze({
   WELCOME: 'welcome',
   HEARTBEAT: 'heartbeat',
   COMPLETE_STATE: 'complete_state',
@@ -33,18 +34,18 @@ const MESSAGE_TYPES = {
   COMMAND_RESPONSE: 'command_response',
   EVENT: 'event',
   ERROR: 'error'
-};
+});
 
-const CLIENT_STATUS = {
+const CLIENT_STATUS = Object.freeze({
   CONNECTED: 'connected',
   DISCONNECTED: 'disconnected',
   ERROR: 'error'
-};
+});
 
-const STREAM_TYPES = {
+const STREAM_TYPES = Object.freeze({
   TASK: 'task',
   GENERAL: 'general'
-};
+});
 
 class WebSocketUtils {
   static generateId(prefix = 'id') {
@@ -69,10 +70,12 @@ class WebSocketUtils {
   }
 
   static isValidClient(client) {
-    return client && client.ws && client.ws.readyState === 1;
+    return client?.ws?.readyState === 1;
   }
 
   static formatTaskData(task) {
+    if (!task) return null;
+
     return {
       id: task.hashCode?.() || task.id || this.generateId('task'),
       content: task.toString?.() || task.content || 'Unknown Task',
@@ -89,6 +92,8 @@ class WebSocketUtils {
   }
 
   static formatConceptData(concept) {
+    if (!concept) return null;
+
     return {
       id: concept.id,
       content: concept.term?.toString() || concept.concept?.term?.toString() || concept.term || 'Unknown Concept',
@@ -100,31 +105,25 @@ class WebSocketUtils {
 
   static getTaskStatus(task) {
     if (!task) return 'Unknown';
-    if (task.isBelief?.()) return 'Belief';
-    if (task.isGoal?.()) return 'Goal';
-    if (task.isQuestion?.()) return 'Question';
-    return 'Derived';
+    return task.isBelief?.() ? 'Belief' : task.isGoal?.() ? 'Goal' : task.isQuestion?.() ? 'Question' : 'Derived';
   }
 
   static getTaskType(task) {
     if (!task) return 'Unknown';
-    if (task.punctuation === '.') return 'Belief';
-    if (task.punctuation === '!') return 'Goal';
-    if (task.punctuation === '?') return 'Question';
-    return 'Derived';
+    return task.punctuation === '.' ? 'Belief' : task.punctuation === '!' ? 'Goal' : task.punctuation === '?' ? 'Question' : 'Derived';
   }
 
   static extractLegacyConcepts(core) {
+    if (!core?.memory?.conceptStorage) return [];
+
     const concepts = [];
-    if (core.memory.conceptStorage) {
-      for (const [hash, concept] of core.memory.conceptStorage) {
-        concepts.push({
-          id: hash,
-          content: concept.term?.toString() || concept.name || 'Unknown Concept',
-          priority: concept.taskTable ? concept.taskTable.size : 0,
-          type: concept.term?.termType || 'concept'
-        });
-      }
+    for (const [hash, concept] of core.memory.conceptStorage) {
+      concepts.push({
+        id: hash,
+        content: concept.term?.toString() || concept.name || 'Unknown Concept',
+        priority: concept.taskTable ? concept.taskTable.size : 0,
+        type: concept.term?.termType || 'concept'
+      });
     }
     return concepts;
   }
@@ -138,7 +137,8 @@ class WebSocketUtils {
 
   static countByProperty(collection, property) {
     return Array.from(collection).reduce((counts, item) => {
-      counts[item[property]] = (counts[item[property]] || 0) + 1;
+      const key = item[property];
+      counts[key] = (counts[key] || 0) + 1;
       return counts;
     }, {});
   }
@@ -151,11 +151,17 @@ class WebSocketUtils {
     };
   }
 
+  static createResponse(command, status, data = {}) {
+    return status === 'error'
+      ? this.createErrorResponse(command, data)
+      : this.createSuccessResponse(command, data);
+  }
+
   static createErrorResponse(command, error) {
     return this.createMessage(MESSAGE_TYPES.COMMAND_RESPONSE, {
       command,
       status: 'error',
-      error: error.message
+      error: error.message || error
     });
   }
 
@@ -180,6 +186,18 @@ class WebSocketUtils {
 
   static createHeartbeatMessage() {
     return this.createMessage(MESSAGE_TYPES.HEARTBEAT);
+  }
+
+  static createStreamMessage(type, streamId, data, source = null) {
+    return this.createMessage(type, { streamId, data, source });
+  }
+
+  static createTaskMessage(type, taskId, data, source = null) {
+    return this.createMessage(type, { taskId, data, source });
+  }
+
+  static createEventMessage(eventType, data, filters = {}) {
+    return this.createMessage(MESSAGE_TYPES.EVENT, { eventType, data, filters });
   }
 
   static validateMessage(data) {
@@ -227,20 +245,16 @@ class WebSocketUtils {
   }
 
   static extractSystemState(core) {
-    const state = { tasks: [], concepts: [], stats: {} };
-
-    if (!core?.memory) return state;
+    if (!core?.memory) return { tasks: [], concepts: [], stats: {} };
 
     const allTasks = core.memory.getAllTasks?.() || [];
-    state.tasks = allTasks.map(task => this.formatTaskData(task));
+    const tasks = allTasks.map(task => this.formatTaskData(task)).filter(Boolean);
 
-    if (core.memory.getTopConcepts) {
-      state.concepts = core.memory.getTopConcepts(50).map(c => this.formatConceptData(c));
-    } else {
-      state.concepts = this.extractLegacyConcepts(core);
-    }
+    const concepts = core.memory.getTopConcepts ?
+      core.memory.getTopConcepts(50).map(c => this.formatConceptData(c)).filter(Boolean) :
+      this.extractLegacyConcepts(core);
 
-    return state;
+    return { tasks, concepts, stats: {} };
   }
 
   static addSystemStatsToState(core, state) {
@@ -259,7 +273,6 @@ class WebSocketUtils {
   static createCompleteStateMessage(core) {
     const state = this.extractSystemState(core);
     this.addSystemStatsToState(core, state);
-
     return this.createMessage(MESSAGE_TYPES.COMPLETE_STATE, state);
   }
 
@@ -277,6 +290,111 @@ class WebSocketUtils {
 
   static error(message, ...args) {
     this.log('error', message, ...args);
+  }
+
+  // Common validation and checking utilities
+  static isValidClient(client) {
+    return client?.ws?.readyState === 1;
+  }
+
+  static isActiveStream(stream) {
+    return stream?.isActive !== false;
+  }
+
+  static hasParticipants(stream) {
+    return stream?.participants?.size > 0;
+  }
+
+  // Common error handling patterns
+  static handleError(operation, error, clientId = null) {
+    const errorMsg = `Error ${operation}${clientId ? ` for client ${clientId}` : ''}: ${error.message || error}`;
+    this.error(errorMsg);
+    return errorMsg;
+  }
+
+  static sendError(wss, clientId, operation, error) {
+    const errorResponse = this.createErrorResponse(operation, error);
+    wss.sendToClient(clientId, errorResponse);
+  }
+
+  // Common stream operations
+  static addToStreamBuffer(stream, data, source, maxSize = null) {
+    const bufferSize = maxSize || stream.options?.bufferSize || DEFAULTS.STREAM_BUFFER_SIZE;
+    stream.buffer.push({ source, data, timestamp: new Date() });
+
+    if (stream.buffer.length > bufferSize) {
+      stream.buffer = stream.buffer.slice(-bufferSize);
+    }
+  }
+
+  static broadcastToParticipants(wss, participants, message, excludeClient = null) {
+    const excludeSet = new Set(excludeClient ? [excludeClient] : []);
+    participants.forEach(participantId => {
+      if (!excludeSet.has(participantId)) {
+        wss.sendToClient(participantId, message);
+      }
+    });
+  }
+
+  // Common configuration helpers
+  static getConfigValue(config, key, defaultValue) {
+    return config?.[key] ?? defaultValue;
+  }
+
+  static mergeConfig(baseConfig, overrides) {
+    return { ...baseConfig, ...overrides };
+  }
+
+  // Factory functions for common objects
+  static createClientInfo(clientId, ws, request, clientIP) {
+    return {
+      id: clientId,
+      type: 'unknown',
+      connectedAt: new Date(),
+      lastSeen: new Date(),
+      ws: ws,
+      ip: clientIP,
+      userAgent: request.headers['user-agent'] || 'unknown',
+      connectionAttempts: 1,
+      status: CLIENT_STATUS.CONNECTED,
+      connectionId: this.generateConnectionId()
+    };
+  }
+
+  static createStream(streamId, streamType, options = {}) {
+    return {
+      id: streamId,
+      type: streamType,
+      participants: new Set(),
+      buffer: [],
+      bufferSize: options.bufferSize || DEFAULTS.STREAM_BUFFER_SIZE,
+      createdAt: new Date(),
+      isActive: true
+    };
+  }
+
+  static createTaskStream(taskId, options = {}) {
+    return {
+      id: taskId,
+      participants: new Set(),
+      history: [],
+      options: {
+        bufferSize: options.bufferSize || DEFAULTS.TASK_STREAM_BUFFER_SIZE,
+        retentionTime: options.retentionTime || DEFAULTS.RETENTION_TIME,
+        streamType: options.streamType || STREAM_TYPES.TASK
+      },
+      createdAt: new Date(),
+      isActive: true
+    };
+  }
+
+  static createSubscription(eventTypes = [], filters = {}) {
+    return {
+      eventTypes: new Set(eventTypes),
+      filters,
+      subscribedAt: new Date(),
+      lastUpdated: new Date()
+    };
   }
 }
 
