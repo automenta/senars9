@@ -9,6 +9,7 @@ class MessageFactory {
     return this.createMessage(type, payload, timestamp);
   }
 
+  // Consolidated response creation methods
   static createSuccessResponse(operation, data = {}) {
     return this.createResponse(MESSAGE_TYPES.COMMAND_RESPONSE, {
       operation,
@@ -23,22 +24,6 @@ class MessageFactory {
       status: 'error',
       message: error.message || error,
       details
-    });
-  }
-
-  static createCommandErrorResponse(command, error) {
-    return this.createResponse(MESSAGE_TYPES.COMMAND_RESPONSE, {
-      command,
-      status: 'error',
-      error: error.message || error
-    });
-  }
-
-  static createCommandSuccessResponse(command, data = {}) {
-    return this.createResponse(MESSAGE_TYPES.COMMAND_RESPONSE, {
-      command,
-      status: 'success',
-      ...data
     });
   }
 

@@ -145,11 +145,9 @@ class WebSocketUtils {
   }
 
   static countByProperty(collection, property) {
-    return Array.from(collection).reduce((counts, item) => {
-      const key = item[property];
-      counts[key] = (counts[key] || 0) + 1;
-      return counts;
-    }, {});
+    return Array.from(collection).reduce((counts, item) => (
+      counts[item[property]] = (counts[item[property]] || 0) + 1, counts
+    ), {});
   }
 
   static createMessage(type, payload = {}, timestamp = null) {
@@ -306,7 +304,7 @@ class WebSocketUtils {
     return stream?.isActive && this.hasParticipants(stream);
   }
 
-  // Common error handling patterns
+  // Consolidated error handling patterns
   static handleError(operation, error, clientId = null) {
     const errorMsg = `Error ${operation}${clientId ? ` for client ${clientId}` : ''}: ${error.message || error}`;
     this.error(errorMsg);
@@ -315,13 +313,52 @@ class WebSocketUtils {
 
   static sendError(wss, clientId, operation, error) {
     const errorResponse = this.createErrorResponse(operation, error);
-    wss.sendToClient(clientId, errorResponse);
+    wss?.sendToClient?.(clientId, errorResponse);
   }
 
   static handleAndSendError(wss, operation, error, clientId = null) {
     const errorMsg = this.handleError(operation, error, clientId);
     if (wss && clientId) {
       this.sendError(wss, clientId, operation, error);
+    }
+    return errorMsg;
+  }
+
+  // Enhanced error handling for different contexts
+  static handleConnectionError(wss, clientId, operation, error) {
+    return this.handleAndSendError(wss, operation, error, clientId);
+  }
+
+  static handleStreamError(wss, clientId, streamId, operation, error) {
+    const errorMsg = `Stream ${operation} failed for ${streamId}${clientId ? ` (client: ${clientId})` : ''}: ${error.message || error}`;
+    this.error(errorMsg);
+
+    if (wss && clientId) {
+      const errorResponse = this.createErrorResponse(operation, { message: errorMsg, streamId });
+      wss.sendToClient(clientId, errorResponse);
+    }
+    return errorMsg;
+  }
+
+  static handleTaskError(wss, clientId, taskId, operation, error) {
+    const errorMsg = `Task ${operation} failed for ${taskId}${clientId ? ` (client: ${clientId})` : ''}: ${error.message || error}`;
+    this.error(errorMsg);
+
+    if (wss && clientId) {
+      const errorResponse = this.createErrorResponse(operation, { message: errorMsg, taskId });
+      wss.sendToClient(clientId, errorResponse);
+    }
+    return errorMsg;
+  }
+
+  static handleGenericError(wss, clientId, operation, error, context = {}) {
+    const contextStr = Object.keys(context).length > 0 ? ` (${Object.entries(context).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '';
+    const errorMsg = `${operation} failed${contextStr}${clientId ? ` (client: ${clientId})` : ''}: ${error.message || error}`;
+    this.error(errorMsg);
+
+    if (wss && clientId) {
+      const errorResponse = this.createErrorResponse(operation, { message: errorMsg, ...context });
+      wss.sendToClient(clientId, errorResponse);
     }
     return errorMsg;
   }

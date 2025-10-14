@@ -81,10 +81,7 @@ class ConnectionManager {
     WebSocketUtils.handleError('WebSocket', error, clientId);
 
     const client = this.wss.clients.get(clientId);
-    if (client) {
-      client.status = CLIENT_STATUS.ERROR;
-      client.error = error.message;
-    }
+    client && (client.status = CLIENT_STATUS.ERROR, client.error = error.message);
   }
 
   isConnectionAllowed(clientIP) {

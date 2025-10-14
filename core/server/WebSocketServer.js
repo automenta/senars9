@@ -112,7 +112,7 @@ class WebSocketServer extends Component {
     return new Promise((resolve) => {
       try {
         for (const [clientId, client] of this.clients) {
-          client.ws.close(1000, 'Server shutting down');
+          client.ws?.close(1000, 'Server shutting down');
         }
         this.clients.clear();
 
@@ -198,7 +198,7 @@ class WebSocketServer extends Component {
     this.connectionManager.sendCurrentState(clientId);
   }
 
-  // Component delegation methods - streamlined to avoid duplication
+  // Delegation methods
    subscribeToTaskStream(clientId, taskId) {
      return this.streamManager.subscribeToTaskStream(clientId, taskId);
    }
@@ -224,7 +224,7 @@ class WebSocketServer extends Component {
     return new WebSocketServer(null, { simpleMode: true, port });
   }
 
-  // DEPRECATED: Backward compatibility methods for existing tests and demos
+  // Backward compatibility methods
   getNARSInstances() {
     return [];
   }

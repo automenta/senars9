@@ -77,11 +77,7 @@ class BaseServer extends Component {
     const isTestEnvironment = typeof process !== 'undefined' &&
                             (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
 
-    if (!enabled && !isTestEnvironment) {
-      WebSocketUtils.debug('Server is disabled, skipping start');
-      return false;
-    }
-    return true;
+    return enabled || isTestEnvironment || (WebSocketUtils.debug('Server is disabled, skipping start'), false);
   }
 
   onServerStart(port, host) {
@@ -110,9 +106,7 @@ class BaseServer extends Component {
 
   closeAllClients() {
     for (const [clientId, client] of this.clients) {
-      if (client.ws) {
-        client.ws.close(1000, 'Server shutting down');
-      }
+      client.ws?.close(1000, 'Server shutting down');
     }
     this.clients.clear();
   }
@@ -144,7 +138,7 @@ class BaseServer extends Component {
     this.onStop?.();
   }
 
-  // Common client operations - consolidated for consistency
+  // Client operations
   sendToClient(clientId, message) {
     const client = this.clients.get(clientId);
     if (WebSocketUtils.isValidClient(client)) {

@@ -1,5 +1,4 @@
 import { WebSocketUtils, DEFAULTS, MESSAGE_TYPES, STREAM_TYPES } from './WebSocketUtils.js';
-import CommonServerUtils from './CommonServerUtils.js';
 
 class StreamManager {
   constructor(webSocketServer) {
@@ -117,7 +116,7 @@ class StreamManager {
     try {
       const stream = this.streams.get(streamId);
       if (!WebSocketUtils.isActiveStream(stream)) {
-        CommonServerUtils.handleStreamError(this.wss, clientId, streamId, 'publish', 'Stream not found or inactive');
+        WebSocketUtils.handleStreamError(this.wss, clientId, streamId, 'publish', 'Stream not found or inactive');
         return false;
       }
 
@@ -133,7 +132,7 @@ class StreamManager {
       WebSocketUtils.broadcastToParticipants(this.wss, stream.participants, dataMessage, clientId);
       return true;
     } catch (error) {
-      CommonServerUtils.handleStreamError(this.wss, clientId, streamId, 'publish', error);
+      WebSocketUtils.handleStreamError(this.wss, clientId, streamId, 'publish', error);
       return false;
     }
   }
@@ -155,7 +154,7 @@ class StreamManager {
         });
       }
     } catch (error) {
-      CommonServerUtils.handleStreamError(this.wss, clientId, streamType, 'broadcast', error);
+      WebSocketUtils.handleStreamError(this.wss, clientId, streamType, 'broadcast', error);
     }
   }
 
@@ -238,7 +237,7 @@ class StreamManager {
         }
       }
     } catch (error) {
-      CommonServerUtils.handleStreamError(this.wss, null, eventType, 'publishEvent', error);
+      WebSocketUtils.handleStreamError(this.wss, null, eventType, 'publishEvent', error);
     }
   }
 
