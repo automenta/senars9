@@ -1,11 +1,7 @@
 import { Term } from './Term.js';
 import { Stamp, TaskHash } from './Stamp.js';
 
-export const Punctuation = {
-  BELIEF: '.',
-  GOAL: '!',
-  QUESTION: '?'
-};
+export const Punctuation = { BELIEF: '.', GOAL: '!', QUESTION: '?' };
 
 export class TruthValue {
   constructor(frequency, confidence) {
@@ -13,9 +9,7 @@ export class TruthValue {
     this.confidence = confidence;
   }
 
-  toString() {
-    return `%${this.frequency.toFixed(2)};${this.confidence.toFixed(2)}%`;
-  }
+  toString() { return `%${this.frequency.toFixed(2)};${this.confidence.toFixed(2)}%`; }
 
   static deduction(t1, t2) {
     const f = t1.frequency * t2.frequency;
@@ -41,9 +35,7 @@ export class TruthValue {
     return new TruthValue(f, c);
   }
 
-  static #weak(c) {
-    return c / (c + 1.0);
-  }
+  static #weak(c) { return c / (c + 1.0); }
 }
 
 export class Task {
@@ -57,11 +49,8 @@ export class Task {
     this.occurrenceTime = occurrenceTime;
     this.expirationTime = null;
     this.derivationPath = null;
-
-    // Initialize stamp for evidence tracking
     this.stamp = stamp || Stamp.createInput();
 
-    // Make key properties immutable
     const immutableProps = ['term', 'punctuation', 'truth', 'createdAt', 'occurrenceTime', 'expirationTime', 'derivationPath', 'stamp'];
     for (const prop of immutableProps) {
       Object.defineProperty(this, prop, { writable: false });
@@ -80,22 +69,16 @@ export class Task {
     if (!Array.isArray(parentTasks) || parentTasks.length === 0) {
       return Task.createInput(term, punctuation, truth, createdAt, occurrenceTime, priority);
     }
-
-    // Merge stamps from parent tasks
     const mergedStamp = Task._mergeStamps(parentTasks, createdAt);
     return new Task(term, punctuation, truth, createdAt, occurrenceTime, priority, mergedStamp);
   }
 
   static _mergeStamps(parentTasks, createdAt) {
-    if (parentTasks.length === 1) {
-      return parentTasks[0].stamp.clone();
-    }
-
+    if (parentTasks.length === 1) return parentTasks[0].stamp.clone();
     let mergedStamp = Stamp.zip(parentTasks[0], parentTasks[1]);
     for (let i = 2; i < parentTasks.length; i++) {
       mergedStamp = Stamp.zip(mergedStamp, parentTasks[i].stamp, createdAt);
     }
-    
     return mergedStamp;
   }
 
@@ -108,9 +91,7 @@ export class Task {
   isGoal() { return this.punctuation === Punctuation.GOAL; }
   isQuestion() { return this.punctuation === Punctuation.QUESTION; }
 
-  isExpired(currentTime) {
-    return this.expirationTime !== null && currentTime > this.expirationTime;
-  }
+  isExpired(currentTime) { return this.expirationTime !== null && currentTime > this.expirationTime; }
 
   setExpirationTime(expirationTime) { this.expirationTime = expirationTime; }
   setDerivationPath(path) { this.derivationPath = [...path]; }
@@ -123,18 +104,12 @@ export class Task {
 
   _createTaskWithProps(props) {
     const newTask = Object.create(Object.getPrototypeOf(this));
-    // Copy immutable properties
     ['term', 'punctuation', 'truth', 'createdAt', 'occurrenceTime', 'stamp']
       .forEach(prop => Object.defineProperty(newTask, prop, { value: this[prop], writable: false }));
-    
-    // Copy mutable properties
     ['expirationTime', 'derivationPath']
       .forEach(prop => Object.defineProperty(newTask, prop, { value: this[prop], writable: true }));
-
-    // Copy internal properties
     newTask._priority = props.priority !== undefined ? props.priority : this._priority;
     newTask._accessedAt = props.accessedAt !== undefined ? props.accessedAt : this._accessedAt;
-
     return newTask;
   }
 
@@ -142,35 +117,24 @@ export class Task {
     return this._createTaskWithProps({ priority: Math.max(0.0, Math.min(1.0, newPriority)) });
   }
 
-  // Stamp-related methods
   getStamp() { return this.stamp; }
   getEvidence() { return this.stamp.stampArray; }
   hasOverlap(otherTask) { return Stamp.overlap(this, otherTask); }
   getOriginality() { return this.stamp.originality(); }
 
-  // Task equality and hashing methods
   equals(otherTask) { return TaskHash.tasksEqual(this, otherTask); }
   hashCode() { return TaskHash.hashTask(this); }
   isDuplicateOf(tasks) { return TaskHash.isDuplicate(this, tasks); }
 
-  // Create a copy with updated stamp (for derivations)
   withStamp(newStamp) {
     const newTask = Object.create(Object.getPrototypeOf(this));
-    // Copy immutable properties
     ['term', 'punctuation', 'truth', 'createdAt', 'occurrenceTime', 'derivationPath']
       .forEach(prop => Object.defineProperty(newTask, prop, { value: this[prop], writable: false }));
-    
-    // Set new stamp as immutable
     Object.defineProperty(newTask, 'stamp', { value: newStamp, writable: false });
-    
-    // Copy mutable properties
     ['expirationTime']
       .forEach(prop => Object.defineProperty(newTask, prop, { value: this[prop], writable: true }));
-
-    // Copy internal properties
     newTask._priority = this._priority;
     newTask._accessedAt = this._accessedAt;
-
     return newTask;
   }
 }
