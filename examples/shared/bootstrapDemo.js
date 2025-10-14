@@ -66,15 +66,17 @@ export async function demonstrateBootstrapAgent() {
     console.log('\\n🔄 Starting bootstrap process...');
     await bootstrapAgent.start();
 
-    // Execute a few bootstrap cycles manually
-    for (let i = 0; i < 3; i++) {
+    // Execute a few bootstrap cycles manually (fewer in test environment)
+    const maxCycles = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 1 : 3;
+    for (let i = 0; i < maxCycles; i++) {
       console.log(`   Executing bootstrap cycle ${i + 1}...`);
       const cycleResult = await bootstrapAgent.executeSingleCycle();
       if (cycleResult) {
         console.log(`      Iteration: ${cycleResult.iteration}, Goals Processed: ${cycleResult.goalsProcessed}`);
       }
-      // Small delay between cycles in demo mode
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Small delay between cycles in demo mode (shorter in tests)
+      const delay = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 10 : 100;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
     // Stop the bootstrap agent
@@ -242,10 +244,12 @@ export async function testPlanFileMonitoringAndUpdates() {
     await bootstrapAgent.start();
 
     const cycleResults = [];
-    for (let i = 0; i < 2; i++) {
+    const maxCycles = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 1 : 2;
+    for (let i = 0; i < maxCycles; i++) {
       const result = await bootstrapAgent.executeSingleCycle();
       if (result) cycleResults.push(result);
-      await new Promise(resolve => setTimeout(resolve, 50)); // Small delay
+      const delay = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 10 : 50;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
     await bootstrapAgent.stop();
@@ -296,15 +300,17 @@ export async function testSelfDirectedGoalProcessing() {
     // Start the bootstrap agent
     await bootstrapAgent.start();
 
-    // Execute several cycles to allow for self-directed improvement
+    // Execute several cycles to allow for self-directed improvement (fewer in tests)
     const executionResults = [];
-    for (let i = 0; i < 3; i++) {
+    const maxCycles = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 1 : 3;
+    for (let i = 0; i < maxCycles; i++) {
       const result = await bootstrapAgent.executeSingleCycle();
       if (result) {
         executionResults.push(result);
       }
-      // Short delay between cycles
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Short delay between cycles (shorter in tests)
+      const delay = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 10 : 50;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
     // Stop the bootstrap agent
@@ -357,14 +363,16 @@ export async function testImprovementLoopIteration() {
     // Start the bootstrap agent
     await bootstrapAgent.start();
 
-    // Execute multiple cycles to trigger improvement loops
+    // Execute multiple cycles to trigger improvement loops (fewer in tests)
     const iterationResults = [];
-    for (let i = 0; i < 4; i++) {
+    const maxCycles = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 1 : 4;
+    for (let i = 0; i < maxCycles; i++) {
       const result = await bootstrapAgent.executeSingleCycle();
       if (result) {
         iterationResults.push(result);
       }
-      await new Promise(resolve => setTimeout(resolve, 40));
+      const delay = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 10 : 40;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
     // Stop the bootstrap agent

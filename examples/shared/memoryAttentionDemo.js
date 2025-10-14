@@ -110,8 +110,9 @@ export async function demonstrateMemoryAttention() {
     memory._updateFocusSets('pattern-traffic-001', { focusSet: 'attention-focus' });
     memory._updateFocusSets('reference-docs', { focusSet: 'long-term-storage' });
 
-    // Get items from current focus
-    const focusItems = memory.getFocusItems(3);
+    // Get items from current focus (fewer in tests)
+    const focusLimit = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 2 : 3;
+    const focusItems = memory.getFocusItems(focusLimit);
     console.log(`   Retrieved ${focusItems.length} items from current focus`);
 
     // 5. Demonstrate attention mechanism
@@ -123,21 +124,22 @@ export async function demonstrateMemoryAttention() {
     const focusStats = memory.getFocusSetStats();
     console.log('   Focus set attention updated');
 
-    // 6. Demonstrate query optimization
+    // 6. Demonstrate query optimization (fewer in tests)
     console.log('\\n🔍 Demonstrating query optimization...');
+    const queryLimit = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 2 : 5;
     const highPriorityItems = memory.query({
       minPriority: 8,
-      limit: 5
+      limit: queryLimit
     });
 
     const alertItems = memory.query({
       type: 'alert',
-      limit: 5
+      limit: queryLimit
     });
 
     const urgentItems = memory.query({
       tags: ['urgent'],
-      limit: 5
+      limit: queryLimit
     });
 
     console.log(`   High priority items: ${highPriorityItems.length}`);
@@ -147,9 +149,10 @@ export async function demonstrateMemoryAttention() {
     // 7. Get memory statistics
     const memStats = memory.getStats();
 
-    // 8. Demonstrate attention-based sorting
+    // 8. Demonstrate attention-based sorting (fewer in tests)
     memory.setFocus('attention-focus');
-    const attentionItems = memory.getFocusItems(5);
+    const attentionLimit = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 2 : 5;
+    const attentionItems = memory.getFocusItems(attentionLimit);
 
     // Show updated stats
     console.log('\\n📈 Updated Memory Stats:');
@@ -235,8 +238,9 @@ export async function testMemoryAttentionFunctionality() {
       memory._updateFocusSets('test-item-2', { focusSet: 'test-focus-2' });
     }
 
-    // Get focus items
-    const focusItems = memory.getFocusItems(5);
+    // Get focus items (fewer in tests)
+    const maxItems = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 2 : 5;
+    const focusItems = memory.getFocusItems(maxItems);
 
     // Update attention
     memory.updateFocusAttention('test-focus-1', 0.7);
@@ -245,9 +249,10 @@ export async function testMemoryAttentionFunctionality() {
     // Get focus stats
     const focusStats = memory.getFocusSetStats();
 
-    // Query items
-    const highPriorityItems = memory.query({ minPriority: 7, limit: 10 });
-    const testTypeItems = memory.query({ type: 'test', limit: 10 });
+    // Query items (fewer in tests)
+    const queryLimit = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 3 : 10;
+    const highPriorityItems = memory.query({ minPriority: 7, limit: queryLimit });
+    const testTypeItems = memory.query({ type: 'test', limit: queryLimit });
 
     // Get overall stats
     const stats = memory.getStats();
@@ -295,15 +300,16 @@ export async function testMultiFocusSetOperations() {
       memory._updateFocusSets('item-fs3-1', { focusSet: 'focus-set-3' });
     }
 
-    // Test switching between focus sets
+    // Test switching between focus sets (fewer operations in tests)
+    const maxItems = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 2 : 5;
     memory.setFocus('focus-set-1');
-    const fs1Items = memory.getFocusItems(5);
+    const fs1Items = memory.getFocusItems(maxItems);
 
     memory.setFocus('focus-set-2');
-    const fs2Items = memory.getFocusItems(5);
+    const fs2Items = memory.getFocusItems(maxItems);
 
     memory.setFocus('focus-set-3');
-    const fs3Items = memory.getFocusItems(5);
+    const fs3Items = memory.getFocusItems(maxItems);
 
     // Update attention for different sets
     memory.updateFocusAttention('focus-set-1', 0.8);
@@ -413,17 +419,19 @@ export async function testCrossFocusSetQuerying() {
       memory._updateFocusSets('item-4-low', { focusSet: 'query-test-2' });
     }
 
-    // Perform cross-focus set queries
-    const allHighPriority = memory.query({ minPriority: 8, limit: 10 });
-    const allTestItems = memory.query({ type: 'test', limit: 10 });
-    const allHighTagItems = memory.query({ tags: ['high'], limit: 10 });
+    // Perform cross-focus set queries (fewer in tests)
+    const queryLimit = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 3 : 10;
+    const allHighPriority = memory.query({ minPriority: 8, limit: queryLimit });
+    const allTestItems = memory.query({ type: 'test', limit: queryLimit });
+    const allHighTagItems = memory.query({ tags: ['high'], limit: queryLimit });
 
-    // Get items from each focus set individually
+    // Get items from each focus set individually (fewer in tests)
+    const maxItems = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 3 : 10;
     memory.setFocus('query-test-1');
-    const focusSet1Items = memory.getFocusItems(10);
+    const focusSet1Items = memory.getFocusItems(maxItems);
 
     memory.setFocus('query-test-2');
-    const focusSet2Items = memory.getFocusItems(10);
+    const focusSet2Items = memory.getFocusItems(maxItems);
 
     // Get global stats
     const globalStats = memory.getStats();

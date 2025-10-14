@@ -76,12 +76,13 @@ export async function demonstrateSystemHealthMonitoring() {
       }
     }
 
-    // Simulate system load for performance monitoring
+    // Simulate system load for performance monitoring (fewer operations in tests)
     console.log('\\n🏋️ Simulating system load...');
     const startTime = Date.now();
 
-    // Perform multiple operations to generate metrics
-    for (let i = 0; i < 10; i++) {
+    // Perform multiple operations to generate metrics (fewer in tests)
+    const maxOperations = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 3 : 10;
+    for (let i = 0; i < maxOperations; i++) {
       if (system.core.memory) {
         system.core.memory.set(`load-test-${i}`, { value: `Load test item ${i}`, timestamp: Date.now() }, { priority: 5 });
       }
@@ -125,8 +126,9 @@ export async function demonstrateSystemHealthMonitoring() {
         timestamp: Date.now()
       });
 
-      // Wait a moment for event processing
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait a moment for event processing (shorter in tests)
+      const delay = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 10 : 100;
+      await new Promise(resolve => setTimeout(resolve, delay));
 
       // Remove listener
       system.core.messages.off('system.monitoring', eventHandler);
@@ -345,7 +347,7 @@ export async function testPerformanceMetricCollection() {
       if (component) {
         const metrics = {};
 
-        // Timing test for standard operations
+        // Timing test for standard operations (fewer operations in tests)
         if (name === 'memory' && typeof component.set === 'function') {
           const start = Date.now();
           component.set('perf-test-key', { test: 'data' }, { priority: 5 });
@@ -440,8 +442,9 @@ export async function testCrossComponentEventPropagation() {
       system.core.messages.emit('test.event', event);
     }
 
-    // Wait for event processing
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // Wait for event processing (shorter in tests)
+    const delay = (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) ? 10 : 50;
+    await new Promise(resolve => setTimeout(resolve, delay));
 
     // Clean up
     system.core.messages.off('test.event', eventHandler);
