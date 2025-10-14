@@ -1,12 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import BaseComponent from './BaseComponent';
-import { createFlexLayout, getStatusColor } from '../../utils/uiHelpers';
+import { createFlexLayout } from '../../utils/uiHelpers';
 
-/**
- * Reusable data list component
- * Provides consistent display for lists of items (tasks, concepts, etc.)
- */
-
+// Optimized data list component with better performance and extensibility
 const DataList = ({
   items = [],
   renderItem,
@@ -17,10 +13,12 @@ const DataList = ({
   error = null,
   style = {},
   itemStyle = {},
+  variant = 'default', // 'default', 'striped', 'bordered'
   ...props
 }) => {
-  const renderContent = () => {
-    if (error) return null; // Error handled by BaseComponent
+  // Memoize item rendering for performance
+  const listContent = useMemo(() => {
+    if (error) return null;
 
     if (items.length === 0) {
       return (
@@ -30,25 +28,42 @@ const DataList = ({
       );
     }
 
+    const getItemStyle = (index) => {
+      const baseStyle = {
+        padding: '8px',
+        ...itemStyle
+      };
+
+      switch (variant) {
+        case 'striped':
+          return {
+            ...baseStyle,
+            backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white'
+          };
+        case 'bordered':
+          return {
+            ...baseStyle,
+            border: '1px solid #e0e0e0',
+            borderRadius: '4px'
+          };
+        default:
+          return baseStyle;
+      }
+    };
+
     return (
       <div style={{ ...createFlexLayout('column', 'stretch', 'stretch'), gap: '8px' }}>
         {items.map((item, index) => (
           <div
             key={keyExtractor ? keyExtractor(item, index) : index}
-            style={{
-              padding: '8px',
-              border: '1px solid #e0e0e0',
-              borderRadius: '4px',
-              backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white',
-              ...itemStyle
-            }}
+            style={getItemStyle(index)}
           >
             {renderItem(item, index)}
           </div>
         ))}
       </div>
     );
-  };
+  }, [items, renderItem, keyExtractor, error, emptyMessage, itemStyle, variant]);
 
   return (
     <BaseComponent
@@ -58,7 +73,7 @@ const DataList = ({
       style={style}
       {...props}
     >
-      {renderContent()}
+      {listContent}
     </BaseComponent>
   );
 };

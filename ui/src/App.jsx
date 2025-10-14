@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import DockingLayout from '@/components/DockingLayout';
 import ReasonerControlPanel from '@/components/ReasonerControlPanel';
 import { UIProvider } from '@/core/UIContext';
@@ -7,6 +7,7 @@ import { useAppWebSocket } from '@/hooks/useAppWebSocket';
 import useCommandHandler from '@/hooks/useCommandHandler';
 import './App.css';
 
+// Main App component - optimized for performance and maintainability
 const App = () => {
   const {
     tasks,
@@ -35,33 +36,60 @@ const App = () => {
     off
   );
 
-  const handleTaskWithConcepts = (handler, task) => handler?.(task) && setTimeout(requestConcepts, 300);
+  // Memoize task handlers for performance
+  const handleTaskWithConcepts = useCallback((handler, task) => {
+    const result = handler?.(task);
+    if (result !== false) {
+      setTimeout(requestConcepts, 300);
+    }
+    return result;
+  }, [requestConcepts]);
 
-  const handleAddTaskWithConcepts = (task) => handleTaskWithConcepts(handleAddTask, task);
-  const handleUpdateTaskWithConcepts = (task) => handleTaskWithConcepts(handleUpdateTask, task);
+  const handleAddTaskWithConcepts = useCallback((task) =>
+    handleTaskWithConcepts(handleAddTask, task), [handleTaskWithConcepts, handleAddTask]);
 
+  const handleUpdateTaskWithConcepts = useCallback((task) =>
+    handleTaskWithConcepts(handleUpdateTask, task), [handleTaskWithConcepts, handleUpdateTask]);
+
+  // Initialize data on connection
   useEffect(() => {
-    connectionStatus === 'connected' && setTimeout(() => {
-      requestConcepts();
-      requestTopTasks();
-    }, 200);
+    if (connectionStatus === 'connected') {
+      const timer = setTimeout(() => {
+        requestConcepts();
+        requestTopTasks();
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
   }, [connectionStatus, requestConcepts, requestTopTasks]);
+
+  // Memoize layout props for performance
+  const layoutProps = useMemo(() => ({
+    logs,
+    tasks,
+    concepts,
+    memoryTasks,
+    reasonerStats,
+    connectionStatus,
+    onUpdateTask: handleUpdateTaskWithConcepts,
+    onDeleteTask: handleDeleteTask
+  }), [
+    logs,
+    tasks,
+    concepts,
+    memoryTasks,
+    reasonerStats,
+    connectionStatus,
+    handleUpdateTaskWithConcepts,
+    handleDeleteTask
+  ]);
 
   return (
     <UIProvider>
       <NotificationProvider>
         <div className="main-container" data-testid="app-container">
           <div className="docking-layout-container">
-            <DockingLayout
-              logs={logs}
-              tasks={tasks}
-              concepts={concepts}
-              memoryTasks={memoryTasks}
-              reasonerStats={reasonerStats}
-              connectionStatus={connectionStatus}
-              onUpdateTask={handleUpdateTaskWithConcepts}
-              onDeleteTask={handleDeleteTask}
-            />
+            <DockingLayout {...layoutProps} />
           </div>
           <ReasonerControlPanel
             stats={reasonerStats}

@@ -1,10 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
-/**
- * React component registry for UI extensibility
- * Allows dynamic registration and loading of UI components for apps/demos
- */
-
+// Component registry - optimized for extensibility and performance
 const ComponentRegistryContext = createContext();
 
 export const useComponentRegistry = () => {
@@ -15,19 +11,33 @@ export const useComponentRegistry = () => {
   return context;
 };
 
+// Component configuration interface for better type safety
+const createComponentConfig = (config) => ({
+  name: '',
+  component: null,
+  render: null,
+  isActive: false,
+  registeredAt: new Date(),
+  activatedAt: null,
+  deactivatedAt: null,
+  metadata: {},
+  dependencies: [],
+  ...config
+});
+
 export const ComponentRegistryProvider = ({ children }) => {
   const [components, setComponents] = useState(new Map());
   const [activeComponents, setActiveComponents] = useState(new Set());
 
   const registerComponent = useCallback((componentName, componentConfig) => {
-    setComponents(prev => new Map(prev).set(componentName, {
-      ...componentConfig,
-      name: componentName,
-      registeredAt: new Date(),
-      isActive: false
-    }));
-
-    console.log(`Component ${componentName} registered successfully`);
+    setComponents(prev => {
+      const newMap = new Map(prev);
+      newMap.set(componentName, createComponentConfig({
+        ...componentConfig,
+        name: componentName
+      }));
+      return newMap;
+    });
   }, []);
 
   const unregisterComponent = useCallback((componentName) => {
@@ -42,44 +52,62 @@ export const ComponentRegistryProvider = ({ children }) => {
       newSet.delete(componentName);
       return newSet;
     });
-
-    console.log(`Component ${componentName} unregistered`);
   }, []);
 
   const activateComponent = useCallback((componentName) => {
-    const component = components.get(componentName);
-    if (!component) {
-      throw new Error(`Component ${componentName} not found`);
-    }
+    setComponents(prev => {
+      const component = prev.get(componentName);
+      if (!component) {
+        throw new Error(`Component ${componentName} not found`);
+      }
+
+      const newMap = new Map(prev);
+      newMap.set(componentName, {
+        ...component,
+        isActive: true,
+        activatedAt: new Date()
+      });
+      return newMap;
+    });
 
     setActiveComponents(prev => new Set(prev).add(componentName));
-    component.isActive = true;
-    component.activatedAt = new Date();
-
-    console.log(`Component ${componentName} activated`);
-  }, [components]);
+  }, []);
 
   const deactivateComponent = useCallback((componentName) => {
+    setComponents(prev => {
+      const component = prev.get(componentName);
+      if (!component) return prev;
+
+      const newMap = new Map(prev);
+      newMap.set(componentName, {
+        ...component,
+        isActive: false,
+        deactivatedAt: new Date()
+      });
+      return newMap;
+    });
+
     setActiveComponents(prev => {
       const newSet = new Set(prev);
       newSet.delete(componentName);
       return newSet;
     });
+  }, []);
 
-    const component = components.get(componentName);
-    if (component) {
-      component.isActive = false;
-      component.deactivatedAt = new Date();
-    }
+  // Memoize computed values for performance
+  const activeComponentsList = useMemo(() =>
+    Array.from(activeComponents), [activeComponents]);
 
-    console.log(`Component ${componentName} deactivated`);
-  }, [components]);
+  const activeComponentsData = useMemo(() =>
+    activeComponentsList.map(name => components.get(name)).filter(Boolean),
+    [activeComponentsList, components]);
+
+  const allComponentsList = useMemo(() =>
+    Array.from(components.values()), [components]);
 
   const renderComponent = useCallback((componentName, props = {}) => {
     const component = components.get(componentName);
-    if (!component || !component.isActive) {
-      return null;
-    }
+    if (!component?.isActive) return null;
 
     if (component.render) {
       return component.render(props);
@@ -93,19 +121,16 @@ export const ComponentRegistryProvider = ({ children }) => {
     return null;
   }, [components]);
 
-  const getComponent = useCallback((componentName) => {
-    return components.get(componentName) || null;
-  }, [components]);
+  const getComponent = useCallback((componentName) =>
+    components.get(componentName) || null, [components]);
 
-  const getActiveComponents = useCallback(() => {
-    return Array.from(activeComponents).map(name => components.get(name)).filter(Boolean);
-  }, [activeComponents, components]);
+  const getActiveComponents = useCallback(() =>
+    activeComponentsData, [activeComponentsData]);
 
-  const getAllComponents = useCallback(() => {
-    return Array.from(components.values());
-  }, [components]);
+  const getAllComponents = useCallback(() =>
+    allComponentsList, [allComponentsList]);
 
-  const value = {
+  const value = useMemo(() => ({
     registerComponent,
     unregisterComponent,
     activateComponent,
@@ -114,9 +139,20 @@ export const ComponentRegistryProvider = ({ children }) => {
     getComponent,
     getActiveComponents,
     getAllComponents,
-    activeComponents: Array.from(activeComponents),
+    activeComponents: activeComponentsList,
     totalComponents: components.size
-  };
+  }), [
+    registerComponent,
+    unregisterComponent,
+    activateComponent,
+    deactivateComponent,
+    renderComponent,
+    getComponent,
+    getActiveComponents,
+    getAllComponents,
+    activeComponentsList,
+    components.size
+  ]);
 
   return (
     <ComponentRegistryContext.Provider value={value}>
