@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "client": "vite",
-    "server": "npx y-websocket",
+    "server": "PORT=8080 npx y-websocket",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

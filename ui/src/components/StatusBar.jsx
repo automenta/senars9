@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CONNECTION_DEFAULTS } from '../../core/shared/ClientConstants.js';
+import { CONNECTION_DEFAULTS } from '@core/shared/ClientConstants.js';
 
 const NARSESE_SUGGESTIONS = [...new Set([
   '-->', '==>', '<=>',

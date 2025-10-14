@@ -6,7 +6,7 @@ import {
   sortTasksByPriority,
   createStateUpdater
 } from './webSocketUtils';
-import { CONNECTION_STATUS, CLIENT_WS_CONFIG as DEFAULT_WS_CONFIG, MESSAGE_TYPES } from '../../core/shared/ClientConstants.js';
+import { CONNECTION_STATUS, CLIENT_WS_CONFIG as DEFAULT_WS_CONFIG, MESSAGE_TYPES } from '@core/shared/ClientConstants.js';
 
 // Unified WebSocket manager - handles both connection and state management
 class WebSocketConnectionManager {
@@ -272,6 +272,13 @@ class WebSocketConnectionManager {
 
   on(event, listener) {
     (this.events[event] ||= []).push(listener);
+    return this;
+  }
+
+  off(event, listener) {
+    if (this.events[event]) {
+      this.events[event] = this.events[event].filter(l => l !== listener);
+    }
     return this;
   }
 

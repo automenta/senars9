@@ -1,4 +1,4 @@
-import { CLIENT_WS_CONFIG as DEFAULT_WS_CONFIG } from '../../core/shared/ClientConstants.js';
+import { CONNECTION_STATUS, CLIENT_WS_CONFIG as DEFAULT_WS_CONFIG } from '@core/shared/ClientConstants.js';
 
 export { DEFAULT_WS_CONFIG };
 

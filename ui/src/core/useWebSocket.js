@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import WebSocketConnectionManager from '../utils/WebSocketConnectionManager';
 import { createWebSocketConfig } from '../utils/webSocketUtils';
-import { MESSAGE_TYPES } from '../../core/shared/ClientConstants.js';
+import { MESSAGE_TYPES } from '@core/shared/ClientConstants.js';
 
 const useWebSocket = (url, config = {}) => {
   const [messages, setMessages] = useState([]);
@@ -68,6 +68,14 @@ const useWebSocket = (url, config = {}) => {
     setTimeout(() => wsManagerRef.current?.connect(), 1000);
   }, []);
 
+  const on = useCallback((event, listener) => {
+    wsManagerRef.current?.on(event, listener);
+  }, []);
+
+  const off = useCallback((event, listener) => {
+    wsManagerRef.current?.off(event, listener);
+  }, []);
+
   // Manage message history retention
   useEffect(() => {
     if (configRef.current.enableMessageHistory && wsManagerRef.current) {
@@ -103,6 +111,8 @@ const useWebSocket = (url, config = {}) => {
     requestState,
     reconnect,
     disconnect,
+    on,
+    off,
     reconnectAttempts: status?.reconnectAttempts || 0
   };
 };
