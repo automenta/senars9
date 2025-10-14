@@ -27,13 +27,8 @@ class WebSocketServer extends Component {
     this.server = createServer();
     this.wss = new WSServer({ server: this.server });
 
-    this.wss.on('connection', (ws, request) => {
-      this._handleConnection(ws, request);
-    });
-
-    this.wss.on('error', (error) => {
-      Logger.error('WebSocket server error', error);
-    });
+    this.wss.on('connection', (ws, request) => this._handleConnection(ws, request));
+    this.wss.on('error', (error) => Logger.error('WebSocket server error', error));
 
     this.heartbeatInterval = heartbeatInterval;
   }
@@ -76,86 +71,94 @@ class WebSocketServer extends Component {
     });
   }
   
+  // Extract current system state into standardized format
+  _extractSystemState() {
+    const state = { tasks: [], concepts: [], stats: {} };
+
+    if (!this.core?.memory) return state;
+
+    // Extract tasks with consistent formatting
+    const allTasks = this.core.memory.getAllTasks?.() || [];
+    state.tasks = allTasks.map(task => this._formatTaskData(task));
+
+    // Extract concepts with fallback handling
+    this.core.memory.getTopConcepts ?
+      state.concepts = this.core.memory.getTopConcepts(50).map(c => this._formatConceptData(c)) :
+      state.concepts = this._extractLegacyConcepts();
+
+    return state;
+  }
+
+  // Format task data consistently
+  _formatTaskData(task) {
+    return {
+      id: task.hashCode?.() || task.id || `task_${Date.now()}`,
+      content: task.toString?.() || task.content || 'Unknown Task',
+      priority: task.getPriority?.() || task.priority || 0.5,
+      status: this._getTaskStatus(task),
+      type: this._getTaskType(task),
+      createdAt: task.createdAt || Date.now(),
+      lastModified: task.getAccessedAt?.() || Date.now(),
+      punctuation: task.punctuation || '.',
+      truth: task.truth || null,
+      occurrenceTime: task.occurrenceTime || Date.now(),
+      derivationPath: task.derivationPath || []
+    };
+  }
+
+  // Format concept data consistently
+  _formatConceptData(c) {
+    return {
+      id: c.id,
+      content: c.term?.toString() || c.concept?.term?.toString() || c.term || 'Unknown Concept',
+      priority: c.priority || 0,
+      taskCount: c.taskCount || 0,
+      type: c.term?.termType || 'concept'
+    };
+  }
+
+  // Extract concepts from legacy storage format
+  _extractLegacyConcepts() {
+    const concepts = [];
+    if (this.core.memory.conceptStorage) {
+      for (const [hash, concept] of this.core.memory.conceptStorage) {
+        concepts.push({
+          id: hash,
+          content: concept.term?.toString() || concept.name || 'Unknown Concept',
+          priority: concept.taskTable ? concept.taskTable.size : 0,
+          type: concept.term?.termType || 'concept'
+        });
+      }
+    }
+    return concepts;
+  }
+
   // Broadcast full current state to all clients
   broadcastCurrentState() {
     if (!this.core) {
       Logger.warn('No core reference available for state broadcasting');
       return;
     }
-    
-    try {
-      // Get current state from core components
-      const state = {
-        tasks: [],
-        concepts: [],
-        stats: {}
-      };
-      
-      // Get tasks from memory if available
-      if (this.core.memory) {
-        const allTasks = this.core.memory.getAllTasks ? this.core.memory.getAllTasks() : [];
-        state.tasks = allTasks.map(task => ({
-          id: task.hashCode ? task.hashCode() : (task.id || `task_${Date.now()}`),
-          content: task.toString ? task.toString() : (task.content || 'Unknown Task'),
-          priority: task.getPriority ? task.getPriority() : (task.priority || 0.5),
-          status: this._getTaskStatus(task),
-          type: this._getTaskType(task),
-          createdAt: task.createdAt || Date.now(),
-          lastModified: task.getAccessedAt ? task.getAccessedAt() : Date.now(),
-          punctuation: task.punctuation || '.',
-          truth: task.truth || null,
-          occurrenceTime: task.occurrenceTime || Date.now(),
-          derivationPath: task.derivationPath || []
-        }));
-        
-        // Get top concepts if available
-        if (this.core.memory.getTopConcepts) {
-          const topConcepts = this.core.memory.getTopConcepts(50); // Get top 50 concepts
-          state.concepts = topConcepts.map(c => ({
-            id: c.id,
-            content: c.term?.toString() || c.concept?.term?.toString() || c.term || 'Unknown Concept',
-            priority: c.priority || 0,
-            taskCount: c.taskCount || 0,
-            type: c.term?.termType || 'concept'
-          }));
-        } else {
-          // Fallback to existing concept storage if getTopConcepts not available
-          state.concepts = [];
-          if (this.core.memory.conceptStorage) {
-            for (const [hash, concept] of this.core.memory.conceptStorage) {
-              state.concepts.push({
-                id: hash,
-                content: concept.term?.toString() || concept.name || 'Unknown Concept',
-                priority: concept.taskTable ? concept.taskTable.size : 0,
-                type: concept.term?.termType || 'concept'
-              });
-            }
-          }
-        }
-      }
-      
-      // Get system stats if available
-      if (this.core.cycle) {
-        state.stats = {
-          isRunning: this.core.cycle.isRunning,
-          isPaused: this.core.cycle.isPaused,
-          cycles: this.core.cycle.cycleCount,
-          tasks: state.tasks.length,
-          concepts: state.concepts.length,
-          timestamp: Date.now()
-        };
-      } else if (this.core.messages) {
-        // Use core's stats if cycle is not available
-        state.stats = this._getSystemStats();
-      }
 
-      // Broadcast the complete state
+    try {
+      const state = this._extractSystemState();
+
+      // Add system stats
+      state.stats = this.core.cycle ? {
+        isRunning: this.core.cycle.isRunning,
+        isPaused: this.core.cycle.isPaused,
+        cycles: this.core.cycle.cycleCount,
+        tasks: state.tasks.length,
+        concepts: state.concepts.length,
+        timestamp: Date.now()
+      } : this.core.messages ? this._getSystemStats() : state.stats;
+
       this.broadcast({
         type: 'complete_state',
         payload: state,
         timestamp: Date.now()
       });
-      
+
     } catch (error) {
       Logger.error('Error broadcasting current state', error);
     }
@@ -326,72 +329,18 @@ class WebSocketServer extends Component {
     setImmediate(() => {
       if (this.core) {
         try {
-          // Get current state from core components
-          const state = {
-            tasks: [],
-            concepts: [],
-            stats: {}
-          };
-          
-          // Get tasks from memory if available
-          if (this.core.memory) {
-            const allTasks = this.core.memory.getAllTasks ? this.core.memory.getAllTasks() : [];
-            state.tasks = allTasks.map(task => ({
-              id: task.hashCode ? task.hashCode() : (task.id || `task_${Date.now()}`),
-              content: task.toString ? task.toString() : (task.content || 'Unknown Task'),
-              priority: task.getPriority ? task.getPriority() : (task.priority || 0.5),
-              status: this._getTaskStatus(task),
-              type: this._getTaskType(task),
-              createdAt: task.createdAt || Date.now(),
-              lastModified: task.getAccessedAt ? task.getAccessedAt() : Date.now(),
-              punctuation: task.punctuation || '.',
-              truth: task.truth || null,
-              occurrenceTime: task.occurrenceTime || Date.now(),
-              derivationPath: task.derivationPath || []
-            }));
-            
-            // Get top concepts if available
-            if (this.core.memory.getTopConcepts) {
-              const topConcepts = this.core.memory.getTopConcepts(50); // Get top 50 concepts
-              state.concepts = topConcepts.map(c => ({
-                id: c.id,
-                content: c.term?.toString() || c.concept?.term?.toString() || c.term || 'Unknown Concept',
-                priority: c.priority || 0,
-                taskCount: c.taskCount || 0,
-                type: c.term?.termType || 'concept'
-              }));
-            } else {
-              // Fallback to existing concept storage if getTopConcepts not available
-              state.concepts = [];
-              if (this.core.memory.conceptStorage) {
-                for (const [hash, concept] of this.core.memory.conceptStorage) {
-                  state.concepts.push({
-                    id: hash,
-                    content: concept.term?.toString() || concept.name || 'Unknown Concept',
-                    priority: concept.taskTable ? concept.taskTable.size : 0,
-                    type: concept.term?.termType || 'concept'
-                  });
-                }
-              }
-            }
-          }
-          
-          // Get system stats if available
-          if (this.core.cycle) {
-            state.stats = {
-              isRunning: this.core.cycle.isRunning,
-              isPaused: this.core.cycle.isPaused,
-              cycles: this.core.cycle.cycleCount,
-              tasks: state.tasks.length,
-              concepts: state.concepts.length,
-              timestamp: Date.now()
-            };
-          } else if (this.core.messages) {
-            // Use core's stats if cycle is not available
-            state.stats = this._getSystemStats();
-          }
+          const state = this._extractSystemState();
 
-          // Send the complete state to the new client only
+          // Add system stats
+          state.stats = this.core.cycle ? {
+            isRunning: this.core.cycle.isRunning,
+            isPaused: this.core.cycle.isPaused,
+            cycles: this.core.cycle.cycleCount,
+            tasks: state.tasks.length,
+            concepts: state.concepts.length,
+            timestamp: Date.now()
+          } : this.core.messages ? this._getSystemStats() : state.stats;
+
           this.sendToClient(clientId, {
             type: 'complete_state',
             payload: state,
@@ -404,66 +353,31 @@ class WebSocketServer extends Component {
     });
   }
 
-  /**
-   * Check if a connection from this IP is allowed based on limits
-   */
   _isConnectionAllowed(ip) {
-    if (!this.connectionLimits) {
-      // Initialize connection limits from config
-      this.connectionLimits = {
-        maxPerIP: this.config.maxConnectionsPerIP || 10,
-        maxTotal: this.config.maxTotalConnections || 1000
-      };
-    }
+    this.connectionLimits ||= {
+      maxPerIP: this.config.maxConnectionsPerIP || 10,
+      maxTotal: this.config.maxTotalConnections || 1000
+    };
 
-    // Count connections from this IP
-    let ipConnectionCount = 0;
-    for (const [_, client] of this.clients) {
-      if (client.ip === ip) {
-        ipConnectionCount++;
-      }
-    }
+    const ipConnectionCount = Array.from(this.clients.values())
+      .filter(client => client.ip === ip).length;
 
-    // Check IP limit
-    if (ipConnectionCount >= this.connectionLimits.maxPerIP) {
-      return false;
-    }
-
-    // Check total connection limit
-    if (this.clients.size >= this.connectionLimits.maxTotal) {
-      return false;
-    }
-
-    return true;
+    return ipConnectionCount < this.connectionLimits.maxPerIP &&
+           this.clients.size < this.connectionLimits.maxTotal;
   }
 
-  /**
-   * Check if connection rate from IP is acceptable
-   */
   _isConnectionRateAllowed(ip) {
-    if (!this.connectionRateTracker) {
-      this.connectionRateTracker = new Map();
-    }
+    this.connectionRateTracker ||= new Map();
 
     const now = Date.now();
-    const windowMs = 60000; // 1 minute window
+    const windowMs = 60000;
     const maxConnectionsPerWindow = this.config.maxConnectionRate || 10;
 
-    if (!this.connectionRateTracker.has(ip)) {
-      this.connectionRateTracker.set(ip, []);
-    }
-
-    const attempts = this.connectionRateTracker.get(ip);
-
-    // Remove attempts older than the window
+    const attempts = this.connectionRateTracker.get(ip) || [];
     const recentAttempts = attempts.filter(attempt => now - attempt < windowMs);
 
-    // Check if too many attempts in the window
-    if (recentAttempts.length >= maxConnectionsPerWindow) {
-      return false;
-    }
+    if (recentAttempts.length >= maxConnectionsPerWindow) return false;
 
-    // Add current attempt
     recentAttempts.push(now);
     this.connectionRateTracker.set(ip, recentAttempts);
 
@@ -500,6 +414,41 @@ class WebSocketServer extends Component {
     return `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  // Utility method for consistent client message sending
+  _sendClientMessage(clientId, message) {
+    this.sendToClient(clientId, { ...message, timestamp: new Date().toISOString() });
+  }
+
+  // Utility method for consistent error responses
+  _sendErrorResponse(clientId, command, error) {
+    this._sendClientMessage(clientId, {
+      type: 'command_response',
+      command,
+      status: 'error',
+      error: error.message
+    });
+  }
+
+  // Utility method for consistent success responses
+  _sendSuccessResponse(clientId, command, data = {}) {
+    this._sendClientMessage(clientId, {
+      type: 'command_response',
+      command,
+      status: 'success',
+      ...data
+    });
+  }
+
+  // Utility method for NARS instance validation
+  _getNARSInstance(clientId) {
+    return this.narsInstances.get(clientId);
+  }
+
+  // Utility method for safe client lookup
+  _getClient(clientId) {
+    return this.clients.get(clientId);
+  }
+
   _handleMessage(clientId, data) {
     const client = this.clients.get(clientId);
     if (!client) return;
@@ -508,66 +457,65 @@ class WebSocketServer extends Component {
 
     try {
       const message = JSON.parse(data.toString());
+      const handler = this._getMessageHandler(message.type);
 
-      // Handle protocol messages
-      if (message.type === 'identify') {
-        this._handleIdentify(clientId, message);
-      } else if (message.type === 'heartbeat') {
-        // Heartbeat response
-        return;
-      } else if (message.type === 'subscribe') {
-        this._handleSubscription(clientId, message);
-      } else if (message.type === 'unsubscribe') {
-        this._handleUnsubscription(clientId, message);
-      } else if (message.type === 'nars_message') {
-        // Enhanced inter-NARS protocol message
-        this._handleNARSMessage(clientId, message);
-      } else if (message.type === 'task_stream') {
-        // Real-time task streaming
-        this._handleTaskStream(clientId, message);
-      } else if (message.type === 'stream_request') {
-        // Handle various streaming operations
-        this._handleStreaming(clientId, message);
-      } else if (message.type === 'subscribe_to_task') {
-        // Subscribe to a specific task's updates
-        this.subscribeToTaskStream(clientId, message.taskId);
-        this.sendToClient(clientId, {
-          type: 'subscription_success',
-          taskId: message.taskId,
-          timestamp: new Date().toISOString()
-        });
-      } else if (message.type === 'unsubscribe_from_task') {
-        // Unsubscribe from a specific task's updates
-        if (this.taskStreams.has(message.taskId)) {
-          const stream = this.taskStreams.get(message.taskId);
-          stream.participants.delete(clientId);
-        }
-      } else if (message.type === 'command') {
-        // Handle system commands
-        this._handleCommand(clientId, message);
-      } else {
-        // Emit custom message event
-        this.emit('message', {
-          clientId,
-          clientType: client.type,
-          message,
-          timestamp: new Date()
-        });
-      }
+      handler ? handler.call(this, clientId, message) :
+        this._handleCustomMessage(clientId, client, message);
+
     } catch (error) {
       Logger.error(`Error parsing message from client ${clientId}`, error);
     }
   }
 
+  // Message handler registry for clean separation of concerns
+  _getMessageHandler(type) {
+    const handlers = {
+      identify: this._handleIdentify,
+      heartbeat: () => null, // Heartbeat response - no action needed
+      subscribe: this._handleSubscription,
+      unsubscribe: this._handleUnsubscription,
+      nars_message: this._handleNARSMessage,
+      task_stream: this._handleTaskStream,
+      stream_request: this._handleStreaming,
+      subscribe_to_task: (clientId, msg) => this._handleTaskSubscription(clientId, msg),
+      unsubscribe_from_task: (clientId, msg) => this._handleTaskUnsubscription(clientId, msg),
+      command: this._handleCommand
+    };
+
+    return handlers[type];
+  }
+
+  _handleTaskSubscription(clientId, message) {
+    this.subscribeToTaskStream(clientId, message.taskId);
+    this.sendToClient(clientId, {
+      type: 'subscription_success',
+      taskId: message.taskId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  _handleTaskUnsubscription(clientId, message) {
+    const stream = this.taskStreams.get(message.taskId);
+    if (stream) stream.participants.delete(clientId);
+  }
+
+  _handleCustomMessage(clientId, client, message) {
+    this.emit('message', {
+      clientId,
+      clientType: client.type,
+      message,
+      timestamp: new Date()
+    });
+  }
+
   _handleCommand(clientId, message) {
     const { command, data } = message;
-    
+
     if (!this.core?.messages) {
       Logger.error('Core messages component not available');
       return;
     }
-    
-    // Map UI commands to internal command names
+
     const commandMap = {
       'start': 'cycle.start',
       'stop': 'cycle.stop',
@@ -577,57 +525,34 @@ class WebSocketServer extends Component {
       'reset': 'cycle.reset',
       'throttle': 'cycle.throttle'
     };
-    
+
     const internalCommand = commandMap[command];
-    
-    if (internalCommand) {
-      try {
-        if (internalCommand === 'cycle.throttle' && data) {
-          // Handle throttle command specifically if needed
-          if (this.core.cycle) {
-            // For now, we'll just log the throttling request
-            Logger.debug(`Throttle request: ${data.value}%`);
-          }
-        } else if (internalCommand === 'cycle.reset') {
-          // Handle reset command - reset the cycle count
-          if (this.core.cycle) {
-            this.core.cycle.cycleCount = 0;
-            // Broadcast updated stats
-            this.core.messages.emit('cycle.stats', {
-              cycles: this.core.cycle.cycleCount,
-              timestamp: Date.now()
-            });
-          }
-        } else {
-          // Execute the mapped command
-          this.core.messages.execute(internalCommand, data);
-        }
-        
-        // Send success response
-        this.sendToClient(clientId, {
-          type: 'command_response',
-          command: command,
-          status: 'success',
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        Logger.error(`Error executing command ${internalCommand}:`, error);
-        this.sendToClient(clientId, {
-          type: 'command_response',
-          command: command,
-          status: 'error',
-          error: error.message,
-          timestamp: new Date().toISOString()
-        });
-      }
-    } else {
+
+    if (!internalCommand) {
       Logger.warn(`Unknown command: ${command}`);
-      this.sendToClient(clientId, {
-        type: 'command_response',
-        command: command,
-        status: 'unknown',
-        timestamp: new Date().toISOString()
+      return this._sendErrorResponse(clientId, command, new Error('Unknown command'));
+    }
+
+    try {
+      this._executeCommand(internalCommand, data);
+      this._sendSuccessResponse(clientId, command);
+    } catch (error) {
+      Logger.error(`Error executing command ${internalCommand}:`, error);
+      this._sendErrorResponse(clientId, command, error);
+    }
+  }
+
+  _executeCommand(command, data) {
+    if (command === 'cycle.throttle' && data && this.core.cycle) {
+      Logger.debug(`Throttle request: ${data.value}%`);
+    } else if (command === 'cycle.reset' && this.core.cycle) {
+      this.core.cycle.cycleCount = 0;
+      this.core.messages.emit('cycle.stats', {
+        cycles: this.core.cycle.cycleCount,
+        timestamp: Date.now()
       });
+    } else {
+      this.core.messages.execute(command, data);
     }
   }
 
@@ -1009,51 +934,45 @@ class WebSocketServer extends Component {
   }
 
   _handleNARSMessage(clientId, message) {
-     const client = this.clients.get(clientId);
-     if (!client) return;
+    const client = this.clients.get(clientId);
+    if (!client) return;
 
-     const { target, data, protocol = 'standard', command } = message;
+    const { target, data, protocol = 'standard', command } = message;
 
-     if (command === 'register_instance') {
-       // Handle NARS instance registration
-       this._handleNARSRegistration(clientId, data);
-       return;
-     } else if (command === 'sync_task') {
-       // Handle task synchronization between instances
-       this._handleTaskSynchronization(clientId, data);
-       return;
-     } else if (command === 'request_status') {
-       // Handle status request from one NARS to another
-       this._handleStatusRequest(clientId, target);
-       return;
-     } else if (command === 'broadcast_status') {
-       // Handle status broadcast to all connected NARS instances
-       this._handleStatusBroadcast(clientId, data);
-       return;
-     }
+    // Handle specific NARS commands
+    const commandHandlers = {
+      register_instance: (cid, data) => this._handleNARSRegistration(cid, data),
+      sync_task: (cid, data) => this._handleTaskSynchronization(cid, data),
+      request_status: (cid, target) => this._handleStatusRequest(cid, target),
+      broadcast_status: (cid, data) => this._handleStatusBroadcast(cid, data)
+    };
 
-     // Enhanced NARS protocol with routing for general messages
-     const narsMessage = {
-       type: 'nars_message',
-       protocol,
-       source: clientId,
-       sourceInstance: client.type === 'nars' ? this.narsInstances.get(clientId)?.instanceId : null,
-       target,
-       data,
-       timestamp: new Date().toISOString()
-     };
+    const handler = commandHandlers[command];
+    if (handler) return handler(clientId, command === 'request_status' ? target : data);
 
-     if (target === 'all') {
-       // Broadcast to all NARS instances
-       this.sendToClientType('nars', narsMessage);
-     } else if (target && this.narsInstances.has(target)) {
-       // Send to specific NARS instance
-       this.sendToClient(target, narsMessage);
-     } else {
-       // Broadcast to all other NARS instances (default behavior)
-       this.sendToClientType('nars', narsMessage, [clientId]);
-     }
-   }
+    // Route general NARS messages
+    this._routeNARSMessage(clientId, client, { target, data, protocol });
+  }
+
+  _routeNARSMessage(clientId, client, { target, data, protocol }) {
+    const narsMessage = {
+      type: 'nars_message',
+      protocol,
+      source: clientId,
+      sourceInstance: client.type === 'nars' ? this._getNARSInstance(clientId)?.instanceId : null,
+      target,
+      data,
+      timestamp: new Date().toISOString()
+    };
+
+    if (target === 'all') {
+      this.sendToClientType('nars', narsMessage);
+    } else if (target && this.narsInstances.has(target)) {
+      this.sendToClient(target, narsMessage);
+    } else {
+      this.sendToClientType('nars', narsMessage, [clientId]);
+    }
+  }
 
   _handleNARSRegistration(clientId, registrationData) {
     const client = this.clients.get(clientId);
@@ -1420,28 +1339,13 @@ class WebSocketServer extends Component {
   }
 
   getStats() {
-    const clientTypes = {};
-    const clientIPs = {};
+    const clientTypes = this._countByProperty(this.clients.values(), 'type');
+    const clientIPs = this._countByProperty(this.clients.values(), 'ip');
 
-    for (const client of this.clients.values()) {
-      clientTypes[client.type] = (clientTypes[client.type] || 0) + 1;
-      clientIPs[client.ip] = (clientIPs[client.ip] || 0) + 1;
-    }
+    const subscriptionStats = this._countSubscriptionTypes();
 
-    const subscriptionStats = {};
-    for (const [clientId, subscription] of this.subscriptions) {
-      Array.from(subscription.eventTypes).forEach(eventType => {
-        subscriptionStats[eventType] = (subscriptionStats[eventType] || 0) + 1;
-      });
-    }
-
-    // Count active streams
-    let totalStreamParticipants = 0;
-    if (this.streams) {
-      for (const stream of this.streams.values()) {
-        totalStreamParticipants += stream.participants.size;
-      }
-    }
+    const totalStreamParticipants = this.streams ?
+      Array.from(this.streams.values()).reduce((sum, stream) => sum + stream.participants.size, 0) : 0;
 
     return {
       isRunning: this.isRunning,
@@ -1455,15 +1359,28 @@ class WebSocketServer extends Component {
       totalStreams: this.streams?.size || 0,
       totalStreamParticipants,
       uptime: this.isRunning ? Date.now() - (this.startTime || Date.now()) : 0,
-      connectionLimits: this.connectionLimits || {
-        maxPerIP: 10,
-        maxTotal: 1000
-      },
+      connectionLimits: this.connectionLimits || { maxPerIP: 10, maxTotal: 1000 },
       connectionStats: {
         trackedIPs: this.connectionTracker?.size || 0,
         totalConnectionAttempts: Array.from(this.connectionTracker?.values() || []).reduce((sum, count) => sum + count, 0)
       }
     };
+  }
+
+  _countByProperty(collection, property) {
+    return Array.from(collection).reduce((counts, item) => {
+      counts[item[property]] = (counts[item[property]] || 0) + 1;
+      return counts;
+    }, {});
+  }
+
+  _countSubscriptionTypes() {
+    return Array.from(this.subscriptions.values())
+      .flatMap(sub => Array.from(sub.eventTypes))
+      .reduce((counts, eventType) => {
+        counts[eventType] = (counts[eventType] || 0) + 1;
+        return counts;
+      }, {});
   }
 }
 
