@@ -192,9 +192,7 @@ class StreamManager {
     };
 
     const handler = actionHandlers[action];
-    handler 
-      ? handler()
-      : WebSocketUtils.warn(`Unknown streaming action: ${action}`);
+    handler ? handler() : WebSocketUtils.warn(`Unknown streaming action: ${action}`);
   }
 
   getStats() {

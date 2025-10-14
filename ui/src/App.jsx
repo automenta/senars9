@@ -43,17 +43,13 @@ const App = () => {
     commandService.execute(command, payload);
 
     // Request updated state after commands that might change system state
-    if (['start', 'step', 'stop', 'reset'].includes(command)) {
-      _requestAfterDelay(requestState, 300);
-    }
+    ['start', 'step', 'stop', 'reset'].includes(command) && _requestAfterDelay(requestState, 300);
 
     // Request updated concepts after certain commands that might generate them
-    if (['start', 'step', 'add_task'].includes(command)) {
-      setTimeout(() => {
-        requestConcepts();
-        requestTopTasks(); // Also request top tasks from Memory
-      }, 500); // Small delay to allow server processing
-    }
+    ['start', 'step', 'add_task'].includes(command) && setTimeout(() => {
+      requestConcepts();
+      requestTopTasks(); // Also request top tasks from Memory
+    }, 500); // Small delay to allow server processing
   };
   
   // Helper function to consolidate delayed request patterns
@@ -64,47 +60,13 @@ const App = () => {
   };
 
   const handleAddTaskWithConcepts = (task) => {
-    if (handleAddTask) {
-      handleAddTask(task);
-      _requestAfterDelay(requestConcepts, 300);
-    } else {
+    handleAddTask ? (handleAddTask(task), _requestAfterDelay(requestConcepts, 300)) :
       console.error('Cannot add task: WebSocket connection not ready');
-    }
   };
 
   const handleUpdateTaskWithConcepts = (task) => {
-    if (handleUpdateTask) {
-      handleUpdateTask(task);
-      _requestAfterDelay(requestConcepts, 300);
-    } else {
+    handleUpdateTask ? (handleUpdateTask(task), _requestAfterDelay(requestConcepts, 300)) :
       console.error('Cannot update task: WebSocket connection not ready');
-    }
-  };
-  };
-
-  const handleAddTaskWithConcepts = (task) => {
-    if (handleAddTask) {
-      handleAddTask(task);
-      _requestAfterDelay(requestConcepts, 300);
-    } else {
-      console.error('Cannot add task: WebSocket connection not ready');
-    }
-  };
-
-  const handleUpdateTaskWithConcepts = (task) => {
-    if (handleUpdateTask) {
-      handleUpdateTask(task);
-      _requestAfterDelay(requestConcepts, 300);
-    } else {
-      console.error('Cannot update task: WebSocket connection not ready');
-    }
-  };
-  
-  // Helper function to consolidate delayed request patterns
-  const _requestAfterDelay = (requestFn, delay) => {
-    setTimeout(() => {
-      requestFn();
-    }, delay);
   };
 
   // Request initial concepts and top tasks when component mounts

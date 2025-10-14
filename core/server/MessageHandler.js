@@ -83,10 +83,10 @@ class MessageHandler {
 
     const subscription = this.wss.subscriptions.get(clientId);
 
-    eventTypes.length === 0
-      ? this.wss.subscriptions.delete(clientId)
-      : (eventTypes.forEach(eventType => subscription.eventTypes.delete(eventType)),
-         subscription.eventTypes.size === 0 && this.wss.subscriptions.delete(clientId));
+    eventTypes.length === 0 ?
+      this.wss.subscriptions.delete(clientId) :
+      (eventTypes.forEach(eventType => subscription.eventTypes.delete(eventType)),
+       subscription.eventTypes.size === 0 && this.wss.subscriptions.delete(clientId));
   }
 
   _handleTaskStream(clientId, message) {

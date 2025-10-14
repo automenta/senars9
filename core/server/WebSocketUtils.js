@@ -348,16 +348,13 @@ class WebSocketUtils {
     const errorMsg = `${operation} failed${contextStr}${clientId ? ` (client: ${clientId})` : ''}: ${error.message || error}`;
     this.error(errorMsg);
 
-    if (wss && clientId) {
-      const errorResponse = this.createErrorResponse(operation, { message: errorMsg, ...context });
-      wss.sendToClient(clientId, errorResponse);
-    }
+    wss && clientId && wss.sendToClient(clientId, this.createErrorResponse(operation, { message: errorMsg, ...context }));
     return errorMsg;
   }
 
   // Specific error handlers using the generic pattern
   static handleConnectionError(wss, clientId, operation, error) {
-    return this.handleContextualError(wss, clientId, operation, error, {});
+    return this.handleContextualError(wss, clientId, operation, error);
   }
 
   static handleStreamError(wss, clientId, streamId, operation, error) {

@@ -60,13 +60,9 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
         const command = inputValue.slice(5).trim();
         // Extract potential payload from command if present in format: command payload
         const [cmd, ...args] = command.split(' ');
-        if (args.length > 0) {
-          onCommand(cmd, { payload: args.join(' ') });
-          addNotification(`Command '${cmd}' executed with payload`, 'info');
-        } else {
-          onCommand(cmd);
-          addNotification(`Command '${cmd}' executed`, 'info');
-        }
+        args.length > 0 ?
+          (onCommand(cmd, { payload: args.join(' ') }), addNotification(`Command '${cmd}' executed with payload`, 'info')) :
+          (onCommand(cmd), addNotification(`Command '${cmd}' executed`, 'info'));
       } else {
         // This is a task, add it via onAddTask
         if (onAddTask) {
