@@ -1,9 +1,5 @@
 import { useInputWithHistory } from '../utils/hooks';
-
-const NARSESE_SUGGESTIONS = new Set([
-  '-->', '==>', '<=>', '&/', '&|', '&&', '||', '--', '~~',
-  '<', '>', '(', ')', '{', '}', '[', ']', '.', '!', '?'
-]);
+import { NARSESE_SUGGESTIONS } from '../constants';
 
 const InputField = ({ onSend }) => {
   const { inputValue, setInputValue, history, handleSubmit, handleArrowNavigation } = useInputWithHistory();

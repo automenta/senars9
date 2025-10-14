@@ -5,13 +5,7 @@ import { useUI } from '../core/UIContext';
 import { useNotification } from '../core/NotificationSystem';
 import { useCommandHistory } from '../utils/hooks';
 import { panelContainerStyle, headerStyle, labelStyle, buttonStyle, inputStyle, statBoxStyle, statusBadgeStyle } from '../utils/styling';
-
-const NARSESE_SUGGESTIONS = [...new Set([
-  '-->', '==>', '<=>',
-  '&/', '&|', '&&', '||', '--', '~~',
-  '<', '>', '(', ')', '{', '}', '[', ']',
-  '.', '!', '?'
-])];
+import { NARSESE_SUGGESTIONS } from '../constants';
 
 const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
   const { config } = useUI();

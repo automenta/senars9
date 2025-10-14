@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { getLogLevelColor, getLogIcon, extractLogData, extractLogLevel } from '../utils/common';
+import { getLogLevelColor, getLogIcon, formatLogData as extractLogData, formatLogLevel as extractLogLevel } from '../utils/uiHelpers';
 import { createButtonStyle, createFlexLayout } from '../utils/uiHelpers';
 
 const LogList = ({ logs = [] }) => {
@@ -16,8 +16,7 @@ const LogList = ({ logs = [] }) => {
 
   const clearLogs = () => {
     // For clearing logs, we would need to modify the parent component's state
-    // This is a placeholder - the actual implementation depends on how logs are managed
-    console.log('Clear logs requested');
+    // TODO: Implement log clearing functionality
   };
 
   const headerStyle = createFlexLayout('row', 'space-between', 'center', {
@@ -153,7 +152,7 @@ const LogList = ({ logs = [] }) => {
                         </button>
                         <button
                           style={createButtonStyle('secondary', { padding: '2px 6px', fontSize: '10px', borderRadius: '3px' })}
-                          onClick={(e) => { e.stopPropagation(); console.log('Filter by type:', logType); }}
+                          onClick={(e) => { e.stopPropagation(); /* TODO: Implement filter by type */ }}
                         >
                           🔍 Filter
                         </button>

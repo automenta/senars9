@@ -16,8 +16,13 @@ const BaseComponent = ({
   loading = false,
   error = null,
   showHeader = true,
+  expandable = false,
+  defaultExpanded = false,
+  onToggle = null,
   ...props
 }) => {
+  const [isExpanded, setIsExpanded] = React.useState(defaultExpanded);
+
   const renderContent = () => {
     if (error) {
       return (
@@ -38,20 +43,51 @@ const BaseComponent = ({
     return children;
   };
 
+  const toggleExpanded = () => {
+    if (expandable) {
+      const newExpanded = !isExpanded;
+      setIsExpanded(newExpanded);
+      onToggle?.(newExpanded);
+    }
+  };
+
+  const header = showHeader && title && (
+    <div
+      style={createHeaderStyle({
+        ...headerStyle,
+        ...(expandable && {
+          cursor: 'pointer',
+          backgroundColor: isExpanded ? '#e7f1ff' : '#f8f9fa',
+          border: `1px solid ${isExpanded ? '#0d6efd' : '#ced4da'}`,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        })
+      })}
+      onClick={expandable ? toggleExpanded : undefined}
+    >
+      <span>{title}</span>
+      {expandable && <span>{isExpanded ? '▼' : '▶'}</span>}
+    </div>
+  );
+
+  const content = (
+    <div style={createContentStyle({
+      ...contentStyle,
+      ...(expandable && !isExpanded && { display: 'none' })
+    })}>
+      {renderContent()}
+    </div>
+  );
+
   return (
     <div
       className={`base-component ${className}`}
       style={createPanelStyle(style)}
       {...props}
     >
-      {showHeader && title && (
-        <div style={createHeaderStyle(headerStyle)}>
-          {title}
-        </div>
-      )}
-      <div style={createContentStyle(contentStyle)}>
-        {renderContent()}
-      </div>
+      {header}
+      {content}
     </div>
   );
 };

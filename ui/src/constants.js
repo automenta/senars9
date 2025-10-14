@@ -1,3 +1,9 @@
+// Narsese syntax suggestions for autocomplete
+export const NARSESE_SUGGESTIONS = new Set([
+  '-->', '==>', '<=>', '&/', '&|', '&&', '||', '--', '~~',
+  '<', '>', '(', ')', '{', '}', '[', ']', '.', '!', '?'
+]);
+
 export const THEME = {
   colors: {
     primary: '#007bff',

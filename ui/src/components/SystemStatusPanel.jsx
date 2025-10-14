@@ -1,7 +1,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { panelContainerStyle, headerStyle, statBoxStyle, labelStyle, statusBadgeStyle } from '../utils/styling';
-import { getConnectionStatusColor } from '../utils/common';
+import { getStatusColor as getConnectionStatusColor } from '../utils/uiHelpers';
 
 const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] }) => {
   // Calculate system metrics

@@ -11,7 +11,7 @@ import useCrdtWebSocket from '../core/crdtWebSocket';
 import CommandService from '../services/CommandService';
 import { PANEL_CONFIG, THEME } from '../constants';
 import Panel from './Panel';
-import { getConnectionStatusStyle, getConnectionStatusText } from '../utils/common';
+import { getStatusColor as getConnectionStatusStyle, getConnectionStatusText } from '../utils/uiHelpers';
 
 const ConnectionTab = ({ name, url }) => {
   const {
