@@ -5,14 +5,26 @@ describe('Cognitive Validation Tests', () => {
 
   beforeEach(async () => {
     system = new System({
-      config: {
+      config: global.createTestConfig({
         maxTasks: 100,
         maxRules: 50,
-        enableWebSocket: false // Disable for testing
-      }
+        // Additional test-specific optimizations
+        memory: {
+          maxTasks: 100,
+          cleanupInterval: 1000 // Faster cleanup for tests
+        },
+        reasoning: {
+          maxRules: 50,
+          enableComplexRules: false // Disable complex rules for faster startup
+        }
+      })
     });
+
+    // Register for cleanup in case of test failure
+    global.registerSystemForCleanup(system);
+
     await system.start();
-  });
+  }, 15000); // Increase timeout to 15 seconds for concurrent test runs
 
   afterEach(async () => {
     if (system) {

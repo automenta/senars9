@@ -38,7 +38,7 @@ describe('Planning Integration Test', () => {
 
   test('should demonstrate plan failure recovery strategies', async () => {
     const System = (await import('../../core/system/System.js')).default;
-    const testSystem = new System({});
+    const testSystem = new System(global.createTestConfig({}));
 
     try {
       await testSystem.start();
