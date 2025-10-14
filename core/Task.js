@@ -103,14 +103,38 @@ export class Task {
   }
 
   _createTaskWithProps(props) {
+    return this._createModifiedTask({
+      ...this._getImmutableProps(),
+      ...this._getMutableProps(),
+      _priority: props.priority ?? this._priority,
+      _accessedAt: props.accessedAt ?? this._accessedAt
+    });
+  }
+
+  _createModifiedTask(props) {
     const newTask = Object.create(Object.getPrototypeOf(this));
-    ['term', 'punctuation', 'truth', 'createdAt', 'occurrenceTime', 'stamp']
-      .forEach(prop => Object.defineProperty(newTask, prop, { value: this[prop], writable: false }));
-    ['expirationTime', 'derivationPath']
-      .forEach(prop => Object.defineProperty(newTask, prop, { value: this[prop], writable: true }));
-    newTask._priority = props.priority !== undefined ? props.priority : this._priority;
-    newTask._accessedAt = props.accessedAt !== undefined ? props.accessedAt : this._accessedAt;
+    Object.keys(props).forEach(prop => {
+      newTask[prop] = props[prop];
+    });
     return newTask;
+  }
+
+  _getImmutableProps() {
+    return {
+      term: this.term,
+      punctuation: this.punctuation,
+      truth: this.truth,
+      createdAt: this.createdAt,
+      occurrenceTime: this.occurrenceTime,
+      stamp: this.stamp
+    };
+  }
+
+  _getMutableProps() {
+    return {
+      expirationTime: this.expirationTime,
+      derivationPath: this.derivationPath
+    };
   }
 
   withPriority(newPriority) {
@@ -127,14 +151,13 @@ export class Task {
   isDuplicateOf(tasks) { return TaskHash.isDuplicate(this, tasks); }
 
   withStamp(newStamp) {
-    const newTask = Object.create(Object.getPrototypeOf(this));
-    ['term', 'punctuation', 'truth', 'createdAt', 'occurrenceTime', 'derivationPath']
-      .forEach(prop => Object.defineProperty(newTask, prop, { value: this[prop], writable: false }));
-    Object.defineProperty(newTask, 'stamp', { value: newStamp, writable: false });
-    ['expirationTime']
-      .forEach(prop => Object.defineProperty(newTask, prop, { value: this[prop], writable: true }));
-    newTask._priority = this._priority;
-    newTask._accessedAt = this._accessedAt;
-    return newTask;
+    return this._createModifiedTask({
+      ...this._getImmutableProps(),
+      stamp: newStamp,
+      derivationPath: this.derivationPath,
+      expirationTime: this.expirationTime,
+      _priority: this._priority,
+      _accessedAt: this._accessedAt
+    });
   }
 }

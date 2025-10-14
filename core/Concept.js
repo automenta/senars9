@@ -42,10 +42,8 @@ export class Concept {
       [Punctuation.GOAL]: this.goalTable,
       [Punctuation.QUESTION]: this.questionTable
     };
-    
-    const table = tableMap[punctuation];
-    if (!table) throw new Error(`Unknown punctuation: ${punctuation}`);
-    return table;
+
+    return tableMap[punctuation] || (() => { throw new Error(`Unknown punctuation: ${punctuation}`); })();
   }
 
   tasks(punctuation = Punctuation.BELIEF, time = Infinity, selectionCriteria = null, limit = 1) {
@@ -64,11 +62,15 @@ export class Concept {
   }
 
   truth(punctuation = Punctuation.BELIEF, time = Infinity, selectionCriteria = null, limit = 1, aggregationFunction = DefaultAggregationFunctions.weighted) {
-    return Concept.truth(this.tasks(punctuation, time, selectionCriteria, limit), aggregationFunction);
+    return this._calculateTruth(this.tasks(punctuation, time, selectionCriteria, limit), aggregationFunction);
   }
 
   truthFromAnswer(answerSpec, aggregationFunction = DefaultAggregationFunctions.weighted) {
-    return Concept.truth(this.answer(answerSpec), aggregationFunction);
+    return this._calculateTruth(this.answer(answerSpec), aggregationFunction);
+  }
+
+  _calculateTruth(tasks, aggregationFunction) {
+    return Concept.truth(tasks, aggregationFunction);
   }
 
   addResource(key, value) { this.resources.set(key, value); }

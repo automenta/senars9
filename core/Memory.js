@@ -14,53 +14,68 @@ class IndexManager {
 
   addTask(task) {
     const {term} = task, taskHash = term.hash, timeKey = Math.floor(task.occurrenceTime / 1000);
-    !this.timeIndex.has(timeKey) && this.timeIndex.set(timeKey, new Set());
-    this.timeIndex.get(timeKey).add(taskHash);
+    this._ensureTimeIndex(timeKey).add(taskHash);
 
-    const indexMap = {
-      implication: () => term.subject && this._add(this.implicationIndex, term.subject.hash, taskHash),
+    const indexOperations = {
+      implication: () => term.subject && this._addIndex(this.implicationIndex, term.subject.hash, taskHash),
       inheritance: () => {
-        term.subject && this._add(this.inheritanceIndexBySubject, term.subject.hash, taskHash);
-        term.predicate && this._add(this.inheritanceIndexByPredicate, term.predicate.hash, taskHash);
+        this._addIndexByTerm(this.inheritanceIndexBySubject, term.subject, taskHash);
+        this._addIndexByTerm(this.inheritanceIndexByPredicate, term.predicate, taskHash);
       },
       similarity: () => {
-        term.subject && this._add(this.similarityIndex, term.subject.hash, taskHash);
-        term.predicate && this._add(this.similarityIndex, term.predicate.hash, taskHash);
+        this._addIndexByTerm(this.similarityIndex, term.subject, taskHash);
+        this._addIndexByTerm(this.similarityIndex, term.predicate, taskHash);
       },
-      operation: () => term.subject && this._add(this.operationIndex, term.subject.hash, taskHash)
+      operation: () => this._addIndexByTerm(this.operationIndex, term.subject, taskHash)
     };
-    indexMap[term.termType]?.();
+    indexOperations[term.termType]?.();
   }
 
   removeTask(task) {
     const {term} = task, taskHash = term.hash, timeKey = Math.floor(task.occurrenceTime / 1000);
-    this.timeIndex.has(timeKey) && this.timeIndex.get(timeKey).delete(taskHash);
+    this.timeIndex.get(timeKey)?.delete(taskHash);
 
-    const indexMap = {
-      implication: () => term.subject && this._remove(this.implicationIndex, term.subject.hash, taskHash),
+    const indexOperations = {
+      implication: () => term.subject && this._removeIndex(this.implicationIndex, term.subject.hash, taskHash),
       inheritance: () => {
-        term.subject && this._remove(this.inheritanceIndexBySubject, term.subject.hash, taskHash);
-        term.predicate && this._remove(this.inheritanceIndexByPredicate, term.predicate.hash, taskHash);
+        this._removeIndexByTerm(this.inheritanceIndexBySubject, term.subject, taskHash);
+        this._removeIndexByTerm(this.inheritanceIndexByPredicate, term.predicate, taskHash);
       },
       similarity: () => {
-        term.subject && this._remove(this.similarityIndex, term.subject.hash, taskHash);
-        term.predicate && this._remove(this.similarityIndex, term.predicate.hash, taskHash);
+        this._removeIndexByTerm(this.similarityIndex, term.subject, taskHash);
+        this._removeIndexByTerm(this.similarityIndex, term.predicate, taskHash);
       },
-      operation: () => term.subject && this._remove(this.operationIndex, term.subject.hash, taskHash)
+      operation: () => this._removeIndexByTerm(this.operationIndex, term.subject, taskHash)
     };
-    indexMap[term.termType]?.();
+    indexOperations[term.termType]?.();
   }
 
-  _add(index, key, value) {
-    !index.has(key) && index.set(key, new Set());
-    index.get(key).add(value);
+  _ensureTimeIndex(timeKey) {
+    return this.timeIndex.has(timeKey) ? this.timeIndex.get(timeKey) : this.timeIndex.set(timeKey, new Set()).get(timeKey);
   }
 
-  _remove(index, key, value) {
-    if (index.has(key)) {
-      index.get(key).delete(value);
-      index.get(key).size === 0 && index.delete(key);
+  _addIndex(index, key, value) {
+    this._ensureIndexSet(index, key).add(value);
+  }
+
+  _removeIndex(index, key, value) {
+    const indexSet = index.get(key);
+    if (indexSet) {
+      indexSet.delete(value);
+      indexSet.size === 0 && index.delete(key);
     }
+  }
+
+  _ensureIndexSet(index, key) {
+    return index.has(key) ? index.get(key) : index.set(key, new Set()).get(key);
+  }
+
+  _addIndexByTerm(index, term, value) {
+    term && this._addIndex(index, term.hash, value);
+  }
+
+  _removeIndexByTerm(index, term, value) {
+    term && this._removeIndex(index, term.hash, value);
   }
 
   getImplicationHashesByPremise(premiseHash) { return this.implicationIndex.get(premiseHash) || null; }
@@ -184,26 +199,32 @@ export class Memory {
 
   getTopConcepts(n = 10) {
     if (this.conceptStorage.size === 0) return [];
-    const conceptArray = Array.from(this.conceptStorage.entries()).map(([hash, concept]) => ({
+    return this._getTopItems(n, (hash, concept) => ({
       id: hash,
       concept,
       term: concept.term,
       taskCount: concept.taskTable?.size || 0,
       priority: concept.taskTable?.size || 0,
       createdAt: concept.createdAt || Date.now()
-    }));
-    conceptArray.sort((a, b) => b.taskCount - a.taskCount);
-    return conceptArray.slice(0, n);
+    }), 'taskCount');
   }
 
   getTopTasks(n = 10) {
     const allTasks = this.getAllTasks();
     if (allTasks.length === 0) return [];
-    allTasks.sort((a, b) => {
-      const priorityB = b.getPriority?.() || b.priority || 0.5;
-      const priorityA = a.getPriority?.() || a.priority || 0.5;
-      return priorityB - priorityA;
-    });
-    return allTasks.slice(0, n);
+    return this._getTopItems(n, task => task, this._getTaskPriority);
+  }
+
+  _getTopItems(n, mapper, sortKeyOrFn) {
+    const items = Array.from(this.conceptStorage.entries()).map(([hash, concept]) => mapper(hash, concept));
+    return items.sort((a, b) => {
+      const aVal = typeof sortKeyOrFn === 'function' ? sortKeyOrFn(a) : a[sortKeyOrFn];
+      const bVal = typeof sortKeyOrFn === 'function' ? sortKeyOrFn(b) : b[sortKeyOrFn];
+      return bVal - aVal;
+    }).slice(0, n);
+  }
+
+  _getTaskPriority(task) {
+    return task.getPriority?.() || task.priority || 0.5;
   }
 }
