@@ -1,4 +1,5 @@
 import { WebSocketUtils, MESSAGE_TYPES } from './WebSocketUtils.js';
+import ErrorHandler from './errorHandler.js';
 
 class MessageHandler {
   constructor(webSocketServer) {
@@ -136,7 +137,7 @@ class MessageHandler {
 
     if (!this.wss.core?.messages) {
       WebSocketUtils.warn('Core messages component not available - command ignored');
-      WebSocketUtils.handleConnectionError(this.wss, clientId, message.command || 'unknown', 'Core not available');
+      ErrorHandler.handleConnectionError(this.wss, clientId, message.command || 'unknown', 'Core not available');
       return;
     }
 
@@ -161,7 +162,7 @@ class MessageHandler {
       this._executeCommand(internalCommand, data);
       this.wss.sendToClient(clientId, WebSocketUtils.createSuccessResponse(command));
     } catch (error) {
-      WebSocketUtils.handleConnectionError(this.wss, clientId, command, error);
+      ErrorHandler.handleConnectionError(this.wss, clientId, command, error);
     }
   }
 
@@ -188,7 +189,7 @@ class MessageHandler {
     try {
       this.wss.streamManager.subscribeToStream(clientId, streamId, streamType, options);
     } catch (error) {
-      WebSocketUtils.handleStreamError(this.wss, clientId, streamId, 'subscribe', error);
+      ErrorHandler.handleStreamError(this.wss, clientId, streamId, 'subscribe', error);
     }
   }
 
@@ -196,7 +197,7 @@ class MessageHandler {
     try {
       this.wss.streamManager.unsubscribeFromStream(clientId, streamId);
     } catch (error) {
-      WebSocketUtils.handleStreamError(this.wss, clientId, streamId, 'unsubscribe', error);
+      ErrorHandler.handleStreamError(this.wss, clientId, streamId, 'unsubscribe', error);
     }
   }
 
@@ -204,7 +205,7 @@ class MessageHandler {
     try {
       this.wss.streamManager.publishToStream(clientId, streamId, data);
     } catch (error) {
-      WebSocketUtils.handleStreamError(this.wss, clientId, streamId, 'publish', error);
+      ErrorHandler.handleStreamError(this.wss, clientId, streamId, 'publish', error);
     }
   }
 

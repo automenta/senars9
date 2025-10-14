@@ -1,8 +1,10 @@
 import { WebSocketUtils, DEFAULTS } from './WebSocketUtils.js';
+import ConfigUtils from './configUtils.js';
 
 /**
  * Centralized configuration management for all server components
  * Consolidates configuration patterns and provides consistent access
+ * Enhanced with validation and sanitization
  */
 class ServerConfig {
   constructor() {
@@ -11,36 +13,37 @@ class ServerConfig {
     this.websocketConfig = {};
     this.connectionLimits = {};
     this.streamSettings = {};
+    this.isInitialized = false;
   }
 
   initialize(baseConfig = {}) {
-    this.config = WebSocketUtils.mergeConfig(this.config, baseConfig);
+    // Validate and sanitize the base configuration
+    const validation = ConfigUtils.validateConfig(baseConfig);
+    if (!validation.isValid) {
+      throw new Error(`Invalid configuration: ${validation.errors.join(', ')}`);
+    }
 
-    // Extract specific config sections
+    const sanitizedConfig = ConfigUtils.sanitizeConfig(baseConfig);
+    this.config = WebSocketUtils.mergeConfig(this.config, sanitizedConfig);
+
+    // Extract specific config sections using ConfigUtils
     this.serverConfig = {
-      port: this.config.port ?? DEFAULTS.PORT,
-      host: this.config.host ?? DEFAULTS.HOST,
+      port: ConfigUtils.getServerPort(this),
+      host: ConfigUtils.getServerHost(this),
       enabled: this.config.enabled ?? DEFAULTS.ENABLED
     };
 
     this.websocketConfig = {
-      heartbeatInterval: this.config.heartbeatInterval ?? DEFAULTS.HEARTBEAT_INTERVAL,
+      heartbeatInterval: ConfigUtils.getHeartbeatInterval(this),
       maxConnectionsPerIP: this.config.maxConnectionsPerIP ?? DEFAULTS.MAX_CONNECTIONS_PER_IP,
       maxTotalConnections: this.config.maxTotalConnections ?? DEFAULTS.MAX_TOTAL_CONNECTIONS,
       maxConnectionRate: this.config.maxConnectionRate ?? DEFAULTS.MAX_CONNECTION_RATE
     };
 
-    this.connectionLimits = {
-      maxPerIP: this.websocketConfig.maxConnectionsPerIP,
-      maxTotal: this.websocketConfig.maxTotalConnections
-    };
+    this.connectionLimits = ConfigUtils.getConnectionLimits(this);
+    this.streamSettings = ConfigUtils.getStreamSettings(this);
 
-    this.streamSettings = {
-      bufferSize: this.config.streamBufferSize ?? DEFAULTS.STREAM_BUFFER_SIZE,
-      taskBufferSize: this.config.taskStreamBufferSize ?? DEFAULTS.TASK_STREAM_BUFFER_SIZE,
-      historyLimit: this.config.taskHistoryLimit ?? DEFAULTS.TASK_HISTORY_LIMIT,
-      retentionTime: this.config.retentionTime ?? DEFAULTS.RETENTION_TIME
-    };
+    this.isInitialized = true;
   }
 
   get(key, defaultValue = null) {

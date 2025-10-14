@@ -1,4 +1,5 @@
 import { WebSocketUtils, DEFAULTS, MESSAGE_TYPES, STREAM_TYPES } from './WebSocketUtils.js';
+import ErrorHandler from './errorHandler.js';
 
 class StreamManager {
   constructor(webSocketServer) {
@@ -116,7 +117,7 @@ class StreamManager {
     try {
       const stream = this.streams.get(streamId);
       if (!WebSocketUtils.isActiveStream(stream)) {
-        WebSocketUtils.handleStreamError(this.wss, clientId, streamId, 'publish', 'Stream not found or inactive');
+        ErrorHandler.handleStreamError(this.wss, clientId, streamId, 'publish', 'Stream not found or inactive');
         return false;
       }
 
@@ -132,7 +133,7 @@ class StreamManager {
       WebSocketUtils.broadcastToParticipants(this.wss, stream.participants, dataMessage, clientId);
       return true;
     } catch (error) {
-      WebSocketUtils.handleStreamError(this.wss, clientId, streamId, 'publish', error);
+      ErrorHandler.handleStreamError(this.wss, clientId, streamId, 'publish', error);
       return false;
     }
   }
@@ -154,7 +155,7 @@ class StreamManager {
         });
       }
     } catch (error) {
-      WebSocketUtils.handleStreamError(this.wss, clientId, streamType, 'broadcast', error);
+      ErrorHandler.handleStreamError(this.wss, clientId, streamType, 'broadcast', error);
     }
   }
 
@@ -238,7 +239,7 @@ class StreamManager {
         }
       }
     } catch (error) {
-      WebSocketUtils.handleStreamError(this.wss, null, eventType, 'publishEvent', error);
+      ErrorHandler.handleStreamError(this.wss, null, eventType, 'publishEvent', error);
     }
   }
 

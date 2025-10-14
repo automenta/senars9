@@ -1,4 +1,5 @@
 import { WebSocketUtils, DEFAULTS, CLIENT_STATUS, MESSAGE_TYPES } from './WebSocketUtils.js';
+import ErrorHandler from './errorHandler.js';
 
 
 class ConnectionManager {
@@ -68,7 +69,7 @@ class ConnectionManager {
       const message = WebSocketUtils.validateMessage(data);
       this.wss.messageHandler.handle(clientId, message);
     } catch (error) {
-      WebSocketUtils.handleError('parsing message', error, clientId);
+      ErrorHandler.handleError('parsing message', error, clientId);
     }
   }
 
@@ -78,7 +79,7 @@ class ConnectionManager {
   }
 
   handleError(clientId, error) {
-    WebSocketUtils.handleError('WebSocket', error, clientId);
+    ErrorHandler.handleError('WebSocket', error, clientId);
 
     const client = this.wss.clients.get(clientId);
     client && (client.status = CLIENT_STATUS.ERROR, client.error = error.message);
@@ -138,7 +139,7 @@ class ConnectionManager {
           client.ws.send(JSON.stringify(WebSocketUtils.createMessage(MESSAGE_TYPES.HEARTBEAT)));
         }
       } catch (error) {
-        WebSocketUtils.handleError('heartbeat processing', error, clientId);
+        ErrorHandler.handleError('heartbeat processing', error, clientId);
         this.handleDisconnection(clientId);
       }
     }
@@ -169,7 +170,7 @@ class ConnectionManager {
         const stateMessage = WebSocketUtils.createMessage(MESSAGE_TYPES.COMPLETE_STATE, state);
         this.wss.sendToClient(clientId, stateMessage);
       } catch (error) {
-        WebSocketUtils.handleError('sending current state', error, clientId);
+        ErrorHandler.handleError('sending current state', error, clientId);
       }
     });
   }
