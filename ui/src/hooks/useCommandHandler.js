@@ -1,28 +1,22 @@
 import { useMemo, useCallback } from 'react';
 import CommandService from '../services/CommandService';
 
-const useCommandHandler = (
-  sendRawMessage,
-  requestState,
-  requestConcepts,
-  requestTopTasks,
-  on,
-  off
-) => {
+const COMMANDS_REQUIRING_STATE_UPDATE = new Set(['start', 'step', 'stop', 'reset']);
+const COMMANDS_REQUIRING_CONCEPT_UPDATE = new Set(['start', 'step', 'add_task']);
+
+const useCommandHandler = (sendRawMessage, requestState, requestConcepts, requestTopTasks, on, off) => {
   const commandService = useMemo(() => new CommandService(sendRawMessage), [sendRawMessage]);
 
   const handleCommand = useCallback((command, payload = {}) => {
     console.log(`Executing command: ${command}`, payload);
     commandService.execute(command, payload);
 
-    const needsStateUpdate = ['start', 'step', 'stop', 'reset'].includes(command);
-    const needsConceptUpdate = ['start', 'step', 'add_task'].includes(command);
+    const needsStateUpdate = COMMANDS_REQUIRING_STATE_UPDATE.has(command);
+    const needsConceptUpdate = COMMANDS_REQUIRING_CONCEPT_UPDATE.has(command);
 
     if (on && off && (needsStateUpdate || needsConceptUpdate)) {
       const onceListener = () => {
-        if (needsStateUpdate) {
-          requestState();
-        }
+        needsStateUpdate && requestState();
         if (needsConceptUpdate) {
           requestConcepts();
           requestTopTasks();
@@ -37,13 +31,10 @@ const useCommandHandler = (
 
       on('message', wrapper);
 
-      // Add a timeout to unregister the listener if no message is received
-      const timeoutId = setTimeout(() => {
-        off('message', wrapper);
-      }, 3000); // 3 seconds timeout
+      // Auto-cleanup after 3 seconds
+      const timeoutId = setTimeout(() => off('message', wrapper), 3000);
     }
   }, [sendRawMessage, requestState, requestConcepts, requestTopTasks, on, off, commandService]);
-
 
   return { handleCommand };
 };

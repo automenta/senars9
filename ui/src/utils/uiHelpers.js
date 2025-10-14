@@ -155,6 +155,29 @@ export const createButtonStyle = (variant = 'primary', overrides = {}) => {
   };
 };
 
+export const createLabelStyle = (overrides = {}) => ({
+  display: 'block',
+  marginBottom: THEME.spacing.xs,
+  fontWeight: THEME.fontWeight.bold,
+  fontSize: THEME.fontSize.xs,
+  ...overrides
+});
+
+export const createInputStyle = (overrides = {}) => ({
+  padding: THEME.spacing.xs,
+  border: `1px solid ${THEME.colors.gray[400]}`,
+  borderRadius: THEME.borderRadius,
+  ...overrides
+});
+
+export const createStatBoxStyle = (overrides = {}) => ({
+  padding: THEME.spacing.sm,
+  backgroundColor: THEME.colors.gray[200],
+  borderRadius: THEME.borderRadius,
+  textAlign: 'center',
+  ...overrides
+});
+
 // Layout utilities
 export const createGridLayout = (columns = 'repeat(auto-fit, minmax(200px, 1fr))', gap = THEME.spacing.md) => ({
   display: 'grid',

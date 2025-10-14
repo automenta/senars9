@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { THEME } from '../constants';
 
-const SortableItem = ({ id, children, activeId }) => {
+const DraggablePanel = ({ id, children, activeId }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isOver } = useSortable({ id });
 
   const style = {
@@ -27,4 +27,4 @@ const SortableItem = ({ id, children, activeId }) => {
   );
 };
 
-export default SortableItem;
+export default DraggablePanel;

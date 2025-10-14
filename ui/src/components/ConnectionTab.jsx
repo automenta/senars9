@@ -5,7 +5,7 @@ import ReasonerControlPanel from './ReasonerControlPanel';
 import LogList from './LogList';
 import TasksPanel from './TasksPanel';
 import ConceptMap from './ConceptMap';
-import SortableItem from './SortableItem';
+import DraggablePanel from './DraggablePanel';
 import SystemStatusPanel from './SystemStatusPanel';
 import useCrdtWebSocket from '../core/crdtWebSocket';
 import CommandService from '../services/CommandService';
@@ -143,9 +143,9 @@ const ConnectionTab = ({ name, url }) => {
         >
           <div className="main-layout">
             {panels.map(panel => (
-              <SortableItem key={panel.id} id={panel.id} activeId={activeId}>
+              <DraggablePanel key={panel.id} id={panel.id} activeId={activeId}>
                 {renderPanel(panel)}
-              </SortableItem>
+              </DraggablePanel>
             ))}
           </div>
         </SortableContext>

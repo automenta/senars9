@@ -1,8 +1,6 @@
-// Consolidated sortable item component to eliminate duplication between TasksPanel and ConceptsPanel
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { getPriorityColor, getItemIcon } from '../../utils/uiHelpers';
-import { createButtonStyle, createFlexLayout } from '../../utils/uiHelpers';
+import { getPriorityColor, getItemIcon, createButtonStyle, createFlexLayout } from '../../utils/uiHelpers';
 
 const SortableItem = ({
   item,
@@ -12,9 +10,7 @@ const SortableItem = ({
   onDelete,
   onToggleExpand,
   isExpanded = false,
-  renderExpandedContent,
-  emptyIcon = '📋',
-  emptyMessage = 'No items available'
+  renderExpandedContent
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id || index
@@ -33,13 +29,12 @@ const SortableItem = ({
     minHeight: '36px'
   });
 
-  const expandedStyle = {
-    backgroundColor: '#e7f1ff',
-    border: `1px solid #0d6efd`
-  };
-  const collapsedStyle = {
-    backgroundColor: '#f8f9fa',
-    border: '1px solid #ced4da'
+  const itemStyle = {
+    ...baseStyle,
+    ...(isExpanded ? { backgroundColor: '#e7f1ff', border: '1px solid #0d6efd' } : { backgroundColor: '#f8f9fa', border: '1px solid #ced4da' }),
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1
   };
 
   const handleClick = (e) => {
@@ -50,18 +45,11 @@ const SortableItem = ({
   return (
     <div
       ref={setNodeRef}
-      style={{
-        ...baseStyle,
-        ...(isExpanded ? expandedStyle : collapsedStyle),
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1
-      }}
+      style={itemStyle}
       {...attributes}
       {...listeners}
       onClick={handleClick}
     >
-      {/* Icon */}
       <span style={createFlexLayout('row', 'center', 'center', {
         width: '24px',
         height: '24px',
@@ -74,14 +62,12 @@ const SortableItem = ({
         {itemIcon}
       </span>
 
-      {/* Content */}
       <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         <div style={{ fontWeight: '500', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {item.content || item.name || item.id || `${type} ${index + 1}`}
         </div>
       </div>
 
-      {/* Controls */}
       <div style={createFlexLayout('row', 'flex-end', 'center', { gap: '6px', minWidth: '120px' })}>
         <span style={{
           fontWeight: 'bold',
@@ -99,13 +85,13 @@ const SortableItem = ({
           max="1"
           step="0.01"
           value={item.priority || 0.5}
-          onChange={e => onPriorityChange?.(item, parseFloat(e.target.value))}
+          onChange={(e) => onPriorityChange?.(item, parseFloat(e.target.value))}
           style={{ width: '40px', cursor: 'ew-resize', height: '16px' }}
           title="Drag to reprioritize"
         />
 
         <button
-          onClick={e => (e.stopPropagation(), onToggleExpand?.())}
+          onClick={(e) => (e.stopPropagation(), onToggleExpand?.())}
           style={createButtonStyle(isExpanded ? 'primary' : 'secondary', {
             padding: '2px 6px',
             fontSize: '12px',
@@ -116,7 +102,6 @@ const SortableItem = ({
         </button>
       </div>
 
-      {/* Expanded content */}
       {isExpanded && (
         <div style={{
           position: 'absolute',

@@ -16,8 +16,7 @@ const createYjsObservers = (ydoc, setters) => {
 
       const observers = {
         tasks: () => setTasks(yTasks.toArray().map(task =>
-          task instanceof Y.Map ? task.toJSON() : task
-        )),
+          task instanceof Y.Map ? task.toJSON() : task)),
         logs: () => setLogs(yLogs.toArray()),
         concepts: () => setConcepts(yConcepts.toArray())
       };
@@ -25,10 +24,9 @@ const createYjsObservers = (ydoc, setters) => {
       Object.entries(observers).forEach(([key, observer]) =>
         ydoc.getArray(key).observe(observer));
 
-      provider.awareness.on('change', () => {
+      provider.awareness.on('change', () =>
         setReasonerStats(Array.from(provider.awareness.getStates().values())
-          .find(state => state.reasonerStats)?.reasonerStats || null);
-      });
+          .find(state => state.reasonerStats)?.reasonerStats || null));
 
       return () => Object.keys(observers).forEach(key =>
         ydoc.getArray(key).unobserve(observers[key]));

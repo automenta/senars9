@@ -14,78 +14,63 @@ const useWebSocket = (url, config = {}) => {
 
   // Initialize WebSocket connection
   useEffect(() => {
-    if (!wsManagerRef.current) {
-      wsManagerRef.current = new WebSocketConnectionManager(url, {
-        config: configRef.current,
-        setData,
-        setError,
-        setLastMessage,
-        setMessages
-      });
+    wsManagerRef.current?.destroy();
 
-      wsManagerRef.current.connect();
-    }
+    wsManagerRef.current = new WebSocketConnectionManager(url, {
+      config: configRef.current,
+      setData,
+      setError,
+      setLastMessage,
+      setMessages
+    });
+
+    wsManagerRef.current.connect();
 
     return () => {
       wsManagerRef.current?.destroy();
       wsManagerRef.current = null;
     };
-  }, [url]); // Added url as dependency to handle reconnections properly
+  }, [url]);
 
   // Handle URL changes
   useEffect(() => {
-    if (wsManagerRef.current) {
-      wsManagerRef.current.disconnect();
-      setTimeout(() => wsManagerRef.current?.connect(), 100);
-    }
+    wsManagerRef.current && (wsManagerRef.current.disconnect(), setTimeout(() => wsManagerRef.current?.connect(), 100));
   }, [url]);
 
-  const sendRawMessage = useCallback((message) =>
-    wsManagerRef.current?.send(message) || false, []);
+  const sendRawMessage = useCallback((message) => wsManagerRef.current?.send(message) || false, []);
 
   const sendMessage = useCallback((command, payload = {}) =>
     sendRawMessage({ type: MESSAGE_TYPES.CONTROL, command, payload }), [sendRawMessage]);
 
-  const taskHandlers = useMemo(() => {
-    return wsManagerRef.current?.getTaskHandlers() || {
+  const taskHandlers = useMemo(() =>
+    wsManagerRef.current?.getTaskHandlers() || {
       handleAddTask: () => console.error('WebSocket not ready: handleAddTask'),
       handleUpdateTask: () => console.error('WebSocket not ready: handleUpdateTask'),
       handleDeleteTask: () => console.error('WebSocket not ready: handleDeleteTask')
-    };
-  }, []);
+    }, []);
 
   const requestConcepts = useCallback(() => sendMessage('get_concepts'), [sendMessage]);
   const requestTopTasks = useCallback(() => sendMessage('get_top_tasks'), [sendMessage]);
   const requestState = useCallback(() => sendRawMessage({ type: 'request_state' }), [sendRawMessage]);
 
-  const disconnect = useCallback(() => {
-    wsManagerRef.current?.disconnect();
-    setError(null);
-  }, []);
+  const disconnect = useCallback(() => (wsManagerRef.current?.disconnect(), setError(null)), []);
 
   const reconnect = useCallback(() => {
     wsManagerRef.current?.disconnect();
     setTimeout(() => wsManagerRef.current?.connect(), 1000);
   }, []);
 
-  const on = useCallback((event, listener) => {
-    wsManagerRef.current?.on(event, listener);
-  }, []);
-
-  const off = useCallback((event, listener) => {
-    wsManagerRef.current?.off(event, listener);
-  }, []);
+  const on = useCallback((event, listener) => wsManagerRef.current?.on(event, listener), []);
+  const off = useCallback((event, listener) => wsManagerRef.current?.off(event, listener), []);
 
   // Manage message history retention
   useEffect(() => {
-    if (configRef.current.enableMessageHistory && wsManagerRef.current) {
+    configRef.current.enableMessageHistory && wsManagerRef.current &&
       setMessages(prev => wsManagerRef.current.manageMessageHistory(prev));
-    }
   }, [messages]);
 
   const sortedTasks = useMemo(() =>
-    wsManagerRef.current?.getSortedTasks(data.tasks || []) || [],
-    [data.tasks]);
+    wsManagerRef.current?.getSortedTasks(data.tasks || []) || [], [data.tasks]);
 
   const status = wsManagerRef.current?.getStatus();
   const connectionStatus = status?.status || 'disconnected';

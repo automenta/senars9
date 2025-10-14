@@ -4,7 +4,8 @@ import { CONNECTION_DEFAULTS } from '@core/shared/ClientConstants.js';
 import { useUI } from '../core/UIContext';
 import { useNotification } from '../core/NotificationSystem';
 import { useCommandHistory } from '../utils/hooks';
-import { panelContainerStyle, headerStyle, labelStyle, buttonStyle, inputStyle, statBoxStyle, statusBadgeStyle } from '../utils/styling';
+import { createPanelStyle, createHeaderStyle, createButtonStyle, createLabelStyle, createInputStyle, createStatBoxStyle } from '../utils/uiHelpers';
+import { THEME } from '../constants';
 import { NARSESE_SUGGESTIONS } from '../constants';
 
 const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
@@ -117,13 +118,13 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
 
 
   return (
-    <div className="reasoner-control-panel" style={{...panelContainerStyle({ marginBottom: '10px' }), border: '1px solid #ccc' }}>
-      <h3 style={headerStyle({ margin: '0 0 10px 0', color: '#333' })}>Reasoner Control</h3>
+    <div className="reasoner-control-panel" style={{...createPanelStyle({ marginBottom: '10px' }), border: '1px solid #ccc' }}>
+      <h3 style={createHeaderStyle({ margin: '0 0 10px 0', color: '#333' })}>Reasoner Control</h3>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {controlConfig.showStartButton || controlConfig.showStopButton || controlConfig.showStepButton || controlConfig.showResetButton ? (
             <div>
-              <label style={labelStyle()}>Control:</label>
+              <label style={createLabelStyle()}>Control:</label>
               <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                 {controlConfig.showStartButton && (
                   <button
@@ -136,7 +137,7 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
                         addNotification('Start command failed', 'error');
                       }
                     }}
-                    style={{ ...buttonStyle('success'), padding: '5px 10px', borderRadius: '3px' }}
+                    style={{ ...createButtonStyle('success'), padding: '5px 10px', borderRadius: '3px' }}
                   >
                     Start
                   </button>
@@ -152,7 +153,7 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
                         addNotification('Stop command failed', 'error');
                       }
                     }}
-                    style={{ ...buttonStyle('danger'), padding: '5px 10px', borderRadius: '3px' }}
+                    style={{ ...createButtonStyle('danger'), padding: '5px 10px', borderRadius: '3px' }}
                   >
                     Stop
                   </button>
@@ -169,7 +170,7 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
                         addNotification('Step command failed', 'error');
                       }
                     }}
-                    style={{ ...buttonStyle('info'), padding: '5px 10px', borderRadius: '3px' }}
+                    style={{ ...createButtonStyle('info'), padding: '5px 10px', borderRadius: '3px' }}
                   >
                     Step
                   </button>
@@ -185,14 +186,14 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
                         addNotification('Reset command failed', 'error');
                       }
                     }}
-                    style={{ ...buttonStyle('warning'), padding: '5px 10px', borderRadius: '3px' }}
+                    style={{ ...createButtonStyle('warning'), padding: '5px 10px', borderRadius: '3px' }}
                   >
                     Reset
                   </button>
                 )}
                 {controlConfig.showThrottleControl && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '10px' }}>
-                    <label htmlFor="cpu-throttle-slider" style={{ ...labelStyle(), cursor: 'pointer' }} title={`CPU Throttle: ${cpuThrottle}%`}>
+                    <label htmlFor="cpu-throttle-slider" style={{ ...createLabelStyle(), cursor: 'pointer' }} title={`CPU Throttle: ${cpuThrottle}%`}>
                       <span role="img" aria-label="CPU Throttle">💨</span>
                     </label>
                     <input
@@ -213,7 +214,7 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
         </div>
         {controlConfig.showStats && (
           <div>
-            <label style={labelStyle()}>
+            <label style={createLabelStyle()}>
               Status:
               <span style={{
                 marginLeft: '10px',
@@ -230,15 +231,15 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
               </span>
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '10px' }}>
-              <div style={{...statBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
+              <div style={{...createStatBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#007bff' }}>{stats?.concepts || 0}</div>
                 <div style={{ fontSize: '12px', color: '#666' }}>Concepts</div>
               </div>
-              <div style={{...statBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
+              <div style={{...createStatBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#28a745' }}>{stats?.tasks || 0}</div>
                 <div style={{ fontSize: '12px', color: '#666' }}>Tasks</div>
               </div>
-              <div style={{...statBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
+              <div style={{...createStatBoxStyle({ textAlign: 'center', padding: '8px', backgroundColor: '#e9ecef' })}}>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#ffc107' }}>{stats?.cycles || 0}</div>
                 <div style={{ fontSize: '12px', color: '#666' }}>Cycles</div>
               </div>
@@ -268,9 +269,9 @@ const ReasonerControlPanel = ({ stats, onCommand, onAddTask }) => {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Enter a command or task (e.g. /cmd start)..."
-            style={{...inputStyle(), flex: 1, padding: '5px', marginRight: '5px', border: '1px solid #ccc', borderRadius: '3px'}}
+            style={{...createInputStyle(), flex: 1, padding: '5px', marginRight: '5px', border: '1px solid #ccc', borderRadius: '3px'}}
           />
-          <button type="submit" style={{...buttonStyle('primary'), padding: '5px 10px', borderRadius: '3px'}}>Send</button>
+          <button type="submit" style={{...createButtonStyle('primary'), padding: '5px 10px', borderRadius: '3px'}}>Send</button>
         </form>
       )}
     </div>

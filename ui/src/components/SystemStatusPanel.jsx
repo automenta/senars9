@@ -1,6 +1,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { panelContainerStyle, headerStyle, statBoxStyle, labelStyle, statusBadgeStyle } from '../utils/styling';
+import { createPanelStyle, createHeaderStyle, createStatBoxStyle } from '../utils/uiHelpers';
+import { THEME } from '../constants';
 import { getStatusColor as getConnectionStatusColor } from '../utils/uiHelpers';
 
 const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] }) => {
@@ -66,7 +67,7 @@ const SystemStatusPanel = ({ stats, connectionStatus, tasks = [], concepts = [] 
           </div>
         </div>
         
-        <div style={statBoxStyle()}>
+        <div style={createStatBoxStyle()}>
           <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>Health</div>
           <div style={{ 
             fontSize: '12px', 

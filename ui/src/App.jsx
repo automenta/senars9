@@ -35,20 +35,16 @@ const App = () => {
     off
   );
 
-  const handleTaskWithConcepts = (handler, task) => {
-    handler?.(task) && setTimeout(requestConcepts, 300);
-  };
+  const handleTaskWithConcepts = (handler, task) => handler?.(task) && setTimeout(requestConcepts, 300);
 
   const handleAddTaskWithConcepts = (task) => handleTaskWithConcepts(handleAddTask, task);
   const handleUpdateTaskWithConcepts = (task) => handleTaskWithConcepts(handleUpdateTask, task);
 
   useEffect(() => {
-    if (connectionStatus === 'connected') {
-      setTimeout(() => {
-        requestConcepts();
-        requestTopTasks();
-      }, 200);
-    }
+    connectionStatus === 'connected' && setTimeout(() => {
+      requestConcepts();
+      requestTopTasks();
+    }, 200);
   }, [connectionStatus, requestConcepts, requestTopTasks]);
 
   return (
