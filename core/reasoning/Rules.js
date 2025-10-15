@@ -7,36 +7,33 @@ import { COMPLEXITY_LEVELS, MAX_PRIORITY, DEFAULTS } from '../base/constants.js'
 class Rules extends Component {
   constructor() {
     super();
-    this.rules = [];
-    this.indexes = new IndexManager();
-    this.preFilters = new Set();
-    this.lastEvaluationTime = null;
-    this.evaluationTimeHistory = [];
-    this.maxHistorySize = DEFAULTS.MAX_HISTORY_SIZE;
+    Object.assign(this, {
+      rules: [],
+      indexes: new IndexManager(),
+      preFilters: new Set(),
+      lastEvaluationTime: null,
+      evaluationTimeHistory: [],
+      maxHistorySize: DEFAULTS.MAX_HISTORY_SIZE
+    });
   }
 
   getDefaultConfig() {
-    return {
-      maxHistorySize: this.maxHistorySize
-    };
+    return { maxHistorySize: this.maxHistorySize };
   }
 
   async _doInitialize(config = {}) {
-    this.rules = [];
+    Object.assign(this, {
+      rules: [],
+      maxHistorySize: this.config.maxHistorySize ?? DEFAULTS.MAX_HISTORY_SIZE
+    });
     this.indexes.clear();
     this.preFilters.clear();
-    this.maxHistorySize = this.config.maxHistorySize ?? DEFAULTS.MAX_HISTORY_SIZE;
   }
 
   add(rule) {
     Validation.requireProps(rule, ['name', 'condition', 'action']);
-
-    if (typeof rule.condition !== 'function') {
-      throw new Error('Rule condition must be a function');
-    }
-
-    if (typeof rule.action !== 'function') {
-      throw new Error('Rule action must be a function');
+    if (typeof rule.condition !== 'function' || typeof rule.action !== 'function') {
+      throw new Error('Rule condition and action must be functions');
     }
 
     this.rules.push({
@@ -55,9 +52,8 @@ class Rules extends Component {
 
     const index = this.rules.findIndex(rule => rule.name === name);
     if (index !== -1) {
-      const rule = this.rules[index];
+      this._removeFromIndexes(this.rules[index]);
       this.rules.splice(index, 1);
-      this._removeFromIndexes(rule);
     }
   }
 
@@ -68,12 +64,10 @@ class Rules extends Component {
     this.indexes.add(`complexity_${rule.complexity}`, rule.name);
     this.indexes.add(`priority_${rule.priority}`, rule.name);
 
-    if (rule.preFilterTags?.length > 0) {
-      for (const tag of rule.preFilterTags) {
-        this.preFilters.add(tag);
-        this.indexes.add(`prefilter_${tag}`, rule.name);
-      }
-    }
+    rule.preFilterTags?.forEach(tag => {
+      this.preFilters.add(tag);
+      this.indexes.add(`prefilter_${tag}`, rule.name);
+    });
   }
 
   _removeFromIndexes(rule) {
@@ -88,28 +82,23 @@ class Rules extends Component {
   }
 
   find(predicate) {
-    if (typeof predicate !== 'function') return [];
-    return this.rules.filter(predicate);
+    return typeof predicate === 'function' ? this.rules.filter(predicate) : [];
   }
 
   getRulesByType(type) {
-    if (!type) return [];
-    return this.indexes.get(type);
+    return type ? this.indexes.get(type) : [];
   }
 
   getRulesByComplexity(complexity) {
-    if (!complexity) return [];
-    return this.indexes.get(`complexity_${complexity}`) || [];
+    return complexity ? this.indexes.get(`complexity_${complexity}`) || [] : [];
   }
 
   getRulesByPriority(priority) {
-    if (priority === undefined || priority === null) return [];
-    return this.indexes.get(`priority_${priority}`) || [];
+    return priority != null ? this.indexes.get(`priority_${priority}`) || [] : [];
   }
 
   getRulesByPreFilterTag(tag) {
-    if (!tag) return [];
-    return this.indexes.get(`prefilter_${tag}`) || [];
+    return tag ? this.indexes.get(`prefilter_${tag}`) || [] : [];
   }
 
   getOptimizedRuleCandidates(context, options = {}) {
@@ -122,8 +111,7 @@ class Rules extends Component {
       for (let level = 1; level <= maxLevel; level++) {
         const levelName = Object.keys(COMPLEXITY_LEVELS).find(key => COMPLEXITY_LEVELS[key] === level);
         if (levelName) {
-          const rules = this.getRulesByComplexity(levelName);
-          rules.forEach(rule => complexityCandidates.add(rule));
+          this.getRulesByComplexity(levelName).forEach(rule => complexityCandidates.add(rule));
         }
       }
 
@@ -149,7 +137,7 @@ class Rules extends Component {
       performance: {
         lastEvaluation: this.lastEvaluationTime,
         averageEvaluationTime: this.evaluationTimeHistory.length > 0
-          ? this.evaluationTimeHistory.reduce((a, b) => a + b, 0) / this.evaluationTimeHistory.length
+          ? this.evaluationTimeHistory.reduce((a, b) => a + b) / this.evaluationTimeHistory.length
           : 0,
         evaluationCount: this.evaluationTimeHistory.length
       }
@@ -157,28 +145,28 @@ class Rules extends Component {
   }
 
   _getRulesByComplexityStats() {
-    const stats = {};
-    for (const rule of this.rules) {
+    return this.rules.reduce((stats, rule) => {
       stats[rule.complexity] = (stats[rule.complexity] || 0) + 1;
-    }
-    return stats;
+      return stats;
+    }, {});
   }
 
   _getRulesByPriorityStats() {
-    const stats = {};
-    for (const rule of this.rules) {
+    return this.rules.reduce((stats, rule) => {
       const priority = rule.priority || 0;
       stats[priority] = (stats[priority] || 0) + 1;
-    }
-    return stats;
+      return stats;
+    }, {});
   }
 
   clear() {
-    this.rules = [];
+    Object.assign(this, {
+      rules: [],
+      lastEvaluationTime: null,
+      evaluationTimeHistory: []
+    });
     this.indexes.clear();
     this.preFilters.clear();
-    this.evaluationTimeHistory = [];
-    this.lastEvaluationTime = null;
   }
 
   async evaluate(context, options = {}) {
@@ -190,15 +178,11 @@ class Rules extends Component {
     const startTime = Date.now();
 
     try {
-      let candidates = this.getOptimizedRuleCandidates(context, options);
+      const candidates = this.getOptimizedRuleCandidates(context, options);
 
-      // Validate and filter applicable rules
-      const applicableRules = [];
-      for (const rule of candidates) {
+      const applicableRules = candidates.filter(rule => {
         try {
-          if (rule.condition(context)) {
-            applicableRules.push(rule);
-          }
+          return rule.condition(context);
         } catch (error) {
           Logger.warn(`Rule '${rule.name}' condition failed`, {
             rule: rule.name,
@@ -206,7 +190,6 @@ class Rules extends Component {
             context: Object.keys(context)
           });
 
-          // Emit error event if available
           if (this.core?.messages) {
             this.core.messages.emit('error:occurred', {
               type: 'RuleConditionError',
@@ -216,8 +199,9 @@ class Rules extends Component {
               contextKeys: Object.keys(context)
             });
           }
+          return false;
         }
-      }
+      });
 
       if (applicableRules.length === 0) {
         this._recordEvaluationTime(Date.now() - startTime);
@@ -227,43 +211,21 @@ class Rules extends Component {
       this._sortByPriority(applicableRules);
 
       const topRule = applicableRules[0];
-      try {
-        const result = await topRule.action(context);
-        this._recordEvaluationTime(Date.now() - startTime);
+      const result = await topRule.action(context);
+      this._recordEvaluationTime(Date.now() - startTime);
 
-        // Emit evaluation event if messaging is available
-        if (this.core?.messages) {
-          this.core.messages.emit('rules:evaluated', {
-            ruleCount: candidates.length,
-            applicableCount: applicableRules.length,
-            selectedRule: topRule.name,
-            duration: Date.now() - startTime,
-            success: true,
-            timestamp: Date.now()
-          });
-        }
-
-        return result;
-      } catch (error) {
-        Logger.error(`Rule '${topRule.name}' action failed`, {
-          rule: topRule.name,
-          error: error.message,
-          context: Object.keys(context)
+      if (this.core?.messages) {
+        this.core.messages.emit('rules:evaluated', {
+          ruleCount: candidates.length,
+          applicableCount: applicableRules.length,
+          selectedRule: topRule.name,
+          duration: Date.now() - startTime,
+          success: true,
+          timestamp: Date.now()
         });
-
-        if (this.core?.messages) {
-          this.core.messages.emit('error:occurred', {
-            type: 'RuleActionError',
-            rule: topRule.name,
-            error: error.message,
-            stack: error.stack,
-            contextKeys: Object.keys(context)
-          });
-        }
-
-        this._recordEvaluationTime(Date.now() - startTime);
-        return null;
       }
+
+      return result;
     } catch (error) {
       this._recordEvaluationTime(Date.now() - startTime);
       throw error;
@@ -274,14 +236,13 @@ class Rules extends Component {
     this.lastEvaluationTime = duration;
     this.evaluationTimeHistory.push(duration);
 
-    // Keep history size manageable
     if (this.evaluationTimeHistory.length > this.maxHistorySize) {
       this.evaluationTimeHistory = this.evaluationTimeHistory.slice(-this.maxHistorySize);
     }
   }
 
   _applyFilters(rules, context, filters) {
-    let filtered = [...rules]; // Create a copy to avoid modifying original
+    let filtered = [...rules];
     if (filters.preFilter) filtered = this._preFilterRules(filtered, context);
     if (filters.ruleType) filtered = this._filterByType(filtered, filters.ruleType);
     if (filters.maxComplexity) filtered = this._filterByComplexity(filtered, filters.maxComplexity);
@@ -316,17 +277,14 @@ class Rules extends Component {
     if (!Array.isArray(rules)) return;
 
     rules.sort((a, b) => {
-      // Primary sort: priority (higher first)
       const priorityDiff = (b.priority ?? 0) - (a.priority ?? 0);
       if (priorityDiff !== 0) return priorityDiff;
 
-      // Secondary sort: complexity (simpler first for faster execution)
       const complexityA = COMPLEXITY_LEVELS[a.complexity] ?? 1;
       const complexityB = COMPLEXITY_LEVELS[b.complexity] ?? 1;
       const complexityDiff = complexityA - complexityB;
       if (complexityDiff !== 0) return complexityDiff;
 
-      // Tertiary sort: rule name for deterministic ordering
       return (a.name ?? '').localeCompare(b.name ?? '');
     });
   }
