@@ -18,10 +18,7 @@ export class Rule {
   }
 
   canApply(context) { return true; }
-
-  async apply(context) {
-    throw new Error('apply must be implemented by subclasses');
-  }
+  async apply(context) { throw new Error('apply must be implemented by subclasses'); }
 
   updatePerformance(success, executionTime) {
     const { performanceMetrics } = this;
@@ -30,14 +27,10 @@ export class Rule {
 
     const total = performanceMetrics.avgExecutionTime * (performanceMetrics.executionCount - 1) + executionTime;
     performanceMetrics.avgExecutionTime = total / performanceMetrics.executionCount;
-    // This field should be updated with actual time from context when context is available
-    // For now, leaving as is but in a full implementation this would come from context
     performanceMetrics.lastExecuted = Date.now();
   }
 
-  getPerformanceStats() {
-    return { ...this.performanceMetrics };
-  }
+  getPerformanceStats() { return { ...this.performanceMetrics }; }
 }
 
 export class LMRule extends Rule {
@@ -66,21 +59,19 @@ export class LMRule extends Rule {
     const lmResponse = await this.lm.process(prompt);
     const executionTime = Date.now() - startTime;
 
-    const { lmMetrics } = this;
-    lmMetrics.apiCalls++;
-    lmMetrics.tokenCount += prompt.length + lmResponse.length;
-    lmMetrics.avgResponseTime = (lmMetrics.avgResponseTime * (lmMetrics.apiCalls - 1) + executionTime) / lmMetrics.apiCalls;
-
+    this._updateLMMetrics(prompt.length + lmResponse.length, executionTime);
     return lmResponse;
   }
 
-  async apply(context) {
-    return this.executeLMProcessing(context);
+  _updateLMMetrics(tokenCount, executionTime) {
+    const { lmMetrics } = this;
+    lmMetrics.apiCalls++;
+    lmMetrics.tokenCount += tokenCount;
+    lmMetrics.avgResponseTime = (lmMetrics.avgResponseTime * (lmMetrics.apiCalls - 1) + executionTime) / lmMetrics.apiCalls;
   }
 
-  getLMMetrics() {
-    return { ...this.lmMetrics };
-  }
+  async apply(context) { return this.executeLMProcessing(context); }
+  getLMMetrics() { return { ...this.lmMetrics }; }
 }
 
 export class NALRule extends Rule {
@@ -100,7 +91,5 @@ export class NALRule extends Rule {
     return this.inferenceRule ? this.inferenceRule(context) : (() => { throw new Error('No NAL inference rule defined'); })();
   }
 
-  async apply(context) {
-    return this.performInference(context);
-  }
+  async apply(context) { return this.performInference(context); }
 }

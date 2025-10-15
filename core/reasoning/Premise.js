@@ -4,7 +4,6 @@ export class Premise {
   }
 
   toString() { return `Premise(type=${this.type})`; }
-
   isValid() { return true; }
 }
 
@@ -15,7 +14,6 @@ export class TaskPremise extends Premise {
   }
 
   toString() { return `TaskPremise(task=${this.task ? this.task.toString() : 'null'})`; }
-
   isValid() { return this.task != null; }
 }
 
@@ -26,7 +24,6 @@ export class TaskTaskPremise extends Premise {
   }
 
   toString() { return `TaskTaskPremise(task1=${this.task1 ? this.task1.toString() : 'null'}, task2=${this.task2 ? this.task2.toString() : 'null'})`; }
-
   isValid() { return this.task1 != null && this.task2 != null; }
 }
 
@@ -37,6 +34,5 @@ export class TaskTermPremise extends Premise {
   }
 
   toString() { return `TaskTermPremise(task=${this.task ? this.task.toString() : 'null'}, term=${this.term ? this.term.toString() : 'null'})`; }
-
   isValid() { return this.task != null && this.term != null; }
 }

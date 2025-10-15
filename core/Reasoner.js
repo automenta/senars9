@@ -2,72 +2,49 @@ import { Logger } from './base/utilities.js';
 import { DEFAULTS } from './base/constants.js';
 import { Component } from './components/Component.js';
 
-/**
- * Base class for NARS inference rules.
- */
+// Base class for NARS inference rules - simplified and consolidated
 export class NALRule {
-  /**
-   * Returns the term type that triggers this rule.
-   * @returns {number} TermType that triggers this rule
-   */
-  getTriggerTermType() {
-    throw new Error('getTriggerTermType must be implemented by subclasses');
-  }
-
-  /**
-   * Applies the inference rule to the given premises.
-   * @param {object} context - The context object.
-   * @returns {Task[]} Array of derived tasks
-   */
-  apply(context) {
-    throw new Error('apply must be implemented by subclasses');
-  }
-
-  canApply(context) {
-    return true;
-  }
+  getTriggerTermType() { throw new Error('getTriggerTermType must be implemented by subclasses'); }
+  apply(context) { throw new Error('apply must be implemented by subclasses'); }
+  canApply(context) { return true; }
 }
 
-/**
- * Unified Reasoner system that combines all reasoning capabilities
- */
 export class Reasoner extends Component {
   constructor(strategyRegistry = null, systemContext = null) {
     super();
-    
-    // Core reasoning components
+
+    // Core configuration
     this.strategyRegistry = strategyRegistry;
     this.systemContext = systemContext;
     this.defaultStrategy = 'basic_reasoning';
     this.overlapCheckingEnabled = true;
-    
+
     // Rule management
-    this.rules = new Map(); // All rules, mapped by ID
-    this.ruleGroups = new Map(); // Rules categorized by group
+    this.rules = new Map();
+    this.ruleGroups = new Map();
     this.enabledRuleIds = new Set();
-    
-    // Reasoning system components
-    this.winnowing = null; // Will be initialized if needed
-    this.derivation = null; // Will be initialized if needed
-    this.lm = null; // Language model instance
-    this.memory = null; // Memory instance
+
+    // System components
+    this.winnowing = null;
+    this.derivation = null;
+    this.lm = null;
+    this.memory = null;
     this.strategies = new Map();
     this.reasoningHistory = [];
     this.maxHistorySize = DEFAULTS.MAX_HISTORY_SIZE;
-    
-    // Initialize the reasoning system
+
     this._initialize();
-    this.strategyRegistry && this._registerWithStrategyRegistry();
+    strategyRegistry && this._registerWithStrategyRegistry();
   }
 
   async initialize(config = {}) {
     await super.initialize(config);
-    this.strategies.clear();
-    this.reasoningHistory = [];
+    this._resetState();
     this.maxHistorySize = config.maxHistorySize ?? DEFAULTS.MAX_HISTORY_SIZE;
   }
 
-  _initialize() {
+  _initialize() { this._resetState(); }
+  _resetState() {
     this.strategies.clear();
     this.reasoningHistory = [];
     this.rules.clear();
@@ -75,51 +52,32 @@ export class Reasoner extends Component {
     this.enabledRuleIds.clear();
   }
 
-  /**
-   * Registers a new rule with the reasoner
-   * @param {Rule} rule - The rule to register
-   * @param {string} group - The group to assign the rule to
-   */
   registerRule(rule, group = 'general') {
-    if (!rule || !rule.id) {
-      throw new Error('Invalid rule: must have an ID');
-    }
+    if (!rule?.id) throw new Error('Invalid rule: must have an ID');
     this.rules.set(rule.id, rule);
-    if (!this.ruleGroups.has(group)) {
-      this.ruleGroups.set(group, new Set());
-    }
+    this.ruleGroups.has(group) || this.ruleGroups.set(group, new Set());
     this.ruleGroups.get(group).add(rule.id);
-    if (rule.enabled) {
-      this.enabledRuleIds.add(rule.id);
-    }
+    rule.enabled && this.enabledRuleIds.add(rule.id);
   }
 
-  /**
-   * Enables a rule or a group of rules
-   * @param {string} idOrGroup - The ID of the rule or the name of the group to enable
-   */
   enableRule(idOrGroup) {
-    if (this.rules.has(idOrGroup)) {
-      this.enabledRuleIds.add(idOrGroup);
-    } else if (this.ruleGroups.has(idOrGroup)) {
-      for (const ruleId of this.ruleGroups.get(idOrGroup)) {
-        this.enabledRuleIds.add(ruleId);
-      }
-    }
+    this._toggleRuleGroup(idOrGroup, 'enable');
   }
 
-  /**
-   * Disables a rule or a group of rules
-   * @param {string} idOrGroup - The ID of the rule or the name of the group to disable
-   */
   disableRule(idOrGroup) {
-    if (this.rules.has(idOrGroup)) {
-      this.enabledRuleIds.delete(idOrGroup);
-    } else if (this.ruleGroups.has(idOrGroup)) {
-      for (const ruleId of this.ruleGroups.get(idOrGroup)) {
-        this.enabledRuleIds.delete(ruleId);
-      }
-    }
+    this._toggleRuleGroup(idOrGroup, 'disable');
+  }
+
+  _toggleRuleGroup(idOrGroup, action) {
+    const isEnable = action === 'enable';
+    const targetSet = isEnable ? this.enabledRuleIds : null;
+    const ruleIds = this.rules.has(idOrGroup)
+      ? [idOrGroup]
+      : this.ruleGroups.get(idOrGroup) || [];
+
+    ruleIds.forEach(id => {
+      isEnable ? targetSet?.add(id) : this.enabledRuleIds.delete(id);
+    });
   }
 
   _registerWithStrategyRegistry() {
@@ -144,86 +102,63 @@ export class Reasoner extends Component {
 
   async reason(focusSet, memory, context = {}) {
     this.memory = memory;
+    if (!focusSet?.length) return [];
+
     const derivedTasks = [];
+    const ruleContext = { memory, tasks: focusSet, context };
 
-    if (!focusSet || focusSet.length === 0) {
-      return derivedTasks;
-    }
+    // Process single-premise rules
+    await this._applySinglePremiseRules(focusSet, derivedTasks, ruleContext);
 
-    // First, process each task individually against the rules
-    for (const task1 of focusSet) {
-      for (const ruleId of this.enabledRuleIds) {
-        const rule = this.rules.get(ruleId);
-        if (rule) {
-          // Check if the rule can be applied to a single premise
-          if (rule.canApply && !rule.canApply({ premise: { task: task1 }, memory, tasks: focusSet, context })) {
-            continue;
-          }
-          
-          let result;
-          try {
-            // Use the newer-style context only
-            result = await rule.apply({ premise: { task: task1 }, memory, tasks: focusSet, context });
-          } catch (error) {
-            console.error(`Error applying rule ${ruleId}:`, error);
-            continue;
-          }
-          
-          if (result) {
-            const results = Array.isArray(result) ? result : [result];
-            derivedTasks.push(...results);
-          }
-        }
-      }
-    }
-
-    // Second, for NAL-style inference rules that work with pairs of tasks
-    for (let i = 0; i < focusSet.length; i++) {
-      for (let j = 0; j < focusSet.length; j++) {
-        if (i !== j) { // Don't compare a task with itself
-          const task1 = focusSet[i];
-          const task2 = focusSet[j];
-          
-          for (const ruleId of this.enabledRuleIds) {
-            const rule = this.rules.get(ruleId);
-            if (rule && rule.type === 'nal') {
-              // Check if the rule can be applied to the pair of tasks
-              if (rule.canApply && !rule.canApply({ 
-                premise: { task: task1 }, 
-                secondaryPremise: { task: task2 }, 
-                memory, 
-                tasks: focusSet, 
-                context 
-              })) {
-                continue;
-              }
-              
-              let result;
-              try {
-                // Apply rule with both premises
-                result = await rule.apply({ 
-                  premise: { task: task1 }, 
-                  secondaryPremise: { task: task2 }, 
-                  memory, 
-                  tasks: focusSet, 
-                  context 
-                });
-              } catch (error) {
-                console.error(`Error applying NAL rule ${ruleId} to task pair:`, error);
-                continue;
-              }
-              
-              if (result) {
-                const results = Array.isArray(result) ? result : [result];
-                derivedTasks.push(...results);
-              }
-            }
-          }
-        }
-      }
-    }
+    // Process dual-premise NAL rules
+    await this._applyDualPremiseRules(focusSet, derivedTasks, ruleContext);
 
     return derivedTasks;
+  }
+
+  async _applySinglePremiseRules(focusSet, derivedTasks, ruleContext) {
+    for (const task of focusSet) {
+      const premiseContext = { ...ruleContext, premise: { task } };
+
+      for (const ruleId of this.enabledRuleIds) {
+        const rule = this.rules.get(ruleId);
+        if (!rule || (rule.canApply && !rule.canApply(premiseContext))) continue;
+
+        const result = await this._applyRuleSafely(rule, premiseContext, ruleId);
+        if (result?.length) derivedTasks.push(...result);
+      }
+    }
+  }
+
+  async _applyDualPremiseRules(focusSet, derivedTasks, ruleContext) {
+    for (let i = 0; i < focusSet.length; i++) {
+      for (let j = i + 1; j < focusSet.length; j++) {
+        const task1 = focusSet[i], task2 = focusSet[j];
+        const premiseContext = {
+          ...ruleContext,
+          premise: { task: task1 },
+          secondaryPremise: { task: task2 }
+        };
+
+        for (const ruleId of this.enabledRuleIds) {
+          const rule = this.rules.get(ruleId);
+          if (rule?.type !== 'nal' || (rule.canApply && !rule.canApply(premiseContext))) continue;
+
+          const result = await this._applyRuleSafely(rule, premiseContext, ruleId);
+          if (result?.length) derivedTasks.push(...result);
+        }
+      }
+    }
+  }
+
+  async _applyRuleSafely(rule, context, ruleId) {
+    try {
+      const result = await rule.apply(context);
+      return result ? (Array.isArray(result) ? result : [result]) : null;
+    } catch (error) {
+      console.error(`Error applying rule ${ruleId}:`, error);
+      return null;
+    }
   }
 
   reasonWithStrategy(focusSet, memory, context) {
@@ -241,112 +176,67 @@ export class Reasoner extends Component {
 
   _hasOverlap(taskA, taskB) { return taskA?.stamp?.overlaps(taskB?.stamp) || false; }
 
-  /**
-   * Advanced reasoning modalities - temporal, counterfactual, causal
-   */
-  async performTemporalReasoning(scenario, timepoints = [], context = {}) {
+  // Advanced reasoning modalities - consolidated into single parameterized method
+  async performAdvancedReasoning(type, params = {}, context = {}) {
     if (!this.lm) {
-      return {
-        original: `Temporal analysis: ${scenario}`,
-        type: 'temporal',
-        error: 'No language model available for temporal reasoning'
-      };
+      const errorMsg = `No language model available for ${type} reasoning`;
+      return this._createErrorResult(type, errorMsg, params);
     }
 
     try {
-      const prompt = `Analyze the following scenario temporally: "${scenario}". Time points: ${timepoints.join(', ')}. Provide temporal relationships, sequence analysis, and timing implications.`;
+      const prompt = this._generatePrompt(type, params);
       const result = await this.lm.generateText(prompt);
-      
-      const currentTime = context.currentTime || Date.now();
+
       const reasoningResult = {
         original: result,
-        type: 'temporal',
-        scenario: scenario,
-        timepoints: timepoints,
-        timestamp: currentTime
+        type,
+        timestamp: context.currentTime || Date.now(),
+        ...params
       };
 
       this.reasoningHistory.push(reasoningResult);
       return reasoningResult;
     } catch (error) {
-      return {
-        original: `Temporal analysis: ${scenario}`,
-        type: 'temporal',
-        error: error.message
-      };
+      return this._createErrorResult(type, error.message, params);
     }
+  }
+
+  _generatePrompt(type, params) {
+    const prompts = {
+      temporal: () => `Analyze temporally: "${params.scenario}". Time points: ${params.timepoints?.join(', ') || 'none'}. Provide temporal relationships, sequence analysis, and timing implications.`,
+      counterfactual: () => `Explore counterfactual: "${params.scenario}". Analyze what would happen if this were true, what conditions would need to change, and the potential consequences.`,
+      causal: () => `Analyze causal relationship: "${params.cause}" leads to "${params.effect}". Explain the causal mechanism, intermediate steps, and validity of this relationship.`
+    };
+
+    return prompts[type]?.() || `Perform ${type} reasoning with provided parameters.`;
+  }
+
+  _createErrorResult(type, error, params) {
+    const baseMsg = { temporal: 'Temporal', counterfactual: 'Counterfactual', causal: 'Causal' }[type] || 'Advanced';
+    return {
+      original: `${baseMsg} analysis: ${JSON.stringify(params)}`,
+      type,
+      error,
+      ...params
+    };
+  }
+
+  // Convenience methods for backward compatibility
+  async performTemporalReasoning(scenario, timepoints = [], context = {}) {
+    return this.performAdvancedReasoning('temporal', { scenario, timepoints }, context);
   }
 
   async performCounterfactualReasoning(scenario, context = {}) {
-    if (!this.lm) {
-      return {
-        original: `Counterfactual analysis: ${scenario}`,
-        type: 'counterfactual',
-        error: 'No language model available for counterfactual reasoning'
-      };
-    }
-
-    try {
-      const prompt = `Explore the following counterfactual scenario: "${scenario}". Analyze what would happen if this were true, what conditions would need to change, and the potential consequences.`;
-      const result = await this.lm.generateText(prompt);
-      
-      const currentTime = context.currentTime || Date.now();
-      const reasoningResult = {
-        original: result,
-        type: 'counterfactual',
-        scenario: scenario,
-        timestamp: currentTime
-      };
-
-      this.reasoningHistory.push(reasoningResult);
-      return reasoningResult;
-    } catch (error) {
-      return {
-        original: `Counterfactual analysis: ${scenario}`,
-        type: 'counterfactual',
-        error: error.message
-      };
-    }
+    return this.performAdvancedReasoning('counterfactual', { scenario }, context);
   }
 
   async performCausalReasoning(cause, effect, context = {}) {
-    if (!this.lm) {
-      return {
-        original: `Causal analysis: ${cause} -> ${effect}`,
-        type: 'causal',
-        error: 'No language model available for causal reasoning'
-      };
-    }
-
-    try {
-      const prompt = `Analyze the causal relationship: "${cause}" leads to "${effect}". Explain the causal mechanism, intermediate steps, and validity of this relationship.`;
-      const result = await this.lm.generateText(prompt);
-      
-      const currentTime = context.currentTime || Date.now();
-      const reasoningResult = {
-        original: result,
-        type: 'causal',
-        cause: cause,
-        effect: effect,
-        timestamp: currentTime
-      };
-
-      this.reasoningHistory.push(reasoningResult);
-      return reasoningResult;
-    } catch (error) {
-      return {
-        original: `Causal analysis: ${cause} -> ${effect}`,
-        type: 'causal',
-        error: error.message
-      };
-    }
+    return this.performAdvancedReasoning('causal', { cause, effect }, context);
   }
 
-  /**
-   * Strategy management methods
-   */
+  // Strategy management
   addStrategy(strategy) {
-    if (!strategy || !strategy.id || typeof strategy.execute !== 'function') {
+    if (!strategy?.id || typeof strategy.execute !== 'function') {
       throw new Error('Invalid strategy: must have an id and execute function');
     }
     this.strategies.set(strategy.id, strategy);
@@ -354,30 +244,26 @@ export class Reasoner extends Component {
 
   setOverlapChecking(enabled) { this.overlapCheckingEnabled = enabled; }
   isOverlapCheckingEnabled() { return this.overlapCheckingEnabled; }
-  
-  // Get statistics
+
+  // Statistics
   getStats() {
-    // Count rules by type
-    let lmRulesCount = 0;
-    let nalRulesCount = 0;
-    
-    for (const rule of this.rules.values()) {
-      if (rule.type === 'lm') {
-        lmRulesCount++;
-      } else if (rule.type === 'nal') {
-        nalRulesCount++;
-      }
-    }
-    
+    const ruleCounts = this._countRulesByType();
     return {
       totalRules: this.rules.size,
-      lmRules: lmRulesCount,
-      nalRules: nalRulesCount,
+      ...ruleCounts,
       enabledRules: this.enabledRuleIds.size,
       reasoningHistorySize: this.reasoningHistory.length,
       hasLM: !!this.lm,
       hasMemory: !!this.memory
     };
+  }
+
+  _countRulesByType() {
+    let lmRulesCount = 0, nalRulesCount = 0;
+    for (const rule of this.rules.values()) {
+      rule.type === 'lm' ? lmRulesCount++ : rule.type === 'nal' && nalRulesCount++;
+    }
+    return { lmRules: lmRulesCount, nalRules: nalRulesCount };
   }
 
   getReasoningHistory(limit = 100) {
