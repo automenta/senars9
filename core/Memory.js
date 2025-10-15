@@ -4,7 +4,7 @@ import { Concept } from './Concept.js';
 import { DEFAULTS } from './base/constants.js';
 import { Validation } from './base/validation.js';
 
-// Focus class - manages attention focus sets
+// Focus class - manages attention focus sets (short-term memory)
 class Focus extends Component {
   constructor() {
     super();
@@ -16,7 +16,7 @@ class Focus extends Component {
   createFocusSet(name, maxSize = this.focusSize) {
     Validation.ensureCondition(!this.focusSets.has(name), `Focus set '${name}' already exists`);
     this.focusSets.set(name, {
-      items: new Map(),
+      tasks: new Map(),  // Store actual task objects in focus (short-term memory)
       maxSize,
       accessCount: 0,
       lastAccessed: Date.now(),
@@ -42,24 +42,47 @@ class Focus extends Component {
     focusSet.lastAccessed = Date.now();
     focusSet.accessCount++;
 
-    const sortedEntries = Array.from(focusSet.items.entries())
-      .sort(([, dataA], [, dataB]) => {
-        const [priorityA, priorityB] = [(dataA.priority || 0), (dataB.priority || 0)];
-        if (priorityA !== priorityB) return priorityB - priorityA;
+    // Create pairs of [key, taskData] where taskData includes both the task and metadata
+    const taskPairs = Array.from(focusSet.tasks.entries()).map(([key, task]) => {
+      // Get metadata from items map if it exists (for backward compatibility)
+      let taskData = task;
+      if (focusSet.items && focusSet.items.has(key)) {
+        const itemMetadata = focusSet.items.get(key);
+        // Combine task with metadata
+        taskData = { task, ...itemMetadata, priority: itemMetadata.priority };
+      } else {
+        // Create a metadata object based on the task
+        const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
+        taskData = { ...task, priority: priority, timestamp: task.timestamp || Date.now() };
+      }
+      
+      return [key, taskData];
+    });
 
-        const [timestampA, timestampB] = [(dataA.timestamp || 0), (dataB.timestamp || 0)];
-        if (timestampA !== timestampB) return timestampB - timestampA;
+    // Sort by priority and timestamp
+    const sortedEntries = taskPairs.sort(([, dataA], [, dataB]) => {
+      const [priorityA, priorityB] = [
+        (typeof dataA.getPriority === 'function' ? dataA.getPriority() : (dataA.priority || 0)),
+        (typeof dataB.getPriority === 'function' ? dataB.getPriority() : (dataB.priority || 0))
+      ];
+      if (priorityA !== priorityB) return priorityB - priorityA;
 
-        const [accessCountA, accessCountB] = [(dataA.accessCount || 0), (dataB.accessCount || 0)];
-        return accessCountB - accessCountA;
-      })
-      .slice(0, count)
-      .map(([key, value]) => {
-        value.accessCount = (value.accessCount || 0) + 1;
-        return [key, value];
-      });
+      const [timestampA, timestampB] = [
+        (dataA.timestamp || dataA.createdAt || Date.now()),
+        (dataB.timestamp || dataB.createdAt || Date.now())
+      ];
+      if (timestampA !== timestampB) return timestampB - timestampA;
 
-    return sortedEntries;
+      return 0;
+    });
+
+    return sortedEntries.slice(0, count);
+  }
+
+  getTasks() {
+    const focusSet = this.focusSets.get(this.currentFocus);
+    if (!focusSet) return [];
+    return Array.from(focusSet.tasks.values());
   }
 
   updateFocusAttention(name, delta) {
@@ -73,24 +96,59 @@ class Focus extends Component {
     const stats = {};
     this.focusSets.forEach((data, name) => {
       stats[name] = {
-        size: data.items.size,
+        size: data.tasks.size,
         maxSize: data.maxSize,
         accessCount: data.accessCount,
         attentionScore: data.attentionScore,
-        utilization: data.items.size / data.maxSize,
+        utilization: data.tasks.size / data.maxSize,
         age: Date.now() - data.createdAt
       };
     });
     return stats;
   }
 
+  addTaskToFocus(task, priority) {
+    const focusSet = this.focusSets.get(this.currentFocus);
+    if (!focusSet) return false;
+
+    const termHash = task.term.hash;
+    focusSet.tasks.set(termHash, task);
+
+    // Maintain focus size limit
+    if (focusSet.tasks.size > focusSet.maxSize) {
+      const firstKey = focusSet.tasks.keys().next().value;
+      focusSet.tasks.delete(firstKey);
+    }
+    
+    return true;
+  }
+
+  removeTaskFromFocus(taskHash) {
+    let removed = false;
+    this.focusSets.forEach(focusSet => {
+      if (focusSet.tasks.has(taskHash)) {
+        focusSet.tasks.delete(taskHash);
+        removed = true;
+      }
+    });
+    return removed;
+  }
+
+  // Compatibility method to add items to focus sets (for legacy usage)
   updateFocusSets(key, options) {
     const { focusSet, priority = 0 } = options;
     if (!focusSet || !this.focusSets.has(focusSet)) return;
 
+    // This method is for adding metadata to track items in focus, not the actual tasks
+    // In the new architecture where tasks are stored directly in focus, this tracks additional metadata
     const focusData = this.focusSets.get(focusSet);
-    if (focusData.items.has(key)) return;
+    if (focusData.items && focusData.items.has(key)) return; // Only create items map if needed for metadata
 
+    // Create items map if it doesn't exist (for backward compatibility)
+    if (!focusData.items) {
+      focusData.items = new Map();
+    }
+    
     focusData.items.set(key, { priority, timestamp: Date.now() });
     if (focusData.items.size > focusData.maxSize) {
       const firstKey = focusData.items.keys().next().value;
@@ -98,11 +156,11 @@ class Focus extends Component {
     }
   }
 
-  removeFromFocusSets(key) {
-    this.focusSets.forEach(focusData => focusData.items.delete(key));
-  }
-
   clear() {
+    this.focusSets.forEach(focusSet => {
+      focusSet.tasks.clear();
+      if (focusSet.items) focusSet.items.clear();
+    });
     this.focusSets.clear();
     this.currentFocus = null;
   }
@@ -203,10 +261,9 @@ class Memory extends Component {
   constructor(focus = null) {
     super();
     this.conceptStorage = new Map();
-    this.shortTermTasks = new Map();    // Active tasks in focus
     this.longTermTasks = new Map();     // Consolidated tasks in long-term memory
     this.indexManager = new IndexManager();
-    this.focus = focus;                 // Reference to focus component
+    this.focus = focus;                 // Reference to focus component (short-term memory)
     this.storage = new Map();           // General storage
     this.cache = new Map();             // Caching layer
     this.indexes = new Map();           // Indexing
@@ -239,23 +296,22 @@ class Memory extends Component {
   addTask(task, currentTime) {
     this._ensureConceptExistsRecursive(task.term, currentTime);
     const termHash = task.term.hash;
-    !this.shortTermTasks.has(termHash) && this.totalTasks++;
-    this.shortTermTasks.set(termHash, task);
     
-    // If we have a focus component, try to add to focus as well
+    // Add to focus (short-term memory) if we have focus component
     if (this.focus) {
-      // Add to focus if possible (assuming focus has appropriate methods)
       try {
-        // This represents "becoming aware of it" - adding to focus
-        if (this.focus.updateFocusSets) {
-          this.focus.updateFocusSets(termHash, {
-            focusSet: this.focus.getCurrentFocus?.() || 'default',
-            priority: task.getPriority?.() || task.priority || 0.5
-          });
-        }
+        // Add to focus - this is now the short-term memory
+        this.focus.addTaskToFocus(task, task.getPriority?.() || task.priority || 0.5);
+        this.totalTasks++;
       } catch (e) {
         // If focus update fails, continue anyway
-        console.warn('Could not update focus:', e.message);
+        console.warn('Could not add task to focus:', e.message);
+      }
+    } else {
+      // Fallback: add to long-term tasks if no focus available
+      if (!this.longTermTasks.has(termHash)) {
+        this.longTermTasks.set(termHash, task);
+        this.totalTasks++;
       }
     }
     
@@ -264,7 +320,16 @@ class Memory extends Component {
     this.indexManager.addTask(task);
   }
 
-  getTask(termHash) { return this.shortTermTasks.get(termHash) || this.longTermTasks.get(termHash) || null; }
+  getTask(termHash) { 
+    // First check focus (short-term memory), then long-term memory
+    let task = null;
+    if (this.focus) {
+      // Look for task in focus
+      const focusTasks = this.focus.getTasks();
+      task = focusTasks.find(t => t.term && t.term.hash === termHash) || null;
+    }
+    return task || this.longTermTasks.get(termHash) || null; 
+  }
 
   getImplicationsByPremise(premise) {
     const hashes = this.indexManager.getImplicationHashesByPremise(premise.hash);
@@ -286,7 +351,10 @@ class Memory extends Component {
     return hashes ? this._getTasksFromHashes(hashes) : null;
   }
 
-  getAllTasks() { return [...this.shortTermTasks.values(), ...this.longTermTasks.values()]; }
+  getAllTasks() { 
+    const focusTasks = this.focus ? this.focus.getTasks() : [];
+    return [...focusTasks, ...this.longTermTasks.values()]; 
+  }
 
   getTasksByTimeRange(startTime, endTime) {
     const hashes = this.indexManager.getTaskHashesByTimeRange(startTime, endTime);
@@ -303,33 +371,78 @@ class Memory extends Component {
   }
 
   removeTask(termHash) {
-    const taskToRemove = this.shortTermTasks.get(termHash) || this.longTermTasks.get(termHash);
-    if (!taskToRemove) return false;
-    (this.shortTermTasks.has(termHash) ? this.shortTermTasks : this.longTermTasks).delete(termHash);
-    this.totalTasks = Math.max(0, this.totalTasks - 1);
-    this.indexManager.removeTask(taskToRemove);
+    let taskToRemove = null;
+    let removed = false;
     
-    // Remove from focus as well
-    if (this.focus?.removeFromFocusSets) {
-      this.focus.removeFromFocusSets(termHash);
+    // Try to remove from focus first (short-term memory)
+    if (this.focus) {
+      removed = this.focus.removeTaskFromFocus(termHash);
+      if (removed) {
+        // Find the task that was removed from focus
+        const focusTasks = this.focus.getTasks();
+        taskToRemove = focusTasks.find(t => t.term && t.term.hash === termHash);
+      }
     }
     
-    return true;
+    // If not in focus, try long-term memory
+    if (!removed) {
+      taskToRemove = this.longTermTasks.get(termHash);
+      if (taskToRemove) {
+        this.longTermTasks.delete(termHash);
+        removed = true;
+      }
+    }
+    
+    if (removed && taskToRemove) {
+      this.totalTasks = Math.max(0, this.totalTasks - 1);
+      this.indexManager.removeTask(taskToRemove);
+    }
+    
+    return removed;
   }
 
   consolidate(currentTime) {
-    for (const [hash, task] of this.shortTermTasks) task.isExpired(currentTime) && this.removeTask(hash);
+    // Handle tasks in focus (short-term memory)
+    if (this.focus) {
+      const focusTasks = this.focus.getTasks();
+      for (const task of focusTasks) {
+        if (task.isExpired && task.isExpired(currentTime)) {
+          this.removeTask(task.term.hash);
+        }
+      }
+    }
+    
     const priorityDecayFactor = 0.001;
     this.getAllTasks().forEach(task => {
-      if (task.getAccessedAt() < currentTime) {
-        task.setPriority(Math.max(0.0, task.getPriority() - priorityDecayFactor));
+      if (task.getAccessedAt && task.getAccessedAt() < currentTime) {
+        const currentPriority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
+        if (typeof task.setPriority === 'function') {
+          task.setPriority(Math.max(0.0, currentPriority - priorityDecayFactor));
+        } else {
+          task.priority = Math.max(0.0, currentPriority - priorityDecayFactor);
+        }
       }
     });
-    const tasksToPromote = [...this.shortTermTasks.entries()].filter(([, task]) => task.getPriority() >= 0.7);
-    for (const [hash, task] of tasksToPromote) {
-      this.shortTermTasks.delete(hash);
-      this.longTermTasks.set(hash, task);
+    
+    // Move high-priority tasks from focus to long-term memory
+    if (this.focus) {
+      const tasksToPromote = [];
+      const focusTasks = this.focus.getTasks();
+      for (const task of focusTasks) {
+        const currentPriority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
+        if (currentPriority >= 0.7) {
+          tasksToPromote.push(task);
+        }
+      }
+      
+      for (const task of tasksToPromote) {
+        const termHash = task.term.hash;
+        // Remove from focus and add to long-term memory
+        this.focus.removeTaskFromFocus(termHash);
+        this.longTermTasks.set(termHash, task);
+      }
     }
+    
     this.consolidationCount++;
     this.lastConsolidation = currentTime;
   }
@@ -434,7 +547,6 @@ class Memory extends Component {
     this.storage.clear();
     this.cache.clear();
     this.indexes.clear();
-    this.shortTermTasks.clear();
     this.longTermTasks.clear();
     this.conceptStorage.clear();
     if (this.focus) {
@@ -472,7 +584,7 @@ class Memory extends Component {
       const priorityKeys = new Set();
       for (const [indexName, keys] of this.indexes.entries()) {
         if (indexName.startsWith('priority_')) {
-          const priority = parseInt(indexName.split('_')[1], 10);
+          const priority = parseFloat(indexName.split('_')[1]);
           if (priority >= minPriority) {
             for (const key of keys) {
               priorityKeys.add(key);
@@ -497,7 +609,7 @@ class Memory extends Component {
       ...super.getStats(), // Include base component stats
       // NARS-specific stats
       totalTasks: this.totalTasks,
-      shortTermTasks: this.shortTermTasks.size,
+      shortTermTasks: this.focus ? this.focus.getTasks().length : 0,  // Focus represents short-term memory
       longTermTasks: this.longTermTasks.size,
       concepts: this.conceptStorage.size,
       consolidationCount: this.consolidationCount,

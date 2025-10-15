@@ -372,6 +372,13 @@ async function initializeSystem(lmProvider = DEFAULT_LM_PROVIDER) {
     await system.start();
     nar = system.core;  // Get the NAR component from the system
     
+    // Set up the focus properly
+    if (system.core.focus) {
+      system.core.focus.createFocusSet('default', 20);
+      system.core.focus.setFocus('default');
+      console.log('🎯 Focus set created and activated');
+    }
+    
     console.log('✅ System initialized with integrated neural and symbolic components');
     return system;
   } catch (error) {

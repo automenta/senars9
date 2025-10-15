@@ -9,6 +9,32 @@ import { Term, TermType } from '../../core/Term.js';
 import { CycleContext } from '../../core/Cycle.js';
 import { withCoreSetup } from '../unit/enhanced-test-utils.js';
 
+// Helper function to format a task with rounded truth values for display
+function formatTaskWithRoundedTruth(task) {
+  if (!task) return 'null';
+  
+  let termStr = 'Unknown';
+  if (task.term) {
+    if (typeof task.term.toString === 'function') {
+      termStr = task.term.toString();
+    } else if (task.term.name) {
+      termStr = task.term.name;
+    } else {
+      termStr = JSON.stringify(task.term);
+    }
+  }
+  
+  let truthStr = '';
+  if (task.truth) {
+    const freq = Math.round((task.truth.frequency || 0) * 100) / 100;
+    const conf = Math.round((task.truth.confidence || 0) * 100) / 100;
+    truthStr = `{f:${freq}, c:${conf}}`;
+  }
+  
+  const punctuation = task.punctuation || '';
+  return `${termStr}${punctuation} ${truthStr}`.trim();
+}
+
 /**
  * A general-purpose reasoning test that takes inputs and expected output matchers
  * @param {Object} config - Configuration object for the test
