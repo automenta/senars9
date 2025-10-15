@@ -175,7 +175,7 @@ class Rules extends Component {
       return null;
     }
 
-    const startTime = Date.now();
+    const startTime = context.currentTime || Date.now();
 
     try {
       const candidates = this.getOptimizedRuleCandidates(context, options);
@@ -204,7 +204,7 @@ class Rules extends Component {
       });
 
       if (applicableRules.length === 0) {
-        this._recordEvaluationTime(Date.now() - startTime);
+        this._recordEvaluationTime((context.currentTime || Date.now()) - startTime);
         return null;
       }
 
@@ -212,22 +212,22 @@ class Rules extends Component {
 
       const topRule = applicableRules[0];
       const result = await topRule.action(context);
-      this._recordEvaluationTime(Date.now() - startTime);
+      this._recordEvaluationTime((context.currentTime || Date.now()) - startTime);
 
       if (this.core?.messages) {
         this.core.messages.emit('rules:evaluated', {
           ruleCount: candidates.length,
           applicableCount: applicableRules.length,
           selectedRule: topRule.name,
-          duration: Date.now() - startTime,
+          duration: (context.currentTime || Date.now()) - startTime,
           success: true,
-          timestamp: Date.now()
+          timestamp: context.currentTime || Date.now()
         });
       }
 
       return result;
     } catch (error) {
-      this._recordEvaluationTime(Date.now() - startTime);
+      this._recordEvaluationTime((context.currentTime || Date.now()) - startTime);
       throw error;
     }
   }

@@ -4,7 +4,8 @@ import { Task, Punctuation, TruthValue } from './Task.js';
 import { Term } from './Term.js';
 import { Reasoner } from './Reasoner.js';
 import { CycleContext, runSingleCycle } from './Cycle.js';
-import { Logger } from './base/utilities.js';
+import { Logger, ObjectUtils } from './base/utilities.js';
+import { Clock, HighResolutionClock } from './Clock.js';
 
 export class NAR {
   constructor(config = {}) {
@@ -17,6 +18,9 @@ export class NAR {
     this.focus = new Focus();
     this.memory = new Memory(this.focus);
     this.reasoner = new Reasoner();
+    
+    // Initialize clock - use provided clock or default to HighResolutionClock
+    this.clock = config.clock || new HighResolutionClock();
 
     // Create a default focus set
     this.focus.createFocusSet('default');
@@ -48,25 +52,30 @@ export class NAR {
 
         term = term.trim();
         
+        const currentTime = this.clock.getTime();
         task = Task.createInput(
           Term.newAtom(term),
           punctuation,
           new TruthValue(0.9, 0.9), // default truth
-          Date.now(),
-          Date.now()
+          currentTime,
+          currentTime
         );
       } else {
+        const currentTime = this.clock.getTime();
         task = Task.createInput(
           typeof taskData.term === 'string' ? Term.newAtom(taskData.term) : taskData.term,
           taskData.punctuation || Punctuation.BELIEF,
           taskData.truth ? new TruthValue(taskData.truth.frequency, taskData.truth.confidence) : new TruthValue(0.9, 0.9),
-          Date.now(),
-          Date.now(),
+          currentTime,
+          currentTime,
           taskData.priority || 0.5
         );
       }
       
-      this.memory.addTask(task, Date.now());
+      if (!task) {
+        task = { createdAt: this.clock.getTime() };
+      }
+      this.memory.addTask(task, this.clock.getTime());
       this.stats.inputTasks++;
       
       Logger.debug(`Task input: ${task.toString()}`);
@@ -126,7 +135,8 @@ export class NAR {
   }
 
   runCycle() {
-    const context = new CycleContext(Date.now());
+    const currentTime = this.clock.getTime();
+    const context = new CycleContext(currentTime);
 
     // Get tasks from the focus set
     const focusItems = this.focus.getFocusItems();
@@ -152,7 +162,7 @@ export class NAR {
     if (this._isRunning) return Logger.warn('NAR is already running');
 
     this._isRunning = true;
-    this.stats.birthdate = Date.now();
+    this.stats.birthdate = this.clock.getTime();
     
     const runCycle = () => {
       if (this._isRunning) {
@@ -183,7 +193,7 @@ export class NAR {
       ...this.stats,
       taskCount: memoryState.totalTasks,
       conceptCount: memoryState.concepts,
-      uptime: this.stats.birthdate ? Date.now() - this.stats.birthdate : 0,
+      uptime: this.stats.birthdate ? this.clock.getTime() - this.stats.birthdate : 0,
       memoryState
     };
   }

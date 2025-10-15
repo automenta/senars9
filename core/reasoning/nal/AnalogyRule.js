@@ -72,7 +72,10 @@ export class Analogy extends NALRule {
           const newTruth = { frequency: newFreq, confidence: newConf };
 
           // Get current time from context
-          const currentTime = context.context?.currentTime || Date.now();
+          const currentTime = context.context?.currentTime;
+          if (currentTime === undefined) {
+            throw new Error('Context must provide currentTime for proper time tracking');
+          }
 
           const newTask = Task.createDerived(
             [premiseTask, sp, pp],

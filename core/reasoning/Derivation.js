@@ -35,14 +35,16 @@ export class Derivation {
 
       if (this.resourcesUsed.rulesApplied >= (context.maxRulesPerDerivation || 10)) break;
 
-      const startTime = Date.now();
+      const startTime = context.currentTime || Date.now();
       try {
         const success = await this._applyRule(rule, premise, context);
-        rule.updatePerformance(success, Date.now() - startTime);
+        const endTime = context.currentTime || Date.now();
+    rule.updatePerformance(success, endTime - startTime, endTime);
         this.resourcesUsed.rulesApplied++;
       } catch (error) {
         console.error(`Error applying rule ${rule.id}:`, error);
-        rule.updatePerformance(false, Date.now() - startTime);
+        const endTime = context.currentTime || Date.now();
+        rule.updatePerformance(false, endTime - startTime, endTime);
       }
     }
 

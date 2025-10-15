@@ -36,13 +36,13 @@ export class ContradictionAnalyzer extends Component {
     });
   }
 
-  async analyzeBeliefs(beliefs) {
+  async analyzeBeliefs(beliefs, context = {}) {
     if (!Array.isArray(beliefs) || beliefs.length < 2) return [];
 
     const contradictions = [];
     for (let i = 0; i < beliefs.length; i++) {
       for (let j = i + 1; j < beliefs.length; j++) {
-        const contradiction = this._findContradiction(beliefs[i], beliefs[j]);
+        const contradiction = this._findContradiction(beliefs[i], beliefs[j], context);
         if (contradiction) {
           contradictions.push(contradiction);
           this._recordContradiction(contradiction);
@@ -52,17 +52,19 @@ export class ContradictionAnalyzer extends Component {
     return contradictions;
   }
 
-  _findContradiction(beliefA, beliefB) {
+  _findContradiction(beliefA, beliefB, context = {}) {
     if (!beliefA || !beliefB) return null;
 
     if (!this._areEquivalentStatements(beliefA.statement, beliefB.statement)) return null;
 
+    const currentTime = context.currentTime || Date.now();
+    
     if (this.config.detectDirectNegations && this._isDirectNegation(beliefA, beliefB)) {
       return {
         type: 'direct_negation',
         beliefs: [beliefA, beliefB],
         strength: 1.0,
-        timestamp: Date.now(),
+        timestamp: currentTime,
         confidence: 1.0
       };
     }
@@ -73,7 +75,7 @@ export class ContradictionAnalyzer extends Component {
         type: 'partial_contradiction',
         beliefs: [beliefA, beliefB],
         strength,
-        timestamp: Date.now(),
+        timestamp: currentTime,
         confidence: strength
       };
     }
@@ -111,7 +113,8 @@ export class ContradictionAnalyzer extends Component {
 
   _generateContradictionId(contradiction) {
     const stmt = contradiction.beliefs[0].statement || 'unknown';
-    return `${stmt.toString()}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const timestamp = contradiction.timestamp || Date.now();
+    return `${stmt.toString()}_${timestamp}_${Math.random().toString(36).substr(2, 5)}`;
   }
 
   getContradictions() {

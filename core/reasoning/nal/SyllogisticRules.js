@@ -63,7 +63,10 @@ export function applySyllogisticRule(
         const newTruth = calculateNewTruth(truth1, truth2);
 
         // Get current time from context
-        const currentTime = context.context?.currentTime || Date.now();
+        const currentTime = context.context?.currentTime;
+        if (currentTime === undefined) {
+          throw new Error('Context must provide currentTime for proper time tracking');
+        }
 
         // Determine the punctuation of the derived task
         const newPunctuation = (premise1.punctuation === Punctuation.GOAL && premise2.punctuation === Punctuation.GOAL)

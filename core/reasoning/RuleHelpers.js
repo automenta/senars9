@@ -70,6 +70,12 @@ export function applySyllogisticRule(
           complexity: newSubject.complexity + newPredicate.complexity + 1
         };
 
+        // Get current time from context
+        const currentTime = context.context?.currentTime;
+        if (currentTime === undefined) {
+          throw new Error('Context must provide currentTime for proper time tracking');
+        }
+        
         // Note: In a real implementation, we'd want to properly create terms using the Term class
         // For now, we'll create a basic task structure with proper inheritance relation
         derived.push({
@@ -78,10 +84,10 @@ export function applySyllogisticRule(
           truth: newTruth,
           getPriority: () => 0.5, // Default priority
           setPriority: () => {},
-          getAccessedAt: () => Date.now(),
-          setAccessedAt: () => {},
-          createdAt: Date.now(),
-          occurrenceTime: Date.now(),
+          getAccessedAt: () => currentTime,
+          setAccessedAt: (time) => { currentTime = time; },
+          createdAt: currentTime,
+          occurrenceTime: currentTime,
           isBelief: () => true,
           isQuestion: () => false,
           isGoal: () => false,

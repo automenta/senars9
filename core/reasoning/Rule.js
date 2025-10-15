@@ -30,6 +30,8 @@ export class Rule {
 
     const total = performanceMetrics.avgExecutionTime * (performanceMetrics.executionCount - 1) + executionTime;
     performanceMetrics.avgExecutionTime = total / performanceMetrics.executionCount;
+    // This field should be updated with actual time from context when context is available
+    // For now, leaving as is but in a full implementation this would come from context
     performanceMetrics.lastExecuted = Date.now();
   }
 

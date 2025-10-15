@@ -244,7 +244,7 @@ export class Reasoner extends Component {
   /**
    * Advanced reasoning modalities - temporal, counterfactual, causal
    */
-  async performTemporalReasoning(scenario, timepoints = []) {
+  async performTemporalReasoning(scenario, timepoints = [], context = {}) {
     if (!this.lm) {
       return {
         original: `Temporal analysis: ${scenario}`,
@@ -257,12 +257,13 @@ export class Reasoner extends Component {
       const prompt = `Analyze the following scenario temporally: "${scenario}". Time points: ${timepoints.join(', ')}. Provide temporal relationships, sequence analysis, and timing implications.`;
       const result = await this.lm.generateText(prompt);
       
+      const currentTime = context.currentTime || Date.now();
       const reasoningResult = {
         original: result,
         type: 'temporal',
         scenario: scenario,
         timepoints: timepoints,
-        timestamp: Date.now()
+        timestamp: currentTime
       };
 
       this.reasoningHistory.push(reasoningResult);
@@ -276,7 +277,7 @@ export class Reasoner extends Component {
     }
   }
 
-  async performCounterfactualReasoning(scenario) {
+  async performCounterfactualReasoning(scenario, context = {}) {
     if (!this.lm) {
       return {
         original: `Counterfactual analysis: ${scenario}`,
@@ -289,11 +290,12 @@ export class Reasoner extends Component {
       const prompt = `Explore the following counterfactual scenario: "${scenario}". Analyze what would happen if this were true, what conditions would need to change, and the potential consequences.`;
       const result = await this.lm.generateText(prompt);
       
+      const currentTime = context.currentTime || Date.now();
       const reasoningResult = {
         original: result,
         type: 'counterfactual',
         scenario: scenario,
-        timestamp: Date.now()
+        timestamp: currentTime
       };
 
       this.reasoningHistory.push(reasoningResult);
@@ -307,7 +309,7 @@ export class Reasoner extends Component {
     }
   }
 
-  async performCausalReasoning(cause, effect) {
+  async performCausalReasoning(cause, effect, context = {}) {
     if (!this.lm) {
       return {
         original: `Causal analysis: ${cause} -> ${effect}`,
@@ -320,12 +322,13 @@ export class Reasoner extends Component {
       const prompt = `Analyze the causal relationship: "${cause}" leads to "${effect}". Explain the causal mechanism, intermediate steps, and validity of this relationship.`;
       const result = await this.lm.generateText(prompt);
       
+      const currentTime = context.currentTime || Date.now();
       const reasoningResult = {
         original: result,
         type: 'causal',
         cause: cause,
         effect: effect,
-        timestamp: Date.now()
+        timestamp: currentTime
       };
 
       this.reasoningHistory.push(reasoningResult);

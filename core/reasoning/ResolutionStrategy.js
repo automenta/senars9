@@ -47,20 +47,22 @@ export class ResolutionStrategy extends Component {
       const result = await strategy.execute(contradiction, context);
       this.stats.contradictionsResolved++;
       this.stats.resolutionSuccess++;
+      const currentTime = context.currentTime || Date.now();
       return {
         success: true,
         strategy: strategyName,
         result,
-        timestamp: Date.now()
+        timestamp: currentTime
       };
     } catch (error) {
       this.stats.resolutionFailures++;
       Logger.error(`Resolution strategy ${strategyName} failed: ${error.message}`);
+      const currentTime = context.currentTime || Date.now();
       return {
         success: false,
         strategy: strategyName,
         error: error.message,
-        timestamp: Date.now()
+        timestamp: currentTime
       };
     }
   }
@@ -139,11 +141,12 @@ export class ResolutionStrategy extends Component {
       ? [(freqA * confA + freqB * confB) / totalWeight, Math.max(confA, confB) * 0.8]
       : [(freqA + freqB) / 2, 0.5];
 
+    const currentTime = context.currentTime || Date.now();
     const synthesizedBelief = {
       ...beliefA,
-      id: `${beliefA.id}_synthesized_${Date.now()}`,
+      id: `${beliefA.id}_synthesized_${currentTime}`,
       truth: { frequency: newFrequency, confidence: newConfidence },
-      creationTime: Date.now(),
+      creationTime: currentTime,
       isSynthesized: true
     };
 

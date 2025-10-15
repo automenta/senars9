@@ -37,7 +37,10 @@ export class ModusPonensRule extends NALRule {
     // New context format from reasoner
     const implicationTask = context.premise && context.premise.task ? context.premise.task : null;
     const memory = context.memory;
-    const currentTime = context.context?.currentTime || Date.now();
+    const currentTime = context.context?.currentTime;
+    if (currentTime === undefined) {
+      throw new Error('Context must provide currentTime for proper time tracking');
+    }
     
     if (!implicationTask || !memory) return derived;
 
