@@ -1,20 +1,16 @@
 import Component from '../base/Component.js';
-import { Storage, IndexManager } from '../base/collections.js';
-import { Logger, ObjectUtils, ArrayUtils } from '../base/utilities.js';
+import { Logger } from '../base/utilities.js';
 import { Validation } from '../base/validation.js';
-import { COMPLEXITY_LEVELS, MAX_PRIORITY, DEFAULTS } from '../base/constants.js';
+import { DEFAULTS } from '../base/constants.js';
 
 class Rules extends Component {
   constructor() {
     super();
-    Object.assign(this, {
-      rules: [],
-      indexes: new IndexManager(),
-      preFilters: new Set(),
-      lastEvaluationTime: null,
-      evaluationTimeHistory: [],
-      maxHistorySize: DEFAULTS.MAX_HISTORY_SIZE
-    });
+    this._rules = new Map();
+    this.ruleGroups = new Map();
+    this.enabledRuleIds = new Set();
+    this.performanceMetrics = new Map();
+    this.maxHistorySize = DEFAULTS.MAX_HISTORY_SIZE;
   }
 
   getDefaultConfig() {
@@ -22,12 +18,20 @@ class Rules extends Component {
   }
 
   async _doInitialize(config = {}) {
-    Object.assign(this, {
-      rules: [],
-      maxHistorySize: this.config.maxHistorySize ?? DEFAULTS.MAX_HISTORY_SIZE
-    });
-    this.indexes.clear();
-    this.preFilters.clear();
+    this.maxHistorySize = config.maxHistorySize ?? DEFAULTS.MAX_HISTORY_SIZE;
+    this._resetState();
+  }
+
+  _resetState() {
+    this._rules.clear();
+    this.ruleGroups.clear();
+    this.enabledRuleIds.clear();
+    this.performanceMetrics.clear();
+  }
+
+  // Backward compatibility - expose rules as array
+  get rules() {
+    return Array.from(this._rules.values());
   }
 
   add(rule) {
@@ -36,217 +40,101 @@ class Rules extends Component {
       throw new Error('Rule condition and action must be functions');
     }
 
-    this.rules.push({
+    const ruleData = {
       priority: 0,
       type: 'general',
       complexity: 'simple',
-      preFilterTags: [],
+      enabled: true,
+      executionCount: 0,
+      successCount: 0,
+      avgExecutionTime: 0,
       ...rule
-    });
+    };
 
-    this._updateIndexes(this.rules[this.rules.length - 1]);
+    this._rules.set(rule.name, ruleData);
+    this._updateRuleGroups(rule.name, ruleData);
+    this._initializePerformanceMetrics(rule.name);
+    ruleData.enabled && this.enabledRuleIds.add(rule.name);
   }
 
   remove(name) {
-    if (!name) return;
+    if (!name || !this._rules.has(name)) return false;
 
-    const index = this.rules.findIndex(rule => rule.name === name);
-    if (index !== -1) {
-      this._removeFromIndexes(this.rules[index]);
-      this.rules.splice(index, 1);
+    this._rules.delete(name);
+    this._cleanupRuleGroups(name);
+    this.enabledRuleIds.delete(name);
+    this.performanceMetrics.delete(name);
+    return true;
+  }
+
+  _updateRuleGroups(ruleName, ruleData) {
+    const group = ruleData.group || 'general';
+    this.ruleGroups.has(group) || this.ruleGroups.set(group, new Set());
+    this.ruleGroups.get(group).add(ruleName);
+  }
+
+  _cleanupRuleGroups(ruleName) {
+    for (const [group, rules] of this.ruleGroups.entries()) {
+      rules.delete(ruleName);
+      if (rules.size === 0) this.ruleGroups.delete(group);
     }
   }
 
-  _updateIndexes(rule) {
-    if (!rule.name) return;
-
-    this.indexes.add(rule.type, rule.name);
-    this.indexes.add(`complexity_${rule.complexity}`, rule.name);
-    this.indexes.add(`priority_${rule.priority}`, rule.name);
-
-    rule.preFilterTags?.forEach(tag => {
-      this.preFilters.add(tag);
-      this.indexes.add(`prefilter_${tag}`, rule.name);
+  _initializePerformanceMetrics(ruleName) {
+    this.performanceMetrics.set(ruleName, {
+      executionCount: 0,
+      successCount: 0,
+      avgExecutionTime: 0,
+      lastExecuted: null
     });
-  }
-
-  _removeFromIndexes(rule) {
-    if (!rule.name) return;
-
-    this.indexes.remove(rule.type, rule.name);
-    this._cleanupPreFilters();
-  }
-
-  _cleanupPreFilters() {
-    this.preFilters = new Set(this.rules.flatMap(rule => rule.preFilterTags || []));
   }
 
   find(predicate) {
-    return typeof predicate === 'function' ? this.rules.filter(predicate) : [];
+    return typeof predicate === 'function'
+      ? Array.from(this._rules.values()).filter(predicate)
+      : [];
   }
 
   getRulesByType(type) {
-    return type ? this.indexes.get(type) : [];
+    return type
+      ? Array.from(this._rules.values()).filter(rule => rule.type === type)
+      : [];
   }
 
   getRulesByComplexity(complexity) {
-    return complexity ? this.indexes.get(`complexity_${complexity}`) || [] : [];
+    return complexity
+      ? Array.from(this._rules.values()).filter(rule => rule.complexity === complexity)
+      : [];
   }
 
   getRulesByPriority(priority) {
-    return priority != null ? this.indexes.get(`priority_${priority}`) || [] : [];
+    return priority != null
+      ? Array.from(this._rules.values()).filter(rule => rule.priority === priority)
+      : [];
   }
 
-  getRulesByPreFilterTag(tag) {
-    return tag ? this.indexes.get(`prefilter_${tag}`) || [] : [];
+  getRulesByGroup(group) {
+    return group && this.ruleGroups.has(group)
+      ? Array.from(this.ruleGroups.get(group)).map(name => this._rules.get(name)).filter(Boolean)
+      : [];
+  }
+
+  getEnabledRules() {
+    return Array.from(this.enabledRuleIds).map(name => this._rules.get(name)).filter(Boolean);
   }
 
   getOptimizedRuleCandidates(context, options = {}) {
-    let candidates = options.ruleType ? this.getRulesByType(options.ruleType) : [...this.rules];
+    let candidates = options.ruleType ? this.getRulesByType(options.ruleType) : this.rules;
 
     if (options.maxComplexity) {
-      const maxLevel = COMPLEXITY_LEVELS[options.maxComplexity] || COMPLEXITY_LEVELS.complex;
-      const complexityCandidates = new Set();
-
-      for (let level = 1; level <= maxLevel; level++) {
-        const levelName = Object.keys(COMPLEXITY_LEVELS).find(key => COMPLEXITY_LEVELS[key] === level);
-        if (levelName) {
-          this.getRulesByComplexity(levelName).forEach(rule => complexityCandidates.add(rule));
-        }
-      }
-
-      candidates = candidates.filter(rule => complexityCandidates.has(rule));
+      const maxLevel = { simple: 1, moderate: 2, complex: 3 }[options.maxComplexity] || 3;
+      candidates = candidates.filter(rule => {
+        const complexityLevel = { simple: 1, moderate: 2, complex: 3 }[rule.complexity] || 1;
+        return complexityLevel <= maxLevel;
+      });
     }
 
     return this._preFilterRules(candidates, context);
-  }
-
-  getStats() {
-    const types = Array.from(this.indexes.indexes.keys());
-    const totalRules = this.rules.length;
-    const preFilterTags = this.preFilters.size;
-
-    return {
-      totalRules,
-      types,
-      preFilterTags,
-      averageRulesPerType: totalRules / Math.max(types.length, 1),
-      indexesSize: this.indexes.indexes.size,
-      rulesByComplexity: this._getRulesByComplexityStats(),
-      rulesByPriority: this._getRulesByPriorityStats(),
-      performance: {
-        lastEvaluation: this.lastEvaluationTime,
-        averageEvaluationTime: this.evaluationTimeHistory.length > 0
-          ? this.evaluationTimeHistory.reduce((a, b) => a + b) / this.evaluationTimeHistory.length
-          : 0,
-        evaluationCount: this.evaluationTimeHistory.length
-      }
-    };
-  }
-
-  _getRulesByComplexityStats() {
-    return this.rules.reduce((stats, rule) => {
-      stats[rule.complexity] = (stats[rule.complexity] || 0) + 1;
-      return stats;
-    }, {});
-  }
-
-  _getRulesByPriorityStats() {
-    return this.rules.reduce((stats, rule) => {
-      const priority = rule.priority || 0;
-      stats[priority] = (stats[priority] || 0) + 1;
-      return stats;
-    }, {});
-  }
-
-  clear() {
-    Object.assign(this, {
-      rules: [],
-      lastEvaluationTime: null,
-      evaluationTimeHistory: []
-    });
-    this.indexes.clear();
-    this.preFilters.clear();
-  }
-
-  async evaluate(context, options = {}) {
-    if (!context || typeof context !== 'object') {
-      Logger.warn('Rules evaluation called with invalid context');
-      return null;
-    }
-
-    const startTime = context.currentTime || Date.now();
-
-    try {
-      const candidates = this.getOptimizedRuleCandidates(context, options);
-
-      const applicableRules = candidates.filter(rule => {
-        try {
-          return rule.condition(context);
-        } catch (error) {
-          Logger.warn(`Rule '${rule.name}' condition failed`, {
-            rule: rule.name,
-            error: error.message,
-            context: Object.keys(context)
-          });
-
-          if (this.core?.messages) {
-            this.core.messages.emit('error:occurred', {
-              type: 'RuleConditionError',
-              rule: rule.name,
-              error: error.message,
-              stack: error.stack,
-              contextKeys: Object.keys(context)
-            });
-          }
-          return false;
-        }
-      });
-
-      if (applicableRules.length === 0) {
-        this._recordEvaluationTime((context.currentTime || Date.now()) - startTime);
-        return null;
-      }
-
-      this._sortByPriority(applicableRules);
-
-      const topRule = applicableRules[0];
-      const result = await topRule.action(context);
-      this._recordEvaluationTime((context.currentTime || Date.now()) - startTime);
-
-      if (this.core?.messages) {
-        this.core.messages.emit('rules:evaluated', {
-          ruleCount: candidates.length,
-          applicableCount: applicableRules.length,
-          selectedRule: topRule.name,
-          duration: (context.currentTime || Date.now()) - startTime,
-          success: true,
-          timestamp: context.currentTime || Date.now()
-        });
-      }
-
-      return result;
-    } catch (error) {
-      this._recordEvaluationTime((context.currentTime || Date.now()) - startTime);
-      throw error;
-    }
-  }
-
-  _recordEvaluationTime(duration) {
-    this.lastEvaluationTime = duration;
-    this.evaluationTimeHistory.push(duration);
-
-    if (this.evaluationTimeHistory.length > this.maxHistorySize) {
-      this.evaluationTimeHistory = this.evaluationTimeHistory.slice(-this.maxHistorySize);
-    }
-  }
-
-  _applyFilters(rules, context, filters) {
-    let filtered = [...rules];
-    if (filters.preFilter) filtered = this._preFilterRules(filtered, context);
-    if (filters.ruleType) filtered = this._filterByType(filtered, filters.ruleType);
-    if (filters.maxComplexity) filtered = this._filterByComplexity(filtered, filters.maxComplexity);
-    return filtered;
   }
 
   _preFilterRules(rules, context) {
@@ -261,31 +149,133 @@ class Rules extends Component {
     });
   }
 
-  _filterByType(rules, type) {
-    if (!type) return rules;
-    const typeRules = this.indexes.get(type);
-    return rules.filter(rule => typeRules.includes(rule.name));
+  enableRule(nameOrGroup) {
+    this._toggleRuleGroup(nameOrGroup, true);
   }
 
-  _filterByComplexity(rules, maxComplexity) {
-    if (!maxComplexity) return rules;
-    const maxLevel = COMPLEXITY_LEVELS[maxComplexity] || COMPLEXITY_LEVELS.complex;
-    return rules.filter(rule => (COMPLEXITY_LEVELS[rule.complexity] || 1) <= maxLevel);
+  disableRule(nameOrGroup) {
+    this._toggleRuleGroup(nameOrGroup, false);
+  }
+
+  _toggleRuleGroup(nameOrGroup, enable) {
+    const ruleNames = this._rules.has(nameOrGroup)
+      ? [nameOrGroup]
+      : this.ruleGroups.get(nameOrGroup) || [];
+
+    ruleNames.forEach(name => {
+      const rule = this._rules.get(name);
+      if (rule) {
+        rule.enabled = enable;
+        enable ? this.enabledRuleIds.add(name) : this.enabledRuleIds.delete(name);
+      }
+    });
+  }
+
+  updatePerformance(ruleName, success, executionTime) {
+    const metrics = this.performanceMetrics.get(ruleName);
+    if (!metrics) return;
+
+    metrics.executionCount++;
+    if (success) metrics.successCount++;
+
+    metrics.avgExecutionTime = (metrics.avgExecutionTime * (metrics.executionCount - 1) + executionTime) / metrics.executionCount;
+    metrics.lastExecuted = Date.now();
+  }
+
+  getPerformanceStats(ruleName) {
+    return ruleName ? this.performanceMetrics.get(ruleName) : this._aggregatePerformanceStats();
+  }
+
+  _aggregatePerformanceStats() {
+    const stats = { totalExecutions: 0, totalSuccesses: 0, avgExecutionTime: 0 };
+    let count = 0;
+
+    for (const metrics of this.performanceMetrics.values()) {
+      stats.totalExecutions += metrics.executionCount;
+      stats.totalSuccesses += metrics.successCount;
+      stats.avgExecutionTime += metrics.avgExecutionTime;
+      count++;
+    }
+
+    stats.avgExecutionTime = count > 0 ? stats.avgExecutionTime / count : 0;
+    return stats;
+  }
+
+  getStats() {
+    const ruleTypes = [...new Set(Array.from(this._rules.values()).map(rule => rule.type))];
+    const ruleComplexities = [...new Set(Array.from(this._rules.values()).map(rule => rule.complexity))];
+    const totalRules = this._rules.size;
+    const enabledRules = this.enabledRuleIds.size;
+
+    return {
+      totalRules,
+      enabledRules,
+      disabledRules: totalRules - enabledRules,
+      types: ruleTypes,
+      ruleTypes,
+      ruleComplexities,
+      ruleGroups: Array.from(this.ruleGroups.keys()),
+      performance: this._aggregatePerformanceStats()
+    };
+  }
+
+  clear() {
+    this._resetState();
+  }
+
+  async evaluate(context, options = {}) {
+    if (!context || typeof context !== 'object') {
+      Logger.warn('Rules evaluation called with invalid context');
+      return null;
+    }
+
+    const startTime = context.currentTime || Date.now();
+    const enabledRules = this.getEnabledRules();
+
+    try {
+      const applicableRules = enabledRules.filter(rule => {
+        try {
+          return rule.condition(context);
+        } catch (error) {
+          Logger.warn(`Rule '${rule.name}' condition failed: ${error.message}`);
+          this.updatePerformance(rule.name, false, Date.now() - startTime);
+          return false;
+        }
+      });
+
+      if (applicableRules.length === 0) return null;
+
+      const sortedRules = this._sortByPriority(applicableRules);
+      const topRule = sortedRules[0];
+
+      const result = await topRule.action(context);
+      const executionTime = (context.currentTime || Date.now()) - startTime;
+
+      this.updatePerformance(topRule.name, true, executionTime);
+
+      if (this.core?.messages) {
+        this.core.messages.emit('rules:evaluated', {
+          ruleCount: enabledRules.length,
+          applicableCount: applicableRules.length,
+          selectedRule: topRule.name,
+          duration: executionTime,
+          success: true,
+          timestamp: context.currentTime || Date.now()
+        });
+      }
+
+      return result;
+    } catch (error) {
+      const executionTime = (context.currentTime || Date.now()) - startTime;
+      Logger.error(`Rule evaluation failed: ${error.message}`);
+      throw error;
+    }
   }
 
   _sortByPriority(rules) {
-    if (!Array.isArray(rules)) return;
-
-    rules.sort((a, b) => {
+    return rules.sort((a, b) => {
       const priorityDiff = (b.priority ?? 0) - (a.priority ?? 0);
-      if (priorityDiff !== 0) return priorityDiff;
-
-      const complexityA = COMPLEXITY_LEVELS[a.complexity] ?? 1;
-      const complexityB = COMPLEXITY_LEVELS[b.complexity] ?? 1;
-      const complexityDiff = complexityA - complexityB;
-      if (complexityDiff !== 0) return complexityDiff;
-
-      return (a.name ?? '').localeCompare(b.name ?? '');
+      return priorityDiff !== 0 ? priorityDiff : a.name.localeCompare(b.name);
     });
   }
 }

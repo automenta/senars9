@@ -8,11 +8,11 @@ export class Rule {
       enabled: options.enabled !== false,
       type: options.type || 'general',
       parameters: options.parameters || {},
-      performanceMetrics: {
-        executionCount: 0,
-        successCount: 0,
-        avgExecutionTime: 0,
-        lastExecuted: null
+      metrics: {
+        executions: 0,
+        successes: 0,
+        avgTime: 0,
+        lastRun: null
       }
     });
   }
@@ -20,76 +20,84 @@ export class Rule {
   canApply(context) { return true; }
   async apply(context) { throw new Error('apply must be implemented by subclasses'); }
 
-  updatePerformance(success, executionTime) {
-    const { performanceMetrics } = this;
-    performanceMetrics.executionCount++;
-    if (success) performanceMetrics.successCount++;
-
-    const total = performanceMetrics.avgExecutionTime * (performanceMetrics.executionCount - 1) + executionTime;
-    performanceMetrics.avgExecutionTime = total / performanceMetrics.executionCount;
-    performanceMetrics.lastExecuted = Date.now();
+  updateMetrics(success, time) {
+    const m = this.metrics;
+    m.executions++;
+    if (success) m.successes++;
+    m.avgTime = (m.avgTime * (m.executions - 1) + time) / m.executions;
+    m.lastRun = Date.now();
   }
 
-  getPerformanceStats() { return { ...this.performanceMetrics }; }
+  getMetrics() { return { ...this.metrics }; }
 }
 
 export class LMRule extends Rule {
   constructor(id, lm, options = {}) {
     super(id, { ...options, type: 'lm' });
-    Object.assign(this, {
-      lm,
-      lmPromptTemplate: options.lmPromptTemplate || null,
-      lmMetrics: {
-        tokenCount: 0,
-        apiCalls: 0,
-        avgResponseTime: 0
-      }
-    });
+    this.lm = lm;
+    this.promptTemplate = options.promptTemplate;
+    this.lmStats = { tokens: 0, calls: 0, avgTime: 0 };
   }
 
   generatePrompt(context) {
-    return this.lmPromptTemplate ? this.lmPromptTemplate(context) : (() => { throw new Error('No LM prompt template provided'); })();
+    if (!this.promptTemplate) throw new Error(`No prompt template for rule ${this.id}`);
+    return this.promptTemplate(context);
   }
 
-  async executeLMProcessing(context) {
-    if (!this.lm) throw new Error(`LM not available for rule ${this.id}`);
+  async executeLM(context) {
+    if (!this.lm) throw new Error(`LM unavailable for rule ${this.id}`);
 
     const startTime = Date.now();
     const prompt = this.generatePrompt(context);
-    const lmResponse = await this.lm.process(prompt);
-    const executionTime = Date.now() - startTime;
+    const response = await this.lm.process(prompt);
+    const time = Date.now() - startTime;
 
-    this._updateLMMetrics(prompt.length + lmResponse.length, executionTime);
-    return lmResponse;
+    this._updateLMStats(prompt.length + response.length, time);
+    this.updateMetrics(true, time);
+    return response;
   }
 
-  _updateLMMetrics(tokenCount, executionTime) {
-    const { lmMetrics } = this;
-    lmMetrics.apiCalls++;
-    lmMetrics.tokenCount += tokenCount;
-    lmMetrics.avgResponseTime = (lmMetrics.avgResponseTime * (lmMetrics.apiCalls - 1) + executionTime) / lmMetrics.apiCalls;
+  // Backward compatibility method
+  async executeLMProcessing(context) {
+    return this.executeLM(context);
   }
 
-  async apply(context) { return this.executeLMProcessing(context); }
-  getLMMetrics() { return { ...this.lmMetrics }; }
+  _updateLMStats(tokens, time) {
+    const s = this.lmStats;
+    s.calls++;
+    s.tokens += tokens;
+    s.avgTime = (s.avgTime * (s.calls - 1) + time) / s.calls;
+  }
+
+  async apply(context) { return this.executeLM(context); }
+  getLMStats() { return { ...this.lmStats }; }
 }
 
 export class NALRule extends Rule {
   constructor(id, options = {}) {
     super(id, { ...options, type: 'nal' });
-    Object.assign(this, {
-      truthFunction: options.truthFunction || null,
-      inferenceRule: options.inferenceRule || null
-    });
+    this.truthFn = options.truthFn;
+    this.inferenceFn = options.inferenceFn;
   }
 
-  applyTruthFunction(...args) {
-    return this.truthFunction ? this.truthFunction(...args) : { frequency: 0.9, confidence: 0.8 };
+  applyTruth(...args) {
+    return this.truthFn ? this.truthFn(...args) : { frequency: 0.9, confidence: 0.8 };
   }
 
   async performInference(context) {
-    return this.inferenceRule ? this.inferenceRule(context) : (() => { throw new Error('No NAL inference rule defined'); })();
+    if (!this.inferenceFn) throw new Error(`No inference function for rule ${this.id}`);
+    return this.inferenceFn(context);
   }
 
-  async apply(context) { return this.performInference(context); }
+  async apply(context) {
+    const startTime = Date.now();
+    try {
+      const result = await this.performInference(context);
+      this.updateMetrics(true, Date.now() - startTime);
+      return result;
+    } catch (error) {
+      this.updateMetrics(false, Date.now() - startTime);
+      throw error;
+    }
+  }
 }

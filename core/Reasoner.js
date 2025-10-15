@@ -2,7 +2,6 @@ import { Logger } from './base/utilities.js';
 import { DEFAULTS } from './base/constants.js';
 import { Component } from './components/Component.js';
 
-// Base class for NARS inference rules - simplified and consolidated
 export class NALRule {
   getTriggerTermType() { throw new Error('getTriggerTermType must be implemented by subclasses'); }
   apply(context) { throw new Error('apply must be implemented by subclasses'); }
@@ -13,18 +12,15 @@ export class Reasoner extends Component {
   constructor(strategyRegistry = null, systemContext = null) {
     super();
 
-    // Core configuration
     this.strategyRegistry = strategyRegistry;
     this.systemContext = systemContext;
     this.defaultStrategy = 'basic_reasoning';
     this.overlapCheckingEnabled = true;
 
-    // Rule management
     this.rules = new Map();
     this.ruleGroups = new Map();
     this.enabledRuleIds = new Set();
 
-    // System components
     this.winnowing = null;
     this.derivation = null;
     this.lm = null;
@@ -69,15 +65,12 @@ export class Reasoner extends Component {
   }
 
   _toggleRuleGroup(idOrGroup, action) {
-    const isEnable = action === 'enable';
-    const targetSet = isEnable ? this.enabledRuleIds : null;
+    const enable = action === 'enable';
     const ruleIds = this.rules.has(idOrGroup)
       ? [idOrGroup]
       : this.ruleGroups.get(idOrGroup) || [];
 
-    ruleIds.forEach(id => {
-      isEnable ? targetSet?.add(id) : this.enabledRuleIds.delete(id);
-    });
+    ruleIds.forEach(id => enable ? this.enabledRuleIds.add(id) : this.enabledRuleIds.delete(id));
   }
 
   _registerWithStrategyRegistry() {
@@ -107,24 +100,21 @@ export class Reasoner extends Component {
     const derivedTasks = [];
     const ruleContext = { memory, tasks: focusSet, context };
 
-    // Process single-premise rules
-    await this._applySinglePremiseRules(focusSet, derivedTasks, ruleContext);
-
-    // Process dual-premise NAL rules
+    await this._applyRules(focusSet, derivedTasks, ruleContext);
     await this._applyDualPremiseRules(focusSet, derivedTasks, ruleContext);
 
     return derivedTasks;
   }
 
-  async _applySinglePremiseRules(focusSet, derivedTasks, ruleContext) {
+  async _applyRules(focusSet, derivedTasks, ruleContext, filterFn = () => true) {
     for (const task of focusSet) {
-      const premiseContext = { ...ruleContext, premise: { task } };
+      const context = { ...ruleContext, premise: { task } };
 
       for (const ruleId of this.enabledRuleIds) {
         const rule = this.rules.get(ruleId);
-        if (!rule || (rule.canApply && !rule.canApply(premiseContext))) continue;
+        if (!rule || !filterFn(rule) || (rule.canApply && !rule.canApply(context))) continue;
 
-        const result = await this._applyRuleSafely(rule, premiseContext, ruleId);
+        const result = await this._applyRule(rule, context, ruleId);
         if (result?.length) derivedTasks.push(...result);
       }
     }
@@ -134,7 +124,7 @@ export class Reasoner extends Component {
     for (let i = 0; i < focusSet.length; i++) {
       for (let j = i + 1; j < focusSet.length; j++) {
         const task1 = focusSet[i], task2 = focusSet[j];
-        const premiseContext = {
+        const context = {
           ...ruleContext,
           premise: { task: task1 },
           secondaryPremise: { task: task2 }
@@ -142,46 +132,37 @@ export class Reasoner extends Component {
 
         for (const ruleId of this.enabledRuleIds) {
           const rule = this.rules.get(ruleId);
-          if (rule?.type !== 'nal' || (rule.canApply && !rule.canApply(premiseContext))) continue;
+          if (rule?.type !== 'nal' || (rule.canApply && !rule.canApply(context))) continue;
 
-          const result = await this._applyRuleSafely(rule, premiseContext, ruleId);
+          const result = await this._applyRule(rule, context, ruleId);
           if (result?.length) derivedTasks.push(...result);
         }
       }
     }
   }
 
-  async _applyRuleSafely(rule, context, ruleId) {
+  async _applyRule(rule, context, ruleId) {
     try {
       const result = await rule.apply(context);
       return result ? (Array.isArray(result) ? result : [result]) : null;
     } catch (error) {
-      console.error(`Error applying rule ${ruleId}:`, error);
+      Logger.error(`Rule ${ruleId} failed: ${error.message}`);
       return null;
     }
   }
 
   reasonWithStrategy(focusSet, memory, context) {
-    if (!this.strategyRegistry) return this.reason(focusSet, memory, context);
-    try {
-      const strategyName = this._selectReasoningStrategy(focusSet, memory, context);
-      return this.strategyRegistry.executeStrategy(strategyName, focusSet, memory, context);
-    } catch (error) {
-      Logger.error(`Strategy selection or execution failed: ${error.message}`);
-      return this.reason(focusSet, memory, context);
-    }
+    return this.strategyRegistry
+      ? this.strategyRegistry.executeStrategy(this._selectReasoningStrategy(focusSet, memory, context), focusSet, memory, context)
+      : this.reason(focusSet, memory, context);
   }
 
   _selectReasoningStrategy(focusSet, memory, context) { return this.defaultStrategy; }
 
   _hasOverlap(taskA, taskB) { return taskA?.stamp?.overlaps(taskB?.stamp) || false; }
 
-  // Advanced reasoning modalities - consolidated into single parameterized method
   async performAdvancedReasoning(type, params = {}, context = {}) {
-    if (!this.lm) {
-      const errorMsg = `No language model available for ${type} reasoning`;
-      return this._createErrorResult(type, errorMsg, params);
-    }
+    if (!this.lm) return this._createErrorResult(type, `LM unavailable for ${type} reasoning`, params);
 
     try {
       const prompt = this._generatePrompt(type, params);
@@ -212,16 +193,15 @@ export class Reasoner extends Component {
   }
 
   _createErrorResult(type, error, params) {
-    const baseMsg = { temporal: 'Temporal', counterfactual: 'Counterfactual', causal: 'Causal' }[type] || 'Advanced';
+    const typeNames = { temporal: 'Temporal', counterfactual: 'Counterfactual', causal: 'Causal' };
     return {
-      original: `${baseMsg} analysis: ${JSON.stringify(params)}`,
+      original: `${typeNames[type] || 'Advanced'} analysis: ${JSON.stringify(params)}`,
       type,
       error,
       ...params
     };
   }
 
-  // Convenience methods for backward compatibility
   async performTemporalReasoning(scenario, timepoints = [], context = {}) {
     return this.performAdvancedReasoning('temporal', { scenario, timepoints }, context);
   }
@@ -234,7 +214,6 @@ export class Reasoner extends Component {
     return this.performAdvancedReasoning('causal', { cause, effect }, context);
   }
 
-  // Strategy management
   addStrategy(strategy) {
     if (!strategy?.id || typeof strategy.execute !== 'function') {
       throw new Error('Invalid strategy: must have an id and execute function');
@@ -245,7 +224,6 @@ export class Reasoner extends Component {
   setOverlapChecking(enabled) { this.overlapCheckingEnabled = enabled; }
   isOverlapCheckingEnabled() { return this.overlapCheckingEnabled; }
 
-  // Statistics
   getStats() {
     const ruleCounts = this._countRulesByType();
     return {
@@ -259,14 +237,15 @@ export class Reasoner extends Component {
   }
 
   _countRulesByType() {
-    let lmRulesCount = 0, nalRulesCount = 0;
+    const counts = { lm: 0, nal: 0 };
     for (const rule of this.rules.values()) {
-      rule.type === 'lm' ? lmRulesCount++ : rule.type === 'nal' && nalRulesCount++;
+      if (rule.type === 'lm') counts.lm++;
+      else if (rule.type === 'nal') counts.nal++;
     }
-    return { lmRules: lmRulesCount, nalRules: nalRulesCount };
+    return counts;
   }
 
-  getReasoningHistory(limit = 100) {
+  getReasoningHistory(limit = this.maxHistorySize) {
     return this.reasoningHistory.slice(-limit);
   }
 }
