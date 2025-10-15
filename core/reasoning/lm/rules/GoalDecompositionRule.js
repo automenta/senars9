@@ -71,12 +71,12 @@ export class GoalDecompositionRule extends LMRule {
     const subGoals = [];
 
     for (const line of lines) {
-      // Look for numbered items or bullet points
-      const match = line.match(/\d+\.\s*(.+)/) || line.match(/[•*-]\s*(.+)/);
+      // Look for numbered items or bullet points that may contain quoted strings
+      const match = line.match(/\d+\.\s*(".*?"|.+)/) || line.match(/[•*-]\s*(".*?"|.+)/);
       if (match) {
         // Clean up the sub-goal text
         let goal = match[1].trim();
-        // Remove any trailing punctuation
+        // Remove any trailing punctuation that's not part of a quote
         goal = goal.replace(/[.:;!]$/, '');
         if (goal && goal.length > 2) { // Ensure it's meaningful
           subGoals.push(goal);

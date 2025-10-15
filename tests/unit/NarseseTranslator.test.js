@@ -85,6 +85,14 @@ describe('NarseseTranslator', () => {
     expect(result).toHaveProperty('predicate', 'world');
   });
 
+  test('narseseToJs should parse inheritance statements with multi-word atoms', () => {
+    const result = translator.narseseToJs('<"Hello world" --> "my predicate">');
+
+    expect(result).toHaveProperty('type', 'inheritance');
+    expect(result).toHaveProperty('subject', '"Hello world"');
+    expect(result).toHaveProperty('predicate', '"my predicate"');
+  });
+
   test('jsToNarsese should convert JS objects to Narsese', () => {
     const jsObj = {
       type: 'inheritance',
@@ -94,6 +102,17 @@ describe('NarseseTranslator', () => {
     const result = translator.jsToNarsese(jsObj);
 
     expect(result).toBe('<Hello --> world>');
+  });
+
+  test('jsToNarsese should convert JS objects with multi-word atoms to Narsese', () => {
+    const jsObj = {
+      type: 'inheritance',
+      subject: '"Hello world"',
+      predicate: '"my predicate"'
+    };
+    const result = translator.jsToNarsese(jsObj);
+
+    expect(result).toBe('<"Hello world" --> "my predicate">');
   });
 
   test('getStats should return statistics about conversions', () => {

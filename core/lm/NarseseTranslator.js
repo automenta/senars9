@@ -36,13 +36,15 @@ class NarseseTranslator extends Component {
   }
 
   _initMacros() {
+    // Regex for a term, which can be a single word or a quoted string
+    const termRegex = /(".*?"|\S+)/;
     const patterns = {
-      inheritance: { pattern: /<([^>]+)-->([^>]+)>/, op: '-->', type: 'inheritance' },
-      implication: { pattern: /<([^>]+)=\/>([^>]+)>/, op: '=/>', type: 'implication' },
-      equivalence: { pattern: /<([^>]+)<=>([^>]+)>/, op: '<=>', type: 'equivalence' },
-      product: { pattern: /\\(([^)]+)\\*([^)]+)\\)/, op: '*', type: 'product' },
-      extIntersection: { pattern: /\\(([^)]+)\\|([^)]+)\\)/, op: '|', type: 'extensional_intersection' },
-      intIntersection: { pattern: /\\(([^)]+)&([^)]+)\\)/, op: '&', type: 'intensional_intersection' }
+        inheritance: { pattern: new RegExp(`<${termRegex.source}\\s*-->\\s*${termRegex.source}>`), op: '-->', type: 'inheritance' },
+        implication: { pattern: new RegExp(`<${termRegex.source}\\s*=\\/>\\s*${termRegex.source}>`), op: '=/>', type: 'implication' },
+        equivalence: { pattern: new RegExp(`<${termRegex.source}\\s*<=>\\s*${termRegex.source}>`), op: '<=>', type: 'equivalence' },
+        product: { pattern: /\\(([^)]+)\\*([^)]+)\\)/, op: '*', type: 'product' },
+        extIntersection: { pattern: /\\(([^)]+)\\|([^)]+)\\)/, op: '|', type: 'extensional_intersection' },
+        intIntersection: { pattern: /\\(([^)]+)&([^)]+)\\)/, op: '&', type: 'intensional_intersection' }
     };
 
     Object.entries(patterns).forEach(([name, meta]) =>
@@ -169,15 +171,22 @@ class NarseseTranslator extends Component {
 
   _parseStatement(stmtStr) {
     const inner = stmtStr.substring(1, stmtStr.length - 1);
-    const ops = { ' --> ': { type: 'inheritance', fields: ['subject', 'predicate'] },
-                  ' =/> ': { type: 'implication', fields: ['antecedent', 'consequent'] },
-                  ' <=> ': { type: 'equivalence', fields: ['term1', 'term2'] } };
+    const termRegex = /(".*?"|\S+)/g;
+    const parts = inner.match(termRegex);
+    if (!parts || parts.length < 3) {
+        return { type: 'simple_statement', value: stmtStr, punctuation: this._extractPunct(stmtStr), statement: this._removePunct(stmtStr) };
+    }
 
-    for (const [op, { type, fields }] of Object.entries(ops)) {
-      if (inner.includes(op)) {
-        const parts = inner.split(op);
-        return { type, [fields[0]]: parts[0].trim(), [fields[1]]: parts[1].trim(), operator: op.trim() };
-      }
+    const [subject, op, predicate] = parts;
+    const ops = {
+        '-->': { type: 'inheritance', fields: ['subject', 'predicate'] },
+        '=/>': { type: 'implication', fields: ['antecedent', 'consequent'] },
+        '<=>': { type: 'equivalence', fields: ['term1', 'term2'] }
+    };
+
+    if (ops[op]) {
+        const { type, fields } = ops[op];
+        return { type, [fields[0]]: subject, [fields[1]]: predicate, operator: op };
     }
     return { type: 'simple_statement', value: stmtStr, punctuation: this._extractPunct(stmtStr), statement: this._removePunct(stmtStr) };
   }
@@ -369,7 +378,6 @@ class NarseseTranslator extends Component {
    * @private
    */
   _simpleConvertToNarsese(text) {
-    // Handle simple cases like "subject predicate" -> "<subject --> predicate>"
     // This is a simplified version; real implementation would be more sophisticated
     const normalized = text.trim();
 
@@ -378,18 +386,18 @@ class NarseseTranslator extends Component {
       return normalized;
     }
 
-    // If it looks like a simple term, convert to Narsese format
-    if (!normalized.includes(' ') && !normalized.includes(' --> ')) {
-      return `<${normalized} --> ${normalized}>`;
-    }
+    // Quote multi-word terms
+    const quoteIfNeeded = (term) => term.includes(' ') ? `"${term}"` : term;
 
     // Attempt to identify patterns and convert appropriately
-    const parts = normalized.split(' ');
+    const parts = normalized.split(/\s+/);
     if (parts.length >= 2) {
-      return `<${parts[0]} --> ${parts.slice(1).join(' ')}>`;
+        const subject = quoteIfNeeded(parts[0]);
+        const predicate = quoteIfNeeded(parts.slice(1).join(' '));
+        return `<${subject} --> ${predicate}>`;
     }
 
-    return `<${normalized} --> ${normalized}>`;
+    return `<${quoteIfNeeded(normalized)} --> ${quoteIfNeeded(normalized)}>`;
   }
 
   /**

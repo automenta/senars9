@@ -10,8 +10,9 @@ import LM from '../../core/lm/LM.js';
 class TestProvider {
   async process(prompt, options = {}) {
     if (prompt.includes("Decompose this goal into")) {
-      if (prompt.includes("Ensure Earth Happiness!")) {
-        return "- Ensure Human Well-being!\n- Ensure Environmental Health!";
+      if (prompt.includes('"Ensure Earth Happiness"')) {
+        return `- "Ensure Human Well-being"!
+- "Ensure Environmental Health"!`;
       }
     }
     return "No sub-goals identified.";
@@ -40,10 +41,10 @@ describe('LM-based Reasoning Tests', () => {
     const rule = new GoalDecompositionRule(lm);
 
     const success = await testBuilder
-      .input("Ensure Earth Happiness!", "!", 0.9, 0.9)
+      .input('"Ensure Earth Happiness"!', "!", 0.9, 0.9)
       .using(rule)
-      .expect("Ensure Human Well-being!")
-      .expect("Ensure Environmental Health!")
+      .expect('"Ensure Human Well-being"')
+      .expect('"Ensure Environmental Health"')
       .cycles(1)
       .run();
 

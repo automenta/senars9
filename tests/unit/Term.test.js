@@ -123,6 +123,11 @@ describe('Term', () => {
     expect(compound.toString()).toBe('(A --> B)');
   });
 
+  test('newAtom should handle multi-word terms with spaces', () => {
+    const multiWordAtom = Term.newAtom('"Hello world"');
+    expect(multiWordAtom.name).toBe('"Hello world"');
+  });
+
   test('equals should correctly compare terms', () => {
     const atomA1 = Term.newAtom('A');
     const atomA2 = Term.newAtom('A'); // Same content, different instance

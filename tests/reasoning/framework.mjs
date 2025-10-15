@@ -267,28 +267,26 @@ function createTaskFromInput(input) {
  */
 function createTaskFromString(taskStr, punctuation = Punctuation.BELIEF, freq = 0.9, conf = 0.9, priority = 0.9) {
   let term;
-  
+
   // Clean up the string by removing outer parentheses if present
   let cleanStr = taskStr.trim();
   if (cleanStr.startsWith('(') && cleanStr.endsWith(')')) {
     cleanStr = cleanStr.substring(1, cleanStr.length - 1);
   }
-  
-  // Handle simple atoms (no arrows)
-  if (!cleanStr.includes('-->') && !cleanStr.includes('==>')) {
+
+  // Regex for parsing relations with potentially quoted terms
+  const relationRegex = /^(?:(".*?"|\S+))\s*(-->|==>)\s*(?:(".*?"|\S+))$/;
+  const match = cleanStr.match(relationRegex);
+
+  if (match) {
+    const [_, subject, operator, predicate] = match;
+    const relationType = operator === '-->' ? TermType.INHERITANCE : TermType.IMPLICATION;
+    term = Term.createCompound(relationType, [Term.newAtom(subject), Term.newAtom(predicate)]);
+  } else {
+    // Handle simple atoms
     term = Term.newAtom(cleanStr);
-  } 
-  // Handle inheritance relations (a --> b)
-  else if (cleanStr.includes('-->')) {
-    const [subject, predicate] = cleanStr.split('-->').map(s => s.trim());
-    term = Term.createCompound(TermType.INHERITANCE, [Term.newAtom(subject), Term.newAtom(predicate)]);
   }
-  // Handle implication relations (a ==> b)
-  else if (cleanStr.includes('==>')) {
-    const [subject, predicate] = cleanStr.split('==>').map(s => s.trim());
-    term = Term.createCompound(TermType.IMPLICATION, [Term.newAtom(subject), Term.newAtom(predicate)]);
-  }
-  
+
   return new Task(
     term,
     punctuation,
