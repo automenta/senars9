@@ -22,15 +22,13 @@ describe('Advanced: Goal Reasoning and Strategic Planning', () => {
     // Present a complex, high-level goal
     const highLevelGoal = 'become_a_successful_software_engineer!';
 
-    // The neural component provides guidance for decomposing the complex goal
-    const subgoals = await core.lm.decomposeGoal(
-      highLevelGoal,
-      {
-        depth: 3,
-        constraints: ['time', 'resources', 'skills'],
-        successCriteria: ['employment', 'competency', 'growth']
-      }
-    );
+    // Submit goal task that triggers GoalDecompositionRule
+    await core.input({
+      term: highLevelGoal,
+      punctuation: '!',
+      truth: { frequency: 0.9, confidence: 0.8 }
+    });
+    const subgoals = `Goal submitted: ${highLevelGoal} - rule system will handle decomposition`;
 
     expect(subgoals).toContainEqual(
       expect.objectContaining({ goal: expect.stringContaining('learn_programming') })

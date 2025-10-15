@@ -102,57 +102,72 @@ export class Reasoner extends Component {
 
   _hasOverlap(taskA, taskB) { return taskA?.stamp?.overlaps(taskB?.stamp) || false; }
 
-  async performAdvancedReasoning(type, params = {}, context = {}) {
-    if (!this.lm) return this._createErrorResult(type, `LM unavailable for ${type} reasoning`, params);
-
-    try {
-      const prompt = this._generatePrompt(type, params);
-      const result = await this.lm.generateText(prompt);
-
-      const reasoningResult = {
-        original: result,
-        type,
-        timestamp: context.currentTime || Date.now(),
-        ...params
-      };
-
-      this.reasoningHistory.push(reasoningResult);
-      return reasoningResult;
-    } catch (error) {
-      return this._createErrorResult(type, error.message, params);
-    }
-  }
-
-  _generatePrompt(type, params) {
-    const prompts = {
-      temporal: () => `Analyze temporally: "${params.scenario}". Time points: ${params.timepoints?.join(', ') || 'none'}. Provide temporal relationships, sequence analysis, and timing implications.`,
-      counterfactual: () => `Explore counterfactual: "${params.scenario}". Analyze what would happen if this were true, what conditions would need to change, and the potential consequences.`,
-      causal: () => `Analyze causal relationship: "${params.cause}" leads to "${params.effect}". Explain the causal mechanism, intermediate steps, and validity of this relationship.`
-    };
-
-    return prompts[type]?.() || `Perform ${type} reasoning with provided parameters.`;
-  }
-
-  _createErrorResult(type, error, params) {
-    const typeNames = { temporal: 'Temporal', counterfactual: 'Counterfactual', causal: 'Causal' };
-    return {
-      original: `${typeNames[type] || 'Advanced'} analysis: ${JSON.stringify(params)}`,
-      type,
-      error,
-      ...params
-    };
-  }
-
   async performTemporalReasoning(scenario, timepoints = [], context = {}) {
-    return this.performAdvancedReasoning('temporal', { scenario, timepoints }, context);
+    // Create a task that will trigger temporal reasoning rules
+    const temporalTask = {
+      term: `temporal_analysis_of_${scenario.replace(/ /g, '_')}`,
+      punctuation: '.',
+      truth: { frequency: 0.8, confidence: 0.7 },
+      priority: 0.6,
+      metadata: { scenario, timepoints, reasoningType: 'temporal' }
+    };
+
+    if (this.memory) {
+      await this.memory.input(temporalTask);
+    }
+
+    return {
+      original: `Temporal analysis initiated: ${scenario}`,
+      type: 'temporal',
+      scenario,
+      timepoints,
+      timestamp: Date.now()
+    };
   }
 
   async performCounterfactualReasoning(scenario, context = {}) {
-    return this.performAdvancedReasoning('counterfactual', { scenario }, context);
+    // Create a task that will trigger counterfactual reasoning rules
+    const counterfactualTask = {
+      term: `counterfactual_analysis_of_${scenario.replace(/ /g, '_')}`,
+      punctuation: '.',
+      truth: { frequency: 0.7, confidence: 0.6 },
+      priority: 0.5,
+      metadata: { scenario, reasoningType: 'counterfactual' }
+    };
+
+    if (this.memory) {
+      await this.memory.input(counterfactualTask);
+    }
+
+    return {
+      original: `Counterfactual analysis initiated: ${scenario}`,
+      type: 'counterfactual',
+      scenario,
+      timestamp: Date.now()
+    };
   }
 
   async performCausalReasoning(cause, effect, context = {}) {
-    return this.performAdvancedReasoning('causal', { cause, effect }, context);
+    // Create a task that will trigger causal reasoning rules
+    const causalTask = {
+      term: `causal_analysis_${cause.replace(/ /g, '_')}_leads_to_${effect.replace(/ /g, '_')}`,
+      punctuation: '.',
+      truth: { frequency: 0.8, confidence: 0.7 },
+      priority: 0.6,
+      metadata: { cause, effect, reasoningType: 'causal' }
+    };
+
+    if (this.memory) {
+      await this.memory.input(causalTask);
+    }
+
+    return {
+      original: `Causal analysis initiated: ${cause} → ${effect}`,
+      type: 'causal',
+      cause,
+      effect,
+      timestamp: Date.now()
+    };
   }
 
   addStrategy(strategy) {

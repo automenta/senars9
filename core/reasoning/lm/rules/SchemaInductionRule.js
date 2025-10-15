@@ -1,8 +1,3 @@
-/**
- * @file core/reasoning/lm/rules/SchemaInductionRule.js
- * @description Schema induction rule for the LM Reasoning API
- */
-
 import { LMRule } from '../../Rule.js';
 
 export class SchemaInductionRule extends LMRule {

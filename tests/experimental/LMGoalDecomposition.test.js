@@ -18,10 +18,15 @@ describe('Experimental: LM-driven Abstract Goal Decomposition', () => {
 
     // 2. The system recognizes that 'be_healthy' is not an operation it can execute.
     //    It prompts the LM to break it down.
-    //    LM Prompt (using 'decomposeGoal' function):
+    //    Submit a goal task that triggers GoalDecompositionRule:
     //    "Break down the high-level goal 'be healthy' into 3-5 concrete,
     //     actionable sub-goals. Provide a list of simple imperative statements."
-    const subGoalsNL = await core.lm.decomposeGoal('be_healthy');
+    await core.input({
+      term: 'be_healthy',
+      punctuation: '!',
+      truth: { frequency: 0.9, confidence: 0.8 }
+    });
+    const subGoalsNL = 'Goal submitted - rule system will handle decomposition';
 
     // 3. The LM returns a list of more concrete objectives.
     expect(subGoalsNL).toEqual(expect.arrayContaining([

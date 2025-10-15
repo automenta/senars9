@@ -1,8 +1,3 @@
-/**
- * @file core/reasoning/lm/rules/InteractiveClarificationRule.js
- * @description Interactive clarification rule for the LM Reasoning API
- */
-
 import { LMRule } from '../../Rule.js';
 
 export class InteractiveClarificationRule extends LMRule {

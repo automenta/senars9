@@ -1,8 +1,3 @@
-/**
- * @file core/reasoning/lm/rules/BeliefRevisionRule.js
- * @description Belief revision rule for the LM Reasoning API
- */
-
 import { LMRule } from '../../Rule.js';
 
 export class BeliefRevisionRule extends LMRule {
@@ -14,33 +9,27 @@ export class BeliefRevisionRule extends LMRule {
     });
   }
 
-  canApply(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      task = context.premise.task;
-    } else if (context.premise1) {
-      // Old context format used by test framework
-      task = context.premise1;
-    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
-      // Format used potentially by test framework
-      task = context.tasks[0];
-    } else {
-      return false;
-    }
-    
-    if (!task) return false;
-    
-    // Check if task represents or contains contradictions/contlicts
+  extractTask(context) {
+    return context.premise?.task || context.premise1 || (Array.isArray(context.tasks) && context.tasks[0]) || null;
+  }
+
+  analyzeTask(task) {
     const termStr = task.term ? task.term.toString() : '';
     const isBelief = task.punctuation === '.' || task.punctuation === '?';
     const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
-    
-    // Apply if this is a belief with potential contradiction/conflict indicators
-    const hasConflictTerms = /contradict|conflict|inconsist|oppos|vs|versus|vs\./i.test(termStr);
-    
-    return (isBelief && priority > 0.1) && hasConflictTerms;
+    return {termStr, isBelief, priority};
+  }
+
+  hasConflictTerms(termStr) {
+    return /contradict|conflict|inconsist|oppos|vs|versus|vs\./i.test(termStr);
+  }
+
+  canApply(context) {
+    const task = this.extractTask(context);
+    if (!task) return false;
+
+    const {termStr, isBelief, priority} = this.analyzeTask(task);
+    return (isBelief && priority > 0.1) && this.hasConflictTerms(termStr);
   }
 
   generatePrompt(context) {

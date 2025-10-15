@@ -1,8 +1,3 @@
-/**
- * @file core/reasoning/lm/rules/MetaReasoningGuidanceRule.js
- * @description Meta-reasoning guidance rule for the LM Reasoning API
- */
-
 import { LMRule } from '../../Rule.js';
 
 export class MetaReasoningGuidanceRule extends LMRule {
