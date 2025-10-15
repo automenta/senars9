@@ -23,7 +23,7 @@ export class Rule {
   updateMetrics(success, time) {
     const m = this.metrics;
     m.executions++;
-    if (success) m.successes++;
+    success && m.successes++;
     m.avgTime = (m.avgTime * (m.executions - 1) + time) / m.executions;
     m.lastRun = Date.now();
   }
@@ -57,7 +57,6 @@ export class LMRule extends Rule {
     return response;
   }
 
-  // Backward compatibility method
   async executeLMProcessing(context) {
     return this.executeLM(context);
   }
