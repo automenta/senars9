@@ -9,17 +9,6 @@ export class BeliefRevisionRule extends LMRule {
     });
   }
 
-  extractTask(context) {
-    return context.premise?.task || context.premise1 || (Array.isArray(context.tasks) && context.tasks[0]) || null;
-  }
-
-  analyzeTask(task) {
-    const termStr = task.term ? task.term.toString() : '';
-    const isBelief = task.punctuation === '.' || task.punctuation === '?';
-    const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
-    return {termStr, isBelief, priority};
-  }
-
   hasConflictTerms(termStr) {
     return /contradict|conflict|inconsist|oppos|vs|versus|vs\./i.test(termStr);
   }
@@ -28,7 +17,8 @@ export class BeliefRevisionRule extends LMRule {
     const task = this.extractTask(context);
     if (!task) return false;
 
-    const {termStr, isBelief, priority} = this.analyzeTask(task);
+    const {termStr, punctuation, priority} = this.analyzeTask(task);
+    const isBelief = punctuation === '.' || punctuation === '?';
     return (isBelief && priority > 0.1) && this.hasConflictTerms(termStr);
   }
 

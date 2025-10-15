@@ -39,6 +39,19 @@ export class LMRule extends Rule {
     this.lmStats = { tokens: 0, calls: 0, avgTime: 0 };
   }
 
+  // Common method to extract task from context in various formats
+  extractTask(context) {
+    return context.premise?.task || context.premise1 || (Array.isArray(context.tasks) && context.tasks[0]) || context || null;
+  }
+
+  // Common method to analyze task properties
+  analyzeTask(task) {
+    const termStr = task?.term ? task.term.toString() : '';
+    const punctuation = task?.punctuation;
+    const priority = typeof task?.getPriority === 'function' ? task.getPriority() : (task?.priority || 0);
+    return { termStr, punctuation, priority };
+  }
+
   generatePrompt(context) {
     if (!this.promptTemplate) throw new Error(`No prompt template for rule ${this.id}`);
     return this.promptTemplate(context);
