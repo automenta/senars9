@@ -65,12 +65,17 @@ export function applySyllogisticRule(
         // Get current time from context
         const currentTime = context.currentTime || context.context?.currentTime || Date.now();
 
+        // Determine the punctuation of the derived task
+        const newPunctuation = (premise1.punctuation === Punctuation.GOAL && premise2.punctuation === Punctuation.GOAL)
+          ? Punctuation.GOAL
+          : Punctuation.BELIEF;
+
         // Create the new derived task with stamps from both parent tasks
         // This properly merges the evidence chains to enable overlap detection
         const newTask = Task.createDerived(
           [premise1, premise2], // Both parent tasks for proper stamp merging
           newTerm,
-          Punctuation.BELIEF, // Default to belief for derived facts
+          newPunctuation,
           newTruth,
           currentTime,
           currentTime

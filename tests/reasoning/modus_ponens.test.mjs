@@ -2,16 +2,16 @@
  * Modus Ponens reasoning tests using Jest framework
  */
 
-import { ReasoningTestBuilder } from './framework.mjs';
+import { ReasoningTestBuilder, TaskMatch } from './framework.mjs';
 import { ModusPonensRule } from '../../core/reasoning/nal/ModusPonensRule.js';
 
 describe('Modus Ponens Tests', () => {
-  test('should derive b from (a ==> b) and a', async () => {
+  test('should derive b from (a ==> b) and a with correct truth value', async () => {
     const success = await new ReasoningTestBuilder("Modus Ponens: (a ==> b) and a should derive b")
       .input("(a ==> b)", undefined, 0.9, 0.9)
       .input("a", undefined, 0.8, 0.8)
       .using(new ModusPonensRule())
-      .expect("b")
+      .expect(new TaskMatch("b").withTruth(0.71, 0.64)) // freq=0.9*0.8=0.72, conf=0.9*0.8*0.9=0.648
       .notExpect("a")  // Should not re-derive the input
       .cycles(2)
       .run();
@@ -36,7 +36,7 @@ describe('Modus Ponens Tests', () => {
       .input("(sunny_day ==> good_mood)", undefined, 0.85, 0.9)
       .input("sunny_day", undefined, 0.9, 0.85)
       .using(new ModusPonensRule())
-      .expect("good_mood")
+      .expect(new TaskMatch("good_mood").withTruth(0.76, 0.64)) // freq=0.85*0.9=0.765, conf=0.85*0.9*0.9=0.6885
       .notExpect("sunny_day")  // Should not re-derive input
       .cycles(2)
       .run();

@@ -2,8 +2,9 @@
  * LM-based reasoning tests
  */
 
-import { ReasoningTestBuilder } from './framework.mjs';
+import { ReasoningTestBuilder, TaskMatch } from './framework.mjs';
 import { GoalDecompositionRule } from '../../core/reasoning/lm/rules/GoalDecompositionRule.js';
+import { Punctuation } from '../../core/Task.js';
 import LM from '../../core/lm/LM.js';
 
 // Simple test provider that returns mock responses
@@ -41,10 +42,10 @@ describe('LM-based Reasoning Tests', () => {
     const rule = new GoalDecompositionRule(lm);
 
     const success = await testBuilder
-      .input('"Ensure Earth Happiness"!', "!", 0.9, 0.9)
+      .input('"Ensure Earth Happiness"!', Punctuation.GOAL, 0.9, 0.9)
       .using(rule)
-      .expect('"Ensure Human Well-being"')
-      .expect('"Ensure Environmental Health"')
+      .expect(new TaskMatch('"Ensure Human Well-being"').withPunctuation(Punctuation.BELIEF))
+      .expect(new TaskMatch('"Ensure Environmental Health"').withPunctuation(Punctuation.BELIEF))
       .cycles(1)
       .run();
 

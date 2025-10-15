@@ -127,29 +127,29 @@ export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
     
     if (config.expectedOutputs && config.expectedOutputs.length > 0) {
       console.log(`🔍 Checking ${config.expectedOutputs.length} expected output conditions...`);
-      for (let i = 0; i < config.expectedOutputs.length; i++) {
-        const matcher = config.expectedOutputs[i];
+      config.expectedOutputs.forEach((matcher, i) => {
         const foundMatch = allDerivedTasksArray.some(task => matcher(task));
+        const matcherDescription = matcher.toString(); // Naive description
         if (foundMatch) {
-          console.log(`  ✅ Expected output condition ${i + 1} PASSED`);
+          console.log(`  ✅ Expected output condition ${i + 1} PASSED: ${matcherDescription}`);
         } else {
-          console.log(`  ❌ Expected output condition ${i + 1} FAILED - no matching task found`);
+          console.log(`  ❌ Expected output condition ${i + 1} FAILED: ${matcherDescription}`);
         }
-      }
+      });
     }
     
     if (config.notExpectedOutputs && config.notExpectedOutputs.length > 0) {
       console.log(`🔍 Checking ${config.notExpectedOutputs.length} not-expected output conditions...`);
-      for (let i = 0; i < config.notExpectedOutputs.length; i++) {
-        const matcher = config.notExpectedOutputs[i];
+      config.notExpectedOutputs.forEach((matcher, i) => {
         const foundMatch = allDerivedTasksArray.some(task => matcher(task));
+        const matcherDescription = matcher.toString(); // Naive description
         if (foundMatch) {
           const matchingTask = allDerivedTasksArray.find(task => matcher(task));
-          console.log(`  ❌ Not-expected output condition ${i + 1} FAILED - found matching task: ${formatTaskWithRoundedTruth(matchingTask)}`);
+          console.log(`  ❌ Not-expected output condition ${i + 1} FAILED: ${matcherDescription} (found: ${formatTaskWithRoundedTruth(matchingTask)})`);
         } else {
-          console.log(`  ✅ Not-expected output condition ${i + 1} PASSED`);
+          console.log(`  ✅ Not-expected output condition ${i + 1} PASSED: ${matcherDescription}`);
         }
-      }
+      });
     }
     
     console.log('\n💥 Test FAILED! Some conditions were not met.');
@@ -157,6 +157,45 @@ export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
   
   return testPassed;
 });
+
+// Fluent builder for creating detailed task matchers
+export class TaskMatch {
+  constructor(term) {
+    this.conditions = [];
+    if (term) {
+      this.conditions.push(task => task.term.name === term);
+    }
+  }
+
+  // Check for specific punctuation
+  withPunctuation(punctuation) {
+    this.conditions.push(task => task.punctuation === punctuation);
+    return this;
+  }
+
+  // Check for a minimum truth value
+  withTruth(minFrequency, minConfidence) {
+    this.conditions.push(task => task.truth.frequency >= minFrequency && task.truth.confidence >= minConfidence);
+    return this;
+  }
+
+  // Check that the task occurred after a specific time
+  after(time) {
+    this.conditions.push(task => task.occurrenceTime > time);
+    return this;
+  }
+
+  // Check that the task occurred before a specific time
+  before(time) {
+    this.conditions.push(task => task.occurrenceTime < time);
+    return this;
+  }
+
+  // Build a single matcher function from all conditions
+  build() {
+    return task => this.conditions.every(condition => condition(task));
+  }
+}
 
 // Convenience builder function for creating tests with minimal boilerplate
 export class ReasoningTestBuilder {
@@ -184,9 +223,13 @@ export class ReasoningTestBuilder {
     return this;
   }
 
-  // Expect a specific output (can be specified as a string pattern)
-  expect(outputStr) {
-    this.config.expectedOutputs.push(task => task.term.name === outputStr);
+  // Expect a specific output (can be a string or a TaskMatch builder)
+  expect(output) {
+    if (typeof output === 'string') {
+      this.config.expectedOutputs.push(task => task.term.name === output);
+    } else if (output instanceof TaskMatch) {
+      this.config.expectedOutputs.push(output.build());
+    }
     return this;
   }
 
@@ -197,8 +240,12 @@ export class ReasoningTestBuilder {
   }
 
   // Ensure a specific output does NOT occur
-  notExpect(outputStr) {
-    this.config.notExpectedOutputs.push(task => task.term.name === outputStr);
+  notExpect(output) {
+    if (typeof output === 'string') {
+      this.config.notExpectedOutputs.push(task => task.term.name === output);
+    } else if (output instanceof TaskMatch) {
+      this.config.notExpectedOutputs.push(output.build());
+    }
     return this;
   }
 

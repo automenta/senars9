@@ -131,7 +131,7 @@ export class GoalDecompositionRule extends LMRule {
 
           const newTask = new Task(
             newTerm,
-            '!',
+            '.',
             { frequency: 0.8, confidence: 0.7 },
             Date.now(),
             Date.now()
