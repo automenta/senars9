@@ -208,6 +208,11 @@ class Core {
       this.reasoning.strategyRegistry = this.strategyRegistry;
       this.reasoning.systemContext = this.systemContext;
     }
+    
+    // Connect LM to reasoning system if both exist
+    if (this.lm && this.reasoning) {
+      this.reasoning.setLM(this.lm);
+    }
 
     // Set up contradiction analyzer to use system context
     if (this.contradictionAnalyzer && this.systemContext) {

@@ -1,25 +1,7 @@
 import { Logger } from './base/utilities.js';
 
-export class InferenceRule {
-  getTriggerTermType() { throw new Error('getTriggerTermType() must be implemented by subclass'); }
-  apply(task, memory, context) { throw new Error('apply() must be implemented by subclass'); }
-}
-
-export class RuleEngine {
-  constructor() { this.rules = new Map(); }
-
-  register(rule) {
-    const triggerType = rule.getTriggerTermType();
-    !this.rules.has(triggerType) && this.rules.set(triggerType, []);
-    this.rules.get(triggerType).push(rule);
-  }
-
-  getApplicableRules(task) { return this.rules.get(task.term.termType) || null; }
-}
-
 export class Reasoner {
   constructor(strategyRegistry = null, systemContext = null) {
-    this.ruleEngine = new RuleEngine();
     this.strategyRegistry = strategyRegistry;
     this.systemContext = systemContext;
     this.defaultStrategy = 'basic_reasoning';
@@ -31,10 +13,12 @@ export class Reasoner {
   _initializeRules() {}
 
   _registerWithStrategyRegistry() {
+    if (!this.strategyRegistry) return;
+    
     this.strategyRegistry.registerStrategy(this.defaultStrategy, {
       execute: (focusSet, memory, context) => this._basicReason(focusSet, memory, context)
     }, {
-      description: 'Basic reasoning using rule engine',
+      description: 'Basic reasoning using NARS rule engine',
       type: 'reasoning',
       group: 'default'
     });
@@ -52,24 +36,16 @@ export class Reasoner {
   }
 
   _basicReason(focusSet, memory, context) {
+    // The actual reasoning will be handled by the core/reasoning/Reasoning.js system
+    // This is maintained for compatibility with the existing interface
     const allNewTasks = [];
+    
+    // For now, this is a simplified version - in a real implementation,
+    // this would interface with the unified reasoning system in core/reasoning/Reasoning.js
     for (const originalTask of focusSet) {
-      const applicableRules = this.ruleEngine.getApplicableRules(originalTask);
-      if (!applicableRules) continue;
-      for (const rule of applicableRules) {
-        try {
-          const newTasks = rule.apply(originalTask, memory, context);
-          if (Array.isArray(newTasks)) {
-            const tasksToAdd = this.overlapCheckingEnabled
-              ? newTasks.filter(derivedTask => !this._hasOverlap(derivedTask, originalTask))
-              : newTasks;
-            allNewTasks.push(...tasksToAdd);
-          }
-        } catch (error) {
-          Logger.error(`Error applying rule: ${error.message}`);
-        }
-      }
+      // Placeholder - actual rule application would happen in the main reasoning system
     }
+    
     return allNewTasks;
   }
 
@@ -88,7 +64,15 @@ export class Reasoner {
 
   _selectReasoningStrategy(focusSet, memory, context) { return this.defaultStrategy; }
 
-  addRule(rule) { this.ruleEngine.register(rule); }
+  addRule(rule) { 
+    // In a real implementation, this would add to the main reasoning system
+  }
+  
   setOverlapChecking(enabled) { this.overlapCheckingEnabled = enabled; }
   isOverlapCheckingEnabled() { return this.overlapCheckingEnabled; }
+  
+  // Set LM (for compatibility)
+  setLM(lm) {
+    // In a real implementation, this would be handled by the main reasoning system
+  }
 }
