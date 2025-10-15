@@ -418,17 +418,20 @@ describe('Enhanced LM Component Unit Tests', () => {
     });
   });
 
-  describe('ReasoningEngine', () => {
+  describe('Reasoning Capabilities', () => {
     let providerRegistry;
     let ioAdapters;
-    let reasoningEngine;
+    let reasoner;
 
     beforeEach(() => {
       providerRegistry = new ProviderRegistry();
       ioAdapters = {
         narseseConverter: new NarseseTranslator()
       };
-      reasoningEngine = new ReasoningEngine(providerRegistry, ioAdapters);
+      reasoner = new Reasoner();
+      // Set up the reasoner with provider registry and io adapters
+      reasoner.providerRegistry = providerRegistry;
+      reasoner.ioAdapters = ioAdapters;
 
       // Register a mock provider
       const mockProvider = createMockProvider({
@@ -436,10 +439,13 @@ describe('Enhanced LM Component Unit Tests', () => {
       });
       providerRegistry.register('default', mockProvider);
       providerRegistry.defaultProviderId = 'default';
+      
+      // Set the LM instance so that reasoning methods work in tests
+      reasoner.lm = { generateText: mockProvider.generateText };
     });
 
     test('should perform temporal reasoning', async () => {
-      const result = await reasoningEngine.temporal('Test scenario', ['T1', 'T2']);
+      const result = await reasoner.performTemporalReasoning('Test scenario', ['T1', 'T2']);
 
       expect(result).toHaveProperty('original');
       expect(result.original).toContain('Processed:');
@@ -447,7 +453,7 @@ describe('Enhanced LM Component Unit Tests', () => {
     });
 
     test('should perform counterfactual reasoning', async () => {
-      const result = await reasoningEngine.counterfactual('Test scenario');
+      const result = await reasoner.performCounterfactualReasoning('Test scenario');
 
       expect(result).toHaveProperty('original');
       expect(result.original).toContain('Processed:');
@@ -455,7 +461,7 @@ describe('Enhanced LM Component Unit Tests', () => {
     });
 
     test('should perform causal reasoning', async () => {
-      const result = await reasoningEngine.causal('Cause', 'Effect');
+      const result = await reasoner.performCausalReasoning('Cause', 'Effect');
 
       expect(result).toHaveProperty('original');
       expect(result.original).toContain('Processed:');

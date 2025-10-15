@@ -122,14 +122,28 @@ export class Reasoner extends Component {
         error: 'No language model available for temporal reasoning'
       };
     }
-    // Temporal reasoning implementation
-    return {
-      original: `Temporal analysis: ${scenario}`,
-      type: 'temporal',
-      scenario: scenario,
-      timepoints: timepoints,
-      timestamp: Date.now()
-    };
+
+    try {
+      const prompt = `Analyze the following scenario temporally: "${scenario}". Time points: ${timepoints.join(', ')}. Provide temporal relationships, sequence analysis, and timing implications.`;
+      const result = await this.lm.generateText(prompt);
+      
+      const reasoningResult = {
+        original: result,
+        type: 'temporal',
+        scenario: scenario,
+        timepoints: timepoints,
+        timestamp: Date.now()
+      };
+
+      this.reasoningHistory.push(reasoningResult);
+      return reasoningResult;
+    } catch (error) {
+      return {
+        original: `Temporal analysis: ${scenario}`,
+        type: 'temporal',
+        error: error.message
+      };
+    }
   }
 
   async performCounterfactualReasoning(scenario) {
@@ -140,13 +154,27 @@ export class Reasoner extends Component {
         error: 'No language model available for counterfactual reasoning'
       };
     }
-    // Counterfactual reasoning implementation
-    return {
-      original: `Counterfactual analysis: ${scenario}`,
-      type: 'counterfactual',
-      scenario: scenario,
-      timestamp: Date.now()
-    };
+
+    try {
+      const prompt = `Explore the following counterfactual scenario: "${scenario}". Analyze what would happen if this were true, what conditions would need to change, and the potential consequences.`;
+      const result = await this.lm.generateText(prompt);
+      
+      const reasoningResult = {
+        original: result,
+        type: 'counterfactual',
+        scenario: scenario,
+        timestamp: Date.now()
+      };
+
+      this.reasoningHistory.push(reasoningResult);
+      return reasoningResult;
+    } catch (error) {
+      return {
+        original: `Counterfactual analysis: ${scenario}`,
+        type: 'counterfactual',
+        error: error.message
+      };
+    }
   }
 
   async performCausalReasoning(cause, effect) {
@@ -157,14 +185,28 @@ export class Reasoner extends Component {
         error: 'No language model available for causal reasoning'
       };
     }
-    // Causal reasoning implementation
-    return {
-      original: `Causal analysis: ${cause} -> ${effect}`,
-      type: 'causal',
-      cause: cause,
-      effect: effect,
-      timestamp: Date.now()
-    };
+
+    try {
+      const prompt = `Analyze the causal relationship: "${cause}" leads to "${effect}". Explain the causal mechanism, intermediate steps, and validity of this relationship.`;
+      const result = await this.lm.generateText(prompt);
+      
+      const reasoningResult = {
+        original: result,
+        type: 'causal',
+        cause: cause,
+        effect: effect,
+        timestamp: Date.now()
+      };
+
+      this.reasoningHistory.push(reasoningResult);
+      return reasoningResult;
+    } catch (error) {
+      return {
+        original: `Causal analysis: ${cause} -> ${effect}`,
+        type: 'causal',
+        error: error.message
+      };
+    }
   }
 
   /**

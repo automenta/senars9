@@ -12,6 +12,7 @@ import StreamingProcessor from './StreamingProcessor.js';
 import ProtocolAdapters from './ProtocolAdapters.js';
 import ProviderRegistry from './ProviderRegistry.js';
 import ModelSelector from './ModelSelector.js';
+import { Reasoner } from '../Reasoner.js';
 
 
 
@@ -31,7 +32,7 @@ class LM extends Component {
     };
     this.activeWorkflows = new Set();
     // Initialize with a placeholder that will be replaced by system integration
-    this.reasoner = null;
+    this.reasoner = new Reasoner();
   }
 
   async initialize(config = {}) {

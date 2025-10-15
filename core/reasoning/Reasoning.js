@@ -203,6 +203,13 @@ class Reasoning extends Component {
     };
   }
 
+  addStrategy(strategy) {
+    if (!strategy || !strategy.id || typeof strategy.execute !== 'function') {
+      throw new Error('Invalid strategy: must have an id and execute function');
+    }
+    this.strategies.set(strategy.id, strategy);
+  }
+
   getReasoningHistory(limit = 100) {
     return this.reasoningHistory.slice(-limit);
   }
