@@ -30,17 +30,9 @@ import { default as System } from './system/System.js';
 // Main NAR class
 import { NAR } from './NAR.js';
 
-// Helper functions for LM setup - if they exist somewhere
-// For now, create placeholder functions
-function setupLangChainProvider() {
-  console.warn('setupLangChainProvider is not implemented in this version');
-  return null;
-}
-
-function setupXenovaProvider() {
-  console.warn('setupXenovaProvider is not implemented in this version');
-  return null;
-}
+// Import actual setup functions
+import { setupLangChainProvider } from './lm/LangChainSetup.js';
+import { setupXenovaProvider } from './lm/XenovaSetup.js';
 
 // Export all the components
 export {

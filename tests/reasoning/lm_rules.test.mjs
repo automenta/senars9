@@ -6,16 +6,29 @@ import { ReasoningTestBuilder } from './framework.mjs';
 import { GoalDecompositionRule } from '../../core/reasoning/lm/rules/GoalDecompositionRule.js';
 import LM from '../../core/lm/LM.js';
 
-// Mock LM Engine
-class MockLMEngine extends LM {
-  async process(prompt) {
-    if (prompt.includes("Ensure Earth Happiness!")) {
-      return JSON.stringify([
-        { term: "Ensure Human Well-being!", punctuation: "!", truth: { frequency: 0.9, confidence: 0.9 } },
-        { term: "Ensure Environmental Health!", punctuation: "!", truth: { frequency: 0.9, confidence: 0.9 } }
-      ]);
+// Simple test provider that returns mock responses
+class TestProvider {
+  async process(prompt, options = {}) {
+    if (prompt.includes("Decompose this goal into")) {
+      if (prompt.includes("Ensure Earth Happiness!")) {
+        return "- Ensure Human Well-being!\n- Ensure Environmental Health!";
+      }
     }
-    return '[]';
+    return "No sub-goals identified.";
+  }
+  
+  async generateText(prompt, options = {}) {
+    return this.process(prompt, options);
+  }
+}
+
+// Simple LM for testing with a real provider registered
+class TestLM extends LM {
+  constructor() {
+    super();
+    // Register a test provider directly
+    this.registerProvider('test', new TestProvider());
+    this.providers.defaultProviderId = 'test';
   }
 }
 
@@ -23,7 +36,7 @@ describe('LM-based Reasoning Tests', () => {
   test('GoalDecompositionRule should decompose a goal', async () => {
     const testBuilder = new ReasoningTestBuilder("GoalDecompositionRule should decompose a high-priority goal");
 
-    const lm = new MockLMEngine();
+    const lm = new TestLM();
     const rule = new GoalDecompositionRule(lm);
 
     const success = await testBuilder

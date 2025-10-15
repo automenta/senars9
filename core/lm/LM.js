@@ -98,6 +98,19 @@ class LM extends Component {
       });
   }
 
+  async process(prompt, options = {}, providerId = null) {
+    return this._withMetrics('process', { prompt, options }, providerId,
+      (provider, args) => {
+        if (typeof provider.process === 'function') {
+          return provider.process(args.prompt, args.options);
+        } else {
+          // Fallback to generateText if process method is not available
+          return provider.generateText ? provider.generateText(args.prompt, args.options) : 
+                 provider.generate ? provider.generate(args.prompt, args.options) : prompt;
+        }
+      });
+  }
+
   // Generic method to handle operations with metrics
   async _withMetrics(operation, args, providerId, operationFn) {
     const startTime = Date.now();
