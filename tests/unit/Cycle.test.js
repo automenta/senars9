@@ -19,8 +19,8 @@ describe('Cycle Component', () => {
         get: jest.fn().mockReturnValue(10), // focusSetSize
       },
       memory: {
-        queryTasks: jest.fn().mockResolvedValue([]),
-        consolidateKnowledge: jest.fn().mockResolvedValue(),
+        getAllTasks: jest.fn().mockReturnValue([]),
+        consolidate: jest.fn().mockResolvedValue(),
       },
       reasoner: {
         reason: jest.fn().mockResolvedValue([]),
@@ -60,13 +60,13 @@ describe('Cycle Component', () => {
 
   test('_runCycle should call memory, reasoner, and other phases', async () => {
     const focusSet = [{ id: 'task1' }];
-    mockCore.memory.queryTasks.mockResolvedValue(focusSet);
+    mockCore.memory.getAllTasks.mockReturnValue(focusSet);
 
     await cycle._runCycle();
 
-    expect(mockCore.memory.queryTasks).toHaveBeenCalled();
+    expect(mockCore.memory.getAllTasks).toHaveBeenCalled();
     expect(mockCore.reasoner.reason).toHaveBeenCalledWith(focusSet);
-    expect(mockCore.memory.consolidateKnowledge).toHaveBeenCalled();
+    expect(mockCore.memory.consolidate).toHaveBeenCalled();
   });
 
   test('_selectFocusSet should select tasks from memory', async () => {
@@ -74,7 +74,7 @@ describe('Cycle Component', () => {
       { term: { hash: 'task1' }, createdAt: 100 },
       { term: { hash: 'task2' }, createdAt: 200 },
     ];
-    mockCore.memory.queryTasks.mockResolvedValue(tasks);
+    mockCore.memory.getAllTasks.mockReturnValue(tasks);
 
     const focusSet = await cycle._selectFocusSet();
 

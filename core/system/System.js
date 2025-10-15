@@ -1,6 +1,8 @@
 import createCore from '../orchestration/createCore.js';
 import { Logger } from '../base/utilities.js';
 import { DEFAULTS } from '../base/constants.js';
+import { Task, Punctuation, TruthValue } from '../Task.js';
+import { Term } from '../Term.js';
 
 class System {
   constructor(config = {}) {
@@ -101,8 +103,28 @@ class System {
     this.taskCount++;
     this.core.messages.emit('task.input', enhancedTask);
 
+    // Add to focus to make it available for processing during cycles
+    if (this.core.focus) {
+      try {
+        const priority = enhancedTask.priority || 0.5;
+        this.core.focus.addTaskToFocus(enhancedTask, priority);
+      } catch (error) {
+        console.error('Error adding task to focus:', error);
+      }
+    }
+
+    // Add to memory for long-term storage
+    if (this.core.memory) {
+      try {
+        this.core.memory.addTask(enhancedTask, Date.now());
+      } catch (error) {
+        console.error('Error adding task to memory:', error);
+      }
+    }
+
     return enhancedTask;
   }
+
 
   on(event, handler) {
     this._requireRunning('registering event handlers');

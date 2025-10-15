@@ -1123,6 +1123,14 @@ async function runDemo(inputText = DEFAULT_INPUT, lmProvider = DEFAULT_LM_PROVID
         screen.render();
       });
 
+      system.on('task.derived', (result) => {
+        const content = result.content || result.term?.toString?.() || 'Unknown derivation';
+        const line = `🔬 New derivation: ${content}`;
+        addLogLine(line);
+        logBox.setContent(getFormattedLog());
+        screen.render();
+      });
+
       system.on('cycle.stats', (stats) => {
         const line = `🔄 Cycle ${stats.cycles} executed at ${new Date(stats.timestamp).toLocaleTimeString()}`;
         addLogLine(line);
@@ -1198,8 +1206,10 @@ async function runDemo(inputText = DEFAULT_INPUT, lmProvider = DEFAULT_LM_PROVID
     
     // Start the cycle in paused mode by default
     if (system.core && system.core.cycle) {
-      // Initialize the cycle but keep it paused by default
-      await system.core.cycle.start(); // Start the cycle manager
+      // Check if cycle is already running to avoid the warning
+      if (!system.core.cycle.isRunning) {
+        await system.core.cycle.start(); // Start the cycle manager if not already running
+      }
       await system.core.cycle.pause(); // Set to paused initially
     }
     

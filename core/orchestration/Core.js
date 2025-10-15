@@ -169,6 +169,29 @@ class Core {
           });
         });
         
+        // Listen for task.input and evaluate rules
+        this.messages.on('task.input', (task) => {
+          // Process the task through reasoning when it's input
+          if (this.reasoning && this.memory) {
+            // Create a focus set with just this task and run reasoning on it
+            const focusSet = [task];
+            this.reasoning.reason(focusSet, this.memory, { source: 'input' })
+              .catch(error => {
+                console.error('Error processing input task with reasoning:', error);
+              });
+          }
+          
+          // Also try to add task to focus so it can be processed in the cycle
+          if (this.focus) {
+            try {
+              const priority = task.getPriority ? task.getPriority() : (task.priority || 0.5);
+              this.focus.addTaskToFocus(task, priority);
+            } catch (error) {
+              console.error('Error adding task to focus:', error);
+            }
+          }
+        });
+        
         // Listen for task.derived events and broadcast them
         this.messages.on('task.derived', (data) => {
           this.webSocketServer.broadcast({
@@ -198,6 +221,11 @@ class Core {
       }
     }
 
+    // Set up cycle component with core reference
+    if (this.cycle) {
+      this.cycle.core = this;
+    }
+    
     // WebSocketServer reference
     if (this.webSocketServer) {
       this.webSocketServer.core = this;

@@ -120,7 +120,17 @@ class Cycle extends Component {
                   this.core.memory.addTask(task, Date.now());
                 }
                 
-                // Emit task.processed event
+                // Emit task.derived event for derived tasks
+                if (this.core.messages) {
+                  this.core.messages.emit('task.derived', {
+                    id: task.id || `task_${Date.now()}`,
+                    content: task.term?.toString?.() || task.toString?.() || task.content || task.term,
+                    status: 'derived',
+                    timestamp: Date.now()
+                  });
+                }
+                
+                // Also emit task.processed event for consistency
                 if (this.core.messages) {
                   this.core.messages.emit('task.processed', {
                     id: task.id || `task_${Date.now()}`,
@@ -150,7 +160,17 @@ class Cycle extends Component {
                   this.core.memory.addTask(task, Date.now());
                 }
                 
-                // Emit task.processed event
+                // Emit task.derived event for derived tasks
+                if (this.core.messages) {
+                  this.core.messages.emit('task.derived', {
+                    id: task.id || `task_${Date.now()}`,
+                    content: task.term?.toString?.() || task.toString?.() || task.content || task.term,
+                    status: 'derived',
+                    timestamp: Date.now()
+                  });
+                }
+                
+                // Also emit task.processed event for consistency
                 if (this.core.messages) {
                   this.core.messages.emit('task.processed', {
                     id: task.id || `task_${Date.now()}`,
@@ -167,7 +187,7 @@ class Cycle extends Component {
 
       // Consolidate knowledge if memory component is available
       if (this.core.memory) {
-        await this.core.memory.consolidateKnowledge();
+        await this.core.memory.consolidate(Date.now());
       }
 
       // Increment cycle count
@@ -199,10 +219,10 @@ class Cycle extends Component {
     }
 
     try {
-      // Query memory for tasks with focus criteria
-      const allTasks = await this.core.memory.queryTasks({});
+      // Get all tasks from memory - using the correct method name
+      let allTasks = this.core.memory.getAllTasks ? this.core.memory.getAllTasks() : [];
       if (!Array.isArray(allTasks)) {
-        Logger.warn('Memory.queryTasks did not return an array');
+        Logger.warn('Memory.getAllTasks did not return an array');
         return [];
       }
 
