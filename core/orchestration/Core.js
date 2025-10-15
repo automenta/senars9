@@ -3,7 +3,7 @@ import Messages from '../messaging/Messages.js';
 import Rules from '../reasoning/Rules.js';
 import Memory from '../Memory.js';
 import { Focus } from '../Focus.js';
-import Reasoning from '../reasoning/Reasoning.js';
+import { Reasoner } from '../Reasoner.js';
 import LM from '../lm/LM.js'; // Add LM component import
 import AdjacencyBag from '../memory/AdjacencyBag.js';
 import GraphTraversal from '../memory/GraphTraversal.js';
@@ -41,7 +41,7 @@ class Core {
     focus.setFocus('default');
 
     // Create reasoner without dependencies initially, will set them up in _setupDependencies
-    this.registerComponent('reasoning', new Reasoning());
+    this.registerComponent('reasoning', new Reasoner());
     this.registerComponent('lm', new LM()); // Register LM component
 
     // Initialize graph components

@@ -4,14 +4,14 @@
  */
 
 import { jest } from '@jest/globals';
-import Reasoning from '../../core/reasoning/Reasoning.js';
+import { Reasoner } from '../../core/Reasoner.js';
 
 describe('Reasoning Component', () => {
   let reasoning;
   let mockCore;
 
   beforeEach(() => {
-    reasoning = new Reasoning();
+    reasoning = new Reasoner();
     mockCore = {
       rules: {
         executeRules: jest.fn().mockReturnValue([]),
