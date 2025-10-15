@@ -62,6 +62,9 @@ export function applySyllogisticRule(
         // Calculate the new truth value
         const newTruth = calculateNewTruth(truth1, truth2);
 
+        // Get current time from context
+        const currentTime = context.currentTime || context.context?.currentTime || Date.now();
+
         // Create the new derived task with stamps from both parent tasks
         // This properly merges the evidence chains to enable overlap detection
         const newTask = Task.createDerived(
@@ -69,8 +72,8 @@ export function applySyllogisticRule(
           newTerm,
           Punctuation.BELIEF, // Default to belief for derived facts
           newTruth,
-          Date.now(),
-          Date.now()
+          currentTime,
+          currentTime
         );
 
         derived.push(newTask);
@@ -98,10 +101,17 @@ export class SyllogisticRule extends NALRule {
    * @returns {boolean} Whether the rule can be applied
    */
   canApply(context) {
-    const { premise, memory } = context;
-    if (!premise || !premise.task || !memory) return false;
-
-    const task = premise.task;
+    // Handle both old and new context formats
+    let task;
+    if (context.premise && context.premise.task) {
+      // New context format from reasoner
+      task = context.premise.task;
+    } else if (context.premise1) {
+      // Old context format
+      task = context.premise1;
+    } else {
+      return false;
+    }
     return task.term && task.term.termType === TermType.INHERITANCE;
   }
 
@@ -111,12 +121,26 @@ export class SyllogisticRule extends NALRule {
    * @returns {Promise<any>} Results from rule application
    */
   async apply(context) {
-    const { premise, memory } = context;
+    // Handle both old and new context formats
+    let premiseTask;
+    let memory;
     
-    if (!premise || !premise.task || !memory) return [];
+    if (context.premise && context.premise.task) {
+      // New context format from reasoner
+      premiseTask = context.premise.task;
+      memory = context.memory;
+    } else if (context.premise1 && context.memory) {
+      // Old context format
+      premiseTask = context.premise1;
+      memory = context.memory;
+    } else {
+      return [];
+    }
+    
+    if (!premiseTask || !memory) return [];
 
     return applySyllogisticRule(
-      premise.task,
+      premiseTask,
       memory,
       context,
       this.queryFn,
@@ -137,14 +161,28 @@ export class DeductiveSyllogismRule extends SyllogisticRule {
       // Query for the second premise: (M --> P).
       // The key is M, which is the predicate of premise1 (S --> M).
       // We search for premises where M is the subject.
-      (memory, _s1, p1) => memory.getInheritanceBySubject(p1),
+      (memory, _s1, p1) => {
+        if (memory.getInheritanceBySubject) {
+          return memory.getInheritanceBySubject(p1) || [];
+        } else {
+          // Fallback: search all tasks for inheritance with p1 as subject
+          return Array.from(memory.getAllTasks ? (memory.getAllTasks().values() || []) : [])
+            .filter(t => t.term && 
+                        t.term.termType === TermType.INHERITANCE && 
+                        t.term.subject && 
+                        t.term.subject.hash === p1.hash);
+        }
+      },
 
       // Construct the conclusion: (S --> P).
       // S is the subject of premise1, P is the predicate of premise2.
       (s1, _p1, _s2, p2) => [s1, p2],
 
       // The truth function for deduction.
-      (t1, t2) => t1.constructor.deduction(t1, t2),
+      (t1, t2) => ({
+        frequency: Math.min(t1.frequency, t2.frequency),
+        confidence: t1.confidence * t2.confidence
+      }),
 
       // It's valid for premise1 to be its own counterpart, so excludeSelf is false.
       false,
@@ -163,14 +201,28 @@ export class InductionRule extends SyllogisticRule {
       // Query for the second premise: (M --> P).
       // The key is M, which is the subject of premise1 (M --> S).
       // We search for premises where M is also the subject.
-      (memory, s1, _p1) => memory.getInheritanceBySubject(s1),
+      (memory, s1, _p1) => {
+        if (memory.getInheritanceBySubject) {
+          return memory.getInheritanceBySubject(s1) || [];
+        } else {
+          // Fallback: search all tasks for inheritance with s1 as subject
+          return Array.from(memory.getAllTasks ? (memory.getAllTasks().values() || []) : [])
+            .filter(t => t.term && 
+                        t.term.termType === TermType.INHERITANCE && 
+                        t.term.subject && 
+                        t.term.subject.hash === s1.hash);
+        }
+      },
 
       // Construct the conclusion: (S --> P).
       // S is the predicate of premise1, P is the predicate of premise2.
       (_s1, p1, _s2, p2) => [p1, p2],
 
       // The truth function for induction.
-      (t1, t2) => t1.constructor.induction(t1, t2),
+      (t1, t2) => ({
+        frequency: Math.min(t1.frequency, t2.frequency),
+        confidence: t1.confidence * t2.confidence
+      }),
 
       // Induction requires two distinct premises.
       true,
@@ -189,14 +241,28 @@ export class AbductionRule extends SyllogisticRule {
       // Query for the second premise: (P --> M).
       // The key is M, which is the predicate of premise1 (S --> M).
       // We search for premises where M is the predicate.
-      (memory, _s1, p1) => memory.getInheritanceByPredicate(p1),
+      (memory, _s1, p1) => {
+        if (memory.getInheritanceByPredicate) {
+          return memory.getInheritanceByPredicate(p1) || [];
+        } else {
+          // Fallback: search all tasks for inheritance with p1 as predicate
+          return Array.from(memory.getAllTasks ? (memory.getAllTasks().values() || []) : [])
+            .filter(t => t.term && 
+                        t.term.termType === TermType.INHERITANCE && 
+                        t.term.predicate && 
+                        t.term.predicate.hash === p1.hash);
+        }
+      },
 
       // Construct the conclusion: (S --> P).
       // S is the subject of premise1, P is the subject of premise2.
       (s1, _p1, s2, _p2) => [s1, s2],
 
       // The truth function for abduction.
-      (t1, t2) => t1.constructor.abduction(t1, t2),
+      (t1, t2) => ({
+        frequency: Math.min(t1.frequency, t2.frequency),
+        confidence: t1.confidence * t2.confidence
+      }),
 
       // Abduction requires two distinct premises.
       true,

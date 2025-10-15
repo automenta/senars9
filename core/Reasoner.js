@@ -150,13 +150,80 @@ export class Reasoner extends Component {
       return derivedTasks;
     }
 
-    // Main reasoning loop
+    // First, process each task individually against the rules
     for (const task1 of focusSet) {
       for (const ruleId of this.enabledRuleIds) {
         const rule = this.rules.get(ruleId);
         if (rule) {
-          const result = await rule.apply({ premise1: task1, memory, context });
-          if (result) derivedTasks.push(...result);
+          // Check if the rule can be applied to a single premise
+          if (rule.canApply && !rule.canApply({ premise: { task: task1 }, memory, tasks: focusSet, context })) {
+            continue;
+          }
+          
+          let result;
+          try {
+            // Try the newer-style context first
+            result = await rule.apply({ premise: { task: task1 }, memory, tasks: focusSet, context });
+          } catch (error) {
+            // Fallback to older-style context
+            try {
+              result = await rule.apply({ premise1: task1, memory, context });
+            } catch (fallbackError) {
+              console.error(`Error applying rule ${ruleId}:`, error);
+              continue;
+            }
+          }
+          
+          if (result) {
+            const results = Array.isArray(result) ? result : [result];
+            derivedTasks.push(...results);
+          }
+        }
+      }
+    }
+
+    // Second, for NAL-style inference rules that work with pairs of tasks
+    for (let i = 0; i < focusSet.length; i++) {
+      for (let j = 0; j < focusSet.length; j++) {
+        if (i !== j) { // Don't compare a task with itself
+          const task1 = focusSet[i];
+          const task2 = focusSet[j];
+          
+          for (const ruleId of this.enabledRuleIds) {
+            const rule = this.rules.get(ruleId);
+            if (rule && rule.type === 'nal') {
+              // Check if the rule can be applied to the pair of tasks
+              if (rule.canApply && !rule.canApply({ 
+                premise: { task: task1 }, 
+                secondaryPremise: { task: task2 }, 
+                memory, 
+                tasks: focusSet, 
+                context 
+              })) {
+                continue;
+              }
+              
+              let result;
+              try {
+                // Apply rule with both premises
+                result = await rule.apply({ 
+                  premise: { task: task1 }, 
+                  secondaryPremise: { task: task2 }, 
+                  memory, 
+                  tasks: focusSet, 
+                  context 
+                });
+              } catch (error) {
+                console.error(`Error applying NAL rule ${ruleId} to task pair:`, error);
+                continue;
+              }
+              
+              if (result) {
+                const results = Array.isArray(result) ? result : [result];
+                derivedTasks.push(...results);
+              }
+            }
+          }
         }
       }
     }
@@ -292,10 +359,22 @@ export class Reasoner extends Component {
   
   // Get statistics
   getStats() {
+    // Count rules by type
+    let lmRulesCount = 0;
+    let nalRulesCount = 0;
+    
+    for (const rule of this.rules.values()) {
+      if (rule.type === 'lm') {
+        lmRulesCount++;
+      } else if (rule.type === 'nal') {
+        nalRulesCount++;
+      }
+    }
+    
     return {
       totalRules: this.rules.size,
-      lmRules: this.lmRules.size,
-      nalRules: this.nalRules.size,
+      lmRules: lmRulesCount,
+      nalRules: nalRulesCount,
       enabledRules: this.enabledRuleIds.size,
       reasoningHistorySize: this.reasoningHistory.length,
       hasLM: !!this.lm,

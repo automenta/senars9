@@ -5,7 +5,7 @@
 
 import { LMRule } from '../../Rule.js';
 import { Term, TermType } from '../../../Term.js';
-import { Task } from '../../../Task.js';
+import { Task, Punctuation } from '../../../Task.js';
 
 export class GoalDecompositionRule extends LMRule {
   constructor(lm) {
@@ -16,24 +16,56 @@ export class GoalDecompositionRule extends LMRule {
     });
   }
 
-  canApply({ premise1 }) {
-    // Check if the premise contains a goal task with sufficient priority
-    if (!premise1) return false;
+  canApply(context) {
+    // Handle both old and new context formats
+    let task;
+    if (context.premise && context.premise.task) {
+      // New context format from reasoner
+      task = context.premise.task;
+    } else if (context.premise1) {
+      // Old context format used by test framework
+      task = context.premise1;
+    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
+      // Format used potentially by test framework
+      task = context.tasks[0];
+    } else {
+      return false;
+    }
     
-    const task = premise1;
-    const isGoal = task.punctuation === '!';
+    if (!task) return false;
+    
+    const isGoal = task.punctuation === '!' || task.punctuation === Punctuation.GOAL;
     const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
     
     return isGoal && priority > 0.05;
   }
 
-  generatePrompt({ premise1 }) {
-    const task = premise1;
+  generatePrompt(context) {
+    // Handle both old and new context formats
+    let task;
+    if (context.premise && context.premise.task) {
+      // New context format from reasoner
+      task = context.premise.task;
+    } else if (context.premise1) {
+      // Old context format used by test framework
+      task = context.premise1;
+    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
+      // Format used potentially by test framework
+      task = context.tasks[0];
+    } else {
+      // Fallback - if context is the task itself
+      task = context;
+    }
+    
+    if (!task) {
+      throw new Error('No task provided to generate prompt for GoalDecompositionRule');
+    }
+    
     const termStr = task.term ? task.term.toString() : task.toString ? task.toString() : String(task);
     return `Decompose this goal into 3-5 concrete, actionable sub-goals that would help achieve it: "${termStr}". Provide them as a numbered list.`;
   }
 
-  processLMOutput(lmResponse, { premise1 }) {
+  processLMOutput(lmResponse, context) {
     // Process the LM response to extract sub-goals
     const lines = lmResponse.split('\n');
     const subGoals = [];
@@ -75,8 +107,20 @@ export class GoalDecompositionRule extends LMRule {
     return subGoals;
   }
 
-  generateTasks(processedOutput, { premise1 }) {
+  generateTasks(processedOutput, context) {
     const newTasks = [];
+    
+    // Get the original premise for creating links
+    let originalTask;
+    if (context.premise && context.premise.task) {
+      originalTask = context.premise.task;
+    } else if (context.premise1) {
+      originalTask = context.premise1;
+    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
+      originalTask = context.tasks[0];
+    } else {
+      originalTask = context;
+    }
     
     if (Array.isArray(processedOutput) && processedOutput.length > 0) {
       for (const subGoal of processedOutput) {
@@ -96,8 +140,8 @@ export class GoalDecompositionRule extends LMRule {
           newTasks.push(newTask);
 
           // Also create a belief linking the sub-goal to the original goal
-          if (premise1.term) {
-            const linkTerm = Term.createCompound(TermType.IMPLICATION, [newTerm, premise1.term]);
+          if (originalTask && originalTask.term) {
+            const linkTerm = Term.createCompound(TermType.IMPLICATION, [newTerm, originalTask.term]);
             
             const beliefTask = new Task(
               linkTerm,

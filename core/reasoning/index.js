@@ -25,5 +25,10 @@ export {
 export { 
   DeductionRule, 
   InductionRule, 
-  AbductionRule 
+  AbductionRule,
+  ModusPonensRule,
+  DeductiveSyllogismRule,
+  NALInductionRule,
+  NALAbductionRule,
+  Analogy
 } from './nal/index.js';

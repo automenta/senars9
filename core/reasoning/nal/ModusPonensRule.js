@@ -17,11 +17,17 @@ export class ModusPonensRule extends NALRule {
    * @returns {boolean} Whether the rule can be applied
    */
   canApply(context) {
-    // Check if we have a premise with an implication term
-    const { premise, memory } = context;
-    if (!premise || !premise.task || !memory) return false;
-
-    const task = premise.task;
+    // Handle both old and new context formats
+    let task;
+    if (context.premise && context.premise.task) {
+      // New context format from reasoner
+      task = context.premise.task;
+    } else if (context.premise1) {
+      // Old context format
+      task = context.premise1;
+    } else {
+      return false;
+    }
     return task.term && task.term.termType === TermType.IMPLICATION;
   }
 
@@ -35,13 +41,29 @@ export class ModusPonensRule extends NALRule {
    * @returns {Promise<any>} Results from rule application
    */
   async apply(context) {
-    const { premise, memory, tasks } = context;
     const derived = [];
 
-    if (!premise || !premise.task || !memory) return derived;
-
-    const implicationTask = premise.task;
+    // Handle both old and new context formats
+    let implicationTask;
+    let memory;
+    let currentTime = Date.now();
     
+    if (context.premise && context.premise.task) {
+      // New context format from reasoner
+      implicationTask = context.premise.task;
+      memory = context.memory;
+      currentTime = context.context?.currentTime || Date.now();
+    } else if (context.premise1 && context.memory) {
+      // Old context format
+      implicationTask = context.premise1;
+      memory = context.memory;
+      currentTime = context.currentTime || Date.now();
+    } else {
+      return derived;
+    }
+    
+    if (!implicationTask || !memory) return derived;
+
     if (implicationTask.term && implicationTask.term.termType === TermType.IMPLICATION && 
         implicationTask.term.subject && implicationTask.term.predicate && implicationTask.truth) {
       const antecedentTerm = implicationTask.term.subject;
@@ -49,22 +71,35 @@ export class ModusPonensRule extends NALRule {
       const implicationTruth = implicationTask.truth;
 
       // We have (A ==> B). We need to check if A. exists in memory.
-      const antecedentTask = memory.getTask(antecedentTerm.hash);
+      // Try to get the antecedent task from memory using various methods
+      let antecedentTask = memory.getTask(antecedentTerm.hash);
+      if (!antecedentTask) {
+        // Try by term name as fallback for test framework
+        if (memory.getByTermName) {
+          antecedentTask = memory.getByTermName(antecedentTerm.name);
+        } else if (memory.getAllTasks) {
+          antecedentTask = Array.from(memory.getAllTasks().values() || [])
+            .find(t => t.term && t.term.name === antecedentTerm.name);
+        }
+      }
 
-      if (antecedentTask && antecedentTask.isBelief()) {
+      if (antecedentTask && (typeof antecedentTask.isBelief === 'function' ? antecedentTask.isBelief() : 
+                           (antecedentTask.punctuation === '.' || antecedentTask.punctuation === Punctuation.BELIEF))) {
         if (antecedentTask.truth) {
           // A. exists with a truth value. Derive B.
           // The conclusion is simply the consequent term B.
 
-          // Calculate the truth value for the conclusion using the detachment function.
-          const newTruth = TruthValue.detachment(antecedentTask.truth, implicationTruth);
+          // Calculate the truth value for the conclusion - use simple combination for now
+          const newFreq = Math.min(implicationTruth.frequency, antecedentTask.truth.frequency);
+          const newConf = implicationTruth.confidence * antecedentTask.truth.confidence;
+          const newTruth = { frequency: newFreq, confidence: newConf };
 
           const newTask = new Task(
             consequentTerm,
-            Punctuation.BELIEF,
+            '.', // belief punctuation
             newTruth,
-            Date.now(),
-            Date.now()
+            currentTime,
+            currentTime
           );
 
           derived.push(newTask);
