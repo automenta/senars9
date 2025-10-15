@@ -18,7 +18,7 @@ import { Task, Punctuation, TruthValue } from '../../core/Task.js';
 import { Term, TermType } from '../../core/Term.js';
 import { Memory } from '../../core/Memory.js';
 import { CycleContext } from '../../core/Cycle.js';
-import { Reasoner, InferenceRule } from '../../core/Reasoner.js';
+import { Reasoner, NALRule } from '../../core/Reasoner.js';
 import { Stamp } from '../../core/Stamp.js';
 
 // Test runner
@@ -167,7 +167,7 @@ class ReasonerWithStampControl extends Reasoner {
 // Test rule for Deductive Syllogism (as per NARS paper)
 // In proper architecture, this rule focuses only on logical derivation,
 // stamp handling is done by the reasoner
-class TestDeductiveSyllogism extends InferenceRule {
+class TestDeductiveSyllogism extends NALRule {
   constructor() {
     super();
   }

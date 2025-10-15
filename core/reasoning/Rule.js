@@ -29,7 +29,7 @@ export class Rule {
    * @returns {boolean} Whether the rule can be applied
    */
   canApply(context) {
-    throw new Error('canApply must be implemented by subclasses');
+    return true;
   }
 
   /**

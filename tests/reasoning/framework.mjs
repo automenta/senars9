@@ -42,13 +42,20 @@ function formatTaskWithRoundedTruth(task) {
  * @param {Array<Function>} config.expectedOutputs - Array of matcher functions that return true if the output is expected
  * @param {Array<Function>} config.notExpectedOutputs - Array of matcher functions that return true if output should NOT match
  * @param {number} config.cycles - Number of reasoning cycles to run
- * @param {Function} config.reasoner - The reasoner function to apply during each cycle
+ * @param {Array<Rule>} config.rules - The rules to register with the reasoner.
  * @param {string} config.description - Description of the test for logging
  * @returns {boolean} - Whether the test passed
  */
 export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
-  const { memory } = core;
+  const { memory, reasoner } = core;
   const context = new CycleContext(Date.now());
+
+  // Register rules with the reasoner
+  if (config.rules) {
+    for (const rule of config.rules) {
+      reasoner.registerRule(rule);
+    }
+  }
   
   // Add input tasks to memory
   for (const [index, input] of config.inputs.entries()) {
@@ -59,20 +66,14 @@ export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
   // Run the reasoner for N cycles
   const allDerivedTasks = new Set(); // Use Set to avoid duplicates
   for (let cycle = 0; cycle < config.cycles; cycle++) {
-    // Get tasks from the focus set, which is the correct way to do it now
     const focusItems = core.focus.getFocusItems();
-    const focusTasks = focusItems.map(item => item[1]); // Extract tasks from [key, taskData] pairs
-
-    for (const task of focusTasks) {
-      // Apply the reasoner to each task in the focus set
-      const derivedTasks = config.reasoner(task, memory, context);
-      if (derivedTasks && derivedTasks.length > 0) {
-        derivedTasks.forEach(derivedTask => {
-          // Add to Set using term hash to avoid duplicates
-          allDerivedTasks.add(derivedTask);
-          memory.addTask(derivedTask, Date.now());
-        });
-      }
+    const focusTasks = focusItems.map(item => item[1]);
+    const derivedTasks = await reasoner.reason(focusTasks, memory, context);
+    if (derivedTasks && derivedTasks.length > 0) {
+      derivedTasks.forEach(derivedTask => {
+        allDerivedTasks.add(derivedTask);
+        memory.addTask(derivedTask, Date.now());
+      });
     }
   }
   
@@ -166,7 +167,7 @@ export class ReasoningTestBuilder {
       expectedOutputs: [],
       notExpectedOutputs: [],
       cycles: 1,
-      reasoner: null
+      rules: []
     };
   }
 
@@ -177,9 +178,9 @@ export class ReasoningTestBuilder {
     return this; // for chaining
   }
 
-  // Set the reasoner function
-  using(reasoner) {
-    this.config.reasoner = reasoner;
+  // Add a rule to the reasoner
+  using(rule) {
+    this.config.rules.push(rule);
     return this;
   }
 
@@ -387,13 +388,5 @@ export function hasTruthValue(minFrequency, minConfidence) {
 export function notContainsTerm(pattern) {
   return function(task) {
     return !(task.term.name && task.term.name.includes(pattern));
-  };
-}
-
-// Helper functions to make reasoner creation easier (users still need to import the rules)
-export function createReasoner(ruleClass) {
-  return (task, memory, context) => {
-    const rule = new ruleClass();
-    return rule.apply(task, memory, context);
   };
 }

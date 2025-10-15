@@ -1,4 +1,4 @@
-import { InferenceRule } from '../Reasoner.js';
+import { NALRule } from '../Reasoner.js';
 import { Term, TermType } from '../Term.js';
 import { Task, Punctuation } from '../Task.js';
 import { CycleContext } from '../Cycle.js';
@@ -12,9 +12,7 @@ import { CycleContext } from '../Cycle.js';
  * 2. Find a second premise in memory based on some criteria.
  * 3. Derive a conclusion from the two premises.
  *
- * @param {Task} premise1 - The first premise task
- * @param {Memory} memory - Reference to the system's memory
- * @param {CycleContext} context - The current cycle's context
+ * @param {object} context - The context object containing premise1, memory, and cycle context.
  * @param {Function} queryPremises2 - Function that takes memory and components of the first premise, returns candidate premises
  * @param {Function} constructNewTermComponents - Function that takes components of both premises and returns subject/predicate for new term
  * @param {Function} calculateNewTruth - Function that calculates the truth value of the conclusion
@@ -22,9 +20,7 @@ import { CycleContext } from '../Cycle.js';
  * @returns {Task[]} Array of derived tasks
  */
 export function applySyllogisticRule(
-  premise1,
-  memory,
-  context,
+  { premise1, memory, context },
   queryPremises2,
   constructNewTermComponents,
   calculateNewTruth,
@@ -84,7 +80,7 @@ export function applySyllogisticRule(
 /**
  * Base class for inheritance-based syllogistic rules.
  */
-export class SyllogisticRule extends InferenceRule {
+export class SyllogisticRule extends NALRule {
   constructor(queryFn, constructFn, truthFn, excludeSelf) {
     super();
     this.queryFn = queryFn;
@@ -97,10 +93,8 @@ export class SyllogisticRule extends InferenceRule {
     return TermType.INHERITANCE;
   }
 
-  apply(premise1, memory, context) {
+  apply(context) {
     return applySyllogisticRule(
-      premise1,
-      memory,
       context,
       this.queryFn,
       this.constructFn,

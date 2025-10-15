@@ -5,7 +5,7 @@ import { Component } from './components/Component.js';
 /**
  * Base class for NARS inference rules.
  */
-export class InferenceRule {
+export class NALRule {
   /**
    * Returns the term type that triggers this rule.
    * @returns {number} TermType that triggers this rule
@@ -16,13 +16,15 @@ export class InferenceRule {
 
   /**
    * Applies the inference rule to the given premises.
-   * @param {Task} premise1 - The first premise task
-   * @param {Memory} memory - Reference to the system's memory
-   * @param {CycleContext} context - The current cycle's context
+   * @param {object} context - The context object.
    * @returns {Task[]} Array of derived tasks
    */
-  apply(premise1, memory, context) {
+  apply(context) {
     throw new Error('apply must be implemented by subclasses');
+  }
+
+  canApply(context) {
+    return true;
   }
 }
 
@@ -40,9 +42,8 @@ export class Reasoner extends Component {
     this.overlapCheckingEnabled = true;
     
     // Rule management
-    this.rules = new Map(); // All rules
-    this.lmRules = new Map(); // LM rules only
-    this.nalRules = new Map(); // NAL rules only
+    this.rules = new Map(); // All rules, mapped by ID
+    this.ruleGroups = new Map(); // Rules categorized by group
     this.enabledRuleIds = new Set();
     
     // Reasoning system components
@@ -69,6 +70,56 @@ export class Reasoner extends Component {
   _initialize() {
     this.strategies.clear();
     this.reasoningHistory = [];
+    this.rules.clear();
+    this.ruleGroups.clear();
+    this.enabledRuleIds.clear();
+  }
+
+  /**
+   * Registers a new rule with the reasoner
+   * @param {Rule} rule - The rule to register
+   * @param {string} group - The group to assign the rule to
+   */
+  registerRule(rule, group = 'general') {
+    if (!rule || !rule.id) {
+      throw new Error('Invalid rule: must have an ID');
+    }
+    this.rules.set(rule.id, rule);
+    if (!this.ruleGroups.has(group)) {
+      this.ruleGroups.set(group, new Set());
+    }
+    this.ruleGroups.get(group).add(rule.id);
+    if (rule.enabled) {
+      this.enabledRuleIds.add(rule.id);
+    }
+  }
+
+  /**
+   * Enables a rule or a group of rules
+   * @param {string} idOrGroup - The ID of the rule or the name of the group to enable
+   */
+  enableRule(idOrGroup) {
+    if (this.rules.has(idOrGroup)) {
+      this.enabledRuleIds.add(idOrGroup);
+    } else if (this.ruleGroups.has(idOrGroup)) {
+      for (const ruleId of this.ruleGroups.get(idOrGroup)) {
+        this.enabledRuleIds.add(ruleId);
+      }
+    }
+  }
+
+  /**
+   * Disables a rule or a group of rules
+   * @param {string} idOrGroup - The ID of the rule or the name of the group to disable
+   */
+  disableRule(idOrGroup) {
+    if (this.rules.has(idOrGroup)) {
+      this.enabledRuleIds.delete(idOrGroup);
+    } else if (this.ruleGroups.has(idOrGroup)) {
+      for (const ruleId of this.ruleGroups.get(idOrGroup)) {
+        this.enabledRuleIds.delete(ruleId);
+      }
+    }
   }
 
   _registerWithStrategyRegistry() {
@@ -91,9 +142,26 @@ export class Reasoner extends Component {
     this.memory = memory;
   }
 
-  reason(focusSet, memory, context = {}) {
+  async reason(focusSet, memory, context = {}) {
     this.memory = memory;
-    return []; // Return empty for now
+    const derivedTasks = [];
+
+    if (!focusSet || focusSet.length === 0) {
+      return derivedTasks;
+    }
+
+    // Main reasoning loop
+    for (const task1 of focusSet) {
+      for (const ruleId of this.enabledRuleIds) {
+        const rule = this.rules.get(ruleId);
+        if (rule) {
+          const result = await rule.apply({ premise1: task1, memory, context });
+          if (result) derivedTasks.push(...result);
+        }
+      }
+    }
+
+    return derivedTasks;
   }
 
   reasonWithStrategy(focusSet, memory, context) {

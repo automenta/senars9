@@ -1,5 +1,6 @@
 import createCore from '../../core/orchestration/createCore.js';
 import Component from '../../core/base/Component.js';
+import { Reasoner } from '../../core/Reasoner.js';
 
 export const createCoreWithLifecycle = async (config = {}) => {
   const core = await createCore(config);
@@ -169,6 +170,9 @@ export const expectToBeHealthy = (component) => {
 // Core lifecycle management utilities
 export const setupCore = async (config = {}) => {
   const core = await createCore(config);
+  core.reasoner = new Reasoner();
+  await core.reasoner.initialize();
+  core.memory.reasoner = core.reasoner;
   return { core };
 };
 

@@ -135,6 +135,11 @@ class Core {
       this.aStarPlanner.adjacencyBag = this.adjacencyBag;
     }
 
+    // Focus dependencies
+    if (this.focus) {
+      this.focus.core = this;
+      this.focus.memory = this.memory;
+    }
 
 
     // Messages middleware and event broadcasting

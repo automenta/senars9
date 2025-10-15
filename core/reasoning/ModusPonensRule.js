@@ -1,4 +1,4 @@
-import { InferenceRule } from '../Reasoner.js';
+import { NALRule } from '../Reasoner.js';
 import { TermType } from '../Term.js';
 import { Task, Punctuation, TruthValue } from '../Task.js';
 
@@ -6,7 +6,7 @@ import { Task, Punctuation, TruthValue } from '../Task.js';
  * Implements the modus ponens inference rule.
  * This rule derives B from (A ==> B) and A.
  */
-export class ModusPonens extends InferenceRule {
+export class ModusPonens extends NALRule {
   /**
    * This rule is triggered by an Implication term.
    */
@@ -15,47 +15,37 @@ export class ModusPonens extends InferenceRule {
   }
 
   /**
-   * Applies the modus ponens rule.
-   *
-   * Given a premise (A ==> B). (an implication), it looks for a second premise A.
-   * (the antecedent as a belief) in memory to derive the conclusion B.
-   *
-   * @param {Task} implicationTask - The implication task (A ==> B)
-   * @param {Memory} memory - Reference to the system's memory
-   * @param {CycleContext} context - The current cycle's context
-   * @returns {Task[]} Array of derived tasks
+   * Applies modus ponens.
+   * Premise1 is the implication (A ==> B).
+   * It looks for premise2, which is the antecedent (A).
    */
-  apply(implicationTask, memory, context) {
+  apply({ premise1, memory, context }) {
     const derived = [];
+    const implicationTerm = premise1.term;
+    const antecedent = implicationTerm.subject;
+    const consequent = implicationTerm.predicate;
 
-    if (implicationTask.term.subject && implicationTask.term.predicate && implicationTask.truth) {
-      const antecedentTerm = implicationTask.term.subject;
-      const consequentTerm = implicationTask.term.predicate;
-      const implicationTruth = implicationTask.truth;
+    // Search for the antecedent as a belief in memory.
+    const antecedentBeliefs = memory.getImplicationsByPremise(antecedent);
 
-      // We have (A ==> B). We need to check if A. exists in memory.
-      const antecedentTask = memory.getTask(antecedentTerm.hash);
+    if (!antecedentBeliefs) return derived;
 
-      if (antecedentTask && antecedentTask.isBelief()) {
-        if (antecedentTask.truth) {
-          // A. exists with a truth value. Derive B.
-          // The conclusion is simply the consequent term B.
+    for (const belief of antecedentBeliefs) {
+      // Calculate the truth value of the derived consequent.
+      const newTruth = TruthValue.deduction(premise1.truth, belief.truth);
 
-          // Calculate the truth value for the conclusion using the detachment function.
-          const newTruth = TruthValue.detachment(antecedentTask.truth, implicationTruth);
-
-          const newTask = new Task(
-            consequentTerm,
-            Punctuation.BELIEF,
-            newTruth,
-            context.currentTime,
-            context.currentTime
-          );
-
-          derived.push(newTask);
-        }
-      }
+      // Create the new derived task for the consequent.
+      const newTask = Task.createDerived(
+        [premise1, belief],
+        consequent,
+        Punctuation.BELIEF,
+        newTruth,
+        context.currentTime,
+        context.currentTime
+      );
+      derived.push(newTask);
     }
+
     return derived;
   }
 }

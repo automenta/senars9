@@ -1,79 +1,64 @@
-// LM Components
-export { default as LM } from './lm/LM.js';
-export { default as LangChainProvider } from './lm/LangChainProvider.js';
-export { setupLangChainProvider, createLMWithLangChain } from './lm/LangChainSetup.js';
-export { default as XenovaProvider } from './lm/XenovaProvider.js';
-export { setupXenovaProvider, createLMWithXenova } from './lm/XenovaSetup.js';
-export { default as MetricsTracker } from './lm/MetricsTracker.js';
-export { default as ResourceManager } from './lm/ResourceManager.js';
-export { default as WorkflowEngine } from './lm/WorkflowEngine.js';
-export { default as NarseseTranslator } from './lm/NarseseTranslator.js';
-export { default as JSONSerializer } from './lm/JSONSerializer.js';
-export { default as StreamingProcessor } from './lm/StreamingProcessor.js';
-export { default as ProtocolAdapters } from './lm/ProtocolAdapters.js';
-export { default as ProviderRegistry } from './lm/ProviderRegistry.js';
-export { default as ModelSelector } from './lm/ModelSelector.js';
-export { default as IOAdapterManager } from './lm/IOAdapterManager.js';
-export { default as LMConfiguration } from './lm/LMConfiguration.js';
-export { ProviderSetup } from './lm/ProviderSetup.js';
+/**
+ * @file: core/index.js
+ * @description: This file exports all the core components of the SeNARS system.
+ * @exports {NAR, Term, Task, Concept, Memory, Reasoner, RuleEngine, System, Logger, DEFAULTS}
+ */
 
-// Core NARS Components
-export { Term, TermType } from './Term.js';
-export { Task, Punctuation, TruthValue } from './Task.js';
-export { Concept } from './Concept.js';
-export { TaskTable, SelectionCriteria, DefaultAggregationFunctions } from './TaskTable.js';
-export { Answer } from './Answer.js';
-export { NAR } from './NAR.js';
-
-// Memory & Cognitive Architecture
-export { default as Bag } from './memory/Bag.js';
-export { default as AdjacencyBag } from './memory/AdjacencyBag.js';
-export { default as GraphTraversal } from './memory/GraphTraversal.js';
-export { FocusSetSelector } from './FocusSetSelector.js';
-export { Clock, IterativeClock, UnixTimeClock, HighResolutionClock } from './Clock.js';
-export { CycleContext, runSingleCycle } from './Cycle.js';
-export { default as Memory } from './Memory.js';
-export { Reasoner, InferenceRule, RuleEngine } from './Reasoner.js';
+import { Logger } from './base/utilities.js';
+import { DEFAULTS } from './base/constants.js';
+import { Term } from './Term.js';
+import { Task, Punctuation, TruthValue } from './Task.js';
+import { Concept } from './Concept.js';
+import { Clock, IterativeClock, UnixTimeClock, HighResolutionClock } from './Clock.js';
+import { CycleContext, runSingleCycle } from './Cycle.js';
+import { default as Memory } from './Memory.js';
+import { Reasoner, NALRule, RuleEngine } from './Reasoner.js';
+import { default as LM } from './lm/LM.js';
+import { default as JSONSerializer } from './lm/JSONSerializer.js';
+import { default as MetricsTracker } from './lm/MetricsTracker.js';
+import { default as ModelSelector } from './lm/ModelSelector.js';
+import { default as NarseseTranslator } from './lm/NarseseTranslator.js';
+import { default as ProtocolAdapters } from './lm/ProtocolAdapters.js';
+import { default as ProviderRegistry } from './lm/ProviderRegistry.js';
+import { default as ResourceManager } from './lm/ResourceManager.js';
+import { default as StreamingProcessor } from './lm/StreamingProcessor.js';
+import { default as WorkflowEngine } from './lm/WorkflowEngine.js';
 
 // System Components
-export { default as System } from './system/System.js';
-export { parse, parseTerm } from './parser/Parser.js';
+import { default as System } from './system/System.js';
 
-// Planning & Analysis
-export { default as HTNPlanner } from './plan/HTNPlanner.js';
-export { default as AStarPlanner } from './plan/AStarPlanner.js';
-export { default as DataIngestor } from './analysis/DataIngestor.js';
-export { default as ReportGenerator } from './analysis/ReportGenerator.js';
-export { default as PatternDetector } from './analysis/PatternDetector.js';
+// Main NAR class
+import { NAR } from './NAR.js';
 
-// Reasoning & Metacognition
-export { ContradictionAnalyzer } from './reasoning/ContradictionAnalyzer.js';
-export { ResolutionStrategy } from './reasoning/ResolutionStrategy.js';
+// Export all the components
 export {
-  applySyllogisticRule,
-  SyllogisticRule,
-  DeductiveSyllogismRule,
-  InductionRule,
-  AbductionRule
-} from './reasoning/nal/SyllogisticRules.js';
-export { ModusPonensRule } from './reasoning/nal/ModusPonensRule.js';
-export { Analogy } from './reasoning/AnalogyRule.js';
-
-// Component Framework
-export {
-  Component,
-  ComponentHealth,
-  ComponentMetrics,
-  ComponentStatus,
-  ComponentConfig
-} from './components/Component.js';
-export { ValidationUtils } from './base/ValidationUtils.js';
-export { ConfigService } from './components/ConfigService.js';
-export { UnifiedResourceManager } from './components/UnifiedResourceManager.js';
-export { StrategyRegistry } from './components/StrategyRegistry.js';
-export { SystemContext } from './components/SystemContext.js';
-export { UnifiedAnalysisEngine } from './components/UnifiedAnalysisEngine.js';
-export { PlanExecutor } from './components/PlanExecutor.js';
-
-// WebSocket Communication
-export { default as WebSocketServer } from './server/WebSocketServer.js';
+  NAR,
+  Term,
+  Task,
+  Punctuation,
+  TruthValue,
+  Concept,
+  Memory,
+  Reasoner,
+  NALRule,
+  RuleEngine,
+  System,
+  Logger,
+  DEFAULTS,
+  Clock,
+  IterativeClock,
+  UnixTimeClock,
+  HighResolutionClock,
+  CycleContext,
+  runSingleCycle,
+  LM,
+  JSONSerializer,
+  MetricsTracker,
+  ModelSelector,
+  NarseseTranslator,
+  ProtocolAdapters,
+  ProviderRegistry,
+  ResourceManager,
+  StreamingProcessor,
+  WorkflowEngine
+};
