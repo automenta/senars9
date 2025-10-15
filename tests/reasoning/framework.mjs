@@ -59,11 +59,12 @@ export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
   // Run the reasoner for N cycles
   const allDerivedTasks = new Set(); // Use Set to avoid duplicates
   for (let cycle = 0; cycle < config.cycles; cycle++) {
-    // Get all tasks from memory to potentially apply reasoner to
-    const allTasks = memory.getAllTasks();
-    
-    for (const task of allTasks) {
-      // Apply the reasoner to each task
+    // Get tasks from the focus set, which is the correct way to do it now
+    const focusItems = core.focus.getFocusItems();
+    const focusTasks = focusItems.map(item => item[1]); // Extract tasks from [key, taskData] pairs
+
+    for (const task of focusTasks) {
+      // Apply the reasoner to each task in the focus set
       const derivedTasks = config.reasoner(task, memory, context);
       if (derivedTasks && derivedTasks.length > 0) {
         derivedTasks.forEach(derivedTask => {

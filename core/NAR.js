@@ -1,9 +1,9 @@
 import Memory from './Memory.js';
+import { Focus } from './Focus.js';
 import { Task, Punctuation, TruthValue } from './Task.js';
 import { Term } from './Term.js';
 import { Reasoner } from './Reasoner.js';
 import { CycleContext, runSingleCycle } from './Cycle.js';
-import { FocusSetSelector } from './FocusSetSelector.js';
 import { Logger } from './base/utilities.js';
 
 export class NAR {
@@ -14,14 +14,13 @@ export class NAR {
   }
 
   _initComponents(config) {
-    this.memory = new Memory();
+    this.focus = new Focus();
+    this.memory = new Memory(this.focus);
     this.reasoner = new Reasoner();
-    this.focusSetSelector = new FocusSetSelector(
-      config.focusSize || 5,
-      config.priorityThreshold || 0.1,
-      config.urgencyWeight || 0.2,
-      config.diversityFactor || 0.1
-    );
+
+    // Create a default focus set
+    this.focus.createFocusSet('default');
+    this.focus.setFocus('default');
   }
 
   _initState(config) {
@@ -129,11 +128,12 @@ export class NAR {
   runCycle() {
     const context = new CycleContext(Date.now());
 
-    const allTasks = this.memory.getAllTasks();
-    if (allTasks.length === 0) return;
+    // Get tasks from the focus set
+    const focusItems = this.focus.getFocusItems();
+    if (focusItems.length === 0) return;
 
-    const focusSet = this.focusSetSelector.select(allTasks, context.currentTime);
-    if (focusSet.length === 0) return;
+    // Extract the tasks from the [key, taskData] pairs
+    const focusSet = focusItems.map(item => item[1]);
 
     focusSet.forEach(task => task.setAccessedAt(context.currentTime));
 

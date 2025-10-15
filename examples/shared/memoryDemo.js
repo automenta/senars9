@@ -4,6 +4,7 @@
  */
 
 import createCore from '../../core/orchestration/createCore.js';
+import { Task, Term, Punctuation, TruthValue } from '../../core/index.js';
 
 // Export the main functionality for both tests and examples to use
 export async function demonstrateMemorySystem() {
@@ -11,87 +12,66 @@ export async function demonstrateMemorySystem() {
 
   try {
     // 1. Create focus sets for different attention areas
-    core.memory.focus.createFocusSet('working-memory', 5);
-    core.memory.focus.createFocusSet('long-term-storage', 10);
-    core.memory.focus.createFocusSet('attention-focus', 3);
-    core.memory.focus.createFocusSet('pattern-buffer', 8);
+    core.focus.createFocusSet('working-memory', 5);
+    core.focus.createFocusSet('long-term-storage', 10);
+    core.focus.createFocusSet('attention-focus', 3);
+    core.focus.createFocusSet('pattern-buffer', 8);
 
     // 2. Set current focus to working memory
-    core.memory.focus.setFocus('working-memory');
+    core.focus.setFocus('working-memory');
 
     // 3. Add items with different priorities and metadata
-    const items = [
-      {
-        key: 'urgent-alert-001',
-        value: {
-          content: 'Critical system temperature exceeded threshold',
-          priority: 10,
-          type: 'alert',
-          severity: 'critical'
-        },
-        options: {
-          type: 'alert',
-          tags: ['urgent', 'system', 'temperature'],
-          priority: 10
-        }
-      },
-      {
-        key: 'task-meeting-0900',
-        value: {
-          content: 'Daily standup meeting at 9:00 AM',
-          priority: 7,
-          type: 'task',
-          category: 'meeting'
-        },
-        options: {
-          type: 'task',
-          tags: ['meeting', 'daily', 'scheduled'],
-          priority: 7
-        }
-      },
-      {
-        key: 'pattern-traffic-001',
-        value: {
-          content: 'Unusual traffic pattern detected on port 443',
-          priority: 8,
-          type: 'pattern',
-          dataPoints: 150
-        },
-        options: {
-          type: 'pattern',
-          tags: ['traffic', 'security', 'analysis'],
-          priority: 8
-        }
-      },
-      {
-        key: 'reference-docs',
-        value: {
-          content: 'System architecture documentation',
-          priority: 3,
-          type: 'reference',
-          lastUpdated: new Date().toISOString()
-        },
-        options: {
-          type: 'reference',
-          tags: ['documentation', 'architecture'],
-          priority: 3
-        }
-      }
+    const tasks = [
+      new Task(
+        new Term('Critical system temperature exceeded threshold'),
+        Punctuation.GOAL,
+        new TruthValue(0.9, 0.9),
+        Date.now(),
+        Date.now(),
+        1.0
+      ),
+      new Task(
+        new Term('Daily standup meeting at 9:00 AM'),
+        Punctuation.GOAL,
+        new TruthValue(0.7, 0.7),
+        Date.now(),
+        Date.now(),
+        0.7
+      ),
+      new Task(
+        new Term('Unusual traffic pattern detected on port 443'),
+        Punctuation.BELIEF,
+        new TruthValue(0.8, 0.8),
+        Date.now(),
+        Date.now(),
+        0.8
+      ),
+      new Task(
+        new Term('System architecture documentation'),
+        Punctuation.BELIEF,
+        new TruthValue(0.5, 0.5),
+        Date.now(),
+        Date.now(),
+        0.3
+      )
     ];
 
     // Add items to memory
-    items.forEach(({ key, value, options }) => {
-      core.memory.set(key, value, options);
-    });
+    core.memory.addTask(tasks[0]);
+    core.memory.addTask(tasks[1]);
 
     // 4. Demonstrate focus set management
-    core.memory.focus.updateFocusSets('urgent-alert-001', { focusSet: 'working-memory' });
-    core.memory.focus.updateFocusSets('task-meeting-0900', { focusSet: 'working-memory' });
-    core.memory.focus.updateFocusSets('pattern-traffic-001', { focusSet: 'attention-focus' });
-    core.memory.focus.updateFocusSets('reference-docs', { focusSet: 'long-term-storage' });
+    core.focus.setFocus('attention-focus');
+    core.memory.addTask(tasks[2]);
+
+    core.focus.setFocus('long-term-storage');
+    core.memory.addTask(tasks[3]);
+
+    // Switch back to working-memory to test retrieval
+    core.focus.setFocus('working-memory');
 
     // Get items from current focus
-    const focusItems = core.memory.focus.getFocusItems(3);
+    const focusItems = core.focus.getFocusItems(3);
 
     // 5. Demonstrate attention mechanism
     core.memory.focus.updateFocusAttention('working-memory', 0.8);
@@ -132,7 +112,7 @@ export async function demonstrateMemorySystem() {
       urgentItems,
       memStats,
       attentionItems,
-      totalItems: items.length
+      totalItems: tasks.length
     };
 
   } finally {

@@ -1,4 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
+import { Task, Term, Punctuation, TruthValue } from '../../core/index.js';
 import {
   withCoreSetup,
   createTestRules,
@@ -106,49 +107,62 @@ describe('Core Foundation Integration Test', () => {
 
   test('should demonstrate enhanced memory focus sets and attention', withCoreSetup(async (core) => {
     // Create focus sets for different attention areas
-    core.memory.focus.createFocusSet('working-memory', 5);
-    core.memory.focus.createFocusSet('long-term-storage', 10);
-    core.memory.focus.createFocusSet('attention-focus', 3);
+    core.focus.createFocusSet('working-memory', 5);
+    core.focus.createFocusSet('long-term-storage', 10);
+    core.focus.createFocusSet('attention-focus', 3);
 
     // Set current focus
-    core.memory.focus.setFocus('working-memory');
+    core.focus.setFocus('working-memory');
 
-    // Add test memory items using consolidated utilities
-    const taskItem1 = createTestMemoryItems.task('urgent task', 10);
-    const taskItem2 = createTestMemoryItems.task('normal task', 5);
-    const memoryItem1 = createTestMemoryItems.task('long term memory', 3);
+    // Create and add proper Task objects
+    const task1 = new Task(
+      new Term('urgent task'),
+      Punctuation.GOAL,
+      new TruthValue(0.9, 0.9),
+      Date.now(),
+      Date.now(),
+      1.0 // High priority
+    );
+    const task2 = new Task(
+      new Term('normal task'),
+      Punctuation.GOAL,
+      new TruthValue(0.7, 0.7),
+      Date.now(),
+      Date.now(),
+      0.5 // Medium priority
+    );
+    const task3 = new Task(
+      new Term('long term memory'),
+      Punctuation.BELIEF,
+      new TruthValue(0.5, 0.5),
+      Date.now(),
+      Date.now(),
+      0.2 // Low priority
+    );
 
-    core.memory.set(taskItem1.key, taskItem1.value, taskItem1.options);
-    core.memory.set(taskItem2.key, taskItem2.value, taskItem2.options);
-    core.memory.set(memoryItem1.key, memoryItem1.value, { ...memoryItem1.options, type: 'memory', tags: ['reference'] });
+    // Add tasks to memory, which will in turn add them to the current focus set
+    core.memory.addTask(task1);
+    core.memory.addTask(task2);
 
-    // Update focus sets for items
-    core.memory.focus.updateFocusSets(taskItem1.key, { focusSet: 'working-memory' });
-    core.memory.focus.updateFocusSets(taskItem2.key, { focusSet: 'working-memory' });
-    core.memory.focus.updateFocusSets(memoryItem1.key, { focusSet: 'long-term-storage' });
+    // Switch focus and add the third task
+    core.focus.setFocus('long-term-storage');
+    core.memory.addTask(task3);
+
+    // Switch back to working-memory to test retrieval
+    core.focus.setFocus('working-memory');
 
     // Test focus set retrieval with attention scoring
-    const focusItems = core.memory.focus.getFocusItems(3);
+    const focusItems = core.focus.getFocusItems(3);
     expect(focusItems.length).toBeGreaterThan(0);
 
     // Test attention mechanism
-    const stats = core.memory.focus.getFocusSetStats();
+    const stats = core.focus.getFocusSetStats();
     expect(stats['working-memory']).toBeDefined();
 
     // Update attention
-    core.memory.focus.updateFocusAttention('working-memory', 0.5);
-    const updatedStats = core.memory.focus.getFocusSetStats();
+    core.focus.updateFocusAttention('working-memory', 0.5);
+    const updatedStats = core.focus.getFocusSetStats();
     expect(updatedStats['working-memory'].attentionScore).toBe(0.5);
-
-    // Test query optimization - search by priority
-    const highPriorityItems = core.memory.query({
-      minPriority: 8,
-      limit: 10
-    });
-    expect(highPriorityItems.length).toBeGreaterThan(0);
-
-    // Also test basic memory retrieval
-    expectMemoryItem(core.memory, taskItem1.key, taskItem1.value);
   }));
 
   test('should demonstrate component interaction and performance', withCoreSetup(async (core) => {

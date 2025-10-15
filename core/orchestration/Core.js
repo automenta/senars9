@@ -1,7 +1,8 @@
 import Config from '../config/Config.js';
 import Messages from '../messaging/Messages.js';
 import Rules from '../reasoning/Rules.js';
-import Memory, { Focus } from '../Memory.js';
+import Memory from '../Memory.js';
+import { Focus } from '../Focus.js';
 import Reasoning from '../reasoning/Reasoning.js';
 import LM from '../lm/LM.js'; // Add LM component import
 import AdjacencyBag from '../memory/AdjacencyBag.js';
@@ -34,6 +35,11 @@ class Core {
     const focus = new Focus();
     this.registerComponent('focus', focus);
     this.registerComponent('memory', new Memory(focus));
+
+    // Create and set a default focus set
+    focus.createFocusSet('default');
+    focus.setFocus('default');
+
     this.registerComponent('reasoning', new Reasoning());
     this.registerComponent('lm', new LM()); // Register LM component
 

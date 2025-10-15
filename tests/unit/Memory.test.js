@@ -1,4 +1,5 @@
-import Memory, { Focus } from '../../core/Memory.js';
+import Memory from '../../core/Memory.js';
+import { Focus } from '../../core/Focus.js';
 import {
   createTestComponent,
   testLifecycleTransitions,
