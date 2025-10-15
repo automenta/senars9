@@ -86,7 +86,7 @@ class FullFeaturedServer extends WebSocketServerBase {
       });
     }
 
-    import('./reasoning/SyllogisticRules.js').then(({ DeductiveSyllogism, Induction, Abduction }) => {
+    import('./reasoning/nal/SyllogisticRules.js').then(({ DeductiveSyllogismRule, InductionRule, AbductionRule }) => {
       if (this.reasoner) {
         this.reasoner.addRule(new DeductiveSyllogism());
         this.reasoner.addRule(new Induction());

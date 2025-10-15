@@ -11,7 +11,7 @@ describe('Reasoning Component', () => {
   let mockCore;
 
   beforeEach(() => {
-    reasoning = new Reasoning();
+    reasoning = new Reasoner();
     mockCore = {
       rules: {
         executeRules: jest.fn().mockReturnValue([]),

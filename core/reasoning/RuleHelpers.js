@@ -1,4 +1,4 @@
-import { InferenceRule } from '../Reasoner.js';
+import { NALRule } from './Rule.js';
 import { TermType } from '../Term.js';
 
 /**
@@ -12,7 +12,7 @@ import { TermType } from '../Term.js';
  *
  * @param {Task} premise1 - The first premise task
  * @param {Memory} memory - Reference to the system's memory
- * @param {CycleContext} context - The current cycle's context
+ * @param {object} context - The reasoning context
  * @param {Function} queryPremises2 - Function that takes memory and components of the first premise, returns candidate premises
  * @param {Function} constructNewTermComponents - Function that takes components of both premises and returns subject/predicate for new term
  * @param {Function} calculateNewTruth - Function that calculates the truth value of the conclusion
@@ -78,10 +78,10 @@ export function applySyllogisticRule(
           truth: newTruth,
           getPriority: () => 0.5, // Default priority
           setPriority: () => {},
-          getAccessedAt: () => context.currentTime,
+          getAccessedAt: () => Date.now(),
           setAccessedAt: () => {},
-          createdAt: context.currentTime,
-          occurrenceTime: context.currentTime,
+          createdAt: Date.now(),
+          occurrenceTime: Date.now(),
           isBelief: () => true,
           isQuestion: () => false,
           isGoal: () => false,
@@ -96,27 +96,55 @@ export function applySyllogisticRule(
 /**
  * Creates a standardized syllogistic rule.
  *
+ * @param {string} id - Unique identifier for the rule
  * @param {Function} queryFn - Function for querying the second premise
  * @param {Function} constructFn - Function for constructing the conclusion's term
  * @param {Function} truthFn - The truth function to be used (e.g., TruthValue.deduction)
  * @param {boolean} excludeSelf - Whether premise1 can also be premise2
- * @returns {InferenceRule} A new syllogistic rule instance
+ * @param {object} options - Additional rule options
+ * @returns {NALRule} A new syllogistic rule instance
  */
-export function createSyllogisticRule(queryFn, constructFn, truthFn, excludeSelf) {
-  return class SyllogisticRule extends InferenceRule {
-    getTriggerTermType() {
-      return TermType.INHERITANCE;
+export function createSyllogisticRule(id, queryFn, constructFn, truthFn, excludeSelf, options = {}) {
+  return class SyllogisticRule extends NALRule {
+    constructor(options = {}) {
+      super(id, options);
+      this.queryFn = queryFn;
+      this.constructFn = constructFn;
+      this.truthFn = truthFn;
+      this.excludeSelf = excludeSelf;
     }
 
-    apply(premise1, memory, context) {
+    /**
+     * Determines if the rule can be applied to the given context
+     * @param {object} context - The reasoning context containing premises, memory, etc.
+     * @returns {boolean} Whether the rule can be applied
+     */
+    canApply(context) {
+      const { premise, memory } = context;
+      if (!premise || !premise.task || !memory) return false;
+
+      const task = premise.task;
+      return task.term && task.term.termType === TermType.INHERITANCE;
+    }
+
+    /**
+     * Applies the syllogistic rule to derive new tasks
+     * @param {object} context - The reasoning context
+     * @returns {Promise<any>} Results from rule application
+     */
+    async apply(context) {
+      const { premise, memory } = context;
+      
+      if (!premise || !premise.task || !memory) return [];
+
       return applySyllogisticRule(
-        premise1,
+        premise.task,
         memory,
         context,
-        queryFn,
-        constructFn,
-        truthFn,
-        excludeSelf
+        this.queryFn,
+        this.constructFn,
+        this.truthFn,
+        this.excludeSelf
       );
     }
   };

@@ -7,8 +7,6 @@ export { setupXenovaProvider, createLMWithXenova } from './lm/XenovaSetup.js';
 export { default as MetricsTracker } from './lm/MetricsTracker.js';
 export { default as ResourceManager } from './lm/ResourceManager.js';
 export { default as WorkflowEngine } from './lm/WorkflowEngine.js';
-export { default as ReasoningSystem } from './lm/ReasoningSystem.js';
-export { default as ReasoningEngine } from './lm/ReasoningEngine.js';
 export { default as NarseseTranslator } from './lm/NarseseTranslator.js';
 export { default as JSONSerializer } from './lm/JSONSerializer.js';
 export { default as StreamingProcessor } from './lm/StreamingProcessor.js';
@@ -54,11 +52,11 @@ export { ResolutionStrategy } from './reasoning/ResolutionStrategy.js';
 export {
   applySyllogisticRule,
   SyllogisticRule,
-  DeductiveSyllogism,
-  Induction,
-  Abduction
-} from './reasoning/SyllogisticRules.js';
-export { ModusPonens } from './reasoning/ModusPonensRule.js';
+  DeductiveSyllogismRule,
+  InductionRule,
+  AbductionRule
+} from './reasoning/nal/SyllogisticRules.js';
+export { ModusPonensRule } from './reasoning/nal/ModusPonensRule.js';
 export { Analogy } from './reasoning/AnalogyRule.js';
 
 // Component Framework

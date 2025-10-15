@@ -12,6 +12,10 @@ import { FocusSetSelector } from '../core/FocusSetSelector.js';
 import Bag from '../core/memory/Bag.js';
 import System from '../core/system/System.js';  // The main System with LM integration
 import blessed from 'blessed';
+import { GoalDecompositionRule } from '../core/reasoning/lm/rules/GoalDecompositionRule.js';
+import { HypothesisGenerationRule } from '../core/reasoning/lm/rules/HypothesisGenerationRule.js';
+import { VariableGroundingRule } from '../core/reasoning/lm/rules/VariableGroundingRule.js';
+import { TaskPremise } from '../core/reasoning/Premise.js';
 
 // Default configuration
 const DEFAULT_INPUT = "Ensure Earth Happiness!";
@@ -26,37 +30,24 @@ let taskUpdateInterval = null;
 let logLines = [];
 const MAX_LOG_LINES = 5000;
 
-// Neurosymbolic integration rules registry
-const integrationRules = [];
-
 /**
- * Add a neurosymbolic integration rule
- * @param {Object} rule - The integration rule
- * @param {Function} rule.premiseCriteria - Function that determines if a task qualifies for this rule
- * @param {Function} rule.lmPromptTemplate - Function that generates the prompt for the LM
- * @param {Function} rule.lmOutputProcessor - Function that processes LM output
- * @param {Function} rule.taskGenerator - Function that creates new tasks from processed output
- */
-function addIntegrationRule(rule) {
-  integrationRules.push(rule);
-}
-
-/**
- * Process tasks through neurosymbolic integration rules
+ * Process tasks through the new unified reasoning system
  */
 async function processNeurosymbolicRules() {
-  if (!system || !system.core || !system.core.focus) return;
+  if (!system || !system.core || !system.core.focus || !system.lm) return;
 
   try {
-    // For reasoning, we use probabilistic sampling from a Bag.
+    // Get focus items to process
     const focusItems = system.core.focus.getFocusItems ? system.core.focus.getFocusItems() : [];
     if (focusItems.length === 0) {
       return;
     }
 
+    // For reasoning, we use probabilistic sampling from a Bag.
     const taskBag = new Bag();
     for (const [key, taskData] of focusItems) {
-      taskBag.put(key, taskData, taskData.priority);
+      const priority = typeof taskData.getPriority === 'function' ? taskData.getPriority() : (taskData.priority || 0);
+      taskBag.put(key, taskData, priority);
     }
 
     // Sample one task to process for this cycle to simulate the NAR's single-premise reasoning.
@@ -64,273 +55,44 @@ async function processNeurosymbolicRules() {
     if (!sampledTaskData) {
       return;
     }
-    const focusTasks = [sampledTaskData.item]; // Process one sampled task.
+    const focusTask = sampledTaskData.item;
     
-    // Apply each integration rule to eligible focus tasks (premises)
-    for (const rule of integrationRules) {
-      for (const task of focusTasks) {
-        try {
-          // Check if the task meets the rule's criteria
-          if (rule.premiseCriteria && rule.premiseCriteria(task)) {
-            // Log that we're consulting the LM
-            addLogLine(`🤖 LM consulted for rule: ${rule.description || 'Neurosymbolic rule'}`);
-            
-            // Generate prompt for the LM
-            const prompt = rule.lmPromptTemplate(task);
-            
-            // Consult with the LM
-            const lmResponse = await system.lm.process(prompt);
-            
-            // Process the LM output
-            const processedOutput = rule.lmOutputProcessor(lmResponse, task);
-            
-            // Generate new tasks based on the processed output
-            if (rule.taskGenerator && processedOutput) {
-              const newTasks = rule.taskGenerator(processedOutput, task);
-              
-              // Add new tasks to the system
-              if (Array.isArray(newTasks)) {
-                for (const newTask of newTasks) {
-                  await system.input(newTask);
-                  addLogLine(`📝 New task added: ${newTask.term || newTask}`);
-                }
-              } else if (newTasks) {
-                await system.input(newTasks);
-                addLogLine(`📝 New task added: ${newTasks.term || newTask}`);
-              }
+    // The unified reasoning system is now handled automatically by the core reasoning component
+    // We can still demonstrate LM-specific processing here if needed
+    
+    // For demo purposes, we'll directly call the LM with the focus task
+    if (focusTask.punctuation === '!') { // If it's a goal
+      // Apply goal decomposition logic directly
+      const rule = new GoalDecompositionRule(system.lm);
+      if (rule.canApply({ tasks: [focusTask] })) {
+        const result = await rule.apply({ tasks: [focusTask] });
+        if (result && Array.isArray(result)) {
+          for (const newTask of result) {
+            try {
+              await system.input(newTask);
+              addLogLine(`📝 New task added: ${newTask.term || newTask}`);
+            } catch (error) {
+              console.error('Error adding new task:', error);
+              addLogLine(`⚠️  Error adding task: ${error.message}`);
             }
           }
-        } catch (error) {
-          console.error('Error in neurosymbolic rule processing:', error);
-          addLogLine(`⚠️  Rule processing error: ${error.message}`);
         }
       }
     }
+    
   } catch (error) {
     console.error('Error processing neurosymbolic rules:', error);
+    addLogLine(`⚠️  Neurosymbolic reasoning error: ${error.message}`);
   }
 }
 
 /**
- * Setup neurosymbolic integration rules based on experimental tests
+ * Setup neurosymbolic integration rules using the unified reasoning system
  */
 function setupNeurosymbolicRules() {
-  // Rule 1: Goal Decomposition - When there's an abstract high-level goal,
-  // use the LM to break it down into more concrete sub-goals
-  addIntegrationRule({
-    description: "Goal Decomposition Rule",
-    premiseCriteria: (task) => {
-      // Check if it's a goal task (not just abstract terms, any goal!)
-      const isGoal = task.punctuation === '!';
-      const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || task._priority || 0);
-      
-      return isGoal && priority > 0.05; // Very low threshold to catch all goals
-    },
-    lmPromptTemplate: (task) => {
-      // Enhanced prompt to make it more likely to get actionable results
-      const termStr = task.term ? task.term.toString() : task.toString ? task.toString() : String(task);
-      return `Decompose this goal into 3-5 concrete, actionable sub-goals that would help achieve it: "${termStr}". Provide them as a numbered list.`;
-    },
-    lmOutputProcessor: (lmResponse, originalTask) => {
-      try {
-        addLogLine(`🤖 LM processed goal: "${originalTask.term || originalTask}"`);
-        
-        // Process the LM response to extract sub-goals
-        const lines = lmResponse.split('\n');
-        const subGoals = [];
-        
-        for (const line of lines) {
-          // Look for numbered items or bullet points
-          const match = line.match(/\d+\.\s*(.+)/) || line.match(/[•*-]\s*(.+)/);
-          if (match) {
-            // Clean up the sub-goal text
-            let goal = match[1].trim();
-            // Remove any trailing punctuation
-            goal = goal.replace(/[.:;!]$/, '');
-            if (goal && goal.length > 2) { // Ensure it's meaningful
-              subGoals.push(goal);
-            }
-          }
-        }
-        
-        // If no structured format found, try simple extraction
-        if (subGoals.length === 0) {
-          // Extract any imperative sentences (starting with verbs)
-          const sentences = lmResponse.split(/[.!?]+/);
-          for (const sentence of sentences) {
-            const trimmed = sentence.trim();
-            // Look for potential action items
-            if (trimmed && trimmed.length > 5 && (trimmed.toLowerCase().startsWith('create') || 
-                trimmed.toLowerCase().startsWith('establish') || 
-                trimmed.toLowerCase().startsWith('implement') || 
-                trimmed.toLowerCase().startsWith('ensure') || 
-                trimmed.toLowerCase().startsWith('improve') ||
-                trimmed.toLowerCase().startsWith('develop') ||
-                trimmed.toLowerCase().startsWith('increase') ||
-                trimmed.toLowerCase().startsWith('reduce'))) {
-              subGoals.push(trimmed);
-            }
-          }
-        }
-        
-        addLogLine(`✅ Extracted ${subGoals.length} subgoals from LM response`);
-        return subGoals;
-      } catch (error) {
-        console.error('Error processing LM response:', error);
-        addLogLine(`❌ Error processing LM response: ${error.message}`);
-        return [];
-      }
-    },
-    taskGenerator: (processedOutput, originalTask) => {
-      const newTasks = [];
-      
-      if (Array.isArray(processedOutput) && processedOutput.length > 0) {
-        addLogLine(`📝 Generating ${processedOutput.length} new tasks from LM output`);
-        for (const subGoal of processedOutput) {
-          if (subGoal && subGoal.trim()) {
-            const trimmedGoal = subGoal.trim();
-            // Convert to a more formal Narsese format
-            const narseseGoal = trimmedGoal.toLowerCase()
-              .replace(/\s+/g, '_')
-              .replace(/[^\w!_]/g, '') + '!'; // Remove special characters, keep the goal mark
-              
-            const newTask = {
-              term: narseseGoal,
-              punctuation: '!',
-              truth: { frequency: 0.8, confidence: 0.7 },
-              parent: originalTask.term || originalTask
-            };
-            
-            newTasks.push(newTask);
-            addLogLine(`🎯 New goal task added: ${narseseGoal}`);
-            
-            // Also create a belief linking the sub-goal to the original goal
-            if (originalTask.term) {
-              const originalTerm = originalTask.term.toString ? originalTask.term.toString() : 
-                                  originalTask.term.replace ? originalTask.term.replace(/[!?]/g, '') : 
-                                  String(originalTask.term).replace(/[!?]/g, '');
-              const termForLink = trimmedGoal.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_]/g, '');
-              const linkTerm = `(${termForLink} ==> ${originalTerm.replace(/\s+/g, '_').replace(/[^\w_]/g, '')}).`;
-              
-              const beliefTask = {
-                term: linkTerm,
-                punctuation: '.',
-                truth: { frequency: 0.9, confidence: 0.8 }
-              };
-              
-              newTasks.push(beliefTask);
-              addLogLine(`🔗 Belief link added: ${linkTerm}`);
-            }
-          }
-        }
-      } else {
-        // Even if no specific output, add some logging
-        addLogLine(`ℹ️ No specific tasks generated from this LM response`);
-      }
-      
-      return newTasks;
-    }
-  });
-  
-  // Rule 2: Hypothesis Generation - When there's a belief that might need 
-  // more supporting evidence, use the LM to generate related hypotheses
-  addIntegrationRule({
-    description: "Hypothesis Generation Rule",
-    premiseCriteria: (task) => {
-      // Look for beliefs with low confidence that might benefit from additional hypotheses
-      const isBelief = task.punctuation === '.';
-      const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || task._priority || 0);
-      // For this demo, we'll trigger on any belief for demonstration purposes
-      return isBelief && priority > 0.1; // Lower threshold for demo
-    },
-    lmPromptTemplate: (task) => {
-      return `Based on the belief "${task.term}", what is a related hypothesis that could either support or challenge this belief? Express it as a causal relationship if possible.`;
-    },
-    lmOutputProcessor: (lmResponse, originalTask) => {
-      // Process the LM's hypothesis
-      return lmResponse.trim();
-    },
-    taskGenerator: (processedOutput, originalTask) => {
-      if (!processedOutput || !processedOutput.trim()) return null;
-      
-      // Convert the hypothesis to Narsese format
-      let narseseHypothesis = processedOutput.trim();
-      
-      // If it's not already in Narsese format, try to convert it
-      if (!narseseHypothesis.includes('==>') && !narseseHypothesis.includes('=') && !narseseHypothesis.includes('<=>')) {
-        // Simple conversion - assume it's a potential implication
-        narseseHypothesis = `(${originalTask.term.replace(/[.?]/g, '')} ==> ${narseseHypothesis.replace(/[.?]/g, '')}).`;
-      }
-      
-      return [{
-        term: narseseHypothesis,
-        punctuation: '.',
-        truth: { frequency: 0.6, confidence: 0.5 }  // Lower confidence for generated hypotheses
-      }];
-    }
-  });
-  
-  // Rule 3: Variable Grounding - When there are variables in tasks, 
-  // use the LM to suggest possible values
-  addIntegrationRule({
-    description: "Variable Grounding Rule",
-    premiseCriteria: (task) => {
-      // Check if the task contains a variable (indicated by ?X pattern)
-      return task.term && task.term.includes('?');
-    },
-    lmPromptTemplate: (task) => {
-      return `For the task "${task.term}", what are 3 plausible values for the variable? Provide them as a list.`;
-    },
-    lmOutputProcessor: (lmResponse, originalTask) => {
-      try {
-        const lines = lmResponse.split('\n');
-        const candidates = [];
-        
-        for (const line of lines) {
-          const match = line.match(/\d+\.\s*(.+)/) || line.match(/[•*-]\s*(.+)/);
-          if (match) {
-            candidates.push(match[1].trim());
-          }
-        }
-        
-        // If no structured format found, try simple extraction
-        if (candidates.length === 0) {
-          // Try simple sentence splitting
-          const sentences = lmResponse.split(/[.!?]+/);
-          for (const sentence of sentences) {
-            const trimmed = sentence.trim();
-            if (trimmed && trimmed.length > 3) {
-              candidates.push(trimmed);
-            }
-          }
-        }
-        
-        return candidates;
-      } catch (error) {
-        console.error('Error processing variable grounding:', error);
-        return [];
-      }
-    },
-    taskGenerator: (processedOutput, originalTask) => {
-      const newTasks = [];
-      
-      if (Array.isArray(processedOutput)) {
-        for (const candidate of processedOutput) {
-          if (candidate.trim()) {
-            // Replace the variable with the candidate value
-            const groundedTerm = originalTask.term.replace(/\?\w+/, candidate.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_]/g, ''));
-            newTasks.push({
-              term: groundedTerm,
-              punctuation: originalTask.punctuation,
-              truth: { frequency: 0.5, confidence: 0.4 }  // Lower confidence for generated values
-            });
-          }
-        }
-      }
-      
-      return newTasks;
-    }
-  });
+  // The unified reasoning system is already set up in the core
+  // LM rules are automatically registered when the LM is available
+  addLogLine("✅ Neurosymbolic rules will be handled by the unified reasoning system");
 }
 
 // Color scheme

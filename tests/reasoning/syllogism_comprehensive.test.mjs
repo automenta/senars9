@@ -3,14 +3,14 @@
  */
 
 import { ReasoningTestBuilder, createReasoner } from './framework.mjs';
-import { DeductiveSyllogism } from '../../core/reasoning/SyllogisticRules.js';
+import { DeductiveSyllogismRule } from '../../core/reasoning/nal/SyllogisticRules.js';
 
 describe('Deductive Syllogism Tests', () => {
   test('should not derive invalid conclusion from unrelated premises', async () => {
     const success = await new ReasoningTestBuilder("Syllogistic Reasoning: (a --> b) and (c --> d) should NOT derive (a --> d)")
       .input("(a --> b)", undefined, 0.9, 0.9)
       .input("(c --> d)", undefined, 0.8, 0.8)
-      .using(createReasoner(DeductiveSyllogism))
+      .using(createReasoner(DeductiveSyllogismRule))
       .notExpect("(a --> d)") // Should not derive this since there's no connection
       .cycles(1)
       .run();
@@ -23,7 +23,7 @@ describe('Deductive Syllogism Tests', () => {
       .input("(a --> b)", undefined, 0.9, 0.9)
       .input("(b --> c)", undefined, 0.8, 0.8)
       .input("(c --> d)", undefined, 0.7, 0.7)
-      .using(createReasoner(DeductiveSyllogism))
+      .using(createReasoner(DeductiveSyllogismRule))
       .expect("(a --> c)")  // First step: a->b + b->c = a->c
       .expect("(b --> d)")  // Second step: b->c + c->d = b->d
       .expect("(a --> d)")  // Third step: a->c + c->d = a->d (or through other paths)
@@ -39,7 +39,7 @@ describe('Deductive Syllogism Tests', () => {
       .input("(bird --> animal)", undefined, 0.9, 0.9)
       .input("(robin --> bird)", undefined, 0.95, 0.85)
       .input("(animal --> living_thing)", undefined, 0.8, 0.85)
-      .using(createReasoner(DeductiveSyllogism))
+      .using(createReasoner(DeductiveSyllogismRule))
       .expect("(robin --> animal)")  // robin -> bird -> animal
       .expect("(bird --> living_thing)")  // bird -> animal -> living_thing
       .expect("(robin --> living_thing)")  // robin -> bird -> living_thing (or through animal)

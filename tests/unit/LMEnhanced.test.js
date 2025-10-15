@@ -3,7 +3,7 @@ import {
   MetricsTracker,
   ResourceManager,
   WorkflowEngine,
-  ReasoningEngine,
+  Reasoner,
   NarseseTranslator,
   JSONSerializer,
   StreamingProcessor,
@@ -41,7 +41,7 @@ describe('Enhanced LM Component Unit Tests', () => {
       expect(lm.metrics).toBeInstanceOf(MetricsTracker);
       expect(lm.resourceManager).toBeInstanceOf(ResourceManager);
       expect(lm.workflows).toBeInstanceOf(WorkflowEngine);
-      expect(lm.reasoningEngine).toBeInstanceOf(ReasoningEngine);
+      expect(lm.reasoner).toBeInstanceOf(Reasoner);
       expect(lm.ioAdapters.narseseConverter).toBeInstanceOf(NarseseTranslator);
       expect(lm.ioAdapters.jsonSerializer).toBeInstanceOf(JSONSerializer);
       expect(lm.ioAdapters.streamingProcessor).toBeInstanceOf(StreamingProcessor);

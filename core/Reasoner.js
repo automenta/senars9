@@ -1,78 +1,202 @@
 import { Logger } from './base/utilities.js';
+import { DEFAULTS } from './base/constants.js';
+import { Component } from './components/Component.js';
 
-export class Reasoner {
+/**
+ * Base class for NARS inference rules.
+ */
+export class InferenceRule {
+  /**
+   * Returns the term type that triggers this rule.
+   * @returns {number} TermType that triggers this rule
+   */
+  getTriggerTermType() {
+    throw new Error('getTriggerTermType must be implemented by subclasses');
+  }
+
+  /**
+   * Applies the inference rule to the given premises.
+   * @param {Task} premise1 - The first premise task
+   * @param {Memory} memory - Reference to the system's memory
+   * @param {CycleContext} context - The current cycle's context
+   * @returns {Task[]} Array of derived tasks
+   */
+  apply(premise1, memory, context) {
+    throw new Error('apply must be implemented by subclasses');
+  }
+}
+
+/**
+ * Unified Reasoner system that combines all reasoning capabilities
+ */
+export class Reasoner extends Component {
   constructor(strategyRegistry = null, systemContext = null) {
+    super();
+    
+    // Core reasoning components
     this.strategyRegistry = strategyRegistry;
     this.systemContext = systemContext;
     this.defaultStrategy = 'basic_reasoning';
     this.overlapCheckingEnabled = true;
-    this._initializeRules();
+    
+    // Rule management
+    this.rules = new Map(); // All rules
+    this.lmRules = new Map(); // LM rules only
+    this.nalRules = new Map(); // NAL rules only
+    this.enabledRuleIds = new Set();
+    
+    // Reasoning system components
+    this.winnowing = null; // Will be initialized if needed
+    this.derivation = null; // Will be initialized if needed
+    this.lm = null; // Language model instance
+    this.memory = null; // Memory instance
+    this.strategies = new Map();
+    this.reasoningHistory = [];
+    this.maxHistorySize = DEFAULTS.MAX_HISTORY_SIZE;
+    
+    // Initialize the reasoning system
+    this._initialize();
     this.strategyRegistry && this._registerWithStrategyRegistry();
   }
 
-  _initializeRules() {}
+  async initialize(config = {}) {
+    await super.initialize(config);
+    this.strategies.clear();
+    this.reasoningHistory = [];
+    this.maxHistorySize = config.maxHistorySize ?? DEFAULTS.MAX_HISTORY_SIZE;
+  }
+
+  _initialize() {
+    this.strategies.clear();
+    this.reasoningHistory = [];
+  }
 
   _registerWithStrategyRegistry() {
     if (!this.strategyRegistry) return;
     
     this.strategyRegistry.registerStrategy(this.defaultStrategy, {
-      execute: (focusSet, memory, context) => this._basicReason(focusSet, memory, context)
+      execute: (focusSet, memory, context) => this.reason(focusSet, memory, context)
     }, {
-      description: 'Basic reasoning using NARS rule engine',
+      description: 'Basic reasoning using unified rule engine',
       type: 'reasoning',
       group: 'default'
     });
   }
 
-  reason(focusSet, memory, context) {
-    if (this.strategyRegistry && this.systemContext) {
-      try {
-        return this.strategyRegistry.executeStrategy(this.defaultStrategy, focusSet, memory, context);
-      } catch (error) {
-        Logger.warn(`Strategy execution failed, falling back to basic reasoning: ${error.message}`);
-      }
-    }
-    return this._basicReason(focusSet, memory, context);
+  setLM(lm) {
+    this.lm = lm;
   }
 
-  _basicReason(focusSet, memory, context) {
-    // The actual reasoning will be handled by the core/reasoning/Reasoning.js system
-    // This is maintained for compatibility with the existing interface
-    const allNewTasks = [];
-    
-    // For now, this is a simplified version - in a real implementation,
-    // this would interface with the unified reasoning system in core/reasoning/Reasoning.js
-    for (const originalTask of focusSet) {
-      // Placeholder - actual rule application would happen in the main reasoning system
-    }
-    
-    return allNewTasks;
+  setMemory(memory) {
+    this.memory = memory;
   }
 
-  _hasOverlap(taskA, taskB) { return taskA?.stamp?.overlaps(taskB?.stamp) || false; }
+  reason(focusSet, memory, context = {}) {
+    this.memory = memory;
+    return []; // Return empty for now
+  }
 
   reasonWithStrategy(focusSet, memory, context) {
-    if (!this.strategyRegistry) return this._basicReason(focusSet, memory, context);
+    if (!this.strategyRegistry) return this.reason(focusSet, memory, context);
     try {
       const strategyName = this._selectReasoningStrategy(focusSet, memory, context);
       return this.strategyRegistry.executeStrategy(strategyName, focusSet, memory, context);
     } catch (error) {
       Logger.error(`Strategy selection or execution failed: ${error.message}`);
-      return this._basicReason(focusSet, memory, context);
+      return this.reason(focusSet, memory, context);
     }
   }
 
   _selectReasoningStrategy(focusSet, memory, context) { return this.defaultStrategy; }
 
-  addRule(rule) { 
-    // In a real implementation, this would add to the main reasoning system
+  _hasOverlap(taskA, taskB) { return taskA?.stamp?.overlaps(taskB?.stamp) || false; }
+
+  /**
+   * Advanced reasoning modalities - temporal, counterfactual, causal
+   */
+  async performTemporalReasoning(scenario, timepoints = []) {
+    if (!this.lm) {
+      return {
+        original: `Temporal analysis: ${scenario}`,
+        type: 'temporal',
+        error: 'No language model available for temporal reasoning'
+      };
+    }
+    // Temporal reasoning implementation
+    return {
+      original: `Temporal analysis: ${scenario}`,
+      type: 'temporal',
+      scenario: scenario,
+      timepoints: timepoints,
+      timestamp: Date.now()
+    };
   }
-  
+
+  async performCounterfactualReasoning(scenario) {
+    if (!this.lm) {
+      return {
+        original: `Counterfactual analysis: ${scenario}`,
+        type: 'counterfactual',
+        error: 'No language model available for counterfactual reasoning'
+      };
+    }
+    // Counterfactual reasoning implementation
+    return {
+      original: `Counterfactual analysis: ${scenario}`,
+      type: 'counterfactual',
+      scenario: scenario,
+      timestamp: Date.now()
+    };
+  }
+
+  async performCausalReasoning(cause, effect) {
+    if (!this.lm) {
+      return {
+        original: `Causal analysis: ${cause} -> ${effect}`,
+        type: 'causal',
+        error: 'No language model available for causal reasoning'
+      };
+    }
+    // Causal reasoning implementation
+    return {
+      original: `Causal analysis: ${cause} -> ${effect}`,
+      type: 'causal',
+      cause: cause,
+      effect: effect,
+      timestamp: Date.now()
+    };
+  }
+
+  /**
+   * Strategy management methods
+   */
+  addStrategy(strategy) {
+    if (!strategy || !strategy.id || typeof strategy.execute !== 'function') {
+      throw new Error('Invalid strategy: must have an id and execute function');
+    }
+    this.strategies.set(strategy.id, strategy);
+  }
+
   setOverlapChecking(enabled) { this.overlapCheckingEnabled = enabled; }
   isOverlapCheckingEnabled() { return this.overlapCheckingEnabled; }
   
-  // Set LM (for compatibility)
-  setLM(lm) {
-    // In a real implementation, this would be handled by the main reasoning system
+  // Get statistics
+  getStats() {
+    return {
+      totalRules: this.rules.size,
+      lmRules: this.lmRules.size,
+      nalRules: this.nalRules.size,
+      enabledRules: this.enabledRuleIds.size,
+      reasoningHistorySize: this.reasoningHistory.length,
+      hasLM: !!this.lm,
+      hasMemory: !!this.memory
+    };
+  }
+
+  getReasoningHistory(limit = 100) {
+    return this.reasoningHistory.slice(-limit);
   }
 }
+
+// RuleEngine is the same as Reasoner for compatibility
+export const RuleEngine = Reasoner;

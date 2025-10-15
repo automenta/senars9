@@ -37,7 +37,7 @@ class ReasoningManager {
       this.selector = new FocusSetSelector();
 
       // Register reasoning rules
-      const { DeductiveSyllogism, Induction, Abduction } = await import('./reasoning/SyllogisticRules.js');
+      const { DeductiveSyllogismRule, InductionRule, AbductionRule } = await import('./reasoning/nal/SyllogisticRules.js');
       this.reasoner.addRule(new DeductiveSyllogism());
       this.reasoner.addRule(new Induction());
       this.reasoner.addRule(new Abduction());

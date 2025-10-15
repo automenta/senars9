@@ -12,7 +12,7 @@ export {
   TaskPremise, 
   TaskTaskPremise, 
   TaskTermPremise 
-} from './lm/Premise.js';
+} from './Premise.js';
 
 // Export LM-specific rules
 export { 

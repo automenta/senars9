@@ -5,7 +5,7 @@ import { Logger } from '../base/utilities.js';
 import MetricsTracker from './MetricsTracker.js';
 import ResourceManager from './ResourceManager.js';
 import WorkflowEngine from './WorkflowEngine.js';
-import ReasoningEngine from './ReasoningEngine.js';
+
 import NarseseTranslator from './NarseseTranslator.js';
 import JSONSerializer from './JSONSerializer.js';
 import StreamingProcessor from './StreamingProcessor.js';
@@ -29,8 +29,9 @@ class LM extends Component {
       streamingProcessor: new StreamingProcessor(),
       protocolAdapters: new ProtocolAdapters()
     };
-    this.reasoningEngine = new ReasoningEngine(this.providers, this.ioAdapters);
     this.activeWorkflows = new Set();
+    // Initialize with a placeholder that will be replaced by system integration
+    this.reasoner = null;
   }
 
   async initialize(config = {}) {
@@ -143,15 +144,7 @@ class LM extends Component {
       throw error;
     }
   }
-
-  async performTemporalReasoning(scenario, timeline) {
-    return this.reasoningEngine.temporal(scenario, timeline);
-  }
-
-  async performCounterfactualReasoning(scenario) {
-    return this.reasoningEngine.counterfactual(scenario);
-  }
-
+  
   async selectOptimalModel(task, constraints = {}) {
     return this.modelSelector.select(task, constraints);
   }
@@ -187,7 +180,30 @@ class LM extends Component {
     await super.destroy();
   }
 
+  // Delegation methods for reasoner functionality
+  async performTemporalReasoning(scenario, timepoints = []) {
+    if (this.reasoner) {
+      return this.reasoner.performTemporalReasoning(scenario, timepoints);
+    }
+    // Fallback if no reasoner is set
+    return {
+      original: `Temporal analysis: ${scenario}`,
+      type: 'temporal',
+      error: 'No reasoner available'
+    };
+  }
 
+  async performCounterfactualReasoning(scenario) {
+    if (this.reasoner) {
+      return this.reasoner.performCounterfactualReasoning(scenario);
+    }
+    // Fallback if no reasoner is set
+    return {
+      original: `Counterfactual analysis: ${scenario}`,
+      type: 'counterfactual',
+      error: 'No reasoner available'
+    };
+  }
 }
 
 export default LM;

@@ -40,6 +40,7 @@ class Core {
     focus.createFocusSet('default');
     focus.setFocus('default');
 
+    // Create reasoner without dependencies initially, will set them up in _setupDependencies
     this.registerComponent('reasoning', new Reasoning());
     this.registerComponent('lm', new LM()); // Register LM component
 
@@ -207,6 +208,10 @@ class Core {
       // Update the reasoning component to use the strategy registry and system context
       this.reasoning.strategyRegistry = this.strategyRegistry;
       this.reasoning.systemContext = this.systemContext;
+      // Call any initialization if needed after setting up dependencies
+      if (typeof this.reasoning.initialize === 'function') {
+        // Dependencies are already passed in constructor, but may need to re-initialize
+      }
     }
     
     // Connect LM to reasoning system if both exist
