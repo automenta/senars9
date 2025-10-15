@@ -17,18 +17,9 @@ export class ModusPonensRule extends NALRule {
    * @returns {boolean} Whether the rule can be applied
    */
   canApply(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      task = context.premise.task;
-    } else if (context.premise1) {
-      // Old context format
-      task = context.premise1;
-    } else {
-      return false;
-    }
-    return task.term && task.term.termType === TermType.IMPLICATION;
+    // New context format from reasoner
+    const task = context.premise && context.premise.task ? context.premise.task : null;
+    return task && task.term && task.term.termType === TermType.IMPLICATION;
   }
 
   /**
@@ -43,24 +34,10 @@ export class ModusPonensRule extends NALRule {
   async apply(context) {
     const derived = [];
 
-    // Handle both old and new context formats
-    let implicationTask;
-    let memory;
-    let currentTime = Date.now();
-    
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      implicationTask = context.premise.task;
-      memory = context.memory;
-      currentTime = context.context?.currentTime || Date.now();
-    } else if (context.premise1 && context.memory) {
-      // Old context format
-      implicationTask = context.premise1;
-      memory = context.memory;
-      currentTime = context.currentTime || Date.now();
-    } else {
-      return derived;
-    }
+    // New context format from reasoner
+    const implicationTask = context.premise && context.premise.task ? context.premise.task : null;
+    const memory = context.memory;
+    const currentTime = context.context?.currentTime || Date.now();
     
     if (!implicationTask || !memory) return derived;
 

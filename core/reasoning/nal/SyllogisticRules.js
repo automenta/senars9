@@ -63,7 +63,7 @@ export function applySyllogisticRule(
         const newTruth = calculateNewTruth(truth1, truth2);
 
         // Get current time from context
-        const currentTime = context.currentTime || context.context?.currentTime || Date.now();
+        const currentTime = context.context?.currentTime || Date.now();
 
         // Determine the punctuation of the derived task
         const newPunctuation = (premise1.punctuation === Punctuation.GOAL && premise2.punctuation === Punctuation.GOAL)
@@ -106,18 +106,9 @@ export class SyllogisticRule extends NALRule {
    * @returns {boolean} Whether the rule can be applied
    */
   canApply(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      task = context.premise.task;
-    } else if (context.premise1) {
-      // Old context format
-      task = context.premise1;
-    } else {
-      return false;
-    }
-    return task.term && task.term.termType === TermType.INHERITANCE;
+    // New context format from reasoner
+    const task = context.premise && context.premise.task ? context.premise.task : null;
+    return task && task.term && task.term.termType === TermType.INHERITANCE;
   }
 
   /**
@@ -126,21 +117,9 @@ export class SyllogisticRule extends NALRule {
    * @returns {Promise<any>} Results from rule application
    */
   async apply(context) {
-    // Handle both old and new context formats
-    let premiseTask;
-    let memory;
-    
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      premiseTask = context.premise.task;
-      memory = context.memory;
-    } else if (context.premise1 && context.memory) {
-      // Old context format
-      premiseTask = context.premise1;
-      memory = context.memory;
-    } else {
-      return [];
-    }
+    // New context format from reasoner
+    const premiseTask = context.premise && context.premise.task ? context.premise.task : null;
+    const memory = context.memory;
     
     if (!premiseTask || !memory) return [];
 

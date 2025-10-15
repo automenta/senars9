@@ -162,16 +162,11 @@ export class Reasoner extends Component {
           
           let result;
           try {
-            // Try the newer-style context first
+            // Use the newer-style context only
             result = await rule.apply({ premise: { task: task1 }, memory, tasks: focusSet, context });
           } catch (error) {
-            // Fallback to older-style context
-            try {
-              result = await rule.apply({ premise1: task1, memory, context });
-            } catch (fallbackError) {
-              console.error(`Error applying rule ${ruleId}:`, error);
-              continue;
-            }
+            console.error(`Error applying rule ${ruleId}:`, error);
+            continue;
           }
           
           if (result) {

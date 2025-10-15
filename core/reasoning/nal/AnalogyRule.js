@@ -12,38 +12,17 @@ export class Analogy extends NALRule {
   }
 
   canApply(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      task = context.premise.task;
-    } else if (context.premise1) {
-      // Old context format
-      task = context.premise1;
-    } else {
-      return false;
-    }
-    return task.term && task.term.termType === TermType.SIMILARITY;
+    // New context format from reasoner
+    const task = context.premise && context.premise.task ? context.premise.task : null;
+    return task && task.term && task.term.termType === TermType.SIMILARITY;
   }
 
   apply(context) {
     const derived = [];
 
-    // Handle both old and new context formats
-    let premiseTask;
-    let memory;
-    
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      premiseTask = context.premise.task;
-      memory = context.memory;
-    } else if (context.premise1 && context.memory) {
-      // Old context format
-      premiseTask = context.premise1;
-      memory = context.memory;
-    } else {
-      return derived;
-    }
+    // New context format from reasoner
+    const premiseTask = context.premise && context.premise.task ? context.premise.task : null;
+    const memory = context.memory;
     
     if (!premiseTask || !memory || !premiseTask.term.subject || !premiseTask.term.predicate || !premiseTask.truth) {
       return derived;
@@ -81,7 +60,7 @@ export class Analogy extends NALRule {
 
           // Create new term ((S --> M) ==> (P --> M))
           const sm = Term.createCompound(TermType.INHERITANCE, [s, m]);
-          const pm = Term.createCompound(TermType.INHERITANCE, [p, m]);
+          const pm = Term.createCompound(TermType.IMPLICATION, [p, m]);
           const newTerm = Term.createCompound(TermType.IMPLICATION, [sm, pm]);
 
           const truth2 = sp.truth;
@@ -93,7 +72,7 @@ export class Analogy extends NALRule {
           const newTruth = { frequency: newFreq, confidence: newConf };
 
           // Get current time from context
-          const currentTime = context.currentTime || context.context?.currentTime || Date.now();
+          const currentTime = context.context?.currentTime || Date.now();
 
           const newTask = Task.createDerived(
             [premiseTask, sp, pp],
