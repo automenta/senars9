@@ -68,6 +68,10 @@ export class RuleManager {
     ruleIds.forEach(id => enable ? this.enabledRuleIds.add(id) : this.enabledRuleIds.delete(id));
   }
 
+  disableAllRules() {
+    this.enabledRuleIds.clear();
+  }
+
   _updateGroups(ruleId, group) {
     if (!this.config.enableGroups) return;
     const groupSet = this.ruleGroups.get(group) || new Set();

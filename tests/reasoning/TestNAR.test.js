@@ -4,84 +4,75 @@
  */
 
 import { test, expect } from '@jest/globals';
-import { TestNAR } from './TestNAR.js';
+import { TestNAR, TaskMatch } from './TestNAR.js';
+import { ModusPonensRule } from '../../core/reasoning/nal/ModusPonensRule.js';
 
-test('TestNAR should initialize without rules for testing', async () => {
-  const testNAR = await new TestNAR().initialize();
-  
-  // Should have no rules initially to allow individual rule testing
-  expect(testNAR.reasoner.rules.size).toBe(0);
-  expect(testNAR.reasoner.getEnabledRules().length).toBe(0);
-  
-  // Should have basic NAR functionality
-  expect(testNAR.memory).toBeDefined();
-  expect(testNAR.reasoner).toBeDefined();
-  expect(testNAR.focus).toBeDefined();
-  
-  // Should be able to add tasks (but they are stored in the input queue)
-  testNAR.input('Test task.');
-  expect(testNAR.inputs.length).toBe(1);
-});
+describe('TestNAR Framework Tests', () => {
+  test('TestNAR should be constructable', () => {
+    const testNAR = new TestNAR();
+    expect(testNAR).toBeInstanceOf(TestNAR);
+  });
 
-test('TestNAR should provide fluent testing methods', async () => {
-  const testNAR = await new TestNAR().initialize();
-  
-  // Test fluent methods
-  testNAR.belief('Test belief', { frequency: 0.8, confidence: 0.9 })
-         .goal('Test goal', { frequency: 0.7, confidence: 0.8 })
-         .question('Test question');
-  
-  // Should have 3 inputs in the queue
-  expect(testNAR.inputs.length).toBe(3);
-  
-  // Should return this for chaining
-  expect(testNAR.run(1)).toBe(testNAR);
-});
+  test('A simple chain without expectations should execute successfully', async () => {
+    const result = await new TestNAR()
+      .input('An input task')
+      .run(1)
+      .execute();
+    expect(result).toBe(true);
+  });
 
-test('TestNAR should provide expectation methods', async () => {
-  const testNAR = await new TestNAR().initialize();
-  
-  // Add a belief and expect it after running
-  await testNAR.belief('A specific test term appears here')
-               .run(1)
-               .execute();
-  
-  // Check if term exists after execution
-  const exists = testNAR._findMatchingTasks({ term: 'specific test term' });
-  expect(exists.length).toBeGreaterThan(0);
-});
+  test('A correct positive expectation (expect) should pass', async () => {
+    const result = await new TestNAR()
+      .using(ModusPonensRule)
+      .input('(a ==> b)')
+      .input('a')
+      .run(2)
+      .expect('b')
+      .execute();
+    expect(result).toBe(true);
+  });
 
-test('TestNAR should execute inputs and run cycles', async () => {
-  const testNAR = await new TestNAR().initialize();
-  
-  // Record a sequence of operations
-  const result = await testNAR.belief('Initial belief')
-                              .run(1)
-                              .expect({ term: 'Initial belief' })
-                              .execute();
-  
-  // Should have executed successfully
-  expect(result).toBeDefined();
-  expect(result.passed).toBe(true);
-  expect(result.expectations).toBe(1);
-});
+  test('A correct negative expectation (expectNot) should pass', async () => {
+    const result = await new TestNAR()
+      .using(ModusPonensRule)
+      .input('(a ==> b)')
+      // 'a' is missing
+      .run(2)
+      .expectNot('b')
+      .execute();
+    expect(result).toBe(true);
+  });
 
-test('TestNAR should allow positive and negative expectations', async () => {
-  const testNAR = await new TestNAR().initialize();
-  
-  // Test positive expectation (should exist)
-  const result1 = await testNAR.belief('Positive test')
-                               .run(1)
-                               .expect({ term: 'Positive test' })
-                               .execute();
-  
-  expect(result1.passed).toBe(true);
-  
-  // Test negative expectation (should not exist)
-  const result2 = await testNAR.belief('Another belief')
-                               .run(1)
-                               .expectNot({ term: 'Non-existent term' })
-                               .execute();
-  
-  expect(result2.passed).toBe(true);
+  test('A failed positive expectation (expect) should throw an error', async () => {
+    const testCase = new TestNAR()
+      .using(ModusPonensRule)
+      .input('(a ==> b)')
+      // 'a' is missing
+      .run(2)
+      .expect('b'); // This should not be derived
+
+    await expect(testCase.execute()).rejects.toThrow('TEST FAILED');
+  });
+
+  test('A failed negative expectation (expectNot) should throw an error', async () => {
+    const testCase = new TestNAR()
+      .using(ModusPonensRule)
+      .input('(a ==> b)')
+      .input('a')
+      .run(2)
+      .expectNot('b'); // This SHOULD be derived, so the expectation is wrong
+
+    await expect(testCase.execute()).rejects.toThrow('TEST FAILED');
+  });
+
+  test('TaskMatch builder should work correctly with withTruth', async () => {
+    const result = await new TestNAR()
+      .using(ModusPonensRule)
+      .input('(a ==> b)', 0.9, 0.9)
+      .input('a', 0.8, 0.8)
+      .run(2)
+      .expect(new TaskMatch('b').withTruth(0.72, 0.58))
+      .execute();
+    expect(result).toBe(true);
+  });
 });

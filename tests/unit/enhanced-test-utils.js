@@ -161,12 +161,6 @@ export const expectToHaveStatus = (component, expectedStatus) => {
   expect(component.getStatus().status).toBe(expectedStatus);
 };
 
-export const expectToBeHealthy = (component) => {
-  const health = component.getHealth();
-  expect(health.status).toBe('healthy');
-  expect(health.issues).toEqual([]);
-};
-
 // Core lifecycle management utilities
 export const setupCore = async (config = {}) => {
   const core = await createCore(config);
@@ -193,6 +187,13 @@ export const withCoreSetup = (testFn) => {
     }
   };
 };
+
+export const expectToBeHealthy = (component) => {
+  const health = component.getHealth();
+  expect(health.status).toBe('healthy');
+  expect(health.issues).toEqual([]);
+};
+
 
 // Common test data factories
 export const createTestRules = {

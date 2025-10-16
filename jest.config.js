@@ -2,7 +2,12 @@ export default {
   preset: null,
   testEnvironment: 'node',
   moduleFileExtensions: ['js', 'mjs'],
-  transform: {},
+  transform: {
+    '^.+\\.(js|mjs)$': 'babel-jest',
+  },
+  transformIgnorePatterns: [
+    '/node_modules/',
+  ],
   testPathIgnorePatterns: [
     '/tests/experimental/',
     '/tests/experimental2/',

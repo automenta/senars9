@@ -17,7 +17,7 @@ export class ModusPonensRule extends NALRule {
    * @returns {boolean} Whether the rule can be applied
    */
   canApply(context) {
-    return context.premise && context.premise.task;
+    return context.premise && context.premise.term;
   }
 
   /**
@@ -31,11 +31,13 @@ export class ModusPonensRule extends NALRule {
    */
   async apply(context) {
     const derived = [];
-    const implicationTask = context.premise && context.premise.task ? context.premise.task : null;
+    const implicationTask = context.premise;
     const memory = context.memory;
     const currentTime = context.context?.currentTime;
 
-    if (!implicationTask || !memory || !currentTime) return derived;
+    if (!implicationTask || !implicationTask.term || !memory || !currentTime) {
+        return derived;
+    }
 
     if (implicationTask.term.termType === TermType.IMPLICATION) {
       const antecedentTerm = implicationTask.term.subject;

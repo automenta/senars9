@@ -1,40 +1,62 @@
 /**
  * @file: tests/unit/Reasoning.test.js
- * @description: Unit tests for the Reasoning component.
+ * @description: Unit tests for the Reasoning component (RuleManager).
  */
 
 import { jest } from '@jest/globals';
-import { Reasoner } from '../../core/Reasoner.js';
-import { withCoreSetup } from './enhanced-test-utils.js';
+import { RuleManager as Reasoner } from '../../core/reasoning/RuleManager.js';
 
-describe('Reasoning Component', () => {
-  test('should initialize with an empty strategy map', withCoreSetup((core) => {
-    const { reasoner } = core;
-    expect(reasoner.strategies.size).toBe(0);
-  }));
+// Mock Memory class for testing purposes
+class MockMemory {
+  constructor() {
+    this.tasks = [];
+  }
+  getTask(hash) {
+    return this.tasks.find(t => t.term.hash === hash);
+  }
+  getAllTasks() {
+    return this.tasks;
+  }
+  addTask(task) {
+    this.tasks.push(task);
+  }
+}
 
-  test('should add a reasoning strategy', withCoreSetup((core) => {
-    const { reasoner } = core;
-    const strategy = { id: 'test-strategy', execute: () => {} };
-    reasoner.addStrategy(strategy);
-    expect(reasoner.strategies.get('test-strategy')).toEqual(strategy);
-  }));
+describe('Reasoner (RuleManager) Component', () => {
+  test('should initialize with an empty rule map', () => {
+    const reasoner = new Reasoner();
+    expect(reasoner.rules.size).toBe(0);
+  });
 
-  test('reason method should process tasks and return derived tasks', withCoreSetup(async (core) => {
-    const { reasoner, memory } = core;
+  test('should add a rule', () => {
+    const reasoner = new Reasoner();
+    const rule = { id: 'test-rule', apply: () => {} };
+    reasoner.addRule(rule);
+    expect(reasoner.rules.get('test-rule')).toEqual(rule);
+  });
+
+  test('reason method should process tasks and return derived tasks', async () => {
+    const reasoner = new Reasoner();
+    const memory = new MockMemory();
     const tasks = [{ term: '((A) --> (B)).', punctuation: '.' }];
 
-    // Mock the getRelevantTasks method to return an empty array
-    memory.getRelevantTasks = jest.fn().mockReturnValue([]);
+    // Mock a simple rule
+    const rule = {
+      id: 'test-rule',
+      apply: jest.fn().mockResolvedValue([{ term: 'derived' }]),
+    };
+    reasoner.addRule(rule);
 
-    const result = await reasoner.reason(tasks, memory);
+    const result = await reasoner.reason(tasks, memory, { currentTime: Date.now() });
 
     expect(result).toBeDefined();
-  }));
+    expect(rule.apply).toHaveBeenCalled();
+  });
 
-  test('reason method should return an empty array for empty task list', withCoreSetup(async (core) => {
-    const { reasoner, memory } = core;
-    const result = await reasoner.reason([], memory);
+  test('reason method should return an empty array for empty task list', async () => {
+    const reasoner = new Reasoner();
+    const memory = new MockMemory();
+    const result = await reasoner.reason([], memory, { currentTime: Date.now() });
     expect(result).toEqual([]);
-  }));
+  });
 });

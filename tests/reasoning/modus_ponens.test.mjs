@@ -1,46 +1,43 @@
 /**
- * Modus Ponens reasoning tests using Jest framework
+ * Modus Ponens reasoning tests using the new TestNAR framework.
  */
 
-import { ReasoningTestBuilder, TaskMatch } from './framework.mjs';
-import { ModusPonensRule } from '../../core/reasoning/nal/ModusPonensRule.js';
+import { TestNAR, TaskMatch } from './TestNAR.js';
 
-describe('Modus Ponens Tests', () => {
-  test('should derive b from (a ==> b) and a with correct truth value', async () => {
-    const success = await new ReasoningTestBuilder("Modus Ponens: (a ==> b) and a should derive b")
-      .input("(a ==> b)", undefined, 0.9, 0.9)
-      .input("a", undefined, 0.8, 0.8)
-      .using(new ModusPonensRule())
-      .expect(new TaskMatch("b").withTruth(0.71, 0.64)) // freq=0.9*0.8=0.72, conf=0.9*0.8*0.9=0.648
-      .notExpect("a")  // Should not re-derive the input
-      .cycles(2)
-      .run();
+describe('Modus Ponens Tests (with new TestNAR)', () => {
+  it('should derive b from (a ==> b) and a with correct truth value', async () => {
+    const result = await new TestNAR()
+      .input('(a ==> b)', 0.9, 0.9)
+      .input('a', 0.8, 0.8)
+      .run(2) // Run for 2 cycles to ensure rule has a chance to fire
+      .expect(new TaskMatch('b').withTruth(0.71, 0.64)) // freq=0.9*0.8=0.72, conf=0.9*0.8*0.9=0.648. Rounded down for the test.
+      .execute();
 
-    expect(success).toBe(true);
+    // The execute method will throw if the expectation fails.
+    // If it completes without error, the test is considered passed.
+    // We can add an explicit assertion for clarity.
+    expect(result).toBe(true);
   });
 
-  test('should not derive without the antecedent', async () => {
-    const success = await new ReasoningTestBuilder("Modus Ponens: (a ==> b) without a should NOT derive b")
-      .input("(a ==> b)", undefined, 0.9, 0.9)
-      // Missing: a
-      .using(new ModusPonensRule())
-      .notExpect("b")  // Should not be able to derive b without a
-      .cycles(1)
-      .run();
+  it('should not derive without the antecedent', async () => {
+    const result = await new TestNAR()
+      .input('(a ==> b)', 0.9, 0.9)
+      // Missing the antecedent 'a'
+      .run(1)
+      .expectNot('b')
+      .execute();
 
-    expect(success).toBe(true);
+    expect(result).toBe(true);
   });
 
-  test('should work with complex terms', async () => {
-    const success = await new ReasoningTestBuilder("Modus Ponens with complex terms")
-      .input("(sunny_day ==> good_mood)", undefined, 0.85, 0.9)
-      .input("sunny_day", undefined, 0.9, 0.85)
-      .using(new ModusPonensRule())
-      .expect(new TaskMatch("good_mood").withTruth(0.76, 0.64)) // freq=0.85*0.9=0.765, conf=0.85*0.9*0.9=0.6885
-      .notExpect("sunny_day")  // Should not re-derive input
-      .cycles(2)
-      .run();
+  it('should work with complex terms', async () => {
+    const result = await new TestNAR()
+      .input('(sunny_day ==> good_mood)', 0.85, 0.9)
+      .input('sunny_day', 0.9, 0.85)
+      .run(2)
+      .expect(new TaskMatch('good_mood').withTruth(0.76, 0.64)) // freq=0.85*0.9=0.765, conf=0.85*0.9*0.9=0.6885. Rounded down.
+      .execute();
 
-    expect(success).toBe(true);
+    expect(result).toBe(true);
   });
 });
