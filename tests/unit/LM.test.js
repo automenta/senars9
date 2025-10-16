@@ -87,8 +87,8 @@ describe('LM Component', () => {
     expect(() => new LangChainProvider(config)).toBeInstanceOf(Function);
   });
 
-  test('throws error for invalid LangChain config', () => {
-    expect(() => new LangChainProvider({})).toThrow('API key is required for LangChain provider');
+  test('does not throw error for local LangChain config', () => {
+    expect(() => new LangChainProvider({})).not.toThrow();
   });
 
   test('integrates with Xenova provider for local models', () => {

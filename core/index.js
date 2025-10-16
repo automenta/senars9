@@ -30,10 +30,6 @@ import { default as System } from './system/System.js';
 // Main NAR class
 import { NAR } from './NAR.js';
 
-// Import actual setup functions
-import { setupLangChainProvider } from './lm/LangChainSetup.js';
-import { setupXenovaProvider } from './lm/XenovaSetup.js';
-
 // Export all the components
 export {
   NAR,
@@ -64,7 +60,5 @@ export {
   ProviderRegistry,
   ResourceManager,
   StreamingProcessor,
-  WorkflowEngine,
-  setupLangChainProvider,
-  setupXenovaProvider
+  WorkflowEngine
 };

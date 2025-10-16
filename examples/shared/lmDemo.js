@@ -3,7 +3,9 @@
  * @description: Shared functionality for Language Model provider demonstration used by both tests and examples
  */
 
-import { LM, setupLangChainProvider, setupXenovaProvider } from '../../core/index.js';
+import { LM } from '../../core/index.js';
+import LangChainProvider from '../../core/lm/LangChainProvider.js';
+import XenovaProvider from '../../core/lm/XenovaProvider.js';
 import System from '../../core/system/System.js';
 
 // Export the main functionality for both tests and examples to use
@@ -12,22 +14,23 @@ export async function demonstrateLMProviders() {
 
   console.log('1️⃣ Setting up Xenova provider (local distilgpt2)...');
   const localLM = new LM();
-  setupXenovaProvider(localLM, {
+  localLM.registerProvider('local', new XenovaProvider({
     modelName: 'Xenova/distilgpt2',
     temperature: 0.7,
     maxTokens: 50,
     device: 'cpu'
-  }, 'local');
+  }));
+
 
   console.log('2️⃣ Setting up LangChain provider (OpenAI-compatible API)...');
   const apiLM = new LM();
-  setupLangChainProvider(apiLM, {
+  apiLM.registerProvider('api', new LangChainProvider({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: 'https://api.openai.com/v1',
     modelName: 'gpt-3.5-turbo',
     temperature: 0.7,
     maxTokens: 100,
-  }, 'api');
+  }));
 
   let localResponse = null;
   let apiResponse = null;
@@ -65,26 +68,16 @@ import os from 'os';
 
 // Export a function specifically for testing LM providers
 export async function testLMProviders() {
-  // Print a situational report to help diagnose SIGILL errors
-  // console.log('--- LM Integration Test: Situational Report ---');
-  // console.log(`Timestamp: ${new Date().toISOString()}`);
-  // console.log(`Node.js Version: ${process.version}`);
-  // console.log(`Operating System: ${os.type()} ${os.release()}`);
-  // console.log(`CPU Architecture: ${os.arch()}`);
-  // console.log('-------------------------------------------------');
-
   const localLM = new LM();
   const apiLM = new LM();
 
   try {
-    // console.log('Attempting to set up Xenova provider (local)...');
-    setupXenovaProvider(localLM, {
-      modelName: 'Xenova/distilgpt2',
-      temperature: 0.7,
-      maxTokens: 50,
-      device: 'cpu'
-    }, 'local');
-    // console.log('✅ Xenova provider setup succeeded.');
+    localLM.registerProvider('local', new XenovaProvider({
+        modelName: 'Xenova/distilgpt2',
+        temperature: 0.7,
+        maxTokens: 50,
+        device: 'cpu'
+    }));
   } catch (error) {
     // console.error('❌ Xenova provider setup failed:', error);
     if (error.stack) {
@@ -93,15 +86,13 @@ export async function testLMProviders() {
   }
 
   try {
-    // console.log('Attempting to set up LangChain provider (API)...');
-    setupLangChainProvider(apiLM, {
-      apiKey: process.env.OPENAI_API_KEY || 'test-key',
-      baseURL: process.env.OPENAI_API_BASE_URL || 'https://api.example.com/v1',
-      modelName: 'gpt-3.5-turbo',
-      temperature: 0.7,
-      maxTokens: 100,
-    }, 'api');
-    // console.log('✅ LangChain provider setup succeeded.');
+    apiLM.registerProvider('api', new LangChainProvider({
+        apiKey: process.env.OPENAI_API_KEY || 'test-key',
+        baseURL: process.env.OPENAI_API_BASE_URL || 'https://api.example.com/v1',
+        modelName: 'gpt-3.5-turbo',
+        temperature: 0.7,
+        maxTokens: 100,
+    }));
   } catch (error) {
     // console.error('❌ LangChain provider setup failed:', error);
     if (error.stack) {
@@ -159,12 +150,12 @@ export async function testLMProviders() {
 // Export function for testing response validation and caching
 export async function testLMResponseValidation() {
   const lm = new LM();
-  setupXenovaProvider(lm, {
+  lm.registerProvider('local', new XenovaProvider({
     modelName: 'Xenova/distilgpt2',
     temperature: 0.7,
     maxTokens: 50,
     device: 'cpu'
-  }, 'local');
+  }));
 
   // Mock the generateText method to avoid Xenova TypeError
   lm.generateText = async () => "This is a mock response for testing.";

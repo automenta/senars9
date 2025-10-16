@@ -6,13 +6,9 @@
 import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation, TruthValue } from '../../../Task.js';
+import { extractTaskFromContext } from '../../RuleHelpers.js';
 
 // Helper functions (previously in RuleHelpers.js)
-
-function extractTaskFromContext(context) {
-  if (context.premise?.task) return context.premise.task;
-  return null;
-}
 
 function parseSubGoals(lmResponse) {
   return lmResponse
@@ -47,7 +43,7 @@ function createSubGoalTask(subGoal, originalTask) {
     originalTruth.confidence * 0.9,
   );
 
-  const newTerm = Term.newAtom(subGoal);
+  const newTerm = Term.newAtom(`Sub-goal: ${subGoal}`);
   return new Task(
     newTerm,
     Punctuation.GOAL,

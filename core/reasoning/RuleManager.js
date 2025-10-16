@@ -93,4 +93,26 @@ export class RuleManager {
     stats.avgExecutionTime = count > 0 ? stats.avgExecutionTime / count : 0;
     return stats;
   }
+
+  async reason(focusSet, memory, context) {
+    const derivedTasks = [];
+    const enabledRules = this.getEnabledRules();
+
+    for (const rule of enabledRules) {
+        for (const premise of focusSet) {
+            const startTime = Date.now();
+            const result = await rule.apply({ premise, memory, context });
+            const endTime = Date.now();
+
+            if (result && result.length > 0) {
+                derivedTasks.push(...result);
+                this.updateMetrics(rule.id, true, endTime - startTime);
+            } else {
+                this.updateMetrics(rule.id, false, endTime - startTime);
+            }
+        }
+    }
+
+    return derivedTasks;
+  }
 }

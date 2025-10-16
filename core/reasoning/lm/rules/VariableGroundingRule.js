@@ -6,13 +6,9 @@
 import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
+import { extractTaskFromContext } from '../../RuleHelpers.js';
 
 // Helper functions
-
-function extractTaskFromContext(context) {
-  if (context.premise?.task) return context.premise.task;
-  return null;
-}
 
 function parseSubGoals(lmResponse) {
   return lmResponse

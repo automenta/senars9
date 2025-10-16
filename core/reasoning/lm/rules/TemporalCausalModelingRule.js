@@ -6,13 +6,9 @@
 import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
+import { extractTaskFromContext } from '../../RuleHelpers.js';
 
 // Helper functions
-
-function extractTaskFromContext(context) {
-  if (context.premise?.task) return context.premise.task;
-  return null;
-}
 
 const temporalCausalKeywords = [
   'before', 'after', 'when', 'then', 'while', 'during', 'causes', 'leads to', 'results in',
