@@ -323,12 +323,7 @@ export class NAR {
     }
   }
 
-  // Method to run reasoning with rule types (nal or lm)
-  async runCycleWithRuleType(type) {
-    const typeRules = this.reasoner.getRulesByType(type);
-    const ruleIds = typeRules.map(rule => rule.id);
-    return this.runCycleWithRules(ruleIds);
-  }
+
 
   // Get the count of rules by type
   getRuleCounts() {

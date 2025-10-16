@@ -6,7 +6,7 @@
 
 import { Task, Punctuation, TruthValue } from '../../core/Task.js';
 import { Term, TermType } from '../../core/Term.js';
-import { CycleContext } from '../../core/Cycle.js';
+import { TestNAR } from './TestNAR.js';
 import { withCoreSetup } from '../unit/enhanced-test-utils.js';
 
 // Helper function to format a task with rounded truth values for display
@@ -47,13 +47,20 @@ function formatTaskWithRoundedTruth(task) {
  * @returns {boolean} - Whether the test passed
  */
 export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
-  const { memory, reasoner } = core;
-  const context = new CycleContext(Date.now());
+  const { memory } = core;
+  const reasoner = core.reasoner;
+  const context = { context: { currentTime: Date.now() } };
 
-  // Register rules with the reasoner
+  // Register rules with the reasoner if provided
   if (config.rules) {
     for (const rule of config.rules) {
-      reasoner.addRule(rule);
+      // Check if rule already exists before adding, to avoid duplicate errors
+      if (!reasoner.ruleManager.rules.has(rule.id)) {
+        reasoner.addRule(rule);
+      } else {
+        // Rule already exists, so enable it just in case it was disabled
+        reasoner.enableRule(rule.id);
+      }
     }
   }
   
@@ -68,7 +75,12 @@ export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
   const allDerivedTasks = new Set(); // Use Set to avoid duplicates
   for (let cycle = 0; cycle < config.cycles; cycle++) {
     const focusItems = core.focus.getFocusItems();
-    const focusTasks = focusItems.map(item => item[1]);
+    const focusTasks = focusItems.map(item => {
+      const taskData = item[1];
+      const task = taskData.task || taskData;
+      return task;
+    });
+    
     const derivedTasks = await reasoner.reason(focusTasks, memory, context);
     if (derivedTasks && derivedTasks.length > 0) {
       derivedTasks.forEach(derivedTask => {
@@ -164,7 +176,7 @@ export class TaskMatch {
   constructor(term) {
     this.conditions = [];
     if (term) {
-      this.conditions.push(task => task.term.name === term);
+      this.conditions.push(task => task.term.toString().includes(term));
     }
   }
 
@@ -227,7 +239,7 @@ export class ReasoningTestBuilder {
   // Expect a specific output (can be a string or a TaskMatch builder)
   expect(output) {
     if (typeof output === 'string') {
-      this.config.expectedOutputs.push(task => task.term.name === output);
+      this.config.expectedOutputs.push(task => task.term.toString().includes(output));
     } else if (output instanceof TaskMatch) {
       this.config.expectedOutputs.push(output.build());
     }
@@ -243,7 +255,7 @@ export class ReasoningTestBuilder {
   // Ensure a specific output does NOT occur
   notExpect(output) {
     if (typeof output === 'string') {
-      this.config.notExpectedOutputs.push(task => task.term.name === output);
+      this.config.notExpectedOutputs.push(task => task.term.toString().includes(output));
     } else if (output instanceof TaskMatch) {
       this.config.notExpectedOutputs.push(output.build());
     }
@@ -323,7 +335,7 @@ function createTaskFromString(taskStr, punctuation = Punctuation.BELIEF, freq = 
   }
 
   // Regex for parsing relations with potentially quoted terms
-  const relationRegex = /^(?:(".*?"|\S+))\s*(-->|==>)\s*(?:(".*?"|\S+))$/;
+  const relationRegex = /^(?:(\".*?\"|\S+))\s*(-->|==>)\s*(?:(\".*?\"|\S+))$/;
   const match = cleanStr.match(relationRegex);
 
   if (match) {
@@ -385,7 +397,7 @@ export function createTruthValue(frequency, confidence) {
  */
 export function containsTerm(pattern) {
   return function(task) {
-    return task.term.name && task.term.name.includes(pattern);
+    return task.term.toString().includes(pattern);
   };
 }
 
@@ -433,6 +445,6 @@ export function hasTruthValue(minFrequency, minConfidence) {
  */
 export function notContainsTerm(pattern) {
   return function(task) {
-    return !(task.term.name && task.term.name.includes(pattern));
+    return !(task.term.toString().includes(pattern));
   };
 }
