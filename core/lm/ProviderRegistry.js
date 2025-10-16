@@ -1,4 +1,15 @@
+/**
+ * @file core/lm/ProviderRegistry.js
+ * @description Registry to manage LM providers
+ */
+
+/**
+ * Registry to manage LM providers
+ */
 class ProviderRegistry {
+  /**
+   * Creates a new ProviderRegistry instance
+   */
   constructor() {
     this.providers = new Map();
     this.defaultProviderId = null;

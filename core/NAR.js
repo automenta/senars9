@@ -44,6 +44,7 @@ export class NAR {
         const isQuestion = taskData.endsWith('?');
         const isBelief = !isGoal && !isQuestion;
 
+        let term, punctuation;
         [term, punctuation] = isGoal
           ? [taskData.slice(0, -1), Punctuation.GOAL]
           : isQuestion

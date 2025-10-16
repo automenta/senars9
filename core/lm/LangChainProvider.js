@@ -35,6 +35,12 @@ class LangChainProvider {
       this.baseURL = 'http://localhost:11434/v1';  // Default for Ollama
       console.log(`ℹ️  Using default baseURL for local Ollama: ${this.baseURL}`);
     }
+
+    // Handle custom URL format like "xyz:11434" - convert to proper HTTP URL
+    if (this.baseURL && this.baseURL.includes(':11434') && !this.baseURL.startsWith('http')) {
+      this.baseURL = `http://${this.baseURL}`;
+      console.log(`ℹ️  Converted custom URL format to: ${this.baseURL}`);
+    }
   }
 
   async generateText(prompt, options = {}) {

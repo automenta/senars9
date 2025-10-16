@@ -23,18 +23,7 @@ export class BeliefRevisionRule extends LMRule {
   }
 
   generatePrompt(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      task = context.premise.task;
-    } else if (context.premise1) {
-      task = context.premise1;
-    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
-      task = context.tasks[0];
-    } else {
-      task = context;
-    }
-    
+    const task = this.extractTask(context);
     if (!task) {
       throw new Error('No task provided to generate prompt for BeliefRevisionRule');
     }
@@ -52,16 +41,7 @@ export class BeliefRevisionRule extends LMRule {
     const newTasks = [];
     
     // Get the original premise for context
-    let originalTask;
-    if (context.premise && context.premise.task) {
-      originalTask = context.premise.task;
-    } else if (context.premise1) {
-      originalTask = context.premise1;
-    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
-      originalTask = context.tasks[0];
-    } else {
-      originalTask = context;
-    }
+    const originalTask = this.extractTask(context);
     
     if (processedOutput && processedOutput.trim()) {
       // Create a belief with the resolution
@@ -84,12 +64,11 @@ export class BeliefRevisionRule extends LMRule {
   }
 
   async apply(context) {
+    if (!this.canApply(context)) return [];
     try {
-      if (!this.canApply(context)) return [];
       const lmResponse = await this.executeLMProcessing(context);
       const processedOutput = this.processLMOutput(lmResponse, context);
-      const newTasks = this.generateTasks(processedOutput, context);
-      return newTasks || [];
+      return this.generateTasks(processedOutput, context);
     } catch (error) {
       console.error(`Error in BeliefRevisionRule:`, error);
       return [];

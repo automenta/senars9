@@ -1,3 +1,8 @@
+/**
+ * @file core/lm/LM.js
+ * @description Main Language Model component that manages LM providers and operations
+ */
+
 import Component from '../base/Component.js';
 import { Logger } from '../base/utilities.js';
 
@@ -16,7 +21,14 @@ import { Reasoner } from '../Reasoner.js';
 
 
 
+/**
+ * Main Language Model component that manages LM providers and operations.
+ * Neurosymbolic operations are handled entirely by the rule system.
+ */
 class LM extends Component {
+  /**
+   * Creates a new LM component instance
+   */
   constructor() {
     super();
     this.providers = new ProviderRegistry();

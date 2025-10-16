@@ -36,13 +36,17 @@ export class Term {
   }
 
   static newAtom(name) {
+    if (name.indexOf(' ')!==-1 && !name.startsWith("\"")) {
+      //TODO proper escaping and quoting
+      name = '"' + name + '"';
+      console.log(name);
+    }
+
     const termType = TermType.ATOM;
     return new Term({
       name,
       termType,
       complexity: 1,
-      subject: null,
-      predicate: null,
       components: null,
       hash: Term.computeHash(name, termType, null)
     });

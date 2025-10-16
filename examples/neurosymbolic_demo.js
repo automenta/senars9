@@ -691,6 +691,22 @@ async function initializeSystem(lmProvider = DEFAULT_LM_PROVIDER) {
       console.log('🎯 Focus set activated');
     }
     
+    // Register the appropriate provider based on config
+    if (lmProvider === 'xenova') {
+      const { setupXenovaProvider } = await import('../core/lm/XenovaSetup.js');
+      setupXenovaProvider(system.core.lm, {
+        modelName: config.components.lm.modelName,
+        temperature: config.components.lm.temperature || 0.7,
+        maxTokens: config.components.lm.maxTokens || 100
+      }, 'xenova');
+      
+      // Set as default provider
+      system.core.lm.providers.defaultProviderId = 'xenova';
+      // Also set the top-level defaultProviderId property
+      system.core.lm.defaultProviderId = 'xenova';
+      console.log('✅ Xenova provider registered and set as default');
+    }
+    
     console.log('✅ System initialized with integrated neural and symbolic components');
     return system;
   } catch (error) {
@@ -1205,13 +1221,24 @@ async function runDemo(inputText = DEFAULT_INPUT, lmProvider = DEFAULT_LM_PROVID
     logBox.setContent(getFormattedLog());
     screen.render();
     
-    // Start the cycle in paused mode by default
+    // For demo purposes, start the cycle automatically unless specifically paused
     if (system.core && system.core.cycle) {
       // Check if cycle is already running to avoid the warning
       if (!system.core.cycle.isRunning) {
         await system.core.cycle.start(); // Start the cycle manager if not already running
       }
-      await system.core.cycle.pause(); // Set to paused initially
+      // Don't pause automatically if we want the system to process tasks immediately
+      // The UI controls can still pause if needed
+      if (options.demoMode === 'minimal' || options.demoMode === 'focused') {
+        // In minimal mode, we want to see some activity, so start running
+        if (system.core.cycle.isPaused) {
+          await system.core.cycle.resume();
+        }
+        console.log('🔄 Cycle started for automatic processing');
+      } else {
+        // For comprehensive mode, pause initially (as UI allows user to start)
+        await system.core.cycle.pause(); // Set to paused initially for UI
+      }
     }
     
     // Handle key events for run/pause

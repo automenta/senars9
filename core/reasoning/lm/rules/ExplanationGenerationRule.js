@@ -23,7 +23,7 @@ export class ExplanationGenerationRule extends LMRule {
   }
 
   generatePrompt(context) {
-    const task = this.extractTask(context) || context;
+    const task = this.extractTask(context);
     if (!task) throw new Error('No task provided to generate prompt for ExplanationGenerationRule');
 
     const termStr = task.term ? task.term.toString() : task.toString ? task.toString() : String(task);
@@ -38,7 +38,7 @@ export class ExplanationGenerationRule extends LMRule {
     const newTasks = [];
 
     if (processedOutput?.trim()) {
-      const originalTerm = context.premise?.task?.term?.toString() || 'unknown';
+      const originalTerm = this.extractTask(context).term?.toString() || 'unknown';
       const sanitizedTerm = originalTerm.replace(/[^\w]/g, '_');
 
       newTasks.push(

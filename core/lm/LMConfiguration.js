@@ -1,4 +1,11 @@
-// LM Configuration class to manage provider and model settings
+/**
+ * @file core/lm/LMConfiguration.js
+ * @description LM Configuration class to manage provider and model settings
+ */
+
+/**
+ * Configuration class for LM that manages provider and model settings
+ */
 class LMConfiguration {
   constructor(config = {}) {
     this.providers = config.providers || [];
