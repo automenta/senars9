@@ -40,7 +40,7 @@ class TestLM extends LM {
 describe('LM-based Reasoning Tests', () => {
   test('createGoalDecompositionRule should decompose a goal', async () => {
     const lm = new TestLM();
-    const rule = createGoalDecompositionRule(lm);
+    const rule = createGoalDecompositionRule({ lm });
     const goalTerm = Term.newAtom('create a comprehensive marketing plan for a new product');
     const goal = new Task(goalTerm, Punctuation.GOAL, new TruthValue(0.9, 0.9), Date.now(), Date.now(), 0.9);
     const context = { premise: { task: goal } };

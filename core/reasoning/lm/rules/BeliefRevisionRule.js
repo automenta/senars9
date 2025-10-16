@@ -3,36 +3,34 @@
  * @description Belief revision rule that uses an LM to resolve contradictions and inconsistencies.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext } from './RuleHelpers.js';
 
-/**
- * Keywords that suggest a contradiction or conflict.
- * @type {string[]}
- */
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
 const conflictKeywords = ['contradict', 'conflict', 'inconsistent', 'opposite', 'versus', 'vs'];
 
-/**
- * Checks if a string contains conflict-related keywords.
- * @param {string} text - The text to check.
- * @returns {boolean} True if the text contains conflict keywords.
- */
 const hasConflictTerms = (text) => {
   const lowerText = text.toLowerCase();
   return conflictKeywords.some(keyword => lowerText.includes(keyword));
 };
 
 /**
- * Creates a belief revision rule using the LMRuleFactory.
+ * Creates a belief revision rule using the LMRule.create method.
  * This rule identifies beliefs containing contradictions and uses an LM to suggest revisions.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for belief revision.
  */
-export const createBeliefRevisionRule = (lm) => {
-  return createLMRule({
+export const createBeliefRevisionRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'belief-revision',
     lm,
     name: 'Belief Revision Rule',

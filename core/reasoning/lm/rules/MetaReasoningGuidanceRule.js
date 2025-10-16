@@ -3,39 +3,37 @@
  * @description Meta-reasoning guidance rule that uses an LM to recommend reasoning strategies for complex problems.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext } from './RuleHelpers.js';
 
-/**
- * Keywords that suggest a need for complex reasoning or planning.
- * @type {string[]}
- */
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
 const complexityKeywords = [
   'solve', 'achieve', 'optimize', 'balance', 'maximize', 'minimize', 'understand', 'analyze',
   'investigate', 'discover', 'resolve', 'plan', 'design', 'create', 'develop', 'implement'
 ];
 
-/**
- * Checks if a string contains terms that imply complexity.
- * @param {string} text - The text to check.
- * @returns {boolean} True if the text suggests complexity.
- */
 const hasComplexityTerms = (text) => {
   const lowerText = text.toLowerCase();
   return complexityKeywords.some(keyword => lowerText.includes(keyword));
 };
 
 /**
- * Creates a meta-reasoning guidance rule using the LMRuleFactory.
+ * Creates a meta-reasoning guidance rule using the LMRule.create method.
  * This rule identifies complex problems and uses an LM to recommend a reasoning strategy.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for meta-reasoning guidance.
  */
-export const createMetaReasoningGuidanceRule = (lm) => {
-  return createLMRule({
+export const createMetaReasoningGuidanceRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'meta-reasoning-guidance',
     lm,
     name: 'Meta-Reasoning Guidance Rule',

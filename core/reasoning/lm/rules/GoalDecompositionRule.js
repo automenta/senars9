@@ -3,26 +3,72 @@
  * @description Goal decomposition rule that uses an LM to break down high-level goals into concrete sub-goals.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
-import { Task, Punctuation } from '../../../Task.js';
-import {
-  cleanSubGoal,
-  isValidSubGoal,
-  parseSubGoals,
-  extractTaskFromContext,
-  createSubGoalTask,
-} from './RuleHelpers.js';
+import { Task, Punctuation, TruthValue } from '../../../Task.js';
+
+// Helper functions (previously in RuleHelpers.js)
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
+function parseSubGoals(lmResponse) {
+  return lmResponse
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => line.replace(/^\s*\d+[\.\)]\s*|^\s*[-*]\s*/, '').trim());
+}
+
+function cleanSubGoal(goal) {
+  if (!goal) return '';
+  goal = goal.replace(/^["']|["']$/g, '');
+  goal = goal.replace(/[.,;!?]+$/, '');
+  return goal.trim();
+}
+
+function isValidSubGoal(goal, minLength, maxLength) {
+  if (!goal || goal.length < minLength || goal.length > maxLength) {
+    return false;
+  }
+  const lowerGoal = goal.toLowerCase();
+  if (lowerGoal.includes('sorry') || lowerGoal.includes('cannot') || lowerGoal.includes('unable')) {
+    return false;
+  }
+  return true;
+}
+
+function createSubGoalTask(subGoal, originalTask) {
+  const originalTruth = originalTask.truth || new TruthValue(1.0, 0.9);
+  const inheritedTruth = new TruthValue(
+    originalTruth.frequency,
+    originalTruth.confidence * 0.9,
+  );
+
+  const newTerm = Term.newAtom(subGoal);
+  return new Task(
+    newTerm,
+    Punctuation.GOAL,
+    inheritedTruth,
+    null,
+    null,
+    0.8
+  );
+}
+
 
 /**
- * Creates a goal decomposition rule using the LMRuleFactory.
+ * Creates a goal decomposition rule using the LMRule.create method.
  * This rule identifies high-priority goals and uses an LM to decompose them into smaller, actionable sub-goals.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @param {object} config - Configuration options for the rule.
  * @returns {LMRule} A new LMRule instance for goal decomposition.
  */
-export const createGoalDecompositionRule = (lm, config = {}) => {
+export const createGoalDecompositionRule = (dependencies, config = {}) => {
+  const { lm } = dependencies;
   const finalConfig = {
     minSubGoals: 2,
     maxSubGoals: 5,
@@ -31,7 +77,7 @@ export const createGoalDecompositionRule = (lm, config = {}) => {
     ...config,
   };
 
-  return createLMRule({
+  return LMRule.create({
     id: 'goal-decomposition',
     lm,
     name: 'Goal Decomposition Rule',

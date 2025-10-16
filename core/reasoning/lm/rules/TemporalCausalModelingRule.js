@@ -3,39 +3,37 @@
  * @description Temporal and causal modeling rule that uses an LM to infer time order and causal relationships from text.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext } from './RuleHelpers.js';
 
-/**
- * Keywords that suggest temporal or causal relationships.
- * @type {string[]}
- */
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
 const temporalCausalKeywords = [
   'before', 'after', 'when', 'then', 'while', 'during', 'causes', 'leads to', 'results in',
   'because', 'since', 'due to', 'therefore', 'consequently', 'if', 'precedes', 'follows'
 ];
 
-/**
- * Checks if a string contains temporal or causal terms.
- * @param {string} text - The text to check.
- * @returns {boolean} True if the text contains relevant keywords.
- */
 const hasTemporalCausalTerms = (text) => {
   const lowerText = text.toLowerCase();
   return temporalCausalKeywords.some(keyword => lowerText.includes(keyword));
 };
 
 /**
- * Creates a temporal/causal modeling rule using the LMRuleFactory.
+ * Creates a temporal/causal modeling rule using the LMRule.create method.
  * This rule identifies statements with temporal or causal language and uses an LM to model them formally.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for temporal/causal modeling.
  */
-export const createTemporalCausalModelingRule = (lm) => {
-  return createLMRule({
+export const createTemporalCausalModelingRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'temporal-causal-modeling',
     lm,
     name: 'Temporal/Causal Modeling Rule',

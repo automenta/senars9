@@ -3,20 +3,27 @@
  * @description Hypothesis generation rule that uses an LM to create new hypotheses based on existing beliefs.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext } from './RuleHelpers.js';
+
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
 
 /**
- * Creates a hypothesis generation rule using the LMRuleFactory.
+ * Creates a hypothesis generation rule using the LMRule.create method.
  * This rule identifies interesting beliefs and uses an LM to generate related hypotheses.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for hypothesis generation.
  */
-export const createHypothesisGenerationRule = (lm) => {
-  return createLMRule({
+export const createHypothesisGenerationRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'hypothesis-generation',
     lm,
     name: 'Hypothesis Generation Rule',

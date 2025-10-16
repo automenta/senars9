@@ -3,29 +3,31 @@
  * @description Explanation generation rule that uses an LM to create natural language explanations for formal conclusions.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext } from './RuleHelpers.js';
 
-/**
- * Checks if a term string represents a complex logical relation.
- * @param {string} termStr - The string representation of the term.
- * @returns {boolean} True if the term contains a complex relation.
- */
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
 const hasComplexRelation = (termStr) => {
   return termStr.includes('-->') || termStr.includes('<->') || termStr.includes('==>');
 };
 
 /**
- * Creates an explanation generation rule using the LMRuleFactory.
+ * Creates an explanation generation rule using the LMRule.create method.
  * This rule identifies complex logical statements and uses an LM to generate natural language explanations.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for explanation generation.
  */
-export const createExplanationGenerationRule = (lm) => {
-  return createLMRule({
+export const createExplanationGenerationRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'explanation-generation',
     lm,
     name: 'Explanation Generation Rule',

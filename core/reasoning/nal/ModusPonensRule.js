@@ -1,4 +1,4 @@
-import { NALRule } from '../Rule.js';
+import { NALRule } from '../NALRule.js';
 import { TermType } from '../../Term.js';
 import { Task, Punctuation, TruthValue } from '../../Task.js';
 

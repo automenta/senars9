@@ -3,29 +3,39 @@
  * @description Variable grounding rule that uses an LM to suggest possible values for variables in statements.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext, parseSubGoals } from './RuleHelpers.js';
 
-/**
- * Checks if a string contains a variable (e.g., "$var" or "?var").
- * @param {string} text - The text to check.
- * @returns {boolean} True if the text contains a variable.
- */
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
+function parseSubGoals(lmResponse) {
+  return lmResponse
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => line.replace(/^\s*\d+[\.\)]\s*|^\s*[-*]\s*/, '').trim());
+}
+
 const hasVariable = (text) => {
   return /[\$\?]\w+/.test(text);
 };
 
 /**
- * Creates a variable grounding rule using the LMRuleFactory.
+ * Creates a variable grounding rule using the LMRule.create method.
  * This rule identifies statements with variables and uses an LM to propose concrete values.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for variable grounding.
  */
-export const createVariableGroundingRule = (lm) => {
-  return createLMRule({
+export const createVariableGroundingRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'variable-grounding',
     lm,
     name: 'Variable Grounding Rule',

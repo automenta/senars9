@@ -3,39 +3,37 @@
  * @description Uncertainty calibration rule that uses an LM to map qualitative uncertainty to quantitative truth values.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext } from './RuleHelpers.js';
 
-/**
- * Keywords that indicate uncertainty in a statement.
- * @type {string[]}
- */
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
 const uncertaintyKeywords = [
   'maybe', 'perhaps', 'likely', 'unlikely', 'uncertain', 'probably', 'possibly', 'might',
   'tend to', 'often', 'sometimes', 'generally', 'usually', 'could be', 'seems'
 ];
 
-/**
- * Checks if a string contains terms that indicate uncertainty.
- * @param {string} text - The text to check.
- * @returns {boolean} True if the text contains uncertainty keywords.
- */
 const hasUncertaintyTerms = (text) => {
   const lowerText = text.toLowerCase();
   return uncertaintyKeywords.some(keyword => lowerText.includes(keyword));
 };
 
 /**
- * Creates an uncertainty calibration rule using the LMRuleFactory.
+ * Creates an uncertainty calibration rule using the LMRule.create method.
  * This rule identifies beliefs with uncertain language and uses an LM to assign a quantitative confidence value.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for uncertainty calibration.
  */
-export const createUncertaintyCalibrationRule = (lm) => {
-  return createLMRule({
+export const createUncertaintyCalibrationRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'uncertainty-calibration',
     lm,
     name: 'Uncertainty Calibration Rule',

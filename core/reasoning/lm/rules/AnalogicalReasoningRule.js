@@ -3,39 +3,37 @@
  * @description Analogical reasoning rule that uses an LM to solve new problems by drawing analogies to known situations.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext } from './RuleHelpers.js';
 
-/**
- * A list of keywords that suggest a problem-solving context.
- * @type {string[]}
- */
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
 const problemSolvingKeywords = [
   'solve', 'fix', 'repair', 'improve', 'handle', 'address', 'resolve', 'overcome', 'manage', 'operate',
   'apply', 'adapt', 'implement', 'execute', 'create', 'build', 'design', 'plan', 'organize', 'find a way to'
 ];
 
-/**
- * Checks if a string contains any of the problem-solving keywords.
- * @param {string} text - The text to check.
- * @returns {boolean} True if the text contains problem-solving keywords, false otherwise.
- */
 const hasProblemSolvingTerms = (text) => {
   const lowerText = text.toLowerCase();
   return problemSolvingKeywords.some(keyword => lowerText.includes(keyword));
 };
 
 /**
- * Creates an analogical reasoning rule using the LMRuleFactory.
+ * Creates an analogical reasoning rule using the LMRule.create method.
  * This rule identifies problem-solving goals and uses an LM to find analogous solutions.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for analogical reasoning.
  */
-export const createAnalogicalReasoningRule = (lm) => {
-  return createLMRule({
+export const createAnalogicalReasoningRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'analogical-reasoning',
     lm,
     name: 'Analogical Reasoning Rule',

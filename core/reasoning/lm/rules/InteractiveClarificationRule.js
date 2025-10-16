@@ -3,24 +3,29 @@
  * @description Interactive clarification rule that uses an LM to generate clarifying questions for ambiguous input.
  */
 
-import { createLMRule } from '../LMRuleFactory.js';
+import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext, parseSubGoals } from './RuleHelpers.js';
 
-/**
- * A list of common ambiguous words and phrases.
- * @type {string[]}
- */
+// Helper functions
+
+function extractTaskFromContext(context) {
+  if (context.premise?.task) return context.premise.task;
+  return null;
+}
+
+function parseSubGoals(lmResponse) {
+  return lmResponse
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => line.replace(/^\s*\d+[\.\)]\s*|^\s*[-*]\s*/, '').trim());
+}
+
 const ambiguousKeywords = [
   'it', 'this', 'that', 'they', 'them', 'which', 'what', 'how', 'some', 'few', 'many', 'most', 'thing', 'stuff', 'deal with'
 ];
 
-/**
- * Checks if a string contains ambiguous terms.
- * @param {string} text - The text to check.
- * @returns {boolean} True if the text contains ambiguous terms.
- */
 const hasAmbiguousTerms = (text) => {
   const lowerText = text.toLowerCase();
   // Check for keywords or if the text is very short and likely incomplete
@@ -28,14 +33,15 @@ const hasAmbiguousTerms = (text) => {
 };
 
 /**
- * Creates an interactive clarification rule using the LMRuleFactory.
+ * Creates an interactive clarification rule using the LMRule.create method.
  * This rule identifies ambiguous goals or questions and uses an LM to ask for clarification.
  *
- * @param {object} lm - The Language Model instance.
+ * @param {object} dependencies - The dependencies for the rule, including the LM instance.
  * @returns {LMRule} A new LMRule instance for interactive clarification.
  */
-export const createInteractiveClarificationRule = (lm) => {
-  return createLMRule({
+export const createInteractiveClarificationRule = (dependencies) => {
+  const { lm } = dependencies;
+  return LMRule.create({
     id: 'interactive-clarification',
     lm,
     name: 'Interactive Clarification Rule',
