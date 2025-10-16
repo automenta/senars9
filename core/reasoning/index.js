@@ -1,4 +1,6 @@
-export { Rule, LMRule, NALRule } from './Rule.js';
+export { Rule } from './Rule.js';
+export { LMRule } from './LMRule.js';
+export { NALRule } from './NALRule.js';
 export {
   Premise,
   TaskPremise,

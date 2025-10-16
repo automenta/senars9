@@ -9,6 +9,7 @@ import { Logger } from './base/utilities.js';
 import { HighResolutionClock } from './Clock.js';
 import LM from './lm/LM.js';
 import { loadRules } from './reasoning/RuleLoader.js';
+import { RuleFactory } from './reasoning/RuleFactory.js';
 
 export class NAR {
   constructor(config = {}) {
@@ -209,26 +210,89 @@ export class NAR {
 
   getStats() {
     const memoryState = this.getMemoryState();
+    const reasonerStats = this.reasoner.getStats();
+
     return {
       ...this.stats,
       taskCount: memoryState.totalTasks,
       conceptCount: memoryState.concepts,
       uptime: this.stats.birthdate ? this.clock.getTime() - this.stats.birthdate : 0,
-      memoryState
+      memoryState,
+      reasonerStats,
+      reasoningMetrics: this._getReasoningMetrics()
+    };
+  }
+
+  _getReasoningMetrics() {
+    const enabledRules = this.reasoner.getEnabledRules();
+    const ruleTypeCounts = {};
+
+    enabledRules.forEach(rule => {
+      if (rule.type) {
+        ruleTypeCounts[rule.type] = (ruleTypeCounts[rule.type] || 0) + 1;
+      }
+    });
+
+    return {
+      enabledRulesCount: enabledRules.length,
+      ruleTypeDistribution: ruleTypeCounts,
+      averageRulesPerCycle: this.stats.cycles > 0
+        ? (this.stats.derivedTasks / this.stats.cycles).toFixed(2)
+        : 0
+    };
+  }
+
+  getDetailedReasoningReport() {
+    const stats = this.getStats();
+    const enabledRules = this.reasoner.getEnabledRules();
+
+    return {
+      ...stats,
+      enabledRules: enabledRules.map(rule => ({
+        id: rule.id,
+        name: rule.name || rule.id,
+        type: rule.type,
+        priority: rule.priority,
+        description: rule.description
+      })),
+      rulePerformance: this._getRulePerformanceReport()
+    };
+  }
+
+  _getRulePerformanceReport() {
+    const performance = this.reasoner.getStats().performance;
+    const enabledRules = this.reasoner.getEnabledRules();
+
+    return {
+      ...performance,
+      ruleDetails: enabledRules.map(rule => {
+        const metrics = this.reasoner.performanceMetrics.get(rule.id);
+        return metrics ? {
+          id: rule.id,
+          executions: metrics.executions,
+          successes: metrics.successes,
+          failures: metrics.failures,
+          successRate: metrics.executions > 0
+            ? ((metrics.successes / metrics.executions) * 100).toFixed(1) + '%'
+            : '0%',
+          avgTime: Math.round(metrics.avgTime * 100) / 100 + 'ms',
+          lastError: metrics.lastError
+        } : null;
+      }).filter(Boolean)
     };
   }
 
   getMemoryState() {
     return {
-       totalTasks: this.getTasks().length,
-       beliefs: this.getBeliefs().length,
-       goals: this.getGoals().length,
-       questions: this.getQuestions().length,
-       concepts: this.memory.conceptStorage.size,
-       shortTermTasks: this.memory.shortTermTasks.size,
-       longTermTasks: this.memory.longTermTasks.size
-     };
-   }
+        totalTasks: this.getTasks().length,
+        beliefs: this.getBeliefs().length,
+        goals: this.getGoals().length,
+        questions: this.getQuestions().length,
+        concepts: this.memory.conceptStorage.size,
+        focusTasks: this.focus.getFocusItems().length,
+        longTermTasks: this.memory.getAllTasks().size
+      };
+    }
 
   getHighestPriorityTask() {
     return this.getTasksByPriority()[0] || null;
@@ -253,12 +317,136 @@ export class NAR {
   }
 
   async _loadReasoningRules() {
-    const ruleDir = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
-    const rules = await loadRules(ruleDir, { lm: this.lm });
-    rules.forEach(rule => this.reasoner.addRule(rule));
+    // Load LM rules using the existing loader
+    const lmRuleDir = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
+    const lmRules = await loadRules(lmRuleDir, { lm: this.lm });
+
+    // Load NAL rules using the factory
+    const nalRuleTypes = RuleFactory.getAvailableNALRules();
+    const nalRules = nalRuleTypes.map(type => RuleFactory.createNALRule(type));
+
+    // Combine and register all rules
+    const allRules = [...lmRules, ...nalRules];
+    allRules.forEach(rule => this.reasoner.addRule(rule));
+
+    Logger.info(`Loaded ${lmRules.length} LM rules and ${nalRules.length} NAL rules`);
   }
 
   isRunning() {
     return this._isRunning;
+  }
+
+  // Rule management methods
+  enableRule(ruleId) {
+    this.reasoner.enable(ruleId);
+    Logger.debug(`Enabled rule: ${ruleId}`);
+  }
+
+  disableRule(ruleId) {
+    this.reasoner.disable(ruleId);
+    Logger.debug(`Disabled rule: ${ruleId}`);
+  }
+
+  enableRuleType(type) {
+    this.reasoner.enable(`type:${type}`);
+    Logger.debug(`Enabled rule type: ${type}`);
+  }
+
+  disableRuleType(type) {
+    this.reasoner.disable(`type:${type}`);
+    Logger.debug(`Disabled rule type: ${type}`);
+  }
+
+  getRulesByType(type) {
+    return this.reasoner.getRulesByType(type);
+  }
+
+  validateAllRules() {
+    return this.reasoner.validateAllRules();
+  }
+
+  // Advanced reasoning methods
+  async runCycleWithTracing() {
+    const currentTime = this.clock.getTime();
+    const context = new CycleContext(currentTime);
+    const focusItems = this.focus.getFocusItems();
+
+    if (focusItems.length === 0) return { derivedTasks: [], trace: [] };
+
+    const focusSet = focusItems.map(item => {
+      const taskData = item[1];
+      const task = taskData.task || taskData;
+      task.setAccessedAt(context.currentTime);
+      return task;
+    });
+
+    const trace = [];
+    const originalReason = this.reasoner.reason.bind(this.reasoner);
+
+    // Wrap the reason method to capture tracing information
+    this.reasoner.reason = async function(focusSet, memory, context) {
+      const derivedTasks = [];
+      const enabledRules = this.getEnabledRules();
+
+      for (const rule of enabledRules) {
+        const ruleStartTime = Date.now();
+        const ruleResults = [];
+
+        for (const premise of focusSet) {
+          try {
+            const result = await rule.apply({ premise, memory, context });
+            if (result && result.length > 0) {
+              ruleResults.push(...result);
+            }
+          } catch (error) {
+            trace.push({
+              type: 'rule_error',
+              ruleId: rule.id,
+              error: error.message,
+              timestamp: Date.now()
+            });
+          }
+        }
+
+        const ruleEndTime = Date.now();
+        if (ruleResults.length > 0) {
+          derivedTasks.push(...ruleResults);
+          trace.push({
+            type: 'rule_success',
+            ruleId: rule.id,
+            derivedCount: ruleResults.length,
+            executionTime: ruleEndTime - ruleStartTime,
+            timestamp: Date.now()
+          });
+        }
+      }
+
+      return derivedTasks;
+    }.bind(this.reasoner);
+
+    const derivedTasks = await this.reasoner.reason(focusSet, this.memory, context);
+
+    derivedTasks.forEach(task => {
+      this.memory.addTask(task, context.currentTime);
+      this.stats.derivedTasks++;
+    });
+
+    this.memory.consolidate(context.currentTime);
+    this.stats.cycles++;
+
+    // Restore original reason method
+    this.reasoner.reason = originalReason;
+
+    return { derivedTasks, trace };
+  }
+
+  // Batch processing for improved performance
+  async runCycles(count) {
+    const results = [];
+    for (let i = 0; i < count; i++) {
+      const result = await this.runCycle();
+      results.push(result);
+    }
+    return results;
   }
 }

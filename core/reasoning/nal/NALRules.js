@@ -1,4 +1,4 @@
-import { NALRule } from '../Rule.js';
+import { NALRule } from '../NALRule.js';
 
 export class DeductionRule extends NALRule {
   constructor(options = {}) {

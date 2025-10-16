@@ -5,10 +5,13 @@ export class RuleManager {
     this.ruleGroups = new Map();
     this.enabledRuleIds = new Set();
     this.performanceMetrics = new Map();
+    this.ruleValidation = new Map();
     this.config = {
       enableMetrics: true,
       enableGroups: true,
+      enableValidation: true,
       maxRules: 1000,
+      validateOnAdd: true,
       ...config
     };
   }
@@ -17,10 +20,18 @@ export class RuleManager {
     if (!rule?.id) throw new Error('Invalid rule: must have an ID');
     if (this.rules.size >= this.config.maxRules) throw new Error('Maximum rule limit reached');
 
+    // Validate rule structure
+    if (this.config.enableValidation && this.config.validateOnAdd) {
+      this._validateRule(rule);
+    }
+
     this.rules.set(rule.id, rule);
     this.config.enableGroups && this._updateGroups(rule.id, group);
     rule.enabled && this.enabledRuleIds.add(rule.id);
     this.config.enableMetrics && this._initMetrics(rule.id);
+
+    // Track rule type for better organization
+    this._trackRuleType(rule);
   }
 
   enable(idOrGroup) { this._toggle(idOrGroup, true); }
@@ -44,19 +55,62 @@ export class RuleManager {
     this.performanceMetrics.set(ruleId, {
       executions: 0,
       successes: 0,
+      failures: 0,
       avgTime: 0,
-      lastRun: null
+      lastRun: null,
+      lastError: null
     });
   }
 
-  updateMetrics(ruleId, success, time) {
+  _validateRule(rule) {
+    const errors = [];
+
+    if (!rule.id || typeof rule.id !== 'string') {
+      errors.push('Rule must have a valid string ID');
+    }
+
+    if (this.rules.has(rule.id)) {
+      errors.push(`Rule with ID '${rule.id}' already exists`);
+    }
+
+    if (typeof rule.apply !== 'function') {
+      errors.push('Rule must have an apply method');
+    }
+
+    if (rule.type && !['nal', 'lm'].includes(rule.type)) {
+      errors.push(`Rule type must be 'nal' or 'lm', got '${rule.type}'`);
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Rule validation failed: ${errors.join(', ')}`);
+    }
+
+    this.ruleValidation.set(rule.id, { validated: true, timestamp: Date.now() });
+  }
+
+  _trackRuleType(rule) {
+    if (!rule.type) return;
+
+    const typeSet = this.ruleGroups.get(`type:${rule.type}`) || new Set();
+    typeSet.add(rule.id);
+    this.ruleGroups.set(`type:${rule.type}`, typeSet);
+  }
+
+  updateMetrics(ruleId, success, time, error = null) {
     if (!this.config.enableMetrics) return;
 
     const metrics = this.performanceMetrics.get(ruleId);
     if (!metrics) return;
 
     metrics.executions++;
-    success && metrics.successes++;
+    if (success) {
+      metrics.successes++;
+    } else {
+      metrics.failures++;
+      if (error) {
+        metrics.lastError = error;
+      }
+    }
     metrics.avgTime = (metrics.avgTime * (metrics.executions - 1) + time) / metrics.executions;
     metrics.lastRun = Date.now();
   }
@@ -70,27 +124,72 @@ export class RuleManager {
   }
 
   getStats() {
+    const ruleTypes = [...new Set(Array.from(this.rules.values()).map(r => r.type).filter(Boolean))];
+    const typeCounts = {};
+
+    ruleTypes.forEach(type => {
+      const typeGroup = this.ruleGroups.get(`type:${type}`);
+      typeCounts[type] = typeGroup ? typeGroup.size : 0;
+    });
+
     return {
       totalRules: this.rules.size,
       enabledRules: this.enabledRuleIds.size,
-      ruleTypes: [...new Set(Array.from(this.rules.values()).map(r => r.type))],
+      ruleTypes,
+      ruleTypeCounts: typeCounts,
       ruleGroups: Array.from(this.ruleGroups.keys()),
+      validationEnabled: this.config.enableValidation,
+      validatedRules: this.ruleValidation.size,
       performance: this._aggregateMetrics()
     };
   }
 
+  getRulesByType(type) {
+    const typeGroup = this.ruleGroups.get(`type:${type}`);
+    if (!typeGroup) return [];
+    return Array.from(typeGroup).map(id => this.rules.get(id)).filter(Boolean);
+  }
+
+  getRuleValidationStatus(ruleId) {
+    return this.ruleValidation.get(ruleId) || { validated: false };
+  }
+
+  validateAllRules() {
+    const results = [];
+    for (const [id, rule] of this.rules) {
+      try {
+        this._validateRule(rule);
+        results.push({ id, status: 'valid' });
+      } catch (error) {
+        results.push({ id, status: 'invalid', error: error.message });
+      }
+    }
+    return results;
+  }
+
   _aggregateMetrics() {
-    const stats = { totalExecutions: 0, totalSuccesses: 0, avgExecutionTime: 0 };
+    const stats = {
+      totalExecutions: 0,
+      totalSuccesses: 0,
+      totalFailures: 0,
+      avgExecutionTime: 0,
+      successRate: 0
+    };
     let count = 0;
 
     for (const metrics of this.performanceMetrics.values()) {
       stats.totalExecutions += metrics.executions;
       stats.totalSuccesses += metrics.successes;
+      stats.totalFailures += metrics.failures;
       stats.avgExecutionTime += metrics.avgTime;
       count++;
     }
 
     stats.avgExecutionTime = count > 0 ? stats.avgExecutionTime / count : 0;
+    stats.successRate = stats.totalExecutions > 0
+      ? (stats.totalSuccesses / stats.totalExecutions) * 100
+      : 0;
+
     return stats;
   }
 
@@ -98,19 +197,35 @@ export class RuleManager {
     const derivedTasks = [];
     const enabledRules = this.getEnabledRules();
 
+    if (!focusSet || focusSet.length === 0) {
+      return derivedTasks;
+    }
+
     for (const rule of enabledRules) {
+      try {
         for (const premise of focusSet) {
-            const startTime = Date.now();
+          const startTime = Date.now();
+
+          try {
             const result = await rule.apply({ premise, memory, context });
             const endTime = Date.now();
 
-            if (result && result.length > 0) {
-                derivedTasks.push(...result);
-                this.updateMetrics(rule.id, true, endTime - startTime);
+            if (result && Array.isArray(result) && result.length > 0) {
+              derivedTasks.push(...result);
+              this.updateMetrics(rule.id, true, endTime - startTime);
             } else {
-                this.updateMetrics(rule.id, false, endTime - startTime);
+              this.updateMetrics(rule.id, false, endTime - startTime);
             }
+          } catch (error) {
+            const endTime = Date.now();
+            Logger.error(`Rule ${rule.id} failed on premise:`, error);
+            this.updateMetrics(rule.id, false, endTime - startTime, error.message);
+          }
         }
+      } catch (error) {
+        Logger.error(`Rule ${rule.id} encountered critical error:`, error);
+        this.updateMetrics(rule.id, false, 0, error.message);
+      }
     }
 
     return derivedTasks;
