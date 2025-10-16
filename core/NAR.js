@@ -45,7 +45,7 @@ export class NAR {
       ...config,
     };
 
-    this.clock = this.config.clock || new HighResolutionClock();
+    this.clock = new HighResolutionClock();
     this.focus = new Focus();
     this.memory = new Memory(this.focus);
     this.lm = new LM();

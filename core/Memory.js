@@ -392,6 +392,17 @@ class Memory extends Component {
     }
   }
 
+  clear() {
+    this.storage.clear();
+    this.cache.clear();
+    this.indexes.clear();
+    this.longTermTasks.clear();
+    this.conceptStorage.clear();
+    if (this.focus) {
+      this.focus.clear();
+    }
+  }
+
   // Helper for indexing
   _updateIndex(indexName, key) {
     if (!this.indexes.has(indexName)) {

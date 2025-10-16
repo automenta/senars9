@@ -3,447 +3,166 @@
  * @description NAR extension for declarative testing functionality.
  */
 
-import { NAR } from '../../core/NAR.js';
-import { Punctuation } from '../../core/Task.js';
+import { withCoreSetup } from '../unit/enhanced-test-utils.js';
+import { Task, Punctuation, TruthValue } from '../../core/Task.js';
+import { Term, TermType } from '../../core/Term.js';
+
+/**
+ * Fluent builder for creating detailed task matchers.
+ */
+export class TaskMatch {
+  constructor(term) {
+    this.conditions = [];
+    if (term) {
+      if (term instanceof RegExp) {
+        this.conditions.push(task => term.test(task.term.toString()));
+      } else {
+        this.conditions.push(task => task.term.toString().includes(term));
+      }
+    }
+  }
+
+  withPunctuation(punctuation) {
+    this.conditions.push(task => task.punctuation === punctuation);
+    return this;
+  }
+
+  withTruth(minFrequency, minConfidence) {
+    this.conditions.push(task =>
+      task.truth.frequency >= minFrequency &&
+      task.truth.confidence >= minConfidence
+    );
+    return this;
+  }
+
+  build() {
+    return task => this.conditions.every(condition => condition(task));
+  }
+}
 
 /**
  * A NAR extension that adds declarative testing functionality.
- * Provides fluent methods for creating and running reasoning tests with minimal boilerplate.
  */
-export class TestNAR extends NAR {
-  constructor(config = {}) {
-    // Call parent constructor
-    super(config);
-    this.testHistory = [];
-    this.expectations = [];
-    this.inputs = [];
-    this.runs = [];
+export class TestNAR {
+  constructor() {
+    this.operations = [];
+    this.rules = new Set();
   }
 
-  /**
-   * Initialize the TestNAR with proper testing setup
-   */
-  async initialize() {
-    // Initialize components but don't load rules for testing specific rules only
-    this._initialize(this.config);
-    
-    // Clear all initially loaded rules to allow individual rule testing
-    this.reasoner.rules.clear();
-    this.reasoner.enabledRuleIds.clear();
-    
-    // Store reference to original input method
-    this.inputOriginal = super.input.bind(this);
-    
-    // Initialize test tracking
-    this.inputs = [];
-    this.expectations = [];
-    this.runs = [];
-    
+  using(rule) {
+    this.rules.add(rule);
     return this;
   }
 
-  /**
-   * Record an input with optional time
-   * @param {string|object} taskData - Task data to input
-   * @param {number} time - Optional time at which to input the task
-   * @returns {TestNAR} This instance for chaining
-   */
-  input(taskData, time = null) {
-    this.inputs.push({ taskData, time, type: 'input' });
+  input(termStr, freq = 0.9, conf = 0.9) {
+    this.operations.push({ type: 'input', termStr, freq, conf });
     return this;
   }
 
-  /**
-   * Record a belief with optional time
-   * @param {string} content - The belief content
-   * @param {Object} truth - Truth values {frequency, confidence}
-   * @param {number} time - Optional time at which to input the task
-   * @returns {TestNAR} This instance for chaining
-   */
-  belief(content, truth = { frequency: 0.9, confidence: 0.9 }, time = null) {
-    this.inputs.push({ 
-      taskData: { term: content, punctuation: Punctuation.BELIEF, truth }, 
-      time, 
-      type: 'belief' 
-    });
+  run(cycles = 1) {
+    this.operations.push({ type: 'run', cycles });
     return this;
   }
 
-  /**
-   * Record a goal with optional time
-   * @param {string} content - The goal content
-   * @param {Object} truth - Truth values {frequency, confidence}
-   * @param {number} time - Optional time at which to input the task
-   * @returns {TestNAR} This instance for chaining
-   */
-  goal(content, truth = { frequency: 0.9, confidence: 0.9 }, time = null) {
-    this.inputs.push({ 
-      taskData: { term: content, punctuation: Punctuation.GOAL, truth }, 
-      time, 
-      type: 'goal' 
-    });
+  expect(criteria) {
+    const matcher = (criteria instanceof TaskMatch) ? criteria.build() : this._createMatcher(criteria);
+    this.operations.push({ type: 'expect', matcher, criteria, shouldExist: true });
     return this;
   }
 
-  /**
-   * Record a question with optional time
-   * @param {string} content - The question content
-   * @param {number} time - Optional time at which to input the task
-   * @returns {TestNAR} This instance for chaining
-   */
-  question(content, time = null) {
-    this.inputs.push({ 
-      taskData: { term: content, punctuation: Punctuation.QUESTION }, 
-      time, 
-      type: 'question' 
-    });
+  expectNot(criteria) {
+    const matcher = (criteria instanceof TaskMatch) ? criteria.build() : this._createMatcher(criteria);
+    this.operations.push({ type: 'expect', matcher, criteria, shouldExist: false });
     return this;
   }
 
-  /**
-   * Record a reasoning run with optional time
-   * @param {number} cycles - Number of cycles to run
-   * @param {number} time - Optional time at which to run
-   * @returns {TestNAR} This instance for chaining
-   */
-  run(cycles = 1, time = null) {
-    this.runs.push({ cycles, time });
-    return this;
-  }
+  execute() {
+    return withCoreSetup(async (core) => {
+      const { memory, reasoner, focus } = core;
 
-  /**
-   * Add an expectation to check after all inputs/runs are processed
-   * @param {Object} criteria - Criteria for the expected task
-   * @param {number} fromTime - Start time range for expectation
-   * @param {number} toTime - End time range for expectation
-   * @param {boolean} shouldExist - Whether the task should exist (true) or not exist (false)
-   * @returns {TestNAR} This instance for chaining
-   */
-  expect(criteria, fromTime = 0, toTime = Infinity, shouldExist = true) {
-    this.expectations.push({ 
-      criteria, 
-      fromTime, 
-      toTime, 
-      shouldExist,
-      type: 'positive' 
-    });
-    return this;
-  }
-
-  /**
-   * Add a negative expectation (should NOT exist)
-   * @param {Object} criteria - Criteria for the task that should NOT exist
-   * @param {number} fromTime - Start time range for expectation
-   * @param {number} toTime - End time range for expectation
-   * @returns {TestNAR} This instance for chaining
-   */
-  expectNot(criteria, fromTime = 0, toTime = Infinity) {
-    this.expectations.push({ 
-      criteria, 
-      fromTime, 
-      toTime, 
-      shouldExist: false,
-      type: 'negative' 
-    });
-    return this;
-  }
-
-  /**
-   * Execute the recorded inputs, runs, and then check expectations
-   * @returns {Object} Results of the test execution
-   */
-  async execute() {
-    // Process all inputs in order
-    for (const input of this.inputs) {
-      const { taskData, type } = input;
-      
-      if (type === 'input') {
-        this.inputOriginal(taskData);
-      } else if (type === 'belief') {
-        this.believe(taskData.term, taskData.truth);
-      } else if (type === 'goal') {
-        this.want(taskData.term, taskData.truth);
-      } else if (type === 'question') {
-        this.ask(taskData.term);
+      // Add rules
+      for (const rule of this.rules) {
+        reasoner.addRule(rule);
       }
-    }
-    
-    // Perform all runs
-    for (const run of this.runs) {
-      const { cycles } = run;
-      for (let i = 0; i < cycles; i++) {
-        await this.runCycle();
+
+      const expectations = [];
+      for (const op of this.operations) {
+        if (op.type === 'input') {
+          const task = this._createTaskFromString(op.termStr, Punctuation.BELIEF, op.freq, op.conf);
+          memory.addTask(task, Date.now());
+          focus.addTaskToFocus(task, task.getPriority());
+        } else if (op.type === 'run') {
+          for (let i = 0; i < op.cycles; i++) {
+            const focusItems = focus.getFocusItems();
+            const focusTasks = focusItems.map(item => item[1].task);
+            const derivedTasks = await reasoner.reason(focusTasks, memory, { currentTime: Date.now() });
+            for (const derivedTask of derivedTasks) {
+              memory.addTask(derivedTask, Date.now());
+            }
+          }
+        } else if (op.type === 'expect') {
+          expectations.push(op);
+        }
       }
+
+      const allTasks = memory.getAllTasks();
+      let allExpectationsMet = true;
+
+      for (const exp of expectations) {
+        const { matcher, criteria, shouldExist } = exp;
+        const matchFound = allTasks.some(matcher);
+        const expectationMet = shouldExist ? matchFound : !matchFound;
+
+        if (!expectationMet) {
+          allExpectationsMet = false;
+          console.error(`Expectation FAILED: Criteria ${JSON.stringify(criteria)} (shouldExist: ${shouldExist}) was not met.`);
+        }
+      }
+
+      return allExpectationsMet;
+    })();
+  }
+
+  _createMatcher(criteria) {
+    if (typeof criteria === 'string') {
+      return task => task.term.toString().includes(criteria);
     }
-    
-    // Check all expectations
-    const results = {
-      passed: true,
-      details: [],
-      expectations: this.expectations.length
+    return task => {
+      if (criteria.term && !task.term.toString().includes(criteria.term)) return false;
+      if (criteria.punctuation && task.punctuation !== criteria.punctuation) return false;
+      if (criteria.truth) {
+        if (criteria.truth.minFrequency && task.truth.frequency < criteria.truth.minFrequency) return false;
+        if (criteria.truth.minConfidence && task.truth.confidence < criteria.truth.minConfidence) return false;
+      }
+      return true;
     };
-    
-    for (const expectation of this.expectations) {
-      const { criteria, shouldExist } = expectation;
-      const matches = this._findMatchingTasks(criteria);
-      const hasMatch = matches.length > 0;
-      const expectationMet = shouldExist ? hasMatch : !hasMatch;
-      
-      results.details.push({
-        criteria,
-        shouldExist,
-        hasMatch,
-        matches,
-        passed: expectationMet
-      });
-      
-      if (!expectationMet) {
-        results.passed = false;
-      }
-    }
-    
-    return results;
-  }
-  
-  /**
-   * Find tasks that match the given criteria
-   * @param {Object} criteria - Criteria for matching tasks
-   * @returns {Array} Array of matching tasks
-   * @private
-   */
-  _findMatchingTasks(criteria) {
-    const allTasks = this.getTasks();
-    const matches = [];
-    
-    for (const task of allTasks) {
-      let isMatch = true;
-      
-      // Check term match
-      if (criteria.term !== undefined) {
-        const termStr = task.term.toString();
-        if (typeof criteria.term === 'string') {
-          if (!termStr.includes(criteria.term)) {
-            isMatch = false;
-          }
-        } else if (criteria.term instanceof RegExp) {
-          if (!criteria.term.test(termStr)) {
-            isMatch = false;
-          }
-        } else {
-          if (termStr !== criteria.term) {
-            isMatch = false;
-          }
-        }
-      }
-      
-      // Check punctuation match
-      if (isMatch && criteria.punctuation !== undefined && task.punctuation !== criteria.punctuation) {
-        isMatch = false;
-      }
-      
-      // Check truth values
-      if (isMatch && task.truth) {
-        if (criteria.minFrequency !== undefined && task.truth.frequency < criteria.minFrequency) {
-          isMatch = false;
-        }
-        if (criteria.maxFrequency !== undefined && task.truth.frequency > criteria.maxFrequency) {
-          isMatch = false;
-        }
-        if (criteria.minConfidence !== undefined && task.truth.confidence < criteria.minConfidence) {
-          isMatch = false;
-        }
-        if (criteria.maxConfidence !== undefined && task.truth.confidence > criteria.maxConfidence) {
-          isMatch = false;
-        }
-      }
-      
-      if (isMatch) {
-        matches.push(task);
-      }
-    }
-    
-    return matches;
   }
 
-  /**
-   * Expect a specific condition to be true after reasoning
-   * @param {Function} condition - A function that takes current NAR state and returns boolean
-   * @returns {boolean} Whether the condition is met
-   */
-  expectCondition(condition) {
-    return condition(this);
-  }
-
-  /**
-   * Assert that a specific term should exist in the current tasks
-   * @param {string} expectedTerm - The term that should exist
-   * @param {Object} options - Options for matching {punctuation, truth}
-   * @returns {boolean} Whether the assertion passes
-   */
-  assertExists(expectedTerm, options = {}) {
-    const exists = this.expect(expectedTerm, options);
-    if (!exists) {
-      console.error(`❌ Assertion failed: Expected term "${expectedTerm}" not found`);
-    }
-    return exists;
-  }
-
-  /**
-   * Assert that a specific term should NOT exist in the current tasks
-   * @param {string} unexpectedTerm - The term that should not exist
-   * @param {Object} options - Options for matching {punctuation, truth}
-   * @returns {boolean} Whether the assertion passes
-   */
-  assertNotExists(unexpectedTerm, options = {}) {
-    const exists = this.expect(unexpectedTerm, options);
-    if (exists) {
-      console.error(`❌ Assertion failed: Unexpected term "${unexpectedTerm}" was found`);
-    }
-    return !exists;
-  }
-
-  /**
-   * Run multiple reasoning cycles
-   * @param {number} count - Number of cycles to run
-   * @param {number} delay - Delay between cycles in ms
-   * @returns {Array} Results from each cycle
-   */
-  async runCyclesWithHistory(count, delay = 0) {
-    const results = [];
-    for (let i = 0; i < count; i++) {
-      const result = await this.runCycle();
-      results.push(result);
-      this.testHistory.push({
-        cycle: i,
-        derivedTasks: result,
-        totalTasks: this.getTasks().length,
-        timestamp: Date.now()
-      });
-      if (delay > 0) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-    return results;
-  }
-
-  /**
-   * Get the history of test runs
-   * @returns {Array} Array of test history objects
-   */
-  getTestHistory() {
-    return [...this.testHistory];
-  }
-
-  /**
-   * Clear the test history
-   */
-  clearHistory() {
-    this.testHistory = [];
-  }
-
-  /**
-   * Run a complex test scenario with setup, execution, and assertions
-   * @param {Object} scenario - Test scenario with inputs, cycles, and expectations
-   * @returns {Object} Test result with success status and details
-   */
-  async runScenario(scenario) {
-    const { 
-      name = 'Test Scenario',
-      inputs = [],
-      cycles = 1,
-      expectations = [],
-      beforeRun = null,
-      afterRun = null 
-    } = scenario;
-
-    console.log(`🧪 Running scenario: ${name}`);
-
-    // Clear any previous state if needed
-    this.clearHistory();
-
-    // Setup phase
-    for (const input of inputs) {
-      if (typeof input === 'string') {
-        this.input(input);
-      } else if (typeof input === 'object') {
-        if (input.type === 'belief') {
-          this.belief(input.content, input.truth);
-        } else if (input.type === 'goal') {
-          this.goal(input.content, input.truth);
-        } else if (input.type === 'question') {
-          this.question(input.content);
-        } else {
-          this.input(input);
-        }
-      }
+  _createTaskFromString(taskStr, punctuation = Punctuation.BELIEF, freq = 0.9, conf = 0.9, priority = 0.9) {
+    let term;
+    let cleanStr = taskStr.trim();
+    if (cleanStr.startsWith('(') && cleanStr.endsWith(')')) {
+      cleanStr = cleanStr.substring(1, cleanStr.length - 1);
     }
 
-    if (beforeRun) {
-      beforeRun(this);
-    }
+    const relationRegex = /^(?:(\".*?\"|\S+))\s*(-->|==>)\s*(?:(\".*?\"|\S+))$/;
+    const match = cleanStr.match(relationRegex);
 
-    // Execution phase
-    const cycleResults = await this.runCyclesWithHistory(cycles);
-
-    if (afterRun) {
-      afterRun(this);
-    }
-
-    // Validation phase
-    const results = {
-      name,
-      success: true,
-      inputs: inputs.length,
-      cycles,
-      totalTasks: this.getTasks().length,
-      derivedTasks: cycleResults.flat().length,
-      expectations: expectations.length,
-      expectationResults: []
-    };
-
-    for (const expectation of expectations) {
-      let expectationResult;
-      let description = 'Unknown expectation';
-
-      if (typeof expectation === 'function') {
-        expectationResult = expectation(this);
-        description = expectation.toString();
-      } else if (typeof expectation === 'object' && expectation.term) {
-        const { term, punctuation, minFrequency, minConfidence, shouldExist = true } = expectation;
-        const matches = this.expect(term, { punctuation, minFrequency, minConfidence });
-        expectationResult = shouldExist ? matches : !matches;
-        description = `Term '${term}' should${shouldExist ? '' : ' not'} exist with specified properties`;
-      } else if (typeof expectation === 'string') {
-        expectationResult = this.expect(expectation);
-        description = `Term '${expectation}' should exist`;
-      }
-
-      const expectationPassed = Boolean(expectationResult);
-      results.expectationResults.push({ 
-        description, 
-        passed: expectationPassed, 
-        result: expectationResult 
-      });
-
-      if (!expectationPassed) {
-        results.success = false;
-      }
-    }
-
-    // Log results
-    if (results.success) {
-      console.log(`✅ Scenario "${name}" PASSED`);
+    if (match) {
+      const [_, subject, operator, predicate] = match;
+      const relationType = operator === '-->' ? TermType.INHERITANCE : TermType.IMPLICATION;
+      term = Term.createCompound(relationType, [Term.newAtom(subject), Term.newAtom(predicate)]);
     } else {
-      console.log(`❌ Scenario "${name}" FAILED`);
-      results.expectationResults.forEach((result, idx) => {
-        if (!result.passed) {
-          console.log(`  ❌ Expectation ${idx + 1} failed: ${result.description}`);
-        } else {
-          console.log(`  ✅ Expectation ${idx + 1} passed: ${result.description}`);
-        }
-      });
+      term = Term.newAtom(cleanStr);
     }
 
-    return results;
+    return new Task(
+      term,
+      punctuation,
+      new TruthValue(freq, conf),
+      Date.now(),
+      Date.now(),
+      priority
+    );
   }
 }

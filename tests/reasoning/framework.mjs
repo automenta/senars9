@@ -49,7 +49,7 @@ function formatTaskWithRoundedTruth(task) {
 export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
   const { memory } = core;
   const reasoner = core.reasoner;
-  const context = { context: { currentTime: Date.now() } };
+  const context = { currentTime: Date.now() };
 
   // Register rules with the reasoner if provided
   if (config.rules) {

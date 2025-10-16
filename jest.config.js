@@ -17,5 +17,8 @@ export default {
   // Force exit after tests complete to handle any remaining async operations
   forceExit: true,
   // Detect open handles that might cause resource leaks (disabled for performance)
-  detectOpenHandles: false
+  detectOpenHandles: false,
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
 };
