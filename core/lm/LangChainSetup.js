@@ -7,7 +7,7 @@ export const setupLangChainProvider = (lm, config, providerId = 'langchain') => 
     LangChainProvider,
     { ...config, _setupMode: true },
     providerId,
-    ['apiKey', 'baseURL']
+    [] // Don't require any fields to allow for flexible local configurations
   );
 };
 
