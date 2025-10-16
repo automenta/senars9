@@ -7,10 +7,8 @@
  * neural (LM) and symbolic (NARS) components.
  */
 
-import { NAR } from '../core/NAR.js';  // The main Non-Axiomatic Reasoner
-import { FocusSetSelector } from '../core/FocusSetSelector.js';
-import Bag from '../core/memory/Bag.js';
 import System from '../core/system/System.js';  // The main System with LM integration
+import Bag from '../core/memory/Bag.js';
 import blessed from 'blessed';
 import { GoalDecompositionRule } from '../core/reasoning/lm/rules/GoalDecompositionRule.js';
 import { HypothesisGenerationRule } from '../core/reasoning/lm/rules/HypothesisGenerationRule.js';
@@ -672,7 +670,9 @@ async function initializeSystem(lmProvider = DEFAULT_LM_PROVIDER) {
     const config = {
       components: {
         lm: {
-          provider: lmProvider
+          provider: lmProvider,
+          // xenova-specific config
+          modelName: 'distilgpt2',
         },
         webSocketServer: {
           enabled: false  // Disable WebSocket server for terminal UI
@@ -1063,9 +1063,9 @@ async function runDemo(inputText = DEFAULT_INPUT, lmProvider = DEFAULT_LM_PROVID
     taskUpdateInterval = setInterval(async () => {
       try {
         // Process neurosymbolic integration rules periodically
-        await processNeurosymbolicRules();
+        // await processNeurosymbolicRules();
         // Add a periodic check to show system activity
-        addLogLine('🔍 Neurosymbolic rule check cycle');
+        // addLogLine('🔍 Neurosymbolic rule check cycle');
         
         // The system's core components handle reasoning automatically
         // When tasks are input and the system is running, reasoning cycles execute
@@ -1123,9 +1123,10 @@ async function runDemo(inputText = DEFAULT_INPUT, lmProvider = DEFAULT_LM_PROVID
         screen.render();
       });
 
-      system.on('task.derived', (result) => {
-        const content = result.content || result.term?.toString?.() || 'Unknown derivation';
-        const line = `🔬 New derivation: ${content}`;
+      system.on('task.derived', (task) => {
+        const content = task.term?.toString?.() || 'Unknown derivation';
+        const truth = task.truth ? `(f=${task.truth.frequency.toFixed(2)}, c=${task.truth.confidence.toFixed(2)})` : '';
+        const line = `🔬 New derivation: ${content} ${truth}`;
         addLogLine(line);
         logBox.setContent(getFormattedLog());
         screen.render();
