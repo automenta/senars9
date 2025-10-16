@@ -1,89 +1,84 @@
 /**
  * @file core/reasoning/lm/rules/VariableGroundingRule.js
- * @description Variable grounding rule for the LM Reasoning API
+ * @description Variable grounding rule that uses an LM to suggest possible values for variables in statements.
  */
 
-import { LMRule } from '../../Rule.js';
+import { createLMRule } from '../LMRuleFactory.js';
+import { Term } from '../../../Term.js';
+import { Task, Punctuation } from '../../../Task.js';
+import { extractTaskFromContext, parseSubGoals } from './RuleHelpers.js';
 
-export class VariableGroundingRule extends LMRule {
-  constructor(lm) {
-    super('variable-grounding', lm, {
-      name: 'Variable Grounding Rule',
-      description: 'Suggests possible values for variables in tasks',
-      priority: 0.7
-    });
-  }
+/**
+ * Checks if a string contains a variable (e.g., "$var" or "?var").
+ * @param {string} text - The text to check.
+ * @returns {boolean} True if the text contains a variable.
+ */
+const hasVariable = (text) => {
+  return /[\$\?]\w+/.test(text);
+};
 
-  canApply(premise) {
-    // Check if the task contains a variable (indicated by ?X pattern)
-    if (premise.type !== 'Task' || !premise.task) return false;
-    
-    const task = premise.task;
-    return task.term && (typeof task.term === 'string' ? task.term : task.term.toString()).includes('?');
-  }
+/**
+ * Creates a variable grounding rule using the LMRuleFactory.
+ * This rule identifies statements with variables and uses an LM to propose concrete values.
+ *
+ * @param {object} lm - The Language Model instance.
+ * @returns {LMRule} A new LMRule instance for variable grounding.
+ */
+export const createVariableGroundingRule = (lm) => {
+  return createLMRule({
+    id: 'variable-grounding',
+    lm,
+    name: 'Variable Grounding Rule',
+    description: 'Suggests possible concrete values for variables in tasks.',
+    priority: 0.7,
 
-  generatePrompt(premise) {
-    return `For the task "${premise.task.term}", what are 3 plausible values for the variable? Provide them as a list.`;
-  }
+    condition: (context) => {
+      const task = extractTaskFromContext(context);
+      if (!task) return false;
 
-  processLMOutput(lmResponse, premise) {
-    const lines = lmResponse.split('\n');
-    const candidates = [];
+      const { term, priority } = task;
+      const termStr = term.toString();
 
-    for (const line of lines) {
-      const match = line.match(/\d+\.\s*(.+)/) || line.match(/[•*-]\s*(.+)/);
-      if (match) {
-        candidates.push(match[1].trim());
-      }
-    }
+      return priority > 0.7 && hasVariable(termStr);
+    },
 
-    // If no structured format found, try simple extraction
-    if (candidates.length === 0) {
-      // Try simple sentence splitting
-      const sentences = lmResponse.split(/[.!?]+/);
-      for (const sentence of sentences) {
-        const trimmed = sentence.trim();
-        if (trimmed && trimmed.length > 3) {
-          candidates.push(trimmed);
-        }
-      }
-    }
+    prompt: (context) => {
+      const task = extractTaskFromContext(context);
+      const termStr = task.term.toString();
+      return `The following statement contains a variable.
+Statement: "${termStr}"
 
-    return candidates;
-  }
+Based on the context, what are 1-3 plausible, concrete values for the variable?
+Provide only the values, one per line.`;
+    },
 
-  generateTasks(processedOutput, premise) {
-    const newTasks = [];
+    process: (lmResponse) => {
+      if (!lmResponse) return [];
+      return parseSubGoals(lmResponse);
+    },
 
-    if (Array.isArray(processedOutput)) {
-      for (const candidate of processedOutput) {
-        if (candidate.trim()) {
-          // Replace the variable with the candidate value
-          const originalTerm = typeof premise.task.term === 'string' 
-            ? premise.task.term 
-            : premise.task.term.toString();
-          
-          const groundedTerm = originalTerm.replace(/\?\w+/, 
-            candidate.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_]/g, ''));
-          newTasks.push({
-            term: groundedTerm,
-            punctuation: premise.task.punctuation,
-            truth: { frequency: 0.5, confidence: 0.4 }  // Lower confidence for generated values
-          });
-        }
-      }
-    }
+    generate: (processedOutput, context) => {
+      if (!processedOutput || processedOutput.length === 0) return [];
 
-    return newTasks;
-  }
+      const originalTask = extractTaskFromContext(context);
+      const originalTermStr = originalTask.term.toString();
 
-  async apply(premise, context) {
-    try {
-      const newTasks = await this.executeLMProcessing(premise);
-      return newTasks || [];
-    } catch (error) {
-      console.error(`Error in VariableGroundingRule:`, error);
-      return [];
-    }
-  }
-}
+      return processedOutput.map(value => {
+        // Replace the first variable found with the proposed value
+        const newTermStr = originalTermStr.replace(/[\$\?]\w+/, value);
+        const newTerm = Term.newAtom(newTermStr);
+
+        return new Task(
+          newTerm,
+          originalTask.punctuation,
+          { frequency: 0.6, confidence: 0.5 } // Grounded statements have moderate uncertainty
+        );
+      });
+    },
+
+    lm_options: {
+      temperature: 0.7,
+      max_tokens: 100,
+    },
+  });
+};

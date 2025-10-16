@@ -1,3 +1,5 @@
+import { glob } from 'glob';
+import path from 'path';
 import Memory from './Memory.js';
 import { Focus } from './Focus.js';
 import { Task, Punctuation, TruthValue } from './Task.js';
@@ -6,6 +8,7 @@ import { Reasoner } from './Reasoner.js';
 import { CycleContext, runSingleCycle } from './Cycle.js';
 import { Logger, ObjectUtils } from './base/utilities.js';
 import { Clock, HighResolutionClock } from './Clock.js';
+import LM from './lm/LM.js';
 
 export class NAR {
   constructor(config = {}) {
@@ -14,10 +17,16 @@ export class NAR {
     Logger.debug('NAR initialized with integrated memory and reasoning components');
   }
 
+  async initialize() {
+    await this._initializeLMRules();
+    return this;
+  }
+
   _initComponents(config) {
     this.focus = new Focus();
     this.memory = new Memory(this.focus);
-    this.reasoner = new Reasoner();
+    this.lm = new LM();
+    this.reasoner = new Reasoner(this.lm);
     
     // Initialize clock - use provided clock or default to HighResolutionClock
     this.clock = config.clock || new HighResolutionClock();
@@ -77,6 +86,7 @@ export class NAR {
         task = { createdAt: this.clock.getTime() };
       }
       this.memory.addTask(task, this.clock.getTime());
+      this.focus.addTaskToFocus(task, task.getPriority());
       this.stats.inputTasks++;
       
       Logger.debug(`Task input: ${task.toString()}`);
@@ -135,13 +145,13 @@ export class NAR {
     return this.memory.removeTask(taskHash);
   }
 
-  runCycle() {
+  async runCycle() {
     const currentTime = this.clock.getTime();
     const context = new CycleContext(currentTime);
 
     // Get tasks from the focus set
     const focusItems = this.focus.getFocusItems();
-    if (focusItems.length === 0) return;
+    if (focusItems.length === 0) return [];
 
     // Extract the tasks from the [key, taskData] pairs
     // Handle both new format (task directly) and legacy format ({ task, ...metadata })
@@ -157,15 +167,16 @@ export class NAR {
       task.setAccessedAt(context.currentTime)
     });
 
-    const derivedTasks = this.reasoner.reason(focusSet, this.memory, context);
+    const derivedTasks = await this.reasoner.reason(focusSet, this.memory, context);
 
-    /*derivedTasks.forEach(task => {
+    derivedTasks.forEach(task => {
       this.memory.addTask(task, context.currentTime);
       this.stats.derivedTasks++;
-    });*/
+    });
 
     this.memory.consolidate(context.currentTime);
     this.stats.cycles++;
+    return derivedTasks;
   }
 
   start() {
@@ -243,6 +254,32 @@ export class NAR {
     Logger.debug('NAR reset to initial state');
   }
   
+  async _initializeLMRules() {
+    const rulePath = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
+    Logger.info(`Searching for LM rules in: ${rulePath}`);
+    const ruleFiles = await glob(`${rulePath}/*.js`);
+    Logger.info(`Found rule files: ${ruleFiles.map(f => path.basename(f)).join(', ')}`);
+
+    for (const file of ruleFiles) {
+      if (file.endsWith('RuleHelpers.js')) continue;
+
+      try {
+        const module = await import(file);
+        const createRuleFn = Object.values(module).find(v => typeof v === 'function' && v.name.startsWith('create'));
+
+        if (createRuleFn) {
+          const rule = createRuleFn(this.lm);
+          this.reasoner.addRule(rule);
+          Logger.info(`Successfully loaded and registered LM rule: ${rule.id}`);
+        } else {
+          Logger.warn(`No create function found in rule file: ${file}`);
+        }
+      } catch (error) {
+        Logger.error(`Failed to load LM rule from ${file}:`, { error });
+      }
+    }
+  }
+
   isRunning() {
     return this._isRunning;
   }

@@ -1,108 +1,90 @@
 /**
  * @file core/reasoning/lm/rules/TemporalCausalModelingRule.js
- * @description Temporal and causal modeling rule for the LM Reasoning API
+ * @description Temporal and causal modeling rule that uses an LM to infer time order and causal relationships from text.
  */
 
-import { LMRule } from '../../Rule.js';
+import { createLMRule } from '../LMRuleFactory.js';
+import { Term } from '../../../Term.js';
+import { Task, Punctuation } from '../../../Task.js';
+import { extractTaskFromContext } from './RuleHelpers.js';
 
-export class TemporalCausalModelingRule extends LMRule {
-  constructor(lm) {
-    super('temporal-causal-modeling', lm, {
-      name: 'Temporal/Causal Modeling Rule',
-      description: 'Infers time order and causal relationships from text',
-      priority: 0.8
-    });
-  }
+/**
+ * Keywords that suggest temporal or causal relationships.
+ * @type {string[]}
+ */
+const temporalCausalKeywords = [
+  'before', 'after', 'when', 'then', 'while', 'during', 'causes', 'leads to', 'results in',
+  'because', 'since', 'due to', 'therefore', 'consequently', 'if', 'precedes', 'follows'
+];
 
-  canApply(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      task = context.premise.task;
-    } else if (context.premise1) {
-      // Old context format used by test framework
-      task = context.premise1;
-    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
-      // Format used potentially by test framework
-      task = context.tasks[0];
-    } else {
-      return false;
-    }
-    
-    if (!task) return false;
-    
-    const termStr = task.term ? task.term.toString() : '';
-    const isBelief = task.punctuation === '.';
-    const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
-    
-    // Apply to beliefs that contain temporal or causal keywords
-    const hasTemporalCausalTerms = /before|after|when|then|while|during|causes|leads to|results in|because|since|due to|as a result|consequently|therefore|thus|if.*then|first.*then|eventually|subsequently|precedes|follows|causal|temporal|time|sequence|order|trigger|effect|outcome|impact|influence/i.test(termStr);
-    
-    return isBelief && priority > 0.1 && hasTemporalCausalTerms;
-  }
+/**
+ * Checks if a string contains temporal or causal terms.
+ * @param {string} text - The text to check.
+ * @returns {boolean} True if the text contains relevant keywords.
+ */
+const hasTemporalCausalTerms = (text) => {
+  const lowerText = text.toLowerCase();
+  return temporalCausalKeywords.some(keyword => lowerText.includes(keyword));
+};
 
-  generatePrompt(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      task = context.premise.task;
-    } else if (context.premise1) {
-      task = context.premise1;
-    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
-      task = context.tasks[0];
-    } else {
-      task = context;
-    }
-    
-    if (!task) {
-      throw new Error('No task provided to generate prompt for TemporalCausalModelingRule');
-    }
-    
-    const termStr = task.term ? task.term.toString() : task.toString ? task.toString() : String(task);
-    return `Analyze the temporal and causal relationships in this statement: "${termStr}". Identify the cause(s), effect(s), and the time sequence if applicable. Express the relationships as formal causal and temporal logic statements.`;
-  }
+/**
+ * Creates a temporal/causal modeling rule using the LMRuleFactory.
+ * This rule identifies statements with temporal or causal language and uses an LM to model them formally.
+ *
+ * @param {object} lm - The Language Model instance.
+ * @returns {LMRule} A new LMRule instance for temporal/causal modeling.
+ */
+export const createTemporalCausalModelingRule = (lm) => {
+  return createLMRule({
+    id: 'temporal-causal-modeling',
+    lm,
+    name: 'Temporal/Causal Modeling Rule',
+    description: 'Infers time order and causal relationships from text.',
+    priority: 0.75,
 
-  processLMOutput(lmResponse, context) {
-    // Process the LM's temporal/causal analysis
-    return lmResponse.trim();
-  }
+    condition: (context) => {
+      const task = extractTaskFromContext(context);
+      if (!task) return false;
 
-  generateTasks(processedOutput, context) {
-    const newTasks = [];
-    
-    if (processedOutput && processedOutput.trim()) {
-      // Create a causal relationship belief
-      const originalTerm = context.premise?.task?.term?.toString() || 'unknown';
+      const { term, punctuation, priority } = task;
+      const termStr = term.toString();
+      const isBelief = punctuation === Punctuation.JUDGMENT;
+
+      return isBelief && priority > 0.7 && hasTemporalCausalTerms(termStr);
+    },
+
+    prompt: (context) => {
+      const task = extractTaskFromContext(context);
+      const termStr = task.term.toString();
+      return `Analyze the temporal and causal relationships in the following statement:
+"${termStr}"
+
+Identify the cause and the effect. Express their relationship as a formal implication (e.g., "cause --> effect").
+If there is a time sequence, describe it.`;
+    },
+
+    process: (lmResponse) => {
+      // Extract the formal implication from the response
+      const match = lmResponse.match(/(\w+\s*-->\s*\w+)/);
+      return match ? match[1] : lmResponse.trim();
+    },
+
+    generate: (processedOutput, context) => {
+      if (!processedOutput) return [];
       
-      newTasks.push({
-        term: `causal_model_of_${originalTerm.replace(/[^\w]/g, '_')}`,
-        punctuation: '.',
-        truth: { frequency: 0.8, confidence: 0.7 },
-        content: processedOutput
-      });
-      
-      // Create a temporal relationship if identified
-      newTasks.push({
-        term: `(temporal_causal_analysis --> "${processedOutput}").`,
-        punctuation: '.',
-        truth: { frequency: 0.8, confidence: 0.7 }
-      });
-    }
-    
-    return newTasks;
-  }
+      const newTerm = Term.newAtom(processedOutput);
+      const newTask = new Task(
+        newTerm,
+        Punctuation.JUDGMENT,
+        { frequency: 0.9, confidence: 0.8 }
+      );
 
-  async apply(context) {
-    try {
-      if (!this.canApply(context)) return [];
-      const lmResponse = await this.executeLMProcessing(context);
-      const processedOutput = this.processLMOutput(lmResponse, context);
-      const newTasks = this.generateTasks(processedOutput, context);
-      return newTasks || [];
-    } catch (error) {
-      console.error(`Error in TemporalCausalModelingRule:`, error);
-      return [];
-    }
-  }
-}
+      return [newTask];
+    },
+
+    lm_options: {
+      temperature: 0.4,
+      max_tokens: 300,
+    },
+  });
+};

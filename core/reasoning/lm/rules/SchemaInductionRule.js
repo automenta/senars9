@@ -1,102 +1,90 @@
-import { LMRule } from '../../Rule.js';
+/**
+ * @file core/reasoning/lm/rules/SchemaInductionRule.js
+ * @description Schema induction rule that uses an LM to extract action schemas from narrative or procedural text.
+ */
 
-export class SchemaInductionRule extends LMRule {
-  constructor(lm) {
-    super('schema-induction', lm, {
-      name: 'Schema Induction Rule',
-      description: 'Extracts action schemas from narrative or instruction sequences',
-      priority: 0.6
-    });
-  }
+import { createLMRule } from '../LMRuleFactory.js';
+import { Term } from '../../../Term.js';
+import { Task, Punctuation } from '../../../Task.js';
+import { extractTaskFromContext } from './RuleHelpers.js';
 
-  canApply(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      // New context format from reasoner
-      task = context.premise.task;
-    } else if (context.premise1) {
-      // Old context format used by test framework
-      task = context.premise1;
-    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
-      // Format used potentially by test framework
-      task = context.tasks[0];
-    } else {
-      return false;
-    }
-    
-    if (!task) return false;
-    
-    const termStr = task.term ? task.term.toString() : '';
-    const isBelief = task.punctuation === '.';
-    const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
-    
-    // Apply to beliefs that contain narrative or procedural information
-    const hasNarrativeTerms = /when.*then|if.*then|first.*then|after.*before|sequence|procedure|instruction|process|step|guide/i.test(termStr);
-    
-    return isBelief && priority > 0.1 && hasNarrativeTerms;
-  }
+/**
+ * Keywords that suggest narrative or procedural content.
+ * @type {string[]}
+ */
+const narrativeKeywords = [
+  'when', 'then', 'if', 'first', 'after', 'before', 'sequence', 'procedure', 'instruction', 'process', 'step', 'guide', 'how to'
+];
 
-  generatePrompt(context) {
-    // Handle both old and new context formats
-    let task;
-    if (context.premise && context.premise.task) {
-      task = context.premise.task;
-    } else if (context.premise1) {
-      task = context.premise1;
-    } else if (Array.isArray(context.tasks) && context.tasks.length > 0) {
-      task = context.tasks[0];
-    } else {
-      task = context;
-    }
-    
-    if (!task) {
-      throw new Error('No task provided to generate prompt for SchemaInductionRule');
-    }
-    
-    const termStr = task.term ? task.term.toString() : task.toString ? task.toString() : String(task);
-    return `From this narrative or instruction: "${termStr}", extract a generalizable action schema or procedure. Express it as a temporal sequence or conditional relationship that could apply to similar situations.`;
-  }
+/**
+ * Checks if a string contains narrative or procedural terms.
+ * @param {string} text - The text to check.
+ * @returns {boolean} True if the text contains narrative terms.
+ */
+const hasNarrativeTerms = (text) => {
+  const lowerText = text.toLowerCase();
+  return narrativeKeywords.some(keyword => lowerText.includes(keyword));
+};
 
-  processLMOutput(lmResponse, context) {
-    // Process the LM's schema extraction
-    return lmResponse.trim();
-  }
+/**
+ * Creates a schema induction rule using the LMRuleFactory.
+ * This rule identifies procedural or narrative text and uses an LM to induce a formal schema.
+ *
+ * @param {object} lm - The Language Model instance.
+ * @returns {LMRule} A new LMRule instance for schema induction.
+ */
+export const createSchemaInductionRule = (lm) => {
+  return createLMRule({
+    id: 'schema-induction',
+    lm,
+    name: 'Schema Induction Rule',
+    description: 'Extracts action schemas from narrative or instruction sequences.',
+    priority: 0.65,
 
-  generateTasks(processedOutput, context) {
-    const newTasks = [];
-    
-    if (processedOutput && processedOutput.trim()) {
-      // Create a procedural belief based on the extracted schema
-      const schemaTerm = `schema_${(context.premise?.task?.term || 'unknown').toString().replace(/[^\w]/g, '_')}`;
+    condition: (context) => {
+      const task = extractTaskFromContext(context);
+      if (!task) return false;
+
+      const { term, punctuation, priority } = task;
+      const termStr = term.toString();
+      const isBelief = punctuation === Punctuation.JUDGMENT;
+
+      return isBelief && priority > 0.6 && hasNarrativeTerms(termStr);
+    },
+
+    prompt: (context) => {
+      const task = extractTaskFromContext(context);
+      const termStr = task.term.toString();
+      return `From the following text, extract a generalizable procedure or schema.
+
+Text: "${termStr}"
+
+Describe the schema as a sequence of conditional steps (e.g., "IF condition THEN action").
+The schema should be abstract enough to apply to similar situations.`;
+    },
+
+    process: (lmResponse) => {
+      return lmResponse.trim();
+    },
+
+
+
+    generate: (processedOutput, context) => {
+      if (!processedOutput) return [];
       
-      newTasks.push({
-        term: `(${processedOutput}) --> procedural_knowledge.`,
-        punctuation: '.',
-        truth: { frequency: 0.8, confidence: 0.7 }
-      });
-      
-      // Create a temporal action schema
-      newTasks.push({
-        term: `action_schema("${processedOutput}").`,
-        punctuation: '.',
-        truth: { frequency: 0.8, confidence: 0.7 }
-      });
-    }
-    
-    return newTasks;
-  }
+      const newTerm = Term.newAtom(processedOutput);
+      const newTask = new Task(
+        newTerm,
+        Punctuation.JUDGMENT,
+        { frequency: 0.9, confidence: 0.8 }
+      );
 
-  async apply(context) {
-    try {
-      if (!this.canApply(context)) return [];
-      const lmResponse = await this.executeLMProcessing(context);
-      const processedOutput = this.processLMOutput(lmResponse, context);
-      const newTasks = this.generateTasks(processedOutput, context);
-      return newTasks || [];
-    } catch (error) {
-      console.error(`Error in SchemaInductionRule:`, error);
-      return [];
-    }
-  }
-}
+      return [newTask];
+    },
+
+    lm_options: {
+      temperature: 0.5,
+      max_tokens: 500,
+    },
+  });
+};

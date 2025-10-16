@@ -32,7 +32,9 @@
     "express": "^5.1.0",
     "langchain": "^0.3.0",
     "ws": "^8.18.3",
-    "y-websocket": "^3.0.0"
+    "y-websocket": "^3.0.0",
+    "fs-extra": "^11.2.0",
+    "glob": "^10.4.1"
   },
   "devDependencies": {
     "jest": "^30.2.0"

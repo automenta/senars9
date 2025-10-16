@@ -1,73 +1,85 @@
-import { LMRule } from '../../Rule.js';
+/**
+ * @file core/reasoning/lm/rules/ExplanationGenerationRule.js
+ * @description Explanation generation rule that uses an LM to create natural language explanations for formal conclusions.
+ */
 
-export class ExplanationGenerationRule extends LMRule {
-  constructor(lm) {
-    super('explanation-generation', lm, {
-      name: 'Explanation Generation Rule',
-      description: 'Generates natural language explanations for formal conclusions',
-      priority: 0.5
-    });
-  }
+import { createLMRule } from '../LMRuleFactory.js';
+import { Term } from '../../../Term.js';
+import { Task, Punctuation } from '../../../Task.js';
+import { extractTaskFromContext } from './RuleHelpers.js';
 
-  hasComplexRelation(termStr) {
-    return /==>|<=>|=/g.test(termStr);
-  }
+/**
+ * Checks if a term string represents a complex logical relation.
+ * @param {string} termStr - The string representation of the term.
+ * @returns {boolean} True if the term contains a complex relation.
+ */
+const hasComplexRelation = (termStr) => {
+  return termStr.includes('-->') || termStr.includes('<->') || termStr.includes('==>');
+};
 
-  canApply(context) {
-    const task = this.extractTask(context);
-    if (!task) return false;
+/**
+ * Creates an explanation generation rule using the LMRuleFactory.
+ * This rule identifies complex logical statements and uses an LM to generate natural language explanations.
+ *
+ * @param {object} lm - The Language Model instance.
+ * @returns {LMRule} A new LMRule instance for explanation generation.
+ */
+export const createExplanationGenerationRule = (lm) => {
+  return createLMRule({
+    id: 'explanation-generation',
+    lm,
+    name: 'Explanation Generation Rule',
+    description: 'Generates natural language explanations for formal conclusions.',
+    priority: 0.5,
 
-    const {termStr, punctuation, priority} = this.analyzeTask(task);
-    const isBelief = punctuation === '.';
-    return isBelief && priority > 0.1 && this.hasComplexRelation(termStr);
-  }
+    condition: (context) => {
+      const task = extractTaskFromContext(context);
+      if (!task) return false;
 
-  generatePrompt(context) {
-    const task = this.extractTask(context);
-    if (!task) throw new Error('No task provided to generate prompt for ExplanationGenerationRule');
+      const { term, punctuation, priority } = task;
+      const termStr = term.toString();
+      const isBelief = punctuation === Punctuation.JUDGMENT;
 
-    const termStr = task.term ? task.term.toString() : task.toString ? task.toString() : String(task);
-    return `Provide a clear, natural language explanation for this logical statement: "${termStr}". Explain what it means in simple terms and why this relationship might be true or important.`;
-  }
+      return isBelief && priority > 0.6 && hasComplexRelation(termStr);
+    },
 
-  processLMOutput(lmResponse, context) {
-    return lmResponse.trim();
-  }
+    prompt: (context) => {
+      const task = extractTaskFromContext(context);
+      const termStr = task.term.toString();
+      return `Translate the following formal logic statement into a clear, simple, natural language explanation.
 
-  generateTasks(processedOutput, context) {
-    const newTasks = [];
+Statement: "${termStr}"
 
-    if (processedOutput?.trim()) {
-      const originalTerm = this.extractTask(context).term?.toString() || 'unknown';
-      const sanitizedTerm = originalTerm.replace(/[^\w]/g, '_');
+Focus on conveying the core meaning and implication of the statement.`;
+    },
 
-      newTasks.push(
-        {
-          term: `explanation_of_${sanitizedTerm}`,
-          punctuation: '.',
-          truth: { frequency: 0.95, confidence: 0.9 },
-          content: processedOutput
-        },
-        {
-          term: `(formal_statement_explained --> "${processedOutput}").`,
-          punctuation: '.',
-          truth: { frequency: 0.95, confidence: 0.9 }
-        }
+    process: (lmResponse) => {
+      return lmResponse.trim();
+    },
+
+    generate: (processedOutput, context) => {
+      if (!processedOutput) return [];
+
+      const originalTask = extractTaskFromContext(context);
+      const explanationTerm = Term.newAtom(`explanation_for_(${originalTask.term.toString()})`);
+
+      const newTask = new Task(
+        explanationTerm,
+        Punctuation.JUDGMENT,
+        { frequency: 1.0, confidence: 0.9 },
+        null,
+        null,
+        null,
+        null,
+        processedOutput // Attach the explanation as metadata
       );
-    }
 
-    return newTasks;
-  }
+      return [newTask];
+    },
 
-  async apply(context) {
-    if (!this.canApply(context)) return [];
-    try {
-      const lmResponse = await this.executeLMProcessing(context);
-      const processedOutput = this.processLMOutput(lmResponse, context);
-      return this.generateTasks(processedOutput, context);
-    } catch (error) {
-      console.error(`Error in ExplanationGenerationRule:`, error);
-      return [];
-    }
-  }
-}
+    lm_options: {
+      temperature: 0.5,
+      max_tokens: 300,
+    },
+  });
+};

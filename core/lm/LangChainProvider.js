@@ -6,34 +6,14 @@ class LangChainProvider {
     this.temperature = config.temperature ?? 0.7;
     this.maxTokens = config.maxTokens ?? 1000;
 
-    // For testing scenarios, allow missing fields but warn about them
-    // Exception: if this is the specific test case that expects errors to be thrown for LangChainProvider constructor directly
-    const isErrorTestCase = process.env.NODE_ENV === 'test' && !config._testMode &&
-      typeof config === 'object' && config !== null && !config._setupMode && (
-        Object.keys(config).length === 0 || // Empty config for LangChainProvider
-        (Object.keys(config).length === 1 && config.apiKey && !config.baseURL) || // Only apiKey provided
-        (Object.keys(config).length === 1 && !config.apiKey && config.baseURL) // Only baseURL provided
-      );
-
-    if (this.apiKey === undefined || this.apiKey === null) {
-      if (isErrorTestCase) {
-        throw new Error('API key is required for LangChain provider');
-      } else if (process.env.NODE_ENV === 'test' || config._testMode) {
-        // Only warn if not in a test scenario that expects missing API key
-        const isExpectedMissingApiKey = process.env.NODE_ENV === 'test' &&
-          (config.apiKey === undefined || config.apiKey === null);
-        if (!isExpectedMissingApiKey) {
-          console.warn('API key is missing for LangChain provider. Provider may not function correctly.');
+    if (!config._testMode) {
+        if (!this.apiKey) {
+            throw new Error('API key is required for LangChain provider');
         }
-      } else {
-        throw new Error('API key is required for LangChain provider');
-      }
-    }
-    // For local Ollama instances, we allow the default baseURL
-    if (!this.baseURL) {
-      // Set a default for local Ollama if not provided
-      this.baseURL = 'http://localhost:11434/v1';  // Default for Ollama
-      console.log(`ℹ️  Using default baseURL for local Ollama: ${this.baseURL}`);
+        if (!this.baseURL) {
+            this.baseURL = 'http://localhost:11434/v1'; // Default for Ollama
+            console.log(`ℹ️  Using default baseURL for local Ollama: ${this.baseURL}`);
+        }
     }
 
     // Handle custom URL format like "xyz:11434" - convert to proper HTTP URL

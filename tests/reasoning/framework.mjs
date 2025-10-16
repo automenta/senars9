@@ -53,7 +53,7 @@ export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
   // Register rules with the reasoner
   if (config.rules) {
     for (const rule of config.rules) {
-      reasoner.registerRule(rule);
+      reasoner.addRule(rule);
     }
   }
   
@@ -61,6 +61,7 @@ export const runGeneralReasoningTest = withCoreSetup(async (core, config) => {
   for (const [index, input] of config.inputs.entries()) {
     const task = createTaskFromInput(input);
     memory.addTask(task, Date.now() + index);
+    core.focus.addTaskToFocus(task, task.getPriority());
   }
   
   // Run the reasoner for N cycles

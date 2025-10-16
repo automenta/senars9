@@ -1,75 +1,93 @@
-import { LMRule } from '../../Rule.js';
+/**
+ * @file core/reasoning/lm/rules/AnalogicalReasoningRule.js
+ * @description Analogical reasoning rule that uses an LM to solve new problems by drawing analogies to known situations.
+ */
 
-export class AnalogicalReasoningRule extends LMRule {
-  constructor(lm) {
-    super('analogical-reasoning', lm, {
-      name: 'Analogical Reasoning Rule',
-      description: 'Solves new problems by drawing analogies to known situations',
-      priority: 0.75
-    });
-  }
+import { createLMRule } from '../LMRuleFactory.js';
+import { Term } from '../../../Term.js';
+import { Task, Punctuation } from '../../../Task.js';
+import { extractTaskFromContext } from './RuleHelpers.js';
 
-  hasProblemSolvingTerms(termStr) {
-    return /solve|open|close|fix|repair|improve|enhance|handle|deal with|address|tackle|approach|resolve|overcome|manage|operate|use|apply|adapt|implement|execute|perform|carry out|conduct|run|control|direct|guide|steer|navigate|tend|maintain|sustain|preserve|protect|defend|guard|shield|assist|help|support|aid|facilitate|enable|allow|permit|grant|offer|provide|give|supply|furnish|deliver|bring|carry|take|move|transport|ship|send|forward|transmit|transfer|shift|relocate|reposition|relocate|change|modify|adjust|alter|transform|convert|turn into|become|develop into|evolve into|grow into|turn out to be|end up as|result in|lead to|produce|generate|create|make|build|construct|form|establish|set up|create|invent|devise|design|plan|organize|arrange|coordinate|align|match|pair|connect|link|tie|join|attach|fasten|bind|secure|hold|grasp|catch|seize|grab|take hold of|get hold of|obtain|acquire|procure|secure|gain|obtain|attain|achieve|reach|accomplish|succeed in|manage|cope with|handle|deal with|take care of|look after|attend to|tend to|cater to|respond to|react to|reply to|answer|respond|react|interact|communicate|talk to|speak to|address|greet|welcome|greet|acknowledge|recognize|identify|distinguish|differentiate|tell apart|separate|sort out|classify|categorize|organize|group|cluster|bundle|collect|gather|assemble|accumulate|amass|pile up|stack|heap|mount|build up|construct|create|make|form|shape|sculpt|model|mold|forge|manufacture|produce|generate|yield|result in|lead to|cause|bring about|trigger|initiate|start|begin|commence|launch|kick off|get going|set in motion|put into action|activate|engage|initiate|prompt|stimulate|spur|encourage|motivate|inspire|urge|push|press|exert|apply|exert pressure|put pressure on|apply pressure to|apply force to|exert force on|use force on|employ force on|utilize force on|make use of force on|take advantage of force on|capitalize on force applied to|take advantage of|capitalize on|exploit|make use of|utilize|employ|apply|put to use|put into service|put into operation|put into effect|implement|enact|carry out|execute|perform|conduct|carry through|follow through|go through with|complete|finish|conclude|terminate|end|stop|halt|cease|discontinue|abandon|give up|quit|drop|leave|depart|go away|exit|exit stage left|exit stage right|make an exit|take an exit|find an exit|locate an exit|identify an exit|recognize an exit|acknowledge an exit|accept an exit|welcome an exit|appreciate an exit|value an exit|treasure an exit|cherish an exit|embrace an exit|welcome|greet|receive|welcome|greet|receive|accept|acknowledge|recognize|identify|distinguish|differentiate|tell apart|separate|sort out|classify|categorize|organize|group|cluster|bundle|collect|gather|assemble|accumulate|amass|pile up|stack|heap|mount|build up|construct|create|make|form|shape|sculpt|model|mold|forge|manufacture|produce|generate|yield|result in|lead to|cause|bring about|trigger|initiate|start|begin|commence|launch|kick off|get going|set in motion|put into action|activate|engage|initiate|prompt|stimulate|spur|encourage|motivate|inspire|urge|push|press|exert|apply|exert pressure|put pressure on|apply pressure to|apply force to|exert force on|use force on|employ force on|utilize force on|make use of force on|take advantage of force on|capitalize on force applied to|take advantage of|capitalize on|exploit|make use of|utilize|employ|apply|put to use|put into service|put into operation|put into effect|implement|enact|carry out|execute|perform|conduct|carry through|follow through|go through with|complete|finish|conclude|terminate|end|stop|halt|cease|discontinue|abandon|give up|quit|drop|leave|depart|go away|exit|exit stage left|exit stage right|make an exit|take an exit|find an exit|locate an exit|identify an exit|recognize an exit|acknowledge an exit|accept an exit|welcome an exit|appreciate an exit|value an exit|treasure an exit|cherish an exit|embrace an exit|welcome|greet|receive/i.test(termStr);
-  }
+/**
+ * A list of keywords that suggest a problem-solving context.
+ * @type {string[]}
+ */
+const problemSolvingKeywords = [
+  'solve', 'fix', 'repair', 'improve', 'handle', 'address', 'resolve', 'overcome', 'manage', 'operate',
+  'apply', 'adapt', 'implement', 'execute', 'create', 'build', 'design', 'plan', 'organize', 'find a way to'
+];
 
-  canApply(context) {
-    const task = this.extractTask(context);
-    if (!task) return false;
+/**
+ * Checks if a string contains any of the problem-solving keywords.
+ * @param {string} text - The text to check.
+ * @returns {boolean} True if the text contains problem-solving keywords, false otherwise.
+ */
+const hasProblemSolvingTerms = (text) => {
+  const lowerText = text.toLowerCase();
+  return problemSolvingKeywords.some(keyword => lowerText.includes(keyword));
+};
 
-    const {termStr, punctuation, priority} = this.analyzeTask(task);
-    const isGoal = punctuation === '!';
-    const isQuestion = punctuation === '?';
-    return (isGoal || isQuestion) && priority > 0.2 && this.hasProblemSolvingTerms(termStr);
-  }
+/**
+ * Creates an analogical reasoning rule using the LMRuleFactory.
+ * This rule identifies problem-solving goals and uses an LM to find analogous solutions.
+ *
+ * @param {object} lm - The Language Model instance.
+ * @returns {LMRule} A new LMRule instance for analogical reasoning.
+ */
+export const createAnalogicalReasoningRule = (lm) => {
+  return createLMRule({
+    id: 'analogical-reasoning',
+    lm,
+    name: 'Analogical Reasoning Rule',
+    description: 'Solves new problems by drawing analogies to known situations.',
+    priority: 0.7,
 
-  generatePrompt(context) {
-    const task = this.extractTask(context) || context;
-    if (!task) throw new Error('No task provided to generate prompt for AnalogicalReasoningRule');
+    condition: (context) => {
+      const task = extractTaskFromContext(context);
+      if (!task) return false;
 
-    const termStr = task.term ? task.term.toString() : task.toString ? task.toString() : String(task);
-    return `For this problem: "${termStr}", identify a similar but already solved problem that could provide a useful analogy. How would the solution to the similar problem apply to this one? Provide the analogous solution approach.`;
-  }
+      const { term, punctuation, priority } = task;
+      const termStr = term.toString();
+      const isGoalOrQuestion = punctuation === Punctuation.GOAL || punctuation === Punctuation.QUESTION;
 
-  processLMOutput(lmResponse, context) {
-    // Process the LM's analogical solution
-    return lmResponse.trim();
-  }
+      return isGoalOrQuestion && priority > 0.6 && hasProblemSolvingTerms(termStr);
+    },
 
-  generateTasks(processedOutput, context) {
-    const newTasks = [];
+    prompt: (context) => {
+      const task = extractTaskFromContext(context);
+      const termStr = task.term.toString();
+      return `Here is a problem: "${termStr}".
 
-    if (processedOutput?.trim()) {
-      const originalTerm = context.premise?.task?.term?.toString() || 'unknown';
-      const sanitizedTerm = originalTerm.replace(/[^\w]/g, '_');
+Think of a similar, well-understood problem. What is the analogy?
+Based on that analogy, describe a step-by-step solution for the original problem.`;
+    },
 
-      newTasks.push(
-        {
-          term: `analogical_solution_to_${sanitizedTerm}`,
-          punctuation: '!',
-          truth: { frequency: 0.7, confidence: 0.6 },
-          content: processedOutput
-        },
-        {
-          term: `(analogical_solution_for_${sanitizedTerm} --> "${processedOutput}").`,
-          punctuation: '.',
-          truth: { frequency: 0.7, confidence: 0.6 }
-        }
+    process: (lmResponse) => {
+      return lmResponse.trim();
+    },
+
+    generate: (processedOutput, context) => {
+      if (!processedOutput) return [];
+
+      const originalTask = extractTaskFromContext(context);
+      const newTerm = Term.newAtom(`solution_proposal_for_(${originalTask.term.toString()})`);
+      const newTask = new Task(
+        newTerm,
+        Punctuation.JUDGMENT,
+        { frequency: 0.8, confidence: 0.7 },
+        null,
+        null,
+        null,
+        null,
+        processedOutput // Attach the detailed solution as metadata
       );
-    }
 
-    return newTasks;
-  }
+      return [newTask];
+    },
 
-  async apply(context) {
-    if (!this.canApply(context)) return [];
-    try {
-      const lmResponse = await this.executeLMProcessing(context);
-      const processedOutput = this.processLMOutput(lmResponse, context);
-      return this.generateTasks(processedOutput, context);
-    } catch (error) {
-      console.error(`Error in AnalogicalReasoningRule:`, error);
-      return [];
-    }
-  }
-}
+    lm_options: {
+      temperature: 0.7,
+      max_tokens: 600,
+    },
+  });
+};

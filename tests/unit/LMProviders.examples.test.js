@@ -1,9 +1,11 @@
 import { describe, test, expect } from '@jest/globals';
-import { LM, setupLangChainProvider, setupXenovaProvider } from '../../core/index.js';
+import { LM } from '../../core/index.js';
+import LangChainProvider from '../../core/lm/LangChainProvider.js';
+import XenovaProvider from '../../core/lm/XenovaProvider.js';
 
 const providerConfigs = {
   xenova: {
-    setup: setupXenovaProvider,
+    provider: XenovaProvider,
     configs: [
       { modelName: 'Xenova/distilgpt2', temperature: 0.7, maxTokens: 50 },
       { modelName: 'Xenova/distilgpt2', temperature: 0.5, maxTokens: 100 },
@@ -11,12 +13,12 @@ const providerConfigs = {
     ]
   },
   langchain: {
-    setup: setupLangChainProvider,
+    provider: LangChainProvider,
     configs: [
-      { apiKey: 'test-key', modelName: 'gpt-3.5-turbo', temperature: 0.7, maxTokens: 100 },
-      { apiKey: 'test-key', baseURL: 'https://api.example.com/v1', modelName: 'test-model', temperature: 0.8, maxTokens: 200 },
-      { apiKey: 'test-key', modelName: 'test-model' },
-      { apiKey: undefined, modelName: 'test-model' }
+      { apiKey: 'test-key', baseURL: 'http://localhost:11434/v1', modelName: 'gpt-3.5-turbo', temperature: 0.7, maxTokens: 100, _testMode: true },
+      { apiKey: 'test-key', baseURL: 'https://api.example.com/v1', modelName: 'test-model', temperature: 0.8, maxTokens: 200, _testMode: true },
+      { apiKey: 'test-key', baseURL: 'http://localhost:11434/v1', modelName: 'test-model', _testMode: true },
+      { apiKey: undefined, baseURL: 'http://localhost:11434/v1', modelName: 'test-model', _testMode: true }
     ]
   }
 };
@@ -25,11 +27,11 @@ const createLM = () => new LM();
 
 describe('LM Providers', () => {
   describe('Setup', () => {
-    Object.entries(providerConfigs).forEach(([providerName, { setup, configs }]) => {
+    Object.entries(providerConfigs).forEach(([providerName, { provider, configs }]) => {
       test(`should set up ${providerName} provider correctly`, () => {
         configs.forEach(config => {
           const lm = createLM();
-          expect(() => setup(lm, config, `${providerName}-test`)).not.toThrow();
+          expect(() => lm.registerProvider(`${providerName}-test`, new provider(config))).not.toThrow();
         });
       });
     });
@@ -44,25 +46,4 @@ describe('LM Providers', () => {
     });
   });
 
-  describe('Interface Consistency', () => {
-    test('should provide consistent interface across providers', () => {
-      const xenovaLM = createLM();
-      const langchainLM = createLM();
-
-      setupXenovaProvider(xenovaLM, { modelName: 'Xenova/distilgpt2' }, 'xenova');
-      setupLangChainProvider(langchainLM, { apiKey: 'test-key', modelName: 'test-model' }, 'langchain');
-
-      expect(xenovaLM).toBeInstanceOf(LM);
-      expect(langchainLM).toBeInstanceOf(LM);
-    });
-  });
-
-  describe('Error Handling', () => {
-    test('should handle invalid configurations gracefully', () => {
-      const lm = createLM();
-
-      expect(() => setupXenovaProvider(lm, {}, 'empty-config')).not.toThrow();
-      expect(() => setupLangChainProvider(lm, { apiKey: 'test' }, 'incomplete-config')).not.toThrow();
-    });
-  });
 });

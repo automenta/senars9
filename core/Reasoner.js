@@ -11,7 +11,7 @@ export class NALRule {
 }
 
 export class Reasoner extends Component {
-  constructor(strategyRegistry = null, systemContext = null) {
+  constructor(lm = null, strategyRegistry = null, systemContext = null) {
     super();
 
     this.strategyRegistry = strategyRegistry;
@@ -19,11 +19,11 @@ export class Reasoner extends Component {
     this.defaultStrategy = 'basic_reasoning';
     this.overlapCheckingEnabled = true;
 
-    this.ruleManager = new RuleManager();
+    this.lm = lm;
+    this.ruleManager = new RuleManager(this.lm);
     this.applicationEngine = new RuleApplicationEngine(this.ruleManager);
     this.winnowing = null;
     this.derivation = null;
-    this.lm = null;
     this.memory = null;
     this.strategies = new Map();
     this.reasoningHistory = [];
@@ -43,12 +43,12 @@ export class Reasoner extends Component {
   _resetState() {
     this.strategies.clear();
     this.reasoningHistory = [];
-    this.ruleManager = new RuleManager();
+    this.ruleManager = new RuleManager(this.lm);
     this.applicationEngine = new RuleApplicationEngine(this.ruleManager);
   }
 
-  registerRule(rule, group = 'general') {
-    this.ruleManager.register(rule, group);
+  addRule(rule, group = 'general') {
+    this.ruleManager.addRule(rule, group);
   }
 
   enableRule(idOrGroup) {
@@ -71,10 +71,6 @@ export class Reasoner extends Component {
     });
   }
 
-  setLM(lm) {
-    this.lm = lm;
-  }
-
   setMemory(memory) {
     this.memory = memory;
   }
@@ -86,8 +82,10 @@ export class Reasoner extends Component {
     const derivedTasks = [];
     const ruleContext = { memory, tasks: focusSet, context };
 
+    Logger.info(`Applying rules to focus set of size ${focusSet.length}`);
     await this.applicationEngine.applyRules(focusSet, derivedTasks, ruleContext);
     await this.applicationEngine.applyDualPremiseRules(focusSet, derivedTasks, ruleContext);
+    Logger.info(`Derived ${derivedTasks.length} new tasks`);
 
     return derivedTasks;
   }

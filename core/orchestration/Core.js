@@ -40,9 +40,9 @@ class Core {
     focus.createFocusSet('default');
     focus.setFocus('default');
 
-    // Create reasoner without dependencies initially, will set them up in _setupDependencies
-    this.registerComponent('reasoning', new Reasoner());
     this.registerComponent('lm', new LM()); // Register LM component
+    // Create reasoner without dependencies initially, will set them up in _setupDependencies
+    this.registerComponent('reasoning', new Reasoner(this.getComponent('lm')));
 
     // Initialize graph components
     const adjacencyBag = new AdjacencyBag();
@@ -247,10 +247,6 @@ class Core {
       }
     }
     
-    // Connect LM to reasoning system if both exist
-    if (this.lm && this.reasoning) {
-      this.reasoning.setLM(this.lm);
-    }
 
     // Set up contradiction analyzer to use system context
     if (this.contradictionAnalyzer && this.systemContext) {

@@ -1,5 +1,6 @@
 export class RuleManager {
-  constructor(config = {}) {
+  constructor(lm = null, config = {}) {
+    this.lm = lm;
     this.rules = new Map();
     this.ruleGroups = new Map();
     this.enabledRuleIds = new Set();
@@ -12,7 +13,7 @@ export class RuleManager {
     };
   }
 
-  register(rule, group = 'general') {
+  addRule(rule, group = 'general') {
     if (!rule?.id) throw new Error('Invalid rule: must have an ID');
     if (this.rules.size >= this.config.maxRules) throw new Error('Maximum rule limit reached');
 

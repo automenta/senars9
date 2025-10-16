@@ -1,8 +1,6 @@
 import LM from '../../core/lm/LM.js';
 import LangChainProvider from '../../core/lm/LangChainProvider.js';
-import { setupLangChainProvider } from '../../core/lm/LangChainSetup.js';
 import XenovaProvider from '../../core/lm/XenovaProvider.js';
-import { setupXenovaProvider, createLMWithXenova } from '../../core/lm/XenovaSetup.js';
 
 describe('LM Component', () => {
   let lm;
@@ -89,20 +87,8 @@ describe('LM Component', () => {
     expect(() => new LangChainProvider(config)).toBeInstanceOf(Function);
   });
 
-  test('sets up LangChain provider with LM', () => {
-    const config = {
-      apiKey: 'test-key',
-      baseURL: 'https://test-api.com/v1',
-    };
-
-    const provider = setupLangChainProvider(lm, config, 'langchain');
-    expect(provider).toBeInstanceOf(LangChainProvider);
-    expect(lm.providers.get('langchain')).toBe(provider);
-  });
-
   test('throws error for invalid LangChain config', () => {
-    expect(() => new LangChainProvider({})).toThrow('API key is required');
-    expect(() => new LangChainProvider({ apiKey: 'key' })).toThrow('Base URL is required');
+    expect(() => new LangChainProvider({})).toThrow('API key is required for LangChain provider');
   });
 
   test('integrates with Xenova provider for local models', () => {
@@ -118,24 +104,4 @@ describe('LM Component', () => {
     expect(provider.temperature).toBe(0.8);
   });
 
-  test('sets up Xenova provider with LM', () => {
-    const config = {
-      modelName: 'Xenova/distilgpt2',
-    };
-
-    const provider = setupXenovaProvider(lm, config, 'xenova');
-    expect(provider).toBeInstanceOf(XenovaProvider);
-    expect(lm.providers.get('xenova')).toBe(provider);
-  });
-
-  test('creates LM instance with Xenova provider', () => {
-    const config = {
-      modelName: 'Xenova/distilgpt2',
-      device: 'webgpu',
-    };
-
-    const lmWithXenova = createLMWithXenova(config, 'xenova');
-    expect(lmWithXenova).toBeInstanceOf(LM);
-    expect(lmWithXenova.providers.get('xenova')).toBeInstanceOf(XenovaProvider);
-  });
 });

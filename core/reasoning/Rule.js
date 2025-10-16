@@ -1,3 +1,13 @@
+/**
+ * @file core/reasoning/Rule.js
+ * @description Base classes for reasoning rules, including general, LM-based, and NAL-based rules.
+ */
+
+import { Logger }from '../base/utilities.js';
+
+/**
+ * Base class for all reasoning rules.
+ */
 export class Rule {
   constructor(id, options = {}) {
     Object.assign(this, {
@@ -11,67 +21,121 @@ export class Rule {
       metrics: {
         executions: 0,
         successes: 0,
+        failures: 0,
         avgTime: 0,
         lastRun: null
       }
     });
   }
 
-  canApply(context) { return true; }
-  async apply(context) { throw new Error('apply must be implemented by subclasses'); }
+  canApply(context) {
+    return true;
+  }
+
+  async apply(context) {
+    throw new Error('apply must be implemented by subclasses');
+  }
 
   updateMetrics(success, time) {
     const m = this.metrics;
     m.executions++;
-    success && m.successes++;
+    if (success) {
+      m.successes++;
+    } else {
+      m.failures++;
+    }
     m.avgTime = (m.avgTime * (m.executions - 1) + time) / m.executions;
     m.lastRun = Date.now();
   }
 
-  getMetrics() { return { ...this.metrics }; }
+  getMetrics() {
+    return { ...this.metrics };
+  }
 }
 
+/**
+ * An LM-based reasoning rule that interacts with a Language Model.
+ * This class is designed to be highly configurable and declarative,
+ * allowing for the easy creation of new rules with minimal boilerplate.
+ */
 export class LMRule extends Rule {
-  constructor(id, lm, options = {}) {
-    super(id, { ...options, type: 'lm' });
+  constructor(id, lm, config = {}) {
+    super(id, { ...config, type: 'lm' });
     this.lm = lm;
-    this.promptTemplate = options.promptTemplate;
+    this.config = {
+      // Default condition: always true if an LM is available
+      condition: (context) => !!this.lm,
+      // Default prompt: throws an error if not overridden
+      prompt: (context) => { throw new Error(`Prompt generation not implemented for rule: ${this.id}`); },
+      // Default process: returns the raw LM output
+      process: (lmResponse, context) => lmResponse,
+      // Default generate: returns an empty array
+      generate: (processedOutput, context) => [],
+      // Default LM options
+      lm_options: {
+        temperature: 0.7,
+        max_tokens: 1000,
+      },
+      ...config,
+    };
     this.lmStats = { tokens: 0, calls: 0, avgTime: 0 };
   }
 
-  // Common method to extract task from context in various formats
-  extractTask(context) {
-    return context.premise?.task || context.premise1 || (Array.isArray(context.tasks) && context.tasks[0]) || context || null;
-  }
-
-  // Common method to analyze task properties
-  analyzeTask(task) {
-    const termStr = task?.term ? task.term.toString() : '';
-    const punctuation = task?.punctuation;
-    const priority = typeof task?.getPriority === 'function' ? task.getPriority() : (task?.priority || 0);
-    return { termStr, punctuation, priority };
+  canApply(context) {
+    return this.config.condition(context);
   }
 
   generatePrompt(context) {
-    if (!this.promptTemplate) throw new Error(`No prompt template for rule ${this.id}`);
-    return this.promptTemplate(context);
+    return this.config.prompt(context);
   }
 
-  async executeLM(context) {
-    if (!this.lm) throw new Error(`LM unavailable for rule ${this.id}`);
+  processLMOutput(lmResponse, context) {
+    return this.config.process(lmResponse, context);
+  }
+
+  generateTasks(processedOutput, context) {
+    return this.config.generate(processedOutput, context);
+  }
+
+  async apply(context) {
+    const startTime = Date.now();
+    try {
+      if (!this.canApply(context)) {
+        this.updateMetrics(false, Date.now() - startTime);
+        return [];
+      }
+
+      const prompt = this.generatePrompt(context);
+      const lmResponse = await this.executeLM(prompt);
+
+      if (!lmResponse) {
+        this.updateMetrics(false, Date.now() - startTime);
+        return [];
+      }
+
+      const processedOutput = this.processLMOutput(lmResponse, context);
+      const newTasks = this.generateTasks(processedOutput, context);
+
+      this.updateMetrics(true, Date.now() - startTime);
+      return newTasks;
+    } catch (error) {
+      Logger.error(`Error in LMRule ${this.id}:`, { error, context });
+      this.updateMetrics(false, Date.now() - startTime);
+      return []; // Return empty array on error to prevent cascading failures
+    }
+  }
+
+  async executeLM(prompt) {
+    if (!this.lm) {
+      throw new Error(`LM unavailable for rule ${this.id}`);
+    }
 
     const startTime = Date.now();
-    const prompt = this.generatePrompt(context);
-    const response = await this.lm.process(prompt);
+    const response = await this.lm.process(prompt, this.config.lm_options);
     const time = Date.now() - startTime;
 
-    this._updateLMStats(prompt.length + response.length, time);
-    this.updateMetrics(true, time);
+    this._updateLMStats(prompt.length + (response?.length || 0), time);
     return response;
-  }
-
-  async executeLMProcessing(context) {
-    return this.executeLM(context);
   }
 
   _updateLMStats(tokens, time) {
@@ -81,10 +145,14 @@ export class LMRule extends Rule {
     s.avgTime = (s.avgTime * (s.calls - 1) + time) / s.calls;
   }
 
-  async apply(context) { return this.executeLM(context); }
-  getLMStats() { return { ...this.lmStats }; }
+  getLMStats() {
+    return { ...this.lmStats };
+  }
 }
 
+/**
+ * A NAL-based reasoning rule that performs logical inference.
+ */
 export class NALRule extends Rule {
   constructor(id, options = {}) {
     super(id, { ...options, type: 'nal' });
@@ -97,7 +165,9 @@ export class NALRule extends Rule {
   }
 
   async performInference(context) {
-    if (!this.inferenceFn) throw new Error(`No inference function for rule ${this.id}`);
+    if (!this.inferenceFn) {
+      throw new Error(`No inference function for rule ${this.id}`);
+    }
     return this.inferenceFn(context);
   }
 
@@ -108,6 +178,7 @@ export class NALRule extends Rule {
       this.updateMetrics(true, Date.now() - startTime);
       return result;
     } catch (error) {
+      Logger.error(`Error in NALRule ${this.id}:`, { error, context });
       this.updateMetrics(false, Date.now() - startTime);
       throw error;
     }
