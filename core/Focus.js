@@ -47,11 +47,13 @@ class Focus extends Component {
       if (focusSet.items && focusSet.items.has(key)) {
         const itemMetadata = focusSet.items.get(key);
         // Combine task with metadata
-        taskData = { task, ...itemMetadata, priority: itemMetadata.priority };
+        //taskData = { task, ...itemMetadata, priority: itemMetadata.priority };
+        taskData = task;
       } else {
         // Create a metadata object based on the task
         const priority = typeof task.getPriority === 'function' ? task.getPriority() : (task.priority || 0);
-        taskData = { ...task, priority: priority, timestamp: task.timestamp || Date.now() };
+        //taskData = { ...task, priority: priority, timestamp: task.timestamp || Date.now() };
+        taskData = task;
       }
 
       return [key, taskData];

@@ -232,7 +232,9 @@ Provide each sub-goal on its own line, with no other output.`;
           '!', // Sub-goals are goals
           inheritedTruth,
           when,
-          when
+          when,
+          0.8, // priority for sub-goals
+          null // TODO inherit stamp
         );
 
         if (inputSubGoal) 
@@ -255,7 +257,9 @@ Provide each sub-goal on its own line, with no other output.`;
               '.',
               linkTruth,
               when,
-              when
+              when,
+              0.7, // priority for implication beliefs
+              null // TODO inherit stamp
             );
 
             newTasks.push(beliefTask);

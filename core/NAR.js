@@ -144,16 +144,25 @@ export class NAR {
     if (focusItems.length === 0) return;
 
     // Extract the tasks from the [key, taskData] pairs
-    const focusSet = focusItems.map(item => item[1]);
+    // Handle both new format (task directly) and legacy format ({ task, ...metadata })
+    const focusSet = focusItems.map(item => {
+      const taskData = item[1];
+      return taskData.task || taskData; // Return task if wrapped, otherwise return directly
+    });
 
-    focusSet.forEach(task => task.setAccessedAt(context.currentTime));
+    focusSet.forEach(task => {
+      /*if (!task.setAccessedAt)
+        console.log(typeof(task), JSON.stringify(task,null,null));*/
+
+      task.setAccessedAt(context.currentTime)
+    });
 
     const derivedTasks = this.reasoner.reason(focusSet, this.memory, context);
 
-    derivedTasks.forEach(task => {
+    /*derivedTasks.forEach(task => {
       this.memory.addTask(task, context.currentTime);
       this.stats.derivedTasks++;
-    });
+    });*/
 
     this.memory.consolidate(context.currentTime);
     this.stats.cycles++;

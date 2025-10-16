@@ -9,7 +9,7 @@
 import { NAR } from '../core/NAR.js';
 import { setupLangChainProvider } from '../core/lm/LangChainSetup.js';
 import { GoalDecompositionRule } from '../core/reasoning/lm/rules/GoalDecompositionRule.js';
-import { Logger } from '../core/base/utilities.js';
+import { Task } from '../core/Task.js';
 
 const DEMO_GOAL = "Make earth happy!";
 const DEMO_TIMEOUT = 10000; // 10 seconds for complete demo
@@ -47,9 +47,6 @@ async function runCompleteNARDemo() {
             maxTokens: 1000,
             timeout: 15000
         };
-
-        // Create LM provider instance for the rule
-        const { setupLangChainProvider } = await import('../core/lm/LangChainSetup.js');
 
         // Create a basic LM instance first
         const { default: LM } = await import('../core/lm/LM.js');
@@ -94,12 +91,17 @@ async function runCompleteNARDemo() {
 
         // Step 4: Test rule independently before system integration
         console.log('\n📋 STEP 4: Testing GoalDecompositionRule independently...');
-        const testGoalTask = {
-            term: DEMO_GOAL.slice(0, -1), // Remove '!' for term
-            punctuation: '!',
-            truth: { frequency: 0.9, confidence: 0.9 },
-            priority: 0.8  // Add priority to ensure rule can apply
-        };
+        const now = Date.now();
+        const testGoalTask = new Task(
+            DEMO_GOAL.slice(0, -1), // Remove '!' for term
+            '!', // Sub-goals are goals
+            { frequency: 0.9, confidence: 0.9 },
+            now,
+            now,
+            1.0, // priority
+            null // auto-generate stamp
+        );
+
 
         const testContext = { premise: { task: testGoalTask } };
         console.log(`🎯 Testing with goal: "${testGoalTask.term}!"`);
@@ -147,10 +149,8 @@ async function runCompleteNARDemo() {
         });
 
         // Step 7: Execute single reasoning cycle
-        console.log('\n📋 STEP 7: Executing single reasoning cycle...');
-        console.log('🔄 Running NAR cycle (this should trigger GoalDecompositionRule)...');
-
-        //nar.runCycle();
+        console.log('\n📋 STEP 7: Executing single reasoning cycle...'); 
+        nar.runCycle();
 
         console.log('✅ Reasoning cycle completed');
 
