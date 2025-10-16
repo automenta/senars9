@@ -46,8 +46,8 @@ describe('LM-based Reasoning Tests', () => {
     const context = { premise: { task: goal } };
     const result = await rule.apply(context);
     expect(result.length).toBe(3);
-    expect(result[0].term.toString()).toBe('"Research target audience"');
-    expect(result[1].term.toString()).toBe('"Develop marketing materials"');
-    expect(result[2].term.toString()).toBe('"Launch social media campaign"');
+    expect(result[0].term.toString()).toBe('"Sub-goal: Research target audience"');
+    expect(result[1].term.toString()).toBe('"Sub-goal: Develop marketing materials"');
+    expect(result[2].term.toString()).toBe('"Sub-goal: Launch social media campaign"');
   });
 });
