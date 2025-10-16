@@ -5,11 +5,19 @@
 import { NALRule } from './NALRule.js';
 import { DeductionRule, InductionRule, AbductionRule } from './nal/NALRules.js';
 import { ModusPonensRule } from './nal/ModusPonensRule.js';
-import { DeductiveSyllogismRule } from './nal/SyllogisticRules.js';
+import { DeductiveSyllogismRule, InductionRule as NALInductionRule, AbductionRule as NALAbductionRule } from './nal/SyllogisticRules.js';
 import { Analogy as AnalogyRule } from './nal/AnalogyRule.js';
 import { createGoalDecompositionRule } from './lm/rules/GoalDecompositionRule.js';
 import { createHypothesisGenerationRule } from './lm/rules/HypothesisGenerationRule.js';
 import { createVariableGroundingRule } from './lm/rules/VariableGroundingRule.js';
+import { createAnalogicalReasoningRule } from './lm/rules/AnalogicalReasoningRule.js';
+import { createBeliefRevisionRule } from './lm/rules/BeliefRevisionRule.js';
+import { createExplanationGenerationRule } from './lm/rules/ExplanationGenerationRule.js';
+import { createInteractiveClarificationRule } from './lm/rules/InteractiveClarificationRule.js';
+import { createMetaReasoningGuidanceRule } from './lm/rules/MetaReasoningGuidanceRule.js';
+import { createSchemaInductionRule } from './lm/rules/SchemaInductionRule.js';
+import { createTemporalCausalModelingRule } from './lm/rules/TemporalCausalModelingRule.js';
+import { createUncertaintyCalibrationRule } from './lm/rules/UncertaintyCalibrationRule.js';
 
 const NAL_RULES = {
   deduction: DeductionRule,
@@ -17,13 +25,23 @@ const NAL_RULES = {
   abduction: AbductionRule,
   modusPonens: ModusPonensRule,
   syllogism: DeductiveSyllogismRule,
+  nalInduction: NALInductionRule,
+  nalAbduction: NALAbductionRule,
   analogy: AnalogyRule
 };
 
 const LM_RULES = {
   goalDecomposition: createGoalDecompositionRule,
   hypothesisGeneration: createHypothesisGenerationRule,
-  variableGrounding: createVariableGroundingRule
+  variableGrounding: createVariableGroundingRule,
+  analogicalReasoning: createAnalogicalReasoningRule,
+  beliefRevision: createBeliefRevisionRule,
+  explanationGeneration: createExplanationGenerationRule,
+  interactiveClarification: createInteractiveClarificationRule,
+  metaReasoningGuidance: createMetaReasoningGuidanceRule,
+  schemaInduction: createSchemaInductionRule,
+  temporalCausalModeling: createTemporalCausalModelingRule,
+  uncertaintyCalibration: createUncertaintyCalibrationRule
 };
 
 export class RuleFactory {

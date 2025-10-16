@@ -8,7 +8,7 @@ import { CycleContext } from './Cycle.js';
 import { Logger } from './base/utilities.js';
 import { HighResolutionClock } from './Clock.js';
 import LM from './lm/LM.js';
-import { loadRules } from './reasoning/RuleLoader.js';
+import { loadRules, validateLoadedRules } from './reasoning/RuleLoader.js';
 import { RuleFactory } from './reasoning/RuleFactory.js';
 
 export class NAR {
@@ -19,6 +19,23 @@ export class NAR {
 
   async initialize() {
     await this._loadReasoningRules();
+    return this;
+  }
+
+  // Simplified method to quickly setup with default LM provider
+  async initializeWithDefaults(lmProvider = null, options = {}) {
+    // Initialize the core system
+    await this.initialize();
+    
+    // Use provided provider or create a default one (e.g., DummyProvider)
+    if (lmProvider) {
+      this.lm.registerProvider('default', lmProvider);
+    } else {
+      // Create a default provider (DummyProvider for testing)
+      const DummyProvider = (await import('./lm/DummyProvider.js')).default;
+      this.lm.registerProvider('default', new DummyProvider());
+    }
+    
     return this;
   }
 
@@ -54,6 +71,52 @@ export class NAR {
       Logger.error('Error inputting task:', error);
       throw error;
     }
+  }
+
+  // Convenience methods for different task types
+  believe(content, truth = { frequency: 0.9, confidence: 0.9 }) {
+    return this.input({
+      term: typeof content === 'string' ? content : content.term,
+      punctuation: Punctuation.BELIEF,
+      truth: truth instanceof TruthValue ? truth : new TruthValue(truth.frequency, truth.confidence)
+    });
+  }
+
+  want(content, truth = { frequency: 0.9, confidence: 0.9 }) {
+    return this.input({
+      term: typeof content === 'string' ? content : content.term,
+      punctuation: Punctuation.GOAL,
+      truth: truth instanceof TruthValue ? truth : new TruthValue(truth.frequency, truth.confidence)
+    });
+  }
+
+  ask(content) {
+    return this.input(typeof content === 'string'
+      ? { term: content, punctuation: Punctuation.QUESTION }
+      : { ...content, punctuation: Punctuation.QUESTION });
+  }
+
+  // Convenience method to quickly run reasoning on a task
+  async think(taskContent) {
+    const task = this.input(taskContent);
+    await this.runCycle();
+    return task;
+  }
+
+  // Run reasoning with a callback for results
+  async thinkAndRespond(taskContent, options = {}) {
+    const task = this.input(taskContent);
+    const derivedTasks = await this.runCycle();
+    
+    if (options.returnDerived !== false) {
+      return {
+        input: task,
+        derived: derivedTasks,
+        tasks: this.getTasksByPriority()
+      };
+    }
+    
+    return { input: task, derived: derivedTasks };
   }
 
   _createTask(taskData) {
@@ -186,8 +249,11 @@ export class NAR {
         await this.runCycle();
       } catch (error) {
         Logger.error('Error in reasoning cycle:', error);
+        // Continue running even if a cycle fails
       }
-      this.cycleTimer = setTimeout(cycleFn, this.config.cycleInterval);
+      if (this._isRunning) { // Check again before scheduling next cycle
+        this.cycleTimer = setTimeout(cycleFn, this.config.cycleInterval);
+      }
     };
 
     cycleFn();
@@ -206,6 +272,80 @@ export class NAR {
       this.cycleTimer = null;
     }
     Logger.debug('NAR stopped continuous reasoning cycle');
+  }
+
+  // Safe async iteration through reasoning cycles with error handling
+  async runCyclesSafe(count, options = {}) {
+    const results = [];
+    const { delayBetweenCycles = 0, onError = null } = options;
+    
+    for (let i = 0; i < count; i++) {
+      try {
+        const result = await this.runCycle();
+        results.push(result);
+        
+        if (delayBetweenCycles > 0 && i < count - 1) {
+          await new Promise(resolve => setTimeout(resolve, delayBetweenCycles));
+        }
+      } catch (error) {
+        Logger.error(`Error in reasoning cycle ${i + 1}:`, error);
+        if (onError) {
+          onError(error, i);
+        } else {
+          // Continue with next cycle by default
+          results.push([]);
+        }
+      }
+    }
+    
+    return results;
+  }
+
+  // Method to run reasoning with specific rule filtering
+  async runCycleWithRules(ruleIds) {
+    const originalEnabledIds = new Set(this.reasoner.enabledRuleIds);
+    
+    try {
+      // Temporarily enable only the specified rules
+      this.reasoner.enabledRuleIds.clear();
+      ruleIds.forEach(id => {
+        if (this.reasoner.rules.has(id)) {
+          this.reasoner.enabledRuleIds.add(id);
+        }
+      });
+      
+      const result = await this.runCycle();
+      
+      return result;
+    } finally {
+      // Restore original enabled rule set
+      this.reasoner.enabledRuleIds = originalEnabledIds;
+    }
+  }
+
+  // Method to run reasoning with rule types (nal or lm)
+  async runCycleWithRuleType(type) {
+    const typeRules = this.reasoner.getRulesByType(type);
+    const ruleIds = typeRules.map(rule => rule.id);
+    return this.runCycleWithRules(ruleIds);
+  }
+
+  // Get the count of rules by type
+  getRuleCounts() {
+    const stats = this.reasoner.getStats();
+    return stats.ruleTypeCounts;
+  }
+
+  // Get rules summary information
+  getRulesSummary() {
+    const stats = this.reasoner.getStats();
+    return {
+      total: stats.totalRules,
+      enabled: stats.enabledRules,
+      types: stats.ruleTypes,
+      byType: stats.ruleTypeCounts,
+      validated: stats.validatedRules
+    };
   }
 
   getStats() {
@@ -321,15 +461,51 @@ export class NAR {
     const lmRuleDir = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
     const lmRules = await loadRules(lmRuleDir, { lm: this.lm });
 
+    // Validate loaded LM rules
+    const lmValidation = validateLoadedRules(lmRules);
+    if (lmValidation.invalidCount > 0) {
+      Logger.warn(`LM rule validation issues: ${lmValidation.invalidCount} invalid rules found`);
+    }
+
     // Load NAL rules using the factory
     const nalRuleTypes = RuleFactory.getAvailableNALRules();
-    const nalRules = nalRuleTypes.map(type => RuleFactory.createNALRule(type));
+    const nalRules = [];
+    const nalErrors = [];
+
+    for (const type of nalRuleTypes) {
+      try {
+        const rule = RuleFactory.createNALRule(type);
+        nalRules.push(rule);
+      } catch (error) {
+        Logger.error(`Failed to create NAL rule of type ${type}:`, error.message);
+        nalErrors.push({ type, error: error.message });
+      }
+    }
+
+    // Validate loaded NAL rules
+    const nalValidation = validateLoadedRules(nalRules);
+    if (nalValidation.invalidCount > 0) {
+      Logger.warn(`NAL rule validation issues: ${nalValidation.invalidCount} invalid rules found`);
+    }
 
     // Combine and register all rules
-    const allRules = [...lmRules, ...nalRules];
-    allRules.forEach(rule => this.reasoner.addRule(rule));
+    const allRules = [...lmValidation.valid, ...nalValidation.valid];
+    let successfullyAdded = 0;
+    
+    for (const rule of allRules) {
+      try {
+        this.reasoner.addRule(rule);
+        successfullyAdded++;
+      } catch (error) {
+        Logger.error(`Failed to add rule ${rule.id}:`, error.message);
+      }
+    }
 
-    Logger.info(`Loaded ${lmRules.length} LM rules and ${nalRules.length} NAL rules`);
+    Logger.info(`Loaded ${lmRules.length} LM rules and ${nalRules.length} NAL rules, with ${successfullyAdded} successfully registered`);
+    
+    if (nalErrors.length > 0) {
+      Logger.error(`Failed to create ${nalErrors.length} NAL rules:`, nalErrors);
+    }
   }
 
   isRunning() {

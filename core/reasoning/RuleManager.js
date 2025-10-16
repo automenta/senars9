@@ -1,3 +1,5 @@
+import { Logger } from '../base/utilities.js';
+
 export class RuleManager {
   constructor(lm = null, config = {}) {
     this.lm = lm;
@@ -17,21 +19,43 @@ export class RuleManager {
   }
 
   addRule(rule, group = 'general') {
-    if (!rule?.id) throw new Error('Invalid rule: must have an ID');
-    if (this.rules.size >= this.config.maxRules) throw new Error('Maximum rule limit reached');
+    if (!rule?.id) {
+      const error = new Error('Invalid rule: must have an ID');
+      Logger.error('Rule registration failed:', error.message);
+      throw error;
+    }
+    
+    if (this.rules.size >= this.config.maxRules) {
+      const error = new Error(`Maximum rule limit (${this.config.maxRules}) reached`);
+      Logger.error('Rule registration failed:', error.message);
+      throw error;
+    }
 
     // Validate rule structure
     if (this.config.enableValidation && this.config.validateOnAdd) {
-      this._validateRule(rule);
+      try {
+        this._validateRule(rule);
+      } catch (validationError) {
+        Logger.error(`Rule validation failed for rule ${rule.id}:`, validationError.message);
+        throw validationError;
+      }
     }
 
     this.rules.set(rule.id, rule);
     this.config.enableGroups && this._updateGroups(rule.id, group);
-    rule.enabled && this.enabledRuleIds.add(rule.id);
+    // Ensure enabled state is properly set - default to true if not specified
+    const shouldBeEnabled = rule.enabled !== false;
+    if (shouldBeEnabled) {
+      this.enabledRuleIds.add(rule.id);
+    } else {
+      this.enabledRuleIds.delete(rule.id); // Explicitly disable if enabled is explicitly false
+    }
     this.config.enableMetrics && this._initMetrics(rule.id);
 
     // Track rule type for better organization
     this._trackRuleType(rule);
+    
+    Logger.debug(`Rule added: ${rule.id} to group ${group}, enabled: ${shouldBeEnabled}`);
   }
 
   enable(idOrGroup) { this._toggle(idOrGroup, true); }
@@ -77,15 +101,33 @@ export class RuleManager {
       errors.push('Rule must have an apply method');
     }
 
-    if (rule.type && !['nal', 'lm'].includes(rule.type)) {
-      errors.push(`Rule type must be 'nal' or 'lm', got '${rule.type}'`);
+    if (rule.type && !['nal', 'lm', 'general'].includes(rule.type)) {
+      errors.push(`Rule type must be 'nal', 'lm', or 'general', got '${rule.type}'`);
+    }
+
+    // Additional validation for NAL rules (only if they don't have a basic apply method)
+    if (rule.type === 'nal' && typeof rule.apply !== 'function') {
+      // NAL rules can use performInference as an alternative to apply
+      if (typeof rule.performInference !== 'function') {
+        errors.push('NAL rule must have either performInference or apply method');
+      }
+    }
+
+    // Additional validation for LM rules (only if they don't have a basic apply method)
+    if (rule.type === 'lm' && typeof rule.apply !== 'function') {
+      // LM rules can use executeLM as an alternative to apply
+      if (typeof rule.executeLM !== 'function') {
+        errors.push('LM rule must have either executeLM or apply method');
+      }
     }
 
     if (errors.length > 0) {
-      throw new Error(`Rule validation failed: ${errors.join(', ')}`);
+      const error = new Error(`Rule validation failed: ${errors.join(', ')}`);
+      Logger.error('Rule validation failed:', error.message);
+      throw error;
     }
 
-    this.ruleValidation.set(rule.id, { validated: true, timestamp: Date.now() });
+    this.ruleValidation.set(rule.id, { validated: true, timestamp: Date.now(), errors: [] });
   }
 
   _trackRuleType(rule) {
@@ -198,36 +240,73 @@ export class RuleManager {
     const enabledRules = this.getEnabledRules();
 
     if (!focusSet || focusSet.length === 0) {
+      Logger.debug('No focus set provided, returning empty derived tasks');
+      return derivedTasks;
+    }
+
+    if (!memory || !context) {
+      Logger.warn('Missing memory or context in reasoning cycle');
       return derivedTasks;
     }
 
     for (const rule of enabledRules) {
+      if (!rule || !rule.id) {
+        Logger.warn('Skipping invalid rule without ID');
+        continue;
+      }
+
       try {
         for (const premise of focusSet) {
+          if (!premise) {
+            continue; // Skip invalid premises
+          }
+
           const startTime = Date.now();
 
           try {
+            // Check if rule can be applied before applying (if method exists)
+            if (rule.canApply && typeof rule.canApply === 'function') {
+              if (!rule.canApply({ premise, memory, context })) {
+                this.updateMetrics(rule.id, false, Date.now() - startTime, 'Rule condition not met');
+                continue;
+              }
+            }
+
             const result = await rule.apply({ premise, memory, context });
             const endTime = Date.now();
 
             if (result && Array.isArray(result) && result.length > 0) {
-              derivedTasks.push(...result);
-              this.updateMetrics(rule.id, true, endTime - startTime);
+              // Validate each derived task before adding
+              const validResults = result.filter(task => {
+                if (!task || !task.term) {
+                  Logger.warn(`Rule ${rule.id} produced invalid task without term`);
+                  return false;
+                }
+                return true;
+              });
+              
+              if (validResults.length > 0) {
+                derivedTasks.push(...validResults);
+                this.updateMetrics(rule.id, true, endTime - startTime);
+              } else {
+                this.updateMetrics(rule.id, false, endTime - startTime, 'No valid results produced');
+              }
             } else {
-              this.updateMetrics(rule.id, false, endTime - startTime);
+              this.updateMetrics(rule.id, false, endTime - startTime, 'No results produced');
             }
-          } catch (error) {
+          } catch (applyError) {
             const endTime = Date.now();
-            Logger.error(`Rule ${rule.id} failed on premise:`, error);
-            this.updateMetrics(rule.id, false, endTime - startTime, error.message);
+            Logger.error(`Rule ${rule.id} apply failed on premise:`, applyError);
+            this.updateMetrics(rule.id, false, endTime - startTime, applyError.message);
           }
         }
-      } catch (error) {
-        Logger.error(`Rule ${rule.id} encountered critical error:`, error);
-        this.updateMetrics(rule.id, false, 0, error.message);
+      } catch (ruleError) {
+        Logger.error(`Rule ${rule.id} encountered critical error:`, ruleError);
+        this.updateMetrics(rule.id, false, 0, ruleError.message);
       }
     }
 
+    Logger.debug(`Reasoning cycle completed with ${derivedTasks.length} derived tasks from ${focusSet.length} premises using ${enabledRules.length} enabled rules`);
     return derivedTasks;
   }
 }
