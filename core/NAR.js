@@ -3,12 +3,12 @@ import Memory from './Memory.js';
 import { Focus } from './Focus.js';
 import { Task, Punctuation, TruthValue } from './Task.js';
 import { Term } from './Term.js';
-import { RuleManager as Reasoner } from './reasoning/RuleManager.js';
+import { Reasoner } from './reasoning/Reasoner.js';
+console.log('Reasoner imported in NAR.js:', Reasoner);
 import { CycleContext } from './Cycle.js';
 import { Logger } from './base/utilities.js';
 import { HighResolutionClock } from './Clock.js';
 import LM from './lm/LM.js';
-import { loadRules } from './reasoning/RuleLoader.js';
 
 export class NAR {
   constructor(config = {}) {
@@ -31,7 +31,7 @@ export class NAR {
     this.focus = new Focus();
     this.memory = new Memory(this.focus);
     this.lm = new LM();
-    this.reasoner = new Reasoner(this.lm);
+    this.reasoner = new Reasoner({ lm: this.lm });
 
     this.focus.createFocusSet('default');
     this.focus.setFocus('default');
@@ -160,10 +160,12 @@ export class NAR {
 
     const derivedTasks = await this.reasoner.reason(focusSet, this.memory, context);
 
-    derivedTasks.forEach(task => {
-      this.memory.addTask(task, context.currentTime);
-      this.stats.derivedTasks++;
-    });
+    if (derivedTasks) {
+      derivedTasks.forEach(task => {
+        this.memory.addTask(task, context.currentTime);
+        this.stats.derivedTasks++;
+      });
+    }
 
     this.memory.consolidate(context.currentTime);
     this.stats.cycles++;
@@ -253,9 +255,12 @@ export class NAR {
   }
 
   async _loadReasoningRules() {
-    const ruleDir = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
-    const rules = await loadRules(ruleDir, { lm: this.lm });
-    rules.forEach(rule => this.reasoner.addRule(rule));
+    const baseDir = path.dirname(import.meta.url.replace('file://', ''));
+    const nalRuleDir = path.join(baseDir, 'reasoning', 'nal');
+    const lmRuleDir = path.join(baseDir, 'reasoning', 'lm', 'rules');
+
+    await this.reasoner.loadRulesFrom(nalRuleDir);
+    await this.reasoner.loadRulesFrom(lmRuleDir);
   }
 
   isRunning() {

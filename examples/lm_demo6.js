@@ -37,7 +37,7 @@ async function main() {
   Logger.level = LOG_LEVEL;
   Logger.info('--- LM Reasoning Demo 6: Streamlined ---');
 
-  // 1. Initialize the NAR. Rules are now loaded automatically.
+  // 1. Initialize the NAR. This automatically loads all reasoning rules (both NAL and LM).
   const nar = await new NAR().initialize();
 
   // 2. Configure and register the desired LM provider.
@@ -48,17 +48,16 @@ async function main() {
   nar.lm.registerProvider('default', provider);
   Logger.info(`Using LM provider: ${provider.constructor.name}`);
 
-  // 3. Input a high-level goal using the simplified string format.
+  // 3. Input a high-level goal.
   const goal = nar.input('Create a comprehensive marketing plan for a new product!');
   Logger.info(`Input goal: ${goal.term.toString()}`);
 
-  // 4. Run the reasoning cycle to process the goal.
-  // The GoalDecompositionRule will trigger automatically.
+  // 4. Run the reasoning cycle. The system will automatically select and apply relevant rules.
+  // In this case, a GoalDecompositionRule (LM-based) is expected to fire.
   Logger.info('\n--- Running Reasoning Cycle ---');
   await nar.runCycle();
 
-  // 5. Observe the results.
-  // The system should have decomposed the goal into several sub-goals.
+  // 5. Observe the results. The high-level goal should be decomposed into smaller sub-goals.
   Logger.info('\n--- Observing Results ---');
   printTopTasks(nar, 10);
 
