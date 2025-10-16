@@ -1,7 +1,7 @@
 /**
  * @file: core/index.js
  * @description: This file exports all the core components of the SeNARS system.
- * @exports {NAR, Term, Task, Concept, Memory, Reasoner, RuleEngine, System, Logger, DEFAULTS}
+ * @exports {NAR, Term, Task, Concept, Memory, Reasoner, System, Logger, DEFAULTS}
  */
 
 import { Logger } from './base/utilities.js';
@@ -12,7 +12,7 @@ import { Concept } from './Concept.js';
 import { Clock, IterativeClock, UnixTimeClock, HighResolutionClock } from './Clock.js';
 import { CycleContext, runSingleCycle } from './Cycle.js';
 import { default as Memory } from './Memory.js';
-import { Reasoner, NALRule, RuleEngine } from './Reasoner.js';
+import { Reasoner, NALRule } from './Reasoner.js';
 import { default as LM } from './lm/LM.js';
 import { default as JSONSerializer } from './lm/JSONSerializer.js';
 import { default as MetricsTracker } from './lm/MetricsTracker.js';
@@ -41,7 +41,6 @@ export {
   Memory,
   Reasoner,
   NALRule,
-  RuleEngine,
   System,
   Logger,
   DEFAULTS,

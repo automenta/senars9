@@ -1,12 +1,12 @@
 import { Logger } from '../base/utilities.js';
 
 export class RuleApplicationEngine {
-  constructor(ruleManager) {
-    this.ruleManager = ruleManager;
+  constructor(reasoner) {
+    this.reasoner = reasoner;
   }
 
   async applyRules(focusSet, derivedTasks, ruleContext, filterFn = () => true) {
-    const enabledRules = this.ruleManager.getEnabledRules();
+    const enabledRules = this.reasoner.getEnabledRules();
     if (!enabledRules.length) return;
 
     for (const task of focusSet) {
@@ -22,7 +22,7 @@ export class RuleApplicationEngine {
   }
 
   async applyDualPremiseRules(focusSet, derivedTasks, ruleContext) {
-    const enabledRules = this.ruleManager.getEnabledRules();
+    const enabledRules = this.reasoner.getEnabledRules();
     if (!enabledRules.length) return;
 
     for (let i = 0; i < focusSet.length; i++) {
@@ -48,11 +48,11 @@ export class RuleApplicationEngine {
     const startTime = Date.now();
     try {
       const result = await rule.apply(context);
-      this.ruleManager.updateMetrics(rule.id, true, Date.now() - startTime);
+      this.reasoner.updateMetrics(rule.id, true, Date.now() - startTime);
       return result ? (Array.isArray(result) ? result : [result]) : null;
     } catch (error) {
       Logger.error(`Rule ${rule.id} failed: ${error.message}`);
-      this.ruleManager.updateMetrics(rule.id, false, Date.now() - startTime);
+      this.reasoner.updateMetrics(rule.id, false, Date.now() - startTime);
       return null;
     }
   }

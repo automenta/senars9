@@ -3,17 +3,19 @@ import Memory from './Memory.js';
 import { Focus } from './Focus.js';
 import { Task, Punctuation, TruthValue } from './Task.js';
 import { Term } from './Term.js';
-import { RuleManager as Reasoner } from './reasoning/RuleManager.js';
+import { Reasoner } from './Reasoner.js';
 import { CycleContext } from './Cycle.js';
 import { Logger } from './base/utilities.js';
 import { HighResolutionClock } from './Clock.js';
 import LM from './lm/LM.js';
 import { loadRules, validateLoadedRules } from './reasoning/RuleLoader.js';
 import { RuleFactory } from './reasoning/RuleFactory.js';
+import { Statistics } from './Statistics.js';
 
 export class NAR {
   constructor(config = {}) {
     this._initialize(config);
+    this.statistics = new Statistics(this);
     Logger.debug('NAR initialized with integrated memory and reasoning components');
   }
 
@@ -121,45 +123,33 @@ export class NAR {
 
   _createTask(taskData) {
     const currentTime = this.clock.getTime();
+    let term, punctuation, truth, priority;
+
     if (typeof taskData === 'string') {
-      const isGoal = taskData.endsWith('!');
-      const isQuestion = taskData.endsWith('?');
-      let termStr = taskData;
-      let punctuation = Punctuation.BELIEF;
+        let termStr = taskData.trim();
+        punctuation = Punctuation.BELIEF; // Default
 
-      if (isGoal) {
-        termStr = taskData.slice(0, -1);
-        punctuation = Punctuation.GOAL;
-      } else if (isQuestion) {
-        termStr = taskData.slice(0, -1);
-        punctuation = Punctuation.QUESTION;
-      } else if (taskData.endsWith('.')) {
-        termStr = taskData.slice(0, -1);
-      }
+        if (termStr.endsWith('!')) {
+            termStr = termStr.slice(0, -1);
+            punctuation = Punctuation.GOAL;
+        } else if (termStr.endsWith('?')) {
+            termStr = termStr.slice(0, -1);
+            punctuation = Punctuation.QUESTION;
+        } else if (termStr.endsWith('.')) {
+            termStr = termStr.slice(0, -1);
+        }
 
-      return Task.createInput(
-        Term.newAtom(termStr.trim()),
-        punctuation,
-        new TruthValue(0.9, 0.9),
-        currentTime,
-        currentTime
-      );
+        term = Term.newAtom(termStr);
+        truth = new TruthValue(0.9, 0.9);
+        priority = 0.5;
+    } else {
+        term = typeof taskData.term === 'string' ? Term.newAtom(taskData.term) : taskData.term;
+        punctuation = taskData.punctuation || Punctuation.BELIEF;
+        truth = taskData.truth ? new TruthValue(taskData.truth.frequency, taskData.truth.confidence) : new TruthValue(0.9, 0.9);
+        priority = taskData.priority || 0.5;
     }
 
-    return Task.createInput(
-      typeof taskData.term === 'string' ? Term.newAtom(taskData.term) : taskData.term,
-      taskData.punctuation || Punctuation.BELIEF,
-      taskData.truth ? new TruthValue(taskData.truth.frequency, taskData.truth.confidence) : new TruthValue(0.9, 0.9),
-      currentTime,
-      currentTime,
-      taskData.priority || 0.5
-    );
-  }
-
-  ask(questionData) {
-    return this.input(typeof questionData === 'string'
-      ? { term: questionData, punctuation: Punctuation.QUESTION }
-      : { ...questionData, punctuation: Punctuation.QUESTION });
+    return Task.createInput(term, punctuation, truth, currentTime, currentTime, priority);
   }
 
   getTasks() {
@@ -344,90 +334,16 @@ export class NAR {
   }
 
   getStats() {
-    const memoryState = this.getMemoryState();
-    const reasonerStats = this.reasoner.getStats();
-
-    return {
-      ...this.stats,
-      taskCount: memoryState.totalTasks,
-      conceptCount: memoryState.concepts,
-      uptime: this.stats.birthdate ? this.clock.getTime() - this.stats.birthdate : 0,
-      memoryState,
-      reasonerStats,
-      reasoningMetrics: this._getReasoningMetrics()
-    };
-  }
-
-  _getReasoningMetrics() {
-    const enabledRules = this.reasoner.getEnabledRules();
-    const ruleTypeCounts = {};
-
-    enabledRules.forEach(rule => {
-      if (rule.type) {
-        ruleTypeCounts[rule.type] = (ruleTypeCounts[rule.type] || 0) + 1;
-      }
-    });
-
-    return {
-      enabledRulesCount: enabledRules.length,
-      ruleTypeDistribution: ruleTypeCounts,
-      averageRulesPerCycle: this.stats.cycles > 0
-        ? (this.stats.derivedTasks / this.stats.cycles).toFixed(2)
-        : 0
-    };
+    return this.statistics.getStats();
   }
 
   getDetailedReasoningReport() {
-    const stats = this.getStats();
-    const enabledRules = this.reasoner.getEnabledRules();
-
-    return {
-      ...stats,
-      enabledRules: enabledRules.map(rule => ({
-        id: rule.id,
-        name: rule.name || rule.id,
-        type: rule.type,
-        priority: rule.priority,
-        description: rule.description
-      })),
-      rulePerformance: this._getRulePerformanceReport()
-    };
-  }
-
-  _getRulePerformanceReport() {
-    const performance = this.reasoner.getStats().performance;
-    const enabledRules = this.reasoner.getEnabledRules();
-
-    return {
-      ...performance,
-      ruleDetails: enabledRules.map(rule => {
-        const metrics = this.reasoner.performanceMetrics.get(rule.id);
-        return metrics ? {
-          id: rule.id,
-          executions: metrics.executions,
-          successes: metrics.successes,
-          failures: metrics.failures,
-          successRate: metrics.executions > 0
-            ? ((metrics.successes / metrics.executions) * 100).toFixed(1) + '%'
-            : '0%',
-          avgTime: Math.round(metrics.avgTime * 100) / 100 + 'ms',
-          lastError: metrics.lastError
-        } : null;
-      }).filter(Boolean)
-    };
+    return this.statistics.getDetailedReasoningReport();
   }
 
   getMemoryState() {
-    return {
-        totalTasks: this.getTasks().length,
-        beliefs: this.getBeliefs().length,
-        goals: this.getGoals().length,
-        questions: this.getQuestions().length,
-        concepts: this.memory.conceptStorage.size,
-        focusTasks: this.focus.getFocusItems().length,
-        longTermTasks: this.memory.getAllTasks().size
-      };
-    }
+    return this.statistics.getMemoryState();
+  }
 
   getHighestPriorityTask() {
     return this.getTasksByPriority()[0] || null;
@@ -452,17 +368,24 @@ export class NAR {
   }
 
   async _loadReasoningRules() {
-    // Load LM rules using the existing loader
+    const lmRules = await this._loadLMRules();
+    const nalRules = this._loadNALRules();
+
+    const allRules = [...lmRules, ...nalRules];
+    this._registerRules(allRules);
+  }
+
+  async _loadLMRules() {
     const lmRuleDir = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
     const lmRules = await loadRules(lmRuleDir, { lm: this.lm });
-
-    // Validate loaded LM rules
-    const lmValidation = validateLoadedRules(lmRules);
-    if (lmValidation.invalidCount > 0) {
-      Logger.warn(`LM rule validation issues: ${lmValidation.invalidCount} invalid rules found`);
+    const { valid, invalidCount } = validateLoadedRules(lmRules);
+    if (invalidCount > 0) {
+      Logger.warn(`LM rule validation issues: ${invalidCount} invalid rules found`);
     }
+    return valid;
+  }
 
-    // Load NAL rules using the factory
+  _loadNALRules() {
     const nalRuleTypes = RuleFactory.getAvailableNALRules();
     const nalRules = [];
     const nalErrors = [];
@@ -477,17 +400,21 @@ export class NAR {
       }
     }
 
-    // Validate loaded NAL rules
-    const nalValidation = validateLoadedRules(nalRules);
-    if (nalValidation.invalidCount > 0) {
-      Logger.warn(`NAL rule validation issues: ${nalValidation.invalidCount} invalid rules found`);
+    const { valid, invalidCount } = validateLoadedRules(nalRules);
+    if (invalidCount > 0) {
+        Logger.warn(`NAL rule validation issues: ${invalidCount} invalid rules found`);
     }
 
-    // Combine and register all rules
-    const allRules = [...lmValidation.valid, ...nalValidation.valid];
+    if (nalErrors.length > 0) {
+        Logger.error(`Failed to create ${nalErrors.length} NAL rules:`, nalErrors);
+    }
+
+    return valid;
+  }
+
+  _registerRules(rules) {
     let successfullyAdded = 0;
-    
-    for (const rule of allRules) {
+    for (const rule of rules) {
       try {
         this.reasoner.addRule(rule);
         successfullyAdded++;
@@ -495,12 +422,7 @@ export class NAR {
         Logger.error(`Failed to add rule ${rule.id}:`, error.message);
       }
     }
-
-    Logger.info(`Loaded ${lmRules.length} LM rules and ${nalRules.length} NAL rules, with ${successfullyAdded} successfully registered`);
-    
-    if (nalErrors.length > 0) {
-      Logger.error(`Failed to create ${nalErrors.length} NAL rules:`, nalErrors);
-    }
+    Logger.info(`Registered ${successfullyAdded} rules`);
   }
 
   isRunning() {
@@ -538,75 +460,24 @@ export class NAR {
 
   // Advanced reasoning methods
   async runCycleWithTracing() {
-    const currentTime = this.clock.getTime();
-    const context = new CycleContext(currentTime);
-    const focusItems = this.focus.getFocusItems();
-
-    if (focusItems.length === 0) return { derivedTasks: [], trace: [] };
-
-    const focusSet = focusItems.map(item => {
-      const taskData = item[1];
-      const task = taskData.task || taskData;
-      task.setAccessedAt(context.currentTime);
-      return task;
-    });
-
-    const trace = [];
-    const originalReason = this.reasoner.reason.bind(this.reasoner);
-
-    // Wrap the reason method to capture tracing information
-    this.reasoner.reason = async function(focusSet, memory, context) {
-      const derivedTasks = [];
-      const enabledRules = this.getEnabledRules();
-
-      for (const rule of enabledRules) {
-        const ruleStartTime = Date.now();
-        const ruleResults = [];
-
-        for (const premise of focusSet) {
-          try {
-            const result = await rule.apply({ premise, memory, context });
-            if (result && result.length > 0) {
-              ruleResults.push(...result);
-            }
-          } catch (error) {
-            trace.push({
-              type: 'rule_error',
-              ruleId: rule.id,
-              error: error.message,
-              timestamp: Date.now()
-            });
-          }
-        }
-
-        const ruleEndTime = Date.now();
-        if (ruleResults.length > 0) {
-          derivedTasks.push(...ruleResults);
-          trace.push({
-            type: 'rule_success',
-            ruleId: rule.id,
-            derivedCount: ruleResults.length,
-            executionTime: ruleEndTime - ruleStartTime,
-            timestamp: Date.now()
-          });
-        }
-      }
-
-      return derivedTasks;
-    }.bind(this.reasoner);
-
-    const derivedTasks = await this.reasoner.reason(focusSet, this.memory, context);
+    const { derivedTasks, trace } = await this.reasoner.reasonWithTrace(
+        this.focus.getFocusItems().map(item => {
+            const taskData = item[1];
+            const task = taskData.task || taskData;
+            task.setAccessedAt(this.clock.getTime());
+            return task;
+        }),
+        this.memory,
+        new CycleContext(this.clock.getTime())
+    );
 
     derivedTasks.forEach(task => {
-      this.memory.addTask(task, context.currentTime);
-      this.stats.derivedTasks++;
+        this.memory.addTask(task, this.clock.getTime());
+        this.stats.derivedTasks++;
     });
 
-    this.memory.consolidate(context.currentTime);
+    this.memory.consolidate(this.clock.getTime());
     this.stats.cycles++;
-
-    // Restore original reason method
-    this.reasoner.reason = originalReason;
 
     return { derivedTasks, trace };
   }

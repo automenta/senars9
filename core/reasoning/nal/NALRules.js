@@ -23,7 +23,7 @@ export class DeductionRule extends NALRule {
     return tasks.some(task =>
       task.punctuation === '.' &&
       task.term &&
-      (task.term.includes(' --> ') || task.term.includes(' ==> '))
+      (task.term.name.includes(' --> ') || task.term.name.includes(' ==> '))
     );
   }
 
@@ -32,8 +32,8 @@ export class DeductionRule extends NALRule {
     const results = [];
 
     for (const task of tasks) {
-      if (task.punctuation === '.' && task.term?.includes(' --> ')) {
-        const match = this.extractImplication(task.term);
+      if (task.punctuation === '.' && task.term?.name.includes(' --> ')) {
+        const match = this.extractImplication(task.term.name);
         if (match) {
           const [, antecedent, consequent] = match;
 
@@ -82,7 +82,7 @@ export class InductionRule extends NALRule {
 
     for (const task of tasks) {
       if (task.punctuation === '.' && task.term) {
-        const pattern = this.extractPattern(task.term);
+        const pattern = this.extractPattern(task.term.name);
         if (!patternMap.has(pattern)) {
           patternMap.set(pattern, []);
         }
@@ -122,7 +122,7 @@ export class AbductionRule extends NALRule {
   canApply(context) {
     const tasks = context.tasks || [];
     return tasks.some(task => task.punctuation === '?' ||
-                           (task.punctuation === '.' && task.term?.includes(' --> ')));
+                           (task.punctuation === '.' && task.term?.name.includes(' --> ')));
   }
 
   async performInference(context) {
@@ -132,7 +132,7 @@ export class AbductionRule extends NALRule {
 
     for (const questionTask of questionTasks) {
       results.push({
-        term: `(${questionTask.term.replace('?', '')} ? hypothesis).`,
+        term: `(${questionTask.term.name.replace('?', '')} ? hypothesis).`,
         punctuation: '.',
         truth: this.applyTruthFunction(null, { type: 'abduction' }),
         derivationPath: ['nal:abduction', this.id],
