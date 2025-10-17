@@ -41,6 +41,9 @@ export class Memory {
    * @returns {boolean} - True if task was added successfully
    */
   addTask(task, currentTime = Date.now()) {
+    if (!task || !task.term) {
+      return false; // Do not add invalid tasks
+    }
     const term = task.term;
 
     // Get or create concept for this term

@@ -1,164 +1,63 @@
 /**
- * Stamp class - Tracks the origin and derivation history of tasks
- * Implements evidence handling as specified in DESIGN.md
+ * Stamp class - tracks the origin and derivation history of tasks.
+ * Implements strict immutability as specified in DESIGN.md.
  */
-
 export class Stamp {
-  constructor({ id, occurrenceTime, source, derivations = [], evidentialBase = [] }) {
+  /**
+   * @private
+   */
+  constructor(id, creationTime, source = 'INPUT', derivations = []) {
     this._id = id;
-    this._occurrenceTime = occurrenceTime;
+    this._creationTime = creationTime;
     this._source = source;
-    this._derivations = [...derivations]; // Array of parent stamp IDs
-    this._evidentialBase = [...evidentialBase]; // Array of term IDs
-
-    // Freeze for immutability
-    Object.freeze(this._derivations);
-    Object.freeze(this._evidentialBase);
+    this._derivations = Object.freeze([...derivations]);
     Object.freeze(this);
   }
 
-  // Getters
-  get id() { return this._id; }
-  get occurrenceTime() { return this._occurrenceTime; }
-  get source() { return this._source; }
-  get derivations() { return this._derivations; }
-  get evidentialBase() { return this._evidentialBase; }
+  // --- Factory Methods ---
 
-  /**
-   * Create a new stamp for input tasks
-   * @param {string} source - Source of the input (default: 'INPUT')
-   * @returns {Stamp} - New input stamp
-   */
-  static createInput(source = 'INPUT') {
-    return new Stamp({
-      id: this._generateId(),
-      occurrenceTime: Date.now(),
-      source,
-      derivations: [],
-      evidentialBase: []
-    });
+  static createInput(creationTime = Date.now()) {
+    const id = Stamp.generateId(creationTime);
+    return new Stamp(id, creationTime);
   }
 
-  /**
-   * Create a new stamp derived from parent stamps
-   * @param {Array<Stamp>} parentStamps - Parent stamps
-   * @param {string} newSource - Source of the derivation
-   * @returns {Stamp} - New derived stamp
-   */
-  static createDerived(parentStamps, newSource = 'INFERENCE') {
-    const parentIds = parentStamps.map(stamp => stamp.id);
-    const mergedDerivations = this._mergeDerivations(parentStamps);
-    const mergedEvidentialBase = this._mergeEvidentialBase(parentStamps);
-
-    return new Stamp({
-      id: this._generateId(),
-      occurrenceTime: Date.now(),
-      source: newSource,
-      derivations: parentIds,
-      evidentialBase: mergedEvidentialBase
-    });
+  static createDerived(parentStamps = []) {
+    const creationTime = Date.now();
+    const id = Stamp.generateId(creationTime, parentStamps.map(s => s.id));
+    const derivations = parentStamps.map(s => s.id);
+    return new Stamp(id, creationTime, 'DERIVED', derivations);
   }
 
-  /**
-   * Check if this stamp is derived from another stamp
-   * @param {Stamp} otherStamp - Other stamp to check
-   * @returns {boolean} - True if this stamp is derived from the other
-   */
-  isDerivedFrom(otherStamp) {
-    return this._derivations.includes(otherStamp.id) ||
-           this._derivations.some(id => otherStamp._derivations.includes(id));
+  // --- Getters ---
+
+  get id() {
+    return this._id;
   }
 
-  /**
-   * Get the derivation depth (how many inference steps from input)
-   * @returns {number} - Derivation depth
-   */
-  getDerivationDepth() {
-    if (this._derivations.length === 0) return 0;
-
-    // This is a simplified calculation - in practice would need to traverse the DAG
-    return 1 + Math.max(0, ...this._derivations.map(() => 1));
+  get creationTime() {
+    return this._creationTime;
   }
 
-  /**
-   * Check if two stamps have overlapping evidence
-   * @param {Stamp} otherStamp - Other stamp to check
-   * @returns {boolean} - True if evidence overlaps
-   */
-  hasOverlappingEvidence(otherStamp) {
-    return this._evidentialBase.some(id => otherStamp._evidentialBase.includes(id));
+  get source() {
+    return this._source;
   }
 
-  /**
-   * Create a copy of this stamp with updated properties
-   * @param {Object} updates - Properties to update
-   * @returns {Stamp} - New stamp with updated properties
-   */
-  withUpdates(updates) {
-    return new Stamp({
-      id: updates.id || this._id,
-      occurrenceTime: updates.occurrenceTime || this._occurrenceTime,
-      source: updates.source || this._source,
-      derivations: updates.derivations || this._derivations,
-      evidentialBase: updates.evidentialBase || this._evidentialBase
-    });
+  get derivations() {
+    return this._derivations;
   }
 
-  /**
-   * Convert stamp to JSON for serialization
-   * @returns {Object} - JSON representation
-   */
-  toJSON() {
-    return {
-      id: this._id,
-      occurrenceTime: this._occurrenceTime,
-      source: this._source,
-      derivations: this._derivations,
-      evidentialBase: this._evidentialBase
-    };
+  // --- Core Methods ---
+
+  equals(other) {
+    return other instanceof Stamp && this.id === other.id;
   }
 
-  /**
-   * Create stamp from JSON
-   * @param {Object} json - JSON representation
-   * @returns {Stamp} - New stamp
-   */
-  static fromJSON(json) {
-    return new Stamp(json);
-  }
+  // --- Static Helpers ---
 
-  // Private helper methods
-
-  static _generateId() {
-    return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-  }
-
-  static _mergeDerivations(parentStamps) {
-    const allDerivations = new Set();
-
-    for (const stamp of parentStamps) {
-      // Add direct derivations
-      for (const derivationId of stamp._derivations) {
-        allDerivations.add(derivationId);
-      }
-
-      // Add the stamp itself to evidential base
-      allDerivations.add(stamp.id);
-    }
-
-    return Array.from(allDerivations);
-  }
-
-  static _mergeEvidentialBase(parentStamps) {
-    const mergedBase = new Set();
-
-    for (const stamp of parentStamps) {
-      for (const evidenceId of stamp._evidentialBase) {
-        mergedBase.add(evidenceId);
-      }
-      mergedBase.add(stamp.id);
-    }
-
-    return Array.from(mergedBase);
+  static generateId(timestamp, parentIds = []) {
+    // A simple ID generator for demonstration purposes. A real implementation might use UUIDs or hashes.
+    const randomPart = Math.random().toString(36).substring(2, 9);
+    const parentPart = parentIds.join('-').substring(0, 10);
+    return `${timestamp}-${parentPart}-${randomPart}`;
   }
 }

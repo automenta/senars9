@@ -1,67 +1,101 @@
+import { sha256 } from 'js-sha256';
+
+export const TermType = {
+  ATOM: 'atom',
+  COMPOUND: 'compound',
+};
+
+// As per DESIGN.md, different term types have different string representations
+const TermRepresentation = {
+  INHERITANCE: '-->',
+  SIMILARITY: '<->',
+  IMPLICATION: '==>',
+  EQUIVALENCE: '<=>',
+  CONJUNCTION: '&,',
+  DISJUNCTION: '|,',
+  NEGATION: '--,',
+  PRODUCT: ',',
+  // Add other types as needed
+};
+
 /**
- * Term class - represents knowledge elements in the system
- * Implements strict immutability as specified in DESIGN.md
+ * Term class - represents knowledge elements in the system.
+ * Implements strict immutability as specified in DESIGN.md.
+ * Use static factory methods `Term.newAtom()` and `Term.createCompound()` to create instances.
  */
-
 export class Term {
-  constructor(components = [], operator = null) {
-    // Handle mixed component types (strings and Term objects)
-    const processedComponents = [...components].map(comp => {
-      if (typeof comp === 'string') {
-        // For string components, create a simple atomic term representation
-        return { type: 'atomic', value: comp, toString: () => comp };
-      }
-      return comp;
-    });
+  /**
+   * @private
+   */
+  constructor(type, name, components = []) {
+    this._type = type;
+    this._name = name; // The canonical string representation
+    this._components = Object.freeze([...components]);
 
-    // Store components as immutable array
-    this._components = Object.freeze(processedComponents);
-    this._operator = operator;
-    this._id = this.calculateId(); // Cache immutable ID
-    this._hashCode = this.calculateHashCode(); // Cache hash code
-    this._complexity = this.calculateComplexity(); // Cache complexity
+    // Pre-calculate and cache complexity and hash
+    this._complexity = this._calculateComplexity();
+    this._hash = Term.computeHash(this._name);
 
-    // Freeze the entire object to ensure strict immutability
     Object.freeze(this);
   }
-  
-  // Getters return immutable data
+
+  // --- Factory Methods ---
+
+  static newAtom(name) {
+    return new Term(TermType.ATOM, name);
+  }
+
+  static createCompound(operator, components) {
+    // Per DESIGN.md, handle normalization for commutative operators
+    if (Term.isCommutative(operator)) {
+      components.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    const name = Term.buildCompoundName(operator, components);
+    return new Term(TermType.COMPOUND, name, components);
+  }
+
+  // --- Getters ---
+
+  get type() {
+    return this._type;
+  }
+
+  get name() {
+    return this._name;
+  }
+
   get components() {
     return this._components;
   }
-  
-  get operator() {
-    return this._operator;
+
+  get complexity() {
+    return this._complexity;
   }
-  
-  get id() {
-    return this._id;
+
+  get hash() {
+    return this._hash;
   }
-  
-  // Immutable operations return new Term instances
-  withAddedComponent(component) {
-    // This would be implemented using TermFactory in the full implementation
-    return component; // Placeholder
+
+  // --- Public Methods ---
+
+  equals(other) {
+    if (!(other instanceof Term)) {
+      return false;
+    }
+    // Since name is the canonical representation, a name match is sufficient
+    return this.name === other.name;
   }
-  
-  // Structural comparison
-  equals(otherTerm) {
-    if (!(otherTerm instanceof Term)) return false;
-    if (this._hashCode !== otherTerm._hashCode) return false;
-    // Deep comparison logic would be implemented here
-    return true;
+
+  toString() {
+    return this.name;
   }
-  
-  hashCode() {
-    return this._hashCode;
-  }
-  
-  // Sub-term operations
+
   visit(visitorFn, order = 'pre-order') {
-    visitorFn(this);
+    if (order === 'pre-order') visitorFn(this);
     this._components.forEach(comp => comp.visit(visitorFn, order));
+    if (order === 'post-order') visitorFn(this);
   }
-  
+
   reduce(reducerFn, initialValue) {
     let result = reducerFn(initialValue, this);
     for (const comp of this._components) {
@@ -69,61 +103,34 @@ export class Term {
     }
     return result;
   }
-  
-  // Generate string representation
-  toString() {
-    if (this._operator) {
-      const componentStrings = this._components.map(comp => {
-        if (typeof comp === 'object' && comp.toString) {
-          return comp.toString();
-        } else if (typeof comp === 'object' && comp.type === 'atomic') {
-          return comp.value;
-        } else {
-          return String(comp);
-        }
-      });
-      return `(${this._operator}, ${componentStrings.join(', ')})`;
-    } else {
-      if (this._components.length === 0) return '';
-      const comp = this._components[0];
-      if (typeof comp === 'object' && comp.type === 'atomic') {
-        return comp.value;
-      } else if (typeof comp === 'object' && comp.toString) {
-        return comp.toString();
-      } else {
-        return String(comp);
-      }
+
+  // --- Private & Static Helpers ---
+
+  _calculateComplexity() {
+    if (this.type === TermType.ATOM) {
+      return 1;
     }
+    return 1 + this._components.reduce((sum, comp) => sum + comp.complexity, 0);
   }
-  
-  calculateId() {
-    // Implementation would generate unique ID
-    return Math.random().toString(36).substr(2, 9);
+
+  static isCommutative(operator) {
+    return [TermRepresentation.CONJUNCTION, TermRepresentation.SIMILARITY, TermRepresentation.EQUIVALENCE, TermRepresentation.DISJUNCTION].includes(operator);
   }
-  
-  calculateHashCode() {
-    // Implementation would generate hash based on structure
-    return this.toString().split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-  }
-  
-  calculateComplexity() {
-    // Implementation would calculate structural complexity
-    if (this._components.length === 0) {
-      return 1; // Atomic term
+
+  static buildCompoundName(operator, components) {
+    const componentNames = components.map(c => c.name).join(', ');
+
+    // Infix operators
+    if (['-->', '<->', '==>', '<=>'].includes(operator)) {
+        if (components.length !== 2) throw new Error(`Operator ${operator} requires 2 components.`);
+        return `(${components[0].name} ${operator} ${components[1].name})`;
     }
 
-    return 1 + this._components.reduce((sum, comp) => {
-      // Handle both Term objects and atomic components
-      if (typeof comp === 'object' && comp.calculateComplexity) {
-        return sum + comp.calculateComplexity();
-      } else if (typeof comp === 'object' && comp.type === 'atomic') {
-        return sum + 1; // Atomic component
-      } else {
-        return sum + 1; // Fallback
-      }
-    }, 0);
+    // Prefix operators
+    return `(${operator} ${componentNames})`;
+  }
+
+  static computeHash(str) {
+    return sha256(str);
   }
 }

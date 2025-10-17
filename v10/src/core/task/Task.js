@@ -1,77 +1,91 @@
-/**
- * Task class - represents units of work or information processed by the system
- * Implements strict immutability as specified in DESIGN.md
- */
 import { Stamp } from './Stamp.js';
+import { Term } from '../term/Term.js';
 
-export class Task {
-  constructor({ term, truth, type, priority = 0.5, budget = 1.0, stamp = null }) {
-    this._term = term;
-    this._truth = truth;
-    this._type = type;
-    this._priority = priority;
-    this._budget = budget;
-    this._stamp = stamp || Stamp.createInput();
-    this._createdAt = Date.now();
-    this._accessedAt = Date.now();
-
-    // Freeze the entire object to ensure strict immutability
+// Placeholder for TruthValue class as per DESIGN.md
+export class TruthValue {
+  constructor(frequency, confidence) {
+    this.frequency = frequency;
+    this.confidence = confidence;
     Object.freeze(this);
   }
-  
-  // Getters
-  get term() { return this._term; }
-  get truth() { return this._truth; }
-  get type() { return this._type; }
-  get priority() { return this._priority; }
-  get budget() { return this._budget; }
-  get stamp() { return this._stamp; }
-  get createdAt() { return this._createdAt; }
-  get accessedAt() { return this._accessedAt; }
-  
-  // Immutable operations that return new Task instances
-  withPriority(newPriority) {
-    return new Task({
-      term: this._term,
-      truth: this._truth,
-      type: this._type,
-      priority: Math.max(0.0, Math.min(1.0, newPriority)),
-      budget: this._budget
-    });
-  }
-  
-  withTruth(newTruth) {
-    return new Task({
-      term: this._term,
-      truth: newTruth,
-      type: this._type,
-      priority: this._priority,
-      budget: this._budget
-    });
-  }
-  
-  setAccessedAt(timestamp) {
-    const newTask = new Task({
-      term: this._term,
-      truth: this._truth,
-      type: this._type,
-      priority: this._priority,
-      budget: this._budget
-    });
-    // Override accessedAt (this is a simplification)
-    newTask._accessedAt = timestamp;
-    return newTask;
-  }
-  
-  isBelief() { return this._type === 'BELIEF'; }
-  isGoal() { return this._type === 'GOAL'; }
-  isQuestion() { return this._type === 'QUESTION'; }
-  
-  equals(otherTask) {
-    if (!(otherTask instanceof Task)) return false;
-    // Deep comparison logic would be implemented
-    return this._stamp.id === otherTask._stamp.id;
+  equals(other) {
+    return other && this.frequency === other.frequency && this.confidence === other.confidence;
   }
 }
 
-// Stamp functionality will be provided by a separate Stamp class
+/**
+ * Task class - represents units of work or information.
+ * Implements strict immutability as specified in DESIGN.md.
+ */
+export class Task {
+  constructor({ term, type, truth = null, stamp = null, priority = 0.5, budget = 1.0, accessedAt = null }) {
+    if (!(term instanceof Term)) {
+      throw new Error('Task must be initialized with a valid Term object.');
+    }
+
+    this._term = term;
+    this._type = type; // e.g., 'BELIEF', 'GOAL', 'QUESTION'
+    this._truth = truth;
+    this._stamp = stamp || Stamp.createInput();
+    this._priority = Math.max(0, Math.min(1, priority));
+    this._budget = budget;
+
+    this._createdAt = this._stamp.creationTime;
+    this._accessedAt = accessedAt || this._createdAt;
+
+    Object.freeze(this);
+  }
+
+  // --- Getters ---
+  get term() { return this._term; }
+  get type() { return this._type; }
+  get truth() { return this._truth; }
+  get stamp() { return this._stamp; }
+  get priority() { return this._priority; }
+  get budget() { return this._budget; }
+  get createdAt() { return this._createdAt; }
+  get accessedAt() { return this._accessedAt; }
+
+  // --- Immutable 'with' methods ---
+
+  withTruth(newTruth) {
+    return new Task({ ...this._getAllProperties(), truth: newTruth });
+  }
+
+  withPriority(newPriority) {
+    return new Task({ ...this._getAllProperties(), priority: newPriority });
+  }
+  
+  withAccessedAt(newAccessedAt) {
+    return new Task({ ...this._getAllProperties(), accessedAt: newAccessedAt });
+  }
+
+  // --- Type checkers ---
+  isBelief() { return this.type === 'BELIEF'; }
+  isGoal() { return this.type === 'GOAL'; }
+  isQuestion() { return this.type === 'QUESTION'; }
+
+  // --- Core Methods ---
+
+  equals(other) {
+    if (!(other instanceof Task)) {
+      return false;
+    }
+    const truthEquals = (!this.truth && !other.truth) || (this.truth && this.truth.equals(other.truth));
+    return this.term.equals(other.term) && this.type === other.type && truthEquals;
+  }
+
+  // --- Private Helpers ---
+
+  _getAllProperties() {
+    return {
+      term: this.term,
+      type: this.type,
+      truth: this.truth,
+      stamp: this.stamp,
+      priority: this.priority,
+      budget: this.budget,
+      accessedAt: this.accessedAt
+    };
+  }
+}
