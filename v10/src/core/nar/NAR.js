@@ -304,7 +304,7 @@ export class NAR {
       isRunning: this._isRunning,
       cycleCount: this._cycle.cycleCount,
       memoryStats: this._memory.getDetailedStats(),
-      taskManagerStats: this._taskManager.getTaskStats(),
+      taskManagerStats: this._taskManager.getTaskStats ? this._taskManager.getTaskStats() : this._taskManager.stats,
       cycleStats: this._cycle.stats,
       config: this._config.toJSON()
     };

@@ -18,15 +18,15 @@ describe('NAR Integration Tests', () => {
     termFactory = new TermFactory();
   });
 
-  afterEach(() => {
+  afterEach(() =) {
     if (nar && nar.isRunning) {
       nar.stop();
     }
   });
 
-  describe('Basic Input Processing', () => {
-    test('should accept and store a simple belief', async () => {
-      const input = '(cat --> animal).';
+  describe('Basic Input Processing', () =) {
+    test('should accept and store a simple belief', async () =) {
+      const input = '(cat --) animal).';
 
       const result = await nar.input(input);
 
@@ -36,55 +36,55 @@ describe('NAR Integration Tests', () => {
       const beliefs = nar.getBeliefs();
       expect(beliefs.length).toBeGreaterThan(0);
 
-      const catBelief = beliefs.find(b => b.term.toString().includes('cat'));
+      const catBelief = beliefs.find(b =) b.term.toString().includes('cat'));
       expect(catBelief).toBeDefined();
       expect(catBelief.type).toBe('BELIEF');
     });
 
-    test('should handle belief with truth value', async () => {
-      const input = '(bird --> animal)%0.9;0.8%.';
+    test('should handle belief with truth value', async () =) {
+      const input = '(bird --) animal)%0.9;0.8%.';
 
       await nar.input(input);
 
       const beliefs = nar.getBeliefs();
-      const birdBelief = beliefs.find(b => b.term.toString().includes('bird'));
+      const birdBelief = beliefs.find(b =) b.term.toString().includes('bird'));
 
       expect(birdBelief).toBeDefined();
       expect(birdBelief.truth).toEqual({ frequency: 0.9, confidence: 0.8 });
     });
 
-    test('should handle goal input', async () => {
-      const input = '(want_food --> goal)!';
+    test('should handle goal input', async () =) {
+      const input = '(want_food --) goal)!';
 
       await nar.input(input);
 
       const goals = nar.getGoals();
       expect(goals.length).toBeGreaterThan(0);
 
-      const wantFoodGoal = goals.find(g => g.term.toString().includes('want_food'));
+      const wantFoodGoal = goals.find(g =) g.term.toString().includes('want_food'));
       expect(wantFoodGoal).toBeDefined();
       expect(wantFoodGoal.type).toBe('GOAL');
     });
 
-    test('should handle question input', async () => {
-      const input = '(cat --> ?x)?';
+    test('should handle question input', async () =) {
+      const input = '(cat --) ?x)?';
 
       await nar.input(input);
 
       const questions = nar.getQuestions();
       expect(questions.length).toBeGreaterThan(0);
 
-      const catQuestion = questions.find(q => q.term.toString().includes('cat'));
+      const catQuestion = questions.find(q =) q.term.toString().includes('cat'));
       expect(catQuestion).toBeDefined();
       expect(catQuestion.type).toBe('QUESTION');
     });
   });
 
-  describe('Memory Storage and Retrieval', () => {
-    test('should store tasks in appropriate concepts', async () => {
-      await nar.input('(cat --> animal).');
-      await nar.input('(dog --> animal).');
-      await nar.input('(cat --> pet).');
+  describe('Memory Storage and Retrieval', () =) {
+    test('should store tasks in appropriate concepts', async () =) {
+      await nar.input('(cat --) animal).');
+      await nar.input('(dog --) animal).');
+      await nar.input('(cat --) pet).');
 
       // Check that concepts were created
       const concepts = nar.memory.getAllConcepts();
@@ -103,10 +103,10 @@ describe('NAR Integration Tests', () => {
       expect(catConcept.totalTasks).toBeGreaterThanOrEqual(2);
     });
 
-    test('should retrieve beliefs by query term', async () => {
-      await nar.input('(cat --> animal).');
-      await nar.input('(dog --> animal).');
-      await nar.input('(bird --> animal).');
+    test('should retrieve beliefs by query term', async () =) {
+      await nar.input('(cat --) animal).');
+      await nar.input('(dog --) animal).');
+      await nar.input('(bird --) animal).');
 
       const catTerm = termFactory.create('cat');
       const catBeliefs = nar.query(catTerm);
@@ -115,11 +115,11 @@ describe('NAR Integration Tests', () => {
       expect(catBeliefs[0].term.toString()).toContain('cat');
     });
 
-    test('should handle compound terms correctly', async () => {
+    test('should handle compound terms correctly', async () =) {
       await nar.input('(&, cat, pet, animal).');
 
       const beliefs = nar.getBeliefs();
-      const compoundBelief = beliefs.find(b =>
+      const compoundBelief = beliefs.find(b =)
         b.term.toString().includes('cat') && b.term.toString().includes('pet')
       );
 
@@ -128,8 +128,8 @@ describe('NAR Integration Tests', () => {
     });
   });
 
-  describe('System Lifecycle', () => {
-    test('should start and stop correctly', async () => {
+  describe('System Lifecycle', () =) {
+    test('should start and stop correctly', async () =) {
       expect(nar.isRunning).toBe(false);
 
       const started = nar.start();
@@ -141,8 +141,8 @@ describe('NAR Integration Tests', () => {
       expect(nar.isRunning).toBe(false);
     });
 
-    test('should execute single cycle', async () => {
-      await nar.input('(cat --> animal).');
+    test('should execute single cycle', async () =) {
+      await nar.input('(cat --) animal).');
 
       const result = await nar.step();
 
@@ -151,21 +151,21 @@ describe('NAR Integration Tests', () => {
       expect(result.processedTasks).toBeGreaterThan(0);
     });
 
-    test('should execute multiple cycles', async () => {
-      await nar.input('(cat --> animal).');
-      await nar.input('(dog --> animal).');
+    test('should execute multiple cycles', async () =) {
+      await nar.input('(cat --) animal).');
+      await nar.input('(dog --) animal).');
 
       const results = await nar.runCycles(3);
 
       expect(results.length).toBe(3);
-      results.forEach((result, index) => {
+      results.forEach((result, index) =) {
         expect(result.cycleNumber).toBe(index + 1);
       });
     });
 
-    test('should reset system state', async () => {
-      await nar.input('(cat --> animal).');
-      await nar.input('(dog --> animal).');
+    test('should reset system state', async () =) {
+      await nar.input('(cat --) animal).');
+      await nar.input('(dog --) animal).');
 
       expect(nar.getBeliefs().length).toBeGreaterThan(0);
       expect(nar.cycleCount).toBe(0);
@@ -177,28 +177,28 @@ describe('NAR Integration Tests', () => {
     });
   });
 
-  describe('Event System', () => {
-    test('should emit events for input processing', async () => {
+  describe('Event System', () =) {
+    test('should emit events for input processing', async () =) {
       const inputEvents = [];
       const taskAddedEvents = [];
 
-      nar.on('task.input', (data) => inputEvents.push(data));
-      nar.on('task.added', (data) => taskAddedEvents.push(data));
+      nar.on('task.input', (data) =) inputEvents.push(data));
+      nar.on('task.added', (data) =) taskAddedEvents.push(data));
 
-      await nar.input('(test --> example).');
+      await nar.input('(test --) example).');
 
       expect(inputEvents.length).toBe(1);
       expect(inputEvents[0].source).toBe('user');
-      expect(inputEvents[0].originalInput).toBe('(test --> example).');
+      expect(inputEvents[0].originalInput).toBe('(test --) example).');
 
       expect(taskAddedEvents.length).toBe(1);
       expect(taskAddedEvents[0].task.type).toBe('BELIEF');
     });
 
-    test('should handle input errors gracefully', async () => {
+    test('should handle input errors gracefully', async () =) {
       const errorEvents = [];
 
-      nar.on('input.error', (data) => errorEvents.push(data));
+      nar.on('input.error', (data) =) errorEvents.push(data));
 
       // This should cause a parsing error
       await expect(nar.input('invalid narsese string!!!')).rejects.toThrow();
@@ -208,10 +208,10 @@ describe('NAR Integration Tests', () => {
     });
   });
 
-  describe('System Statistics', () => {
-    test('should provide comprehensive statistics', async () => {
-      await nar.input('<cat --> animal>.');
-      await nar.input('<dog --> animal>.');
+  describe('System Statistics', () =) {
+    test('should provide comprehensive statistics', async () =) {
+      await nar.input('(cat --) animal).');
+      await nar.input('(dog --) animal).');
       await nar.step();
 
       const stats = nar.getStats();
@@ -223,10 +223,10 @@ describe('NAR Integration Tests', () => {
       expect(stats.cycleStats).toBeDefined();
     });
 
-    test('should track memory usage correctly', async () => {
-      await nar.input('<cat --> animal>.');
-      await nar.input('<dog --> animal>.');
-      await nar.input('<bird --> animal>.');
+    test('should track memory usage correctly', async () =) {
+      await nar.input('(cat --) animal).');
+      await nar.input('(dog --) animal).');
+      await nar.input('(bird --) animal).');
 
       const stats = nar.getStats();
       const memoryStats = stats.memoryStats;
@@ -236,12 +236,12 @@ describe('NAR Integration Tests', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    test('should handle malformed input gracefully', async () => {
+  describe('Error Handling', () =) {
+    test('should handle malformed input gracefully', async () =) {
       const invalidInputs = [
         'incomplete statement',
         '(unclosed parenthesis',
-        'missing punctuation>',
+        'missing punctuation)',
         '(term)%invalid truth%',
         ''
       ];
@@ -251,15 +251,15 @@ describe('NAR Integration Tests', () => {
       }
     });
 
-    test('should continue operating after input errors', async () => {
+    test('should continue operating after input errors', async () =) {
       // First, a valid input
-      await nar.input('(cat --> animal).');
+      await nar.input('(cat --) animal).');
 
       // Then an invalid input
       await expect(nar.input('invalid input')).rejects.toThrow();
 
       // Should still be able to process valid input
-      const result = await nar.input('(dog --> animal).');
+      const result = await nar.input('(dog --) animal).');
       expect(result).toBe(true);
 
       const beliefs = nar.getBeliefs();
@@ -267,13 +267,13 @@ describe('NAR Integration Tests', () => {
     });
   });
 
-  describe('Performance and Scalability', () => {
-    test('should handle multiple inputs efficiently', async () => {
+  describe('Performance and Scalability', () =) {
+    test('should handle multiple inputs efficiently', async () =) {
       const startTime = Date.now();
 
       // Add many beliefs
-      for (let i = 0; i < 100; i++) {
-        await nar.input(`(item${i} --> category).`);
+      for (let i = 0; i ( 100; i++) {
+        await nar.input(`(item${i} --) category).`);
       }
 
       const endTime = Date.now();
@@ -286,13 +286,13 @@ describe('NAR Integration Tests', () => {
       expect(beliefs.length).toBe(100);
     });
 
-    test('should handle large compound terms', async () => {
+    test('should handle large compound terms', async () =) {
       // Create a complex compound term
       const complexTerm = '(&, A, B, C, D, E).';
       await nar.input(complexTerm);
 
       const beliefs = nar.getBeliefs();
-      const complexBelief = beliefs.find(b =>
+      const complexBelief = beliefs.find(b =)
         b.term.toString().includes('A') && b.term.toString().includes('E')
       );
 

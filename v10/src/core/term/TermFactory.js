@@ -57,7 +57,7 @@ export class TermFactory {
       // Check for infix operators: A --> B, A <-> B, etc.
       if (inner.includes(' --> ')) {
         const parts = inner.split(' --> ');
-        if (parts.length === 2) {
+        if (parts.length === 2 && this._validateComponents(parts)) {
           return {
             operator: '-->',
             components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
@@ -65,7 +65,7 @@ export class TermFactory {
         }
       } else if (inner.includes(' <-> ')) {
         const parts = inner.split(' <-> ');
-        if (parts.length === 2) {
+        if (parts.length === 2 && this._validateComponents(parts)) {
           return {
             operator: '<->',
             components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
@@ -73,7 +73,7 @@ export class TermFactory {
         }
       } else if (inner.includes(' ==> ')) {
         const parts = inner.split(' ==> ');
-        if (parts.length === 2) {
+        if (parts.length === 2 && this._validateComponents(parts)) {
           return {
             operator: '==>',
             components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
@@ -81,7 +81,7 @@ export class TermFactory {
         }
       } else if (inner.includes(' <=> ')) {
         const parts = inner.split(' <=> ');
-        if (parts.length === 2) {
+        if (parts.length === 2 && this._validateComponents(parts)) {
           return {
             operator: '<=>',
             components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
@@ -94,10 +94,16 @@ export class TermFactory {
       if (parts) {
         return parts;
       }
+
+      throw new Error(`Invalid compound term syntax: ${trimmed}`);
     }
 
-    // Atomic term
-    return { components: [trimmed], operator: null };
+    // Atomic term - validate it's a reasonable atomic term
+    if (this._isValidAtomicTerm(trimmed)) {
+      return { components: [trimmed], operator: null };
+    }
+
+    throw new Error(`Invalid atomic term: ${trimmed}`);
   }
 
    _parsePrefixOperator(str) {
@@ -126,6 +132,32 @@ export class TermFactory {
        const componentStr = canonicalForm.components.join(', ');
        return `(${canonicalForm.operator}, ${componentStr})`;
      }
+   }
+
+   _validateComponents(parts) {
+     return parts.every(part => part.trim().length > 0);
+   }
+
+   _isValidAtomicTerm(term) {
+     // Valid atomic terms: words, quoted strings, variables
+     const trimmed = term.trim();
+
+     // Empty strings are invalid
+     if (trimmed.length === 0) return false;
+
+     // Check for quoted strings
+     if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+         (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+       return trimmed.length > 1; // Must have content between quotes
+     }
+
+     // Check for variables (start with ? or $)
+     if (trimmed.startsWith('?') || trimmed.startsWith('$')) {
+       return trimmed.length > 1; // Must have name after ? or $
+     }
+
+     // Regular words: letters, numbers, hyphens, underscores
+     return /^[a-zA-Z0-9_-]+$/.test(trimmed);
    }
 
   _simpleTokenize(str) {
