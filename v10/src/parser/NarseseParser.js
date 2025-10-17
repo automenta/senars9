@@ -181,7 +181,7 @@ export class NarseseParser {
     }
 
     getTaskType(punct) {
-        return punct === '.' ? 'BELIEF' : punct === '!' ? 'GOAL' : punct === '?' ? 'QUESTION' : 'BELIEF';
+        return { '.': 'BELIEF', '!': 'GOAL', '?': 'QUESTION' }[punct] || 'BELIEF';
     }
 
     getOperatorSymbol(op) {

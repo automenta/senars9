@@ -89,20 +89,14 @@ export class Cycle {
      */
     _getTasksForReasoning() {
         const maxTasks = this._config.maxTasksPerCycle;
-
-        // Get most active concepts
         const activeConcepts = this._memory.getMostActiveConcepts(20);
-
         const selectedTasks = [];
 
         for (const concept of activeConcepts) {
             if (selectedTasks.length >= maxTasks) break;
 
             // Get highest priority tasks from this concept
-            const conceptTasks = concept.getAllTasks();
-
-            // Sort by priority and take top tasks
-            conceptTasks.sort((a, b) => b.priority - a.priority);
+            const conceptTasks = concept.getAllTasks().sort((a, b) => b.priority - a.priority);
 
             for (const task of conceptTasks) {
                 if (selectedTasks.length >= maxTasks) break;
@@ -123,16 +117,15 @@ export class Cycle {
 
         for (const task of tasks) {
             try {
-                // Get applicable rules for this task
+                // Get applicable rules for this task and apply them
                 const applicableRules = this._ruleEngine.getApplicableRules(task);
-
+                
                 for (const rule of applicableRules) {
-                    // Apply the rule
                     const ruleResults = await this._ruleEngine.applyRule(rule, task);
-
-                    if (ruleResults && ruleResults.length > 0) {
+                    
+                    if (ruleResults?.length > 0) {
                         newInferences.push(...ruleResults);
-                        this._stats.totalRulesApplied++;
+                        this._stats.totalRulesApplied += ruleResults.length;
                     }
                 }
             } catch (error) {

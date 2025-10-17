@@ -41,27 +41,38 @@ export class RuleEngine {
     applyRule(rule, task) {
         if (!rule || !this._rules.has(rule.id)) return { results: [], rule };
 
+        const startTime = Date.now();
+        let success = false;
+
         try {
             const { results, rule: updatedRule } = rule.apply(task);
             this._rules.set(rule.id, updatedRule);
+            success = true;
             return { results, rule: updatedRule };
         } catch (error) {
             if (error.rule) this._rules.set(rule.id, error.rule);
             throw error.error || error;
+        } finally {
+            this._updateMetrics(success, Date.now() - startTime);
         }
     }
 
     applyRules(task, ruleIds = null) {
-        const rules = ruleIds ? ruleIds.map(id => this._rules.get(id)).filter(Boolean) : this.getApplicableRules(task);
+        const rules = ruleIds ? 
+            ruleIds.map(id => this._rules.get(id)).filter(Boolean) : 
+            this.getApplicableRules(task);
 
-        return rules.flatMap(rule => {
+        const allResults = [];
+        for (const rule of rules) {
             try {
                 const { results } = this.applyRule(rule, task);
-                return results;
+                allResults.push(...results);
             } catch (error) {
-                return console.warn(`Rule ${rule.id} failed:`, error), [];
+                console.warn(`Rule ${rule.id} failed:`, error);
             }
-        });
+        }
+        
+        return allResults;
     }
 
     enableRule(ruleId) {

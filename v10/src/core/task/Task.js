@@ -35,6 +35,7 @@ export class Task {
         };
     }
 
+    // Getters
     get term() {
         return this._term;
     }
@@ -75,6 +76,7 @@ export class Task {
         return this._createdAt;
     }
 
+    // Immutable operations
     withTruth(newTruth) {
         return new Task({...this._getAllProperties(), truth: newTruth});
     }
@@ -87,6 +89,7 @@ export class Task {
         return new Task({...this._getAllProperties(), accessedAt: newAccessedAt});
     }
 
+    // Type checking
     isBelief() {
         return this.type === 'BELIEF';
     }
@@ -99,12 +102,14 @@ export class Task {
         return this.type === 'QUESTION';
     }
 
+    // Equality
     equals(other) {
         if (!(other instanceof Task)) return false;
         const truthEqual = (!this.truth && !other.truth) || (this.truth?.equals(other.truth));
         return this.term.equals(other.term) && this.type === other.type && truthEqual;
     }
 
+    // Internal method
     _getAllProperties() {
         return {
             term: this.term,
@@ -115,5 +120,12 @@ export class Task {
             budget: this.budget,
             accessedAt: this.accessedAt
         };
+    }
+
+    // String representation
+    toString() {
+        const termStr = this.term.toString();
+        const typeStr = this.type === 'BELIEF' ? '.' : this.type === 'GOAL' ? '!' : '?';
+        return this.truth ? `${termStr}${typeStr} ${this.truth.f.toFixed(2)};${this.truth.c.toFixed(2)}` : `${termStr}${typeStr}`;
     }
 }

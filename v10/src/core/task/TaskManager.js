@@ -104,9 +104,7 @@ export class TaskManager {
      */
     findTasksByTerm(term) {
         const concept = this._memory.getConcept(term);
-        if (!concept) return [];
-
-        return concept.getAllTasks();
+        return concept ? concept.getAllTasks() : [];
     }
 
     /**

@@ -13,7 +13,6 @@ export class NAR {
         this._config = SystemConfig.from(config);
 
         this._memory = new Memory(this._config.memory);
-        this._taskManager = new TaskManager(this._memory, null, this._config.taskManager);
         this._parser = new NarseseParser();
         this._eventBus = new EventBus();
 
@@ -181,7 +180,8 @@ export class NAR {
             isRunning: this._isRunning,
             cycleCount: this._cycle.cycleCount,
             memoryStats: this._memory.getDetailedStats(),
-            taskManagerStats: this._taskManager.getTaskStats?.() || this._taskManager.stats,
+            taskManagerStats: this._taskManager.getTaskStats ? 
+                this._taskManager.getTaskStats() : this._taskManager.stats,
             cycleStats: this._cycle.stats,
             config: this._config.toJSON()
         };
@@ -189,8 +189,17 @@ export class NAR {
 
     _calculateInputPriority(parsed) {
         let priority = this._config.taskManager.defaultPriority;
-        priority = parsed.truthValue?.confidence ? Math.min(TRUTH.MAX_PRIORITY, priority + parsed.truthValue.confidence * PRIORITY.CONFIDENCE_MULTIPLIER) : priority;
-        return Math.min(TRUTH.MAX_PRIORITY, priority + { GOAL: PRIORITY.GOAL_BOOST, QUESTION: PRIORITY.QUESTION_BOOST }[parsed.taskType] || 0);
+        
+        // Add confidence boost if available
+        if (parsed.truthValue?.confidence) {
+            priority += parsed.truthValue.confidence * PRIORITY.CONFIDENCE_MULTIPLIER;
+        }
+        
+        // Add task type boost
+        const typeBoost = { GOAL: PRIORITY.GOAL_BOOST, QUESTION: PRIORITY.QUESTION_BOOST }[parsed.taskType] || 0;
+        priority += typeBoost;
+        
+        return Math.min(TRUTH.MAX_PRIORITY, priority);
     }
 
     async _processPendingTasks() {
