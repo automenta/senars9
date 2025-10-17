@@ -27,29 +27,23 @@ export class Bag {
  }
 
  getItemsInPriorityOrder() {
-   return [...this._items.entries()]
-     .sort((a, b) => b[1] - a[1])
-     .map(entry => entry[0]);
+   return [...this._items.entries()].sort((a, b) => b[1] - a[1]).map(([item]) => item);
  }
 
  getAveragePriority() {
-   return this.size === 0 ? 0 :
-     [...this._items.values()].reduce((sum, priority) => sum + priority, 0) / this.size;
+   return this.size === 0 ? 0 : [...this._items.values()].reduce((sum, priority) => sum + priority, 0) / this.size;
  }
 
  applyDecay(decayRate) {
    const newItems = new Map();
    for (const [item, priority] of this._items.entries()) {
      const newPriority = priority * (1 - decayRate);
-     const newItem = item.withPriority(newPriority);
-     newItems.set(newItem, newPriority);
+     newItems.set(item.withPriority(newPriority), newPriority);
    }
    this._items = newItems;
  }
 
  _removeLowestPriorityItem() {
-   if (this.size === 0) return;
-   const lowestPriorityItem = this.getItemsInPriorityOrder().pop();
-   this.remove(lowestPriorityItem);
+   this.size > 0 && this.remove(this.getItemsInPriorityOrder().pop());
  }
 }

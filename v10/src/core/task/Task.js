@@ -19,6 +19,9 @@ export class Task {
    Object.freeze(this);
  }
 
+ static get DEFAULT_PRIORITY() { return 0.5; }
+ static get DEFAULT_BUDGET() { return 1.0; }
+
  get term() { return this._term; }
  get type() { return this._type; }
  get truth() { return this._truth; }
@@ -28,8 +31,6 @@ export class Task {
  get createdAt() { return this._createdAt; }
  get accessedAt() { return this._accessedAt; }
 
-  // --- Immutable 'with' methods ---
-
   withTruth(newTruth) {
     return new Task({ ...this._getAllProperties(), truth: newTruth });
   }
@@ -37,27 +38,20 @@ export class Task {
   withPriority(newPriority) {
     return new Task({ ...this._getAllProperties(), priority: newPriority });
   }
-  
+
   withAccessedAt(newAccessedAt) {
     return new Task({ ...this._getAllProperties(), accessedAt: newAccessedAt });
   }
 
-  // --- Type checkers ---
   isBelief() { return this.type === 'BELIEF'; }
   isGoal() { return this.type === 'GOAL'; }
   isQuestion() { return this.type === 'QUESTION'; }
 
-  // --- Core Methods ---
-
   equals(other) {
-    if (!(other instanceof Task)) {
-      return false;
-    }
+    if (!(other instanceof Task)) return false;
     const truthEquals = (!this.truth && !other.truth) || (this.truth && this.truth.equals(other.truth));
     return this.term.equals(other.term) && this.type === other.type && truthEquals;
   }
-
-  // --- Private Helpers ---
 
   _getAllProperties() {
     return {

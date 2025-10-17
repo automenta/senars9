@@ -17,7 +17,7 @@ export class Stamp {
     throw new Error("Method 'toString()' must be implemented.");
   }
 
-  static createInput(creationTime = Date.now(), occurrenceTime = Date.now()) {
+  static createInput(creationTime = Date.now(), occurrenceTime = creationTime) {
     return new ArrayStamp(Stamp.generateId(creationTime), occurrenceTime, 'INPUT', []);
   }
 
@@ -25,10 +25,8 @@ export class Stamp {
 
   static createDerived(parentStamps = [], fromConcept = null) {
     const creationTime = Date.now();
-    const occurrenceTime = creationTime;
     const id = Stamp.generateId(creationTime, parentStamps.map(s => s.id));
-    const derivations = parentStamps.map(s => s.id);
-    return new ArrayStamp(id, occurrenceTime, 'DERIVED', derivations);
+    return new ArrayStamp(id, creationTime, 'DERIVED', parentStamps.map(s => s.id));
   }
 
   static generateId(timestamp, parentIds = []) {
@@ -57,9 +55,8 @@ export class ArrayStamp extends Stamp {
 
   static derive(parentStamps) {
     const newId = Math.random().toString(36).substring(2);
-    const newTime = Date.now();
     const newDerivations = [...new Set(parentStamps.flatMap(p => [p.id, ...p.derivations]))];
-    return new ArrayStamp(newId, newTime, 'INFERENCE', newDerivations);
+    return new ArrayStamp(newId, Date.now(), 'INFERENCE', newDerivations);
   }
 
   equals(other) {
