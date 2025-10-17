@@ -1,9 +1,10 @@
 import {TRUTH} from './config/constants.js';
+import {clamp} from '../util/common.js';
 
 export class Truth {
     constructor(f = TRUTH.DEFAULT_FREQUENCY, c = TRUTH.DEFAULT_CONFIDENCE) {
-        this._f = f;
-        this._c = c;
+        this._f = clamp(f, 0, 1);
+        this._c = clamp(c, 0, 1);
         Object.freeze(this);
     }
 
@@ -43,7 +44,7 @@ export class Truth {
         if (!t1 || !t2) return t1 || t2;
         const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
         const f = (f1 * c1 + f2 * c2) / (c1 + c2);
-        return new Truth(f, Math.min(1.0, c1 + c2));
+        return new Truth(f, Math.min(1.0, c1 + c2));  // This can also be clamped
     }
 
     static negation(truth) {
@@ -100,11 +101,11 @@ export class Truth {
     static _validateInputs(t1, t2) { return t1 && t2; }
     static _validateInput(t) { return t; }
     static _combineConfidence(c1, c2) { return Math.min(c1, c2); }
-    static _averageFrequency(f1, f2) { return (f1 + f2) / 2; }
+    static _averageFrequency(f1, f2) { return clamp((f1 + f2) / 2, 0, 1); }  // Now using clamp
     static _safeDivide(numerator, denominator) { 
-        return denominator === 0 ? TRUTH.DEFAULT_FREQUENCY : numerator / denominator;
+        return denominator === 0 ? TRUTH.DEFAULT_FREQUENCY : clamp(numerator / denominator, 0, 1);  // Now using clamp
     }
-    static _weak(c) { return c / (c + 1.0); }
+    static _weak(c) { return clamp(c / (c + 1.0), 0, 1); }  // Now using clamp
 
     equals(other) {
         return other instanceof Truth && 

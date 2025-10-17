@@ -76,3 +76,19 @@ export const collectTasksFromAllConcepts = (memory, filterFn = null) => {
     }
     return allTasks;
 };
+
+export const freezeObject = (obj) => Object.freeze(obj);
+
+export const clampAndFreeze = (obj, min = 0, max = 1) => {
+    if (typeof obj === 'number') {
+        return clamp(obj, min, max);
+    }
+    // Assuming obj has numeric properties that need clamping
+    const clamped = {...obj};
+    for (const key of Object.keys(clamped)) {
+        if (typeof clamped[key] === 'number') {
+            clamped[key] = clamp(clamped[key], min, max);
+        }
+    }
+    return freezeObject(clamped);
+};

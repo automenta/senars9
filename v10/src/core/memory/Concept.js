@@ -1,5 +1,5 @@
 import {Bag} from './Bag.js';
-import {sortByPriority} from '../../util/common.js';
+import {sortByPriority, clamp} from '../../util/common.js';
 
 export class Concept {
     constructor(term, config = {}) {
@@ -106,7 +106,7 @@ export class Concept {
     }
 
     boostActivation(activationBoost = this._config.defaultActivationBoost) {
-        this._activation = Math.min(this._config.maxActivation, this._activation + activationBoost);
+        this._activation = clamp(this._activation + activationBoost, 0, this._config.maxActivation);
         this._updateLastAccessed();
         this.incrementUseCount();
     }
@@ -116,8 +116,7 @@ export class Concept {
     }
 
     updateQuality(qualityChange) {
-        this._quality = Math.max(this._config.minQuality,
-            Math.min(this._config.maxQuality, this._quality + qualityChange));
+        this._quality = clamp(this._quality + qualityChange, this._config.minQuality, this._config.maxQuality);
     }
 
     containsTask(task) {

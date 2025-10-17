@@ -69,7 +69,14 @@ export class Bag {
         }
         this._items = newItems;
     }
-
+    
+    updatePriority(item, newPriority) {
+        if (!this._items.has(item)) return false;
+        
+        this._items.set(item, newPriority);
+        return true;
+    }
+    
     _removeLowestPriorityItem() {
         if (this.size > 0) {
             const items = this.getItemsInPriorityOrder();

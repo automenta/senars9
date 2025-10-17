@@ -1,4 +1,5 @@
 import { TRUTH } from '../../config/constants.js';
+import { clamp } from '../../../util/common.js';
 
 /**
  * NAL Truth Value Functions for reasoning
@@ -165,8 +166,8 @@ export class TruthFunctions {
     if (!v) return { frequency: 0.5, confidence: 0.9 };
     
     return {
-      frequency: Math.max(0, Math.min(1, v.frequency)),
-      confidence: Math.max(0, Math.min(1, v.confidence))
+      frequency: clamp(v.frequency, 0, 1),
+      confidence: clamp(v.confidence, 0, 1)
     };
   }
 }

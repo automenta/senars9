@@ -1,5 +1,6 @@
 import {Metrics} from '../util/Metrics.js';
 import {TRUTH} from '../config/constants.js';
+import {clamp} from '../../util/common.js';
 
 export class Rule {
     constructor(id, type, priority = 1.0, config = {}) {
@@ -9,7 +10,7 @@ export class Rule {
 
         this._id = id;
         this._type = type;
-        this._priority = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
+        this._priority = clamp(priority, TRUTH.MIN_PRIORITY, TRUTH.MAX_PRIORITY);
         this._config = Object.freeze({...config});
         this._enabled = config.enabled !== false;
         this._metrics = Object.freeze({
@@ -34,7 +35,7 @@ export class Rule {
     }
 
     withPriority(priority) {
-        const clamped = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
+        const clamped = clamp(priority, TRUTH.MIN_PRIORITY, TRUTH.MAX_PRIORITY);
         return this._updateIfChanged('_priority', clamped);
     }
 

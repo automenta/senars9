@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import {freezeObject} from '../../util/common.js';
 
 export const TermType = {
     ATOM: 'atom',
@@ -13,15 +14,15 @@ export class Term {
         // For atomic terms, components should include the name itself
         // For compound terms, use provided components
         const actualComponents = type === TermType.ATOM && components.length === 0 
-            ? Object.freeze([name]) 
-            : Object.freeze(components);
+            ? freezeObject([name]) 
+            : freezeObject(components);
             
         this._operator = operator;
         this._components = actualComponents;
         this._complexity = this._calculateComplexity();
         this._id = this._calculateId();
         this._hash = Term.computeHash(this._id);
-        Object.freeze(this);
+        return freezeObject(this);
     }
 
     get type() { return this._type; }

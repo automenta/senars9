@@ -2,7 +2,7 @@
  * Focus class - manages attention focus sets (short-term memory)
  * Implements focus set management as specified in DESIGN.md
  */
-import {sortByPriority} from '../../util/common.js';
+import {sortByPriority, clamp} from '../../util/common.js';
 
 export class Focus {
     constructor(config = {}) {
@@ -240,7 +240,7 @@ class FocusSet {
      * @param {number} delta - Change in attention score
      */
     updateAttention(delta) {
-        this._attentionScore = Math.max(0, Math.min(1, this._attentionScore + delta));
+        this._attentionScore = clamp(this._attentionScore + delta, 0, 1);
     }
 
     /**

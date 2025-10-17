@@ -1,6 +1,7 @@
 import {Concept} from './Concept.js';
 import {MemoryIndex} from './MemoryIndex.js';
 import {MemoryConsolidation} from './MemoryConsolidation.js';
+import {clamp} from '../../util/common.js';
 
 export class Memory {
     static get SCORING_WEIGHTS() {
@@ -112,8 +113,8 @@ export class Memory {
         const {activation: activationWeight, useCount: useCountWeight, taskCount: taskCountWeight} = Memory.SCORING_WEIGHTS;
         const {useCount: useLimit, taskCount: taskLimit} = Memory.NORMALIZATION_LIMITS;
         
-        const normalizedUseCount = Math.min(concept.useCount / useLimit, 1);
-        const normalizedTaskCount = Math.min(concept.totalTasks / taskLimit, 1);
+        const normalizedUseCount = clamp(concept.useCount / useLimit, 0, 1);
+        const normalizedTaskCount = clamp(concept.totalTasks / taskLimit, 0, 1);
         const score = concept.activation * activationWeight +
             normalizedUseCount * useCountWeight +
             normalizedTaskCount * taskCountWeight;
