@@ -27,9 +27,10 @@ export class Term {
   /**
    * @private
    */
-  constructor(type, name, components = []) {
+  constructor(type, name, components = [], operator = null) {
     this._type = type;
     this._name = name; // The canonical string representation
+    this._operator = operator;
     this._components = Object.freeze([...components]);
 
     // Pre-calculate and cache complexity and hash
@@ -51,7 +52,7 @@ export class Term {
       components.sort((a, b) => a.name.localeCompare(b.name));
     }
     const name = Term.buildCompoundName(operator, components);
-    return new Term(TermType.COMPOUND, name, components);
+    return new Term(TermType.COMPOUND, name, components, operator);
   }
 
   // --- Getters ---
@@ -62,6 +63,10 @@ export class Term {
 
   get name() {
     return this._name;
+  }
+
+  get operator() {
+    return this._operator;
   }
 
   get components() {
@@ -118,16 +123,15 @@ export class Term {
   }
 
   static buildCompoundName(operator, components) {
-    const componentNames = components.map(c => c.name).join(', ');
-
-    // Infix operators
+    // Infix operators (A --> B)
     if (['-->', '<->', '==>', '<=>'].includes(operator)) {
-        if (components.length !== 2) throw new Error(`Operator ${operator} requires 2 components.`);
-        return `(${components[0].name} ${operator} ${components[1].name})`;
+      if (components.length !== 2) throw new Error(`Operator ${operator} requires 2 components.`);
+      return `(${components[0].name} ${operator} ${components[1].name})`;
     }
 
-    // Prefix operators
-    return `(${operator} ${componentNames})`;
+    // Prefix operators (&, A, B)
+    const componentNames = components.map(c => c.name).join(' ');
+    return `(${operator}${componentNames ? ' ' + componentNames : ''})`;
   }
 
   static computeHash(str) {

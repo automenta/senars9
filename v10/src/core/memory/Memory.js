@@ -42,7 +42,7 @@ export class Memory {
    */
   addTask(task, currentTime = Date.now()) {
     if (!task || !task.term) {
-      return false; // Do not add invalid tasks
+      return false;
     }
     const term = task.term;
 
@@ -75,6 +75,9 @@ export class Memory {
    * @returns {Concept|null} - Concept or null if not found
    */
   getConcept(term) {
+    if (!term) {
+      return null;
+    }
     return this._concepts.get(term) || null;
   }
 
@@ -269,6 +272,9 @@ export class Memory {
    */
   getDetailedStats() {
     const conceptStats = this.getAllConcepts().map(c => c.getStats());
+    const oldestConcept = conceptStats.length > 0 ? Math.min(...conceptStats.map(s => s.createdAt)) : null;
+    const newestConcept = conceptStats.length > 0 ? Math.max(...conceptStats.map(s => s.createdAt)) : null;
+
 
     return {
       ...this._stats,
@@ -278,8 +284,8 @@ export class Memory {
         focusConcepts: this._focusConcepts.size,
         totalTasks: this._stats.totalTasks
       },
-      oldestConcept: Math.min(...conceptStats.map(s => s.createdAt)),
-      newestConcept: Math.max(...conceptStats.map(s => s.createdAt)),
+      oldestConcept,
+      newestConcept,
       averageActivation: conceptStats.length > 0 ?
         conceptStats.reduce((sum, s) => sum + s.activation, 0) / conceptStats.length : 0,
       averageQuality: conceptStats.length > 0 ?

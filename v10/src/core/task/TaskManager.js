@@ -59,7 +59,7 @@ export class TaskManager {
 
       if (addedToMemory) {
         // Add to focus if priority is high enough
-        if (task.priority >= this._config.priorityThreshold) {
+        if (this._focus && task.priority >= this._config.priorityThreshold) {
           this._focus.addTaskToFocus(task, task.priority);
         }
 
@@ -311,9 +311,13 @@ export class TaskManager {
         }
 
         // Priority distribution
-        if (task.priority < 0.3) priorityDistribution.low++;
-        else if (task.priority < 0.7) priorityDistribution.medium++;
-        else priorityDistribution.high++;
+        if (task.priority < 0.3) {
+            priorityDistribution.low++;
+        } else if (task.priority < 0.7) {
+            priorityDistribution.medium++;
+        } else {
+            priorityDistribution.high++;
+        }
 
         totalPriority += task.priority;
 

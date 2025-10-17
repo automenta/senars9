@@ -1,4 +1,5 @@
-import { Task, TruthValue } from '../../../src/core/task/Task.js';
+import { Task } from '../../../src/core/task/Task.js';
+import { Truth } from '../../../src/core/Truth.js';
 import { Stamp } from '../../../src/core/task/Stamp.js';
 import { Term } from '../../../src/core/term/Term.js';
 
@@ -10,7 +11,7 @@ describe('Task', () => {
   });
 
   test('should create tasks with correct properties', () => {
-    const truth = new TruthValue(0.9, 0.8);
+    const truth = new Truth(0.9, 0.8);
     const task = new Task({ term, type: 'BELIEF', truth });
 
     expect(task.term).toBe(term);
@@ -42,7 +43,7 @@ describe('Task', () => {
     expect(task2.priority).toBe(0.8);
     expect(task2.term).toBe(task1.term);
 
-    const truth = new TruthValue(0.9, 0.9);
+    const truth = new Truth(0.9, 0.9);
     const task3 = task2.withTruth(truth);
     expect(task2.truth).toBeNull();
     expect(task3.truth).toBe(truth);
@@ -65,9 +66,9 @@ describe('Task', () => {
   });
 
   test('should implement proper equality comparison', () => {
-    const truth1 = new TruthValue(0.9, 0.9);
-    const truth2 = new TruthValue(0.9, 0.9);
-    const truth3 = new TruthValue(0.8, 0.8);
+    const truth1 = new Truth(0.9, 0.9);
+    const truth2 = new Truth(0.9, 0.9);
+    const truth3 = new Truth(0.8, 0.8);
 
     const task1 = new Task({ term, type: 'BELIEF', truth: truth1 });
     const task2 = new Task({ term, type: 'BELIEF', truth: truth2 }); // Same content

@@ -17,9 +17,9 @@ export class Concept {
     this._questions = new Bag(config.maxQuestions || 20);
 
     // Concept metadata
-    this._activation = 0.5; // Base activation level
+    this._activation = 0; // Base activation level
     this._useCount = 0; // How many times this concept has been used
-    this._quality = 0.5; // Quality measure based on successful inferences
+    this._quality = 0; // Quality measure based on successful inferences
 
     // Note: Not freezing to allow internal property updates for performance
   }
@@ -208,6 +208,11 @@ export class Concept {
   boostActivation(activationBoost = 0.1) {
     this._activation = Math.min(1.0, this._activation + activationBoost);
     this._lastAccessed = Date.now();
+    this.incrementUseCount();
+  }
+
+  incrementUseCount() {
+    this._useCount++;
   }
 
   /**

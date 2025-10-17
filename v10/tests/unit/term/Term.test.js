@@ -89,8 +89,8 @@ describe('Term', () => {
     const term2 = Term.createCompound('&,', [atomB, atomA]);
 
     // Name should be identical due to canonical sorting
-    expect(term1.name).toBe('(&, A, B)');
-    expect(term2.name).toBe('(&, A, B)');
+    expect(term1.name).toBe('(&, A B)');
+    expect(term2.name).toBe('(&, A B)');
     expect(term1.equals(term2)).toBe(true);
   });
 

@@ -1,17 +1,6 @@
 import { Stamp } from './Stamp.js';
 import { Term } from '../term/Term.js';
-
-// Placeholder for TruthValue class as per DESIGN.md
-export class TruthValue {
-  constructor(frequency, confidence) {
-    this.frequency = frequency;
-    this.confidence = confidence;
-    Object.freeze(this);
-  }
-  equals(other) {
-    return other && this.frequency === other.frequency && this.confidence === other.confidence;
-  }
-}
+import { Truth } from '../Truth.js';
 
 /**
  * Task class - represents units of work or information.
