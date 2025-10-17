@@ -64,12 +64,11 @@ export const createGoalDecompositionRule = (dependencies, config = {}) => {
     prompt: (context) => {
       const task = extractTaskFromContext(context);
       const termStr = task.term.toString();
-      return `Decompose the following high-level goal into ${finalConfig.minSubGoals} to ${finalConfig.maxSubGoals} smaller, concrete sub-goals.
-Each sub-goal must be a single, actionable step.
+      return `Decompose the following goal into ${finalConfig.minSubGoals} to ${finalConfig.maxSubGoals} smaller, actionable sub-goals.
 
 Goal: "${termStr}"
 
-Provide the sub-goals as a plain list, one per line.`;
+Output: List of subgoals, one per line`;
     },
 
     process: (lmResponse) => {
