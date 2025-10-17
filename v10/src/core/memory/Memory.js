@@ -1,52 +1,29 @@
-/**
- * Memory class - Central memory component with dual architecture
- * Manages concepts, tasks, and implements focus/long-term memory separation
- */
-
 import { Concept } from './Concept.js';
 
 export class Memory {
-  constructor(config) {
-    this._config = config;
+ constructor(config) {
+   this._config = config;
+   this._concepts = new Map();
+   this._focusConcepts = new Set();
+   this._stats = {
+     totalConcepts: 0,
+     totalTasks: 0,
+     focusConceptsCount: 0,
+     createdAt: Date.now(),
+     lastConsolidation: Date.now()
+   };
+   this._cyclesSinceConsolidation = 0;
+ }
 
-    // Long-term memory: Map<Term, Concept> for efficient lookup
-    this._concepts = new Map();
+ get concepts() { return new Map(this._concepts); }
+ get focusConcepts() { return new Set(this._focusConcepts); }
+ get stats() { return { ...this._stats }; }
+ get config() { return this._config; }
 
-    // Focus memory (short-term): Set of active concepts
-    this._focusConcepts = new Set();
-
-    // Statistics
-    this._stats = {
-      totalConcepts: 0,
-      totalTasks: 0,
-      focusConceptsCount: 0,
-      createdAt: Date.now(),
-      lastConsolidation: Date.now()
-    };
-
-    // Consolidation tracking
-    this._cyclesSinceConsolidation = 0;
-  }
-
-  // Getters
-  get concepts() { return new Map(this._concepts); } // Return copy for immutability
-  get focusConcepts() { return new Set(this._focusConcepts); }
-  get stats() { return { ...this._stats }; }
-  get config() { return this._config; }
-
-  /**
-   * Add or update a task in memory
-   * @param {Task} task - The task to add
-   * @param {number} currentTime - Current timestamp
-   * @returns {boolean} - True if task was added successfully
-   */
   addTask(task, currentTime = Date.now()) {
-    if (!task || !task.term) {
-      return false;
-    }
+    if (!task || !task.term) return false;
     const term = task.term;
 
-    // Get or create concept for this term
     let concept = this._concepts.get(term);
     if (!concept) {
       concept = new Concept(term, this._config);
@@ -54,44 +31,25 @@ export class Memory {
       this._stats.totalConcepts++;
     }
 
-    // Add task to concept
     const added = concept.addTask(task);
     if (added) {
       this._stats.totalTasks++;
-
-      // Add to focus memory if priority is high enough
-      if (task.priority >= this._config.priorityThreshold) {
-        this._focusConcepts.add(concept);
-        this._stats.focusConceptsCount = this._focusConcepts.size;
-      }
+      task.priority >= this._config.priorityThreshold && (
+        this._focusConcepts.add(concept),
+        this._stats.focusConceptsCount = this._focusConcepts.size
+      );
     }
-
     return added;
   }
 
-  /**
-   * Get concept for a specific term
-   * @param {Term} term - The term to look up
-   * @returns {Concept|null} - Concept or null if not found
-   */
   getConcept(term) {
-    if (!term) {
-      return null;
-    }
-    // Try direct lookup first (using object identity)
+    if (!term) return null;
     let concept = this._concepts.get(term);
-    if (concept) {
-      return concept;
-    }
-    
-    // If direct lookup fails, try to find by logical equality
-    // This handles cases where different Term instances represent the same logical term
+    if (concept) return concept;
+
     for (let [key, value] of this._concepts) {
-      if (key.equals(term)) {
-        return value;
-      }
+      if (key.equals(term)) return value;
     }
-    
     return null;
   }
 

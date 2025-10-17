@@ -1,8 +1,3 @@
-/**
- * Abstract base class for Stamps.
- * A Stamp tracks the origin and derivation history of a Task.
- * This class is strictly immutable.
- */
 export class Stamp {
   constructor() {
     if (this.constructor === Stamp) {
@@ -10,7 +5,6 @@ export class Stamp {
     }
   }
 
-  // Abstract methods to be implemented by subclasses
   derive(parentStamps) {
     throw new Error("Method 'derive()' must be implemented.");
   }
@@ -22,39 +16,47 @@ export class Stamp {
   toString() {
     throw new Error("Method 'toString()' must be implemented.");
   }
+
+  static createInput(creationTime = Date.now(), occurrenceTime = Date.now()) {
+    return new ArrayStamp(Stamp.generateId(creationTime), occurrenceTime, 'INPUT', []);
+  }
+
+  get fromConcept() { return null; }
+
+  static createDerived(parentStamps = [], fromConcept = null) {
+    const creationTime = Date.now();
+    const occurrenceTime = creationTime;
+    const id = Stamp.generateId(creationTime, parentStamps.map(s => s.id));
+    const derivations = parentStamps.map(s => s.id);
+    return new ArrayStamp(id, occurrenceTime, 'DERIVED', derivations);
+  }
+
+  static generateId(timestamp, parentIds = []) {
+    const randomPart = Math.random().toString(36).substring(2, 9);
+    const parentPart = parentIds.join('-').substring(0, 10);
+    return `${timestamp}-${parentPart}-${randomPart}`;
+  }
 }
 
-/**
- * An array-based implementation of Stamp.
- */
 export class ArrayStamp extends Stamp {
   constructor(id, occurrenceTime, source, derivations = []) {
     super();
     this._id = id;
     this._occurrenceTime = occurrenceTime;
+    this._creationTime = occurrenceTime; // For compatibility with Task class
     this._source = source;
     this._derivations = Object.freeze(derivations);
     Object.freeze(this);
   }
 
-  get id() {
-    return this._id;
-  }
-
-  get occurrenceTime() {
-    return this._occurrenceTime;
-  }
-
-  get source() {
-    return this._source;
-  }
-
-  get derivations() {
-    return this._derivations;
-  }
+  get id() { return this._id; }
+  get occurrenceTime() { return this._occurrenceTime; }
+  get creationTime() { return this._creationTime; }
+  get source() { return this._source; }
+  get derivations() { return this._derivations; }
 
   static derive(parentStamps) {
-    const newId = Math.random().toString(36).substring(2); // Simplified ID generation
+    const newId = Math.random().toString(36).substring(2);
     const newTime = Date.now();
     const newDerivations = [...new Set(parentStamps.flatMap(p => [p.id, ...p.derivations]))];
     return new ArrayStamp(newId, newTime, 'INFERENCE', newDerivations);
@@ -65,19 +67,13 @@ export class ArrayStamp extends Stamp {
   }
 
   toString() {
-    return `Stamp(id=${this.id}, time=${this.occurrenceTime}, source=${this.source})`;
+    return `Stamp(${this.id},${this.occurrenceTime},${this.source})`;
   }
 }
 
-/**
- * A bloom-filter-based implementation of Stamp.
- * This is a placeholder for future development.
- */
 export class BloomStamp extends Stamp {
   constructor() {
     super();
     throw new Error("BloomStamp is not yet implemented.");
   }
-
-  // In the future, this would use a bloom filter for efficient derivation tracking.
 }

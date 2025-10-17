@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import { TaskManager } from '../../../src/core/task/TaskManager.js';
 import { Task } from '../../../src/core/task/Task.js';
 import { Term } from '../../../src/core/term/Term.js';
-import { Stamp } from '../../../src/core/task/Stamp.js';
+import { Stamp } from '../../../src/core/Stamp.js';
 import { TermFactory } from '../../../src/core/term/TermFactory.js';
 
 describe('TaskManager', () => {
@@ -246,9 +246,9 @@ describe('TaskManager', () => {
     const term = newAtom('A');
     const now = Date.now();
     const tasks = [
-        new Task({ term, type: 'BELIEF', stamp: Stamp.createInput(now - 1000) }),
-        new Task({ term, type: 'BELIEF', stamp: Stamp.createInput(now - 500) }),
-        new Task({ term, type: 'BELIEF', stamp: Stamp.createInput(now - 2000) })
+        new Task({ term, type: 'BELIEF', stamp: Stamp.createInput(now - 1000, now - 1000) }),
+        new Task({ term, type: 'BELIEF', stamp: Stamp.createInput(now - 500, now - 500) }),
+        new Task({ term, type: 'BELIEF', stamp: Stamp.createInput(now - 2000, now - 2000) })
     ];
 
     const mockConcept = {

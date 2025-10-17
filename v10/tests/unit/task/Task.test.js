@@ -1,6 +1,6 @@
 import { Task } from '../../../src/core/task/Task.js';
 import { Truth } from '../../../src/core/Truth.js';
-import { Stamp } from '../../../src/core/task/Stamp.js';
+import { Stamp } from '../../../src/core/Stamp.js';
 import { Term } from '../../../src/core/term/Term.js';
 import { TermFactory } from '../../../src/core/term/TermFactory.js';
 

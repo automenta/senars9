@@ -1,190 +1,93 @@
-/**
- * Concept class - Represents a concept in memory, holds related tasks
- * Implements knowledge organization as specified in DESIGN.md
- */
-
 import { Bag } from './Bag.js';
 
 export class Concept {
-  constructor(term, config = {}) {
-    this._term = term;
-    this._createdAt = Date.now();
-    this._lastAccessed = Date.now();
+ constructor(term, config = {}) {
+   this._term = term;
+   this._createdAt = Date.now();
+   this._lastAccessed = Date.now();
+   this._beliefs = new Bag(config.maxBeliefs || 100);
+   this._goals = new Bag(config.maxGoals || 50);
+   this._questions = new Bag(config.maxQuestions || 20);
+   this._activation = 0;
+   this._useCount = 0;
+   this._quality = 0;
+ }
 
-    // Task storage by type
-    this._beliefs = new Bag(config.maxBeliefs || 100);
-    this._goals = new Bag(config.maxGoals || 50);
-    this._questions = new Bag(config.maxQuestions || 20);
+ get term() { return this._term; }
+ get createdAt() { return this._createdAt; }
+ get lastAccessed() { return this._lastAccessed; }
+ get activation() { return this._activation; }
+ get useCount() { return this._useCount; }
+ get quality() { return this._quality; }
+ get beliefs() { return this._beliefs; }
+ get goals() { return this._goals; }
+ get questions() { return this._questions; }
 
-    // Concept metadata
-    this._activation = 0; // Base activation level
-    this._useCount = 0; // How many times this concept has been used
-    this._quality = 0; // Quality measure based on successful inferences
-
-    // Note: Not freezing to allow internal property updates for performance
-  }
-
-  // Getters
-  get term() { return this._term; }
-  get createdAt() { return this._createdAt; }
-  get lastAccessed() { return this._lastAccessed; }
-  get activation() { return this._activation; }
-  get useCount() { return this._useCount; }
-  get quality() { return this._quality; }
-
-  // Task storage getters
-  get beliefs() { return this._beliefs; }
-  get goals() { return this._goals; }
-  get questions() { return this._questions; }
-
-  // Computed properties
   get totalTasks() {
     return this._beliefs.size + this._goals.size + this._questions.size;
   }
 
   get averagePriority() {
     if (this.totalTasks === 0) return 0;
-
     const totalPriority = this._beliefs.getAveragePriority() * this._beliefs.size +
                         this._goals.getAveragePriority() * this._goals.size +
                         this._questions.getAveragePriority() * this._questions.size;
-
     return totalPriority / this.totalTasks;
   }
 
-  /**
-   * Add a task to the appropriate storage based on its type
-   * @param {Task} task - The task to add
-   * @returns {boolean} - True if task was added successfully
-   */
-  addTask(task) {
-    const taskType = task.type;
-    let storage;
-
+  _getStorage(taskType) {
     switch (taskType) {
-      case 'BELIEF':
-        storage = this._beliefs;
-        break;
-      case 'GOAL':
-        storage = this._goals;
-        break;
-      case 'QUESTION':
-        storage = this._questions;
-        break;
-      default:
-        throw new Error(`Unknown task type: ${taskType}`);
+      case 'BELIEF': return this._beliefs;
+      case 'GOAL': return this._goals;
+      case 'QUESTION': return this._questions;
+      default: throw new Error(`Unknown task type: ${taskType}`);
     }
+  }
 
+  addTask(task) {
+    const storage = this._getStorage(task.type);
     const added = storage.add(task, task.priority);
-
     if (added) {
-      // Create new concept with updated access time and use count
       this._lastAccessed = Date.now();
       this._useCount++;
     }
-
     return added;
   }
 
-  /**
-   * Get the highest priority task of a specific type
-   * @param {string} taskType - Type of task (BELIEF, GOAL, QUESTION)
-   * @returns {Task|null} - Highest priority task or null if none found
-   */
   getHighestPriorityTask(taskType) {
-    switch (taskType) {
-      case 'BELIEF':
-        return this._beliefs.peek();
-      case 'GOAL':
-        return this._goals.peek();
-      case 'QUESTION':
-        return this._questions.peek();
-      default:
-        return null;
+    try {
+      return this._getStorage(taskType).peek();
+    } catch {
+      return null;
     }
   }
 
-  /**
-   * Get all tasks of a specific type in priority order
-   * @param {string} taskType - Type of task (BELIEF, GOAL, QUESTION)
-   * @returns {Array} - Array of tasks in priority order
-   */
   getTasksByType(taskType) {
-    switch (taskType) {
-      case 'BELIEF':
-        return this._beliefs.getItemsInPriorityOrder();
-      case 'GOAL':
-        return this._goals.getItemsInPriorityOrder();
-      case 'QUESTION':
-        return this._questions.getItemsInPriorityOrder();
-      default:
-        return [];
+    try {
+      return this._getStorage(taskType).getItemsInPriorityOrder();
+    } catch {
+      return [];
     }
   }
 
-  /**
-   * Remove a specific task from the concept
-   * @param {Task} task - The task to remove
-   * @returns {boolean} - True if task was found and removed
-   */
   removeTask(task) {
-    const taskType = task.type;
-    let storage;
-
-    switch (taskType) {
-      case 'BELIEF':
-        storage = this._beliefs;
-        break;
-      case 'GOAL':
-        storage = this._goals;
-        break;
-      case 'QUESTION':
-        storage = this._questions;
-        break;
-      default:
-        return false;
+    try {
+      const removed = this._getStorage(task.type).remove(task);
+      if (removed) this._lastAccessed = Date.now();
+      return removed;
+    } catch {
+      return false;
     }
-
-    const removed = storage.remove(task);
-
-    if (removed) {
-      this._lastAccessed = Date.now();
-    }
-
-    return removed;
   }
 
-  /**
-   * Update the priority of a specific task
-   * @param {Task} task - The task to update
-   * @param {number} newPriority - New priority value
-   * @returns {boolean} - True if task was found and updated
-   */
   updateTaskPriority(task, newPriority) {
-    const taskType = task.type;
-    let storage;
-
-    switch (taskType) {
-      case 'BELIEF':
-        storage = this._beliefs;
-        break;
-      case 'GOAL':
-        storage = this._goals;
-        break;
-      case 'QUESTION':
-        storage = this._questions;
-        break;
-      default:
-        return false;
+    try {
+      const updated = this._getStorage(task.type).updatePriority(task, newPriority);
+      if (updated) this._lastAccessed = Date.now();
+      return updated;
+    } catch {
+      return false;
     }
-
-    const updated = storage.updatePriority(task, newPriority);
-
-    if (updated) {
-      this._lastAccessed = Date.now();
-    }
-
-    return updated;
   }
 
   /**

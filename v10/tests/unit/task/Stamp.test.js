@@ -1,4 +1,4 @@
-import { Stamp } from '../../../src/core/task/Stamp.js';
+import { Stamp, ArrayStamp } from '../../../src/core/Stamp.js';
 
 describe('Stamp', () => {
   test('should create a new Stamp instance with correct properties', () => {
