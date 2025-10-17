@@ -54,7 +54,12 @@ export class Bag {
         const newItems = new Map();
         for (const [item, priority] of this._items.entries()) {
             const newPriority = priority * (1 - decayRate);
-            newItems.set(item.withPriority(newPriority), newPriority);
+            if (typeof item.withPriority === 'function') {
+                newItems.set(item.withPriority(newPriority), newPriority);
+            } else {
+                // If item doesn't support priority update, keep original
+                newItems.set(item, newPriority);
+            }
         }
         this._items = newItems;
     }

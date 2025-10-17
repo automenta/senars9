@@ -3,7 +3,7 @@
  * Orchestrates task selection, rule application, and memory updates
  */
 
-import { Logger } from '../../util/Logger.js';
+import {Logger} from '../../util/Logger.js';
 
 export class Cycle {
     constructor({memory, focus, ruleEngine, taskManager, config}) {
@@ -122,10 +122,10 @@ export class Cycle {
             try {
                 // Get applicable rules for this task and apply them
                 const applicableRules = this._ruleEngine.getApplicableRules(task);
-                
+
                 for (const rule of applicableRules) {
                     const ruleResults = await this._ruleEngine.applyRule(rule, task);
-                    
+
                     if (ruleResults?.length > 0) {
                         newInferences.push(...ruleResults);
                         this._stats.totalRulesApplied += ruleResults.length;

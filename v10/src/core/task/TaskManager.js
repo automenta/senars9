@@ -115,14 +115,14 @@ export class TaskManager {
      */
     _collectTasksFromAllConcepts(filterFn = null) {
         const allTasks = [];
-        
+
         for (const concept of this._memory.getAllConcepts()) {
-            const conceptTasks = filterFn ? 
-                concept.getAllTasks().filter(filterFn) : 
+            const conceptTasks = filterFn ?
+                concept.getAllTasks().filter(filterFn) :
                 concept.getAllTasks();
             allTasks.push(...conceptTasks);
         }
-        
+
         return allTasks;
     }
 
@@ -172,7 +172,7 @@ export class TaskManager {
     getHighestPriorityTasks(limit = 10) {
         // Use the helper method to collect all tasks
         const allTasks = this._collectTasksFromAllConcepts();
-        
+
         // Sort by priority (highest first)
         allTasks.sort((a, b) => b.priority - a.priority);
 
@@ -223,7 +223,7 @@ export class TaskManager {
         } = criteria;
 
         const currentTime = Date.now();
-        
+
         // Use the helper method with combined filter
         let allTasks = this._collectTasksFromAllConcepts(task => {
             return task.priority >= minPriority &&

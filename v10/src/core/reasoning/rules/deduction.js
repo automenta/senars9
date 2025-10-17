@@ -25,8 +25,8 @@ export class DeductionRule extends NALRule {
 
     _matches(task) {
         return task.term.isCompound &&
-               task.term.operator === '-->' &&
-               super._matches(task);
+            task.term.operator === '-->' &&
+            super._matches(task);
     }
 
     async _deriveFromPremise(premise, task) {

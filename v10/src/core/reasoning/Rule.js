@@ -10,7 +10,7 @@ export class Rule {
         this._id = id;
         this._type = type;
         this._priority = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
-        this._config = Object.freeze({ ...config });
+        this._config = Object.freeze({...config});
         this._enabled = config.enabled !== false;
         this._metrics = Object.freeze({
             applications: 0, successes: 0, failures: 0, totalTime: 0, createdAt: Date.now()
@@ -20,23 +20,47 @@ export class Rule {
         Object.freeze(this);
     }
 
-    get id() { return this._id; }
-    get type() { return this._type; }
-    get priority() { return this._priority; }
-    get enabled() { return this._enabled; }
-    get config() { return this._config; }
-    get metrics() { return this._metrics; }
+    get id() {
+        return this._id;
+    }
+
+    get type() {
+        return this._type;
+    }
+
+    get priority() {
+        return this._priority;
+    }
+
+    get enabled() {
+        return this._enabled;
+    }
+
+    get config() {
+        return this._config;
+    }
+
+    get metrics() {
+        return this._metrics;
+    }
 
     // Immutable state modifiers
-    enable() { return this._enabled ? this : this._clone({ enabled: true }); }
-    disable() { return this._enabled ? this._clone({ enabled: false }) : this; }
+    enable() {
+        return this._enabled ? this : this._clone({enabled: true});
+    }
+
+    disable() {
+        return this._enabled ? this._clone({enabled: false}) : this;
+    }
+
     withPriority(priority) {
         const clamped = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
-        return clamped === this._priority ? this : this._clone({ priority: clamped });
+        return clamped === this._priority ? this : this._clone({priority: clamped});
     }
+
     withConfig(config) {
-        const merged = { ...this._config, ...config };
-        return this._config === merged ? this : this._clone({ config: merged });
+        const merged = {...this._config, ...config};
+        return this._config === merged ? this : this._clone({config: merged});
     }
 
     canApply(task) {
@@ -49,21 +73,26 @@ export class Rule {
         const start = performance.now();
         try {
             const results = this._apply(task);
-            return { results, rule: this._updateMetrics(true, performance.now() - start) };
+            return {results, rule: this._updateMetrics(true, performance.now() - start)};
         } catch (error) {
-            throw { error, rule: this._updateMetrics(false, performance.now() - start) };
+            throw {error, rule: this._updateMetrics(false, performance.now() - start)};
         }
     }
 
     // Template methods
-    _matches(task) { return true; }
-    _apply(task) { return []; }
+    _matches(task) {
+        return true;
+    }
+
+    _apply(task) {
+        return [];
+    }
 
     // Internal utilities
     _clone(overrides = {}) {
         const Constructor = this.constructor;
         const baseArgs = [this._id, this._type, this._priority];
-        const configArg = { ...this._config, ...overrides };
+        const configArg = {...this._config, ...overrides};
 
         // Handle different constructor signatures for subclasses
         return Constructor.length === 4
@@ -73,6 +102,6 @@ export class Rule {
 
     _updateMetrics(success, time) {
         const metrics = Metrics.update(this._metrics, success, time);
-        return this._clone({ metrics });
+        return this._clone({metrics});
     }
 }

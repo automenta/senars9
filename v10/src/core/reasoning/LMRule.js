@@ -1,6 +1,6 @@
-import { Logger } from '../../util/Logger.js';
-import { Rule } from './Rule.js';
-import { LM } from '../config/constants.js';
+import {Logger} from '../../util/Logger.js';
+import {Rule} from './Rule.js';
+import {LM} from '../config/constants.js';
 
 export class LMRule extends Rule {
     constructor(id, promptTemplate, responseProcessor, priority = 1.0, config = {}) {
@@ -17,12 +17,25 @@ export class LMRule extends Rule {
         Object.freeze(this);
     }
 
-    get promptTemplate() { return this._promptTemplate; }
-    get responseProcessor() { return this._responseProcessor; }
-    get lmConfig() { return { ...this._lmConfig }; }
+    get promptTemplate() {
+        return this._promptTemplate;
+    }
 
-    _matches(task) { return this._enabled && this._isRelevant(task); }
-    _isRelevant(task) { return true; }
+    get responseProcessor() {
+        return this._responseProcessor;
+    }
+
+    get lmConfig() {
+        return {...this._lmConfig};
+    }
+
+    _matches(task) {
+        return this._enabled && this._isRelevant(task);
+    }
+
+    _isRelevant(task) {
+        return true;
+    }
 
     async _apply(task) {
         try {
@@ -49,7 +62,9 @@ export class LMRule extends Rule {
         );
     }
 
-    _getContext(task) { return `Task: ${task.term.toString()}, Type: ${task.type}`; }
+    _getContext(task) {
+        return `Task: ${task.term.toString()}, Type: ${task.type}`;
+    }
 
     async _callLanguageModel(prompt) {
         if (this._config.mock) return this._mockLMResponse(prompt);
@@ -59,7 +74,7 @@ export class LMRule extends Rule {
     _mockLMResponse(prompt) {
         return Promise.resolve({
             content: `Based on the task "${prompt.substring(0, LM.MOCK_CONTENT_TRUNCATION)}...", I think...`,
-            usage: { tokens: LM.MOCK_RESPONSE_TOKENS },
+            usage: {tokens: LM.MOCK_RESPONSE_TOKENS},
             model: this._lmConfig.model
         });
     }
@@ -72,10 +87,18 @@ export class LMRule extends Rule {
     }
 
     withConfig(newConfig) {
-        return this._clone({ ...newConfig });
+        return this._clone({...newConfig});
     }
 
-    withTemperature(temperature) { return this.withConfig({ lm: { ...this._lmConfig, temperature } }); }
-    withMaxTokens(maxTokens) { return this.withConfig({ lm: { ...this._lmConfig, maxTokens } }); }
-    withModel(model) { return this.withConfig({ lm: { ...this._lmConfig, model } }); }
+    withTemperature(temperature) {
+        return this.withConfig({lm: {...this._lmConfig, temperature}});
+    }
+
+    withMaxTokens(maxTokens) {
+        return this.withConfig({lm: {...this._lmConfig, maxTokens}});
+    }
+
+    withModel(model) {
+        return this.withConfig({lm: {...this._lmConfig, model}});
+    }
 }

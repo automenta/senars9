@@ -13,14 +13,6 @@ export class Truth {
         return this._c;
     }
 
-    equals(other) {
-        return other instanceof Truth && this.f === other.f && this.c === other.c;
-    }
-
-    toString() {
-        return `%${this.f.toFixed(2)};${this.c.toFixed(2)}%`;
-    }
-
     // Static methods for truth value operations
     static deduction(t1, t2) {
         const f = t1.f * t2.f;
@@ -48,5 +40,13 @@ export class Truth {
 
     static _weak(c) {
         return c / (c + 1.0);
+    }
+
+    equals(other) {
+        return other instanceof Truth && this.f === other.f && this.c === other.c;
+    }
+
+    toString() {
+        return `%${this.f.toFixed(2)};${this.c.toFixed(2)}%`;
     }
 }

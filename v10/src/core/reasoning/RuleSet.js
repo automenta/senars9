@@ -6,10 +6,21 @@ export class RuleSet {
         Object.freeze(this);
     }
 
-    get name() { return this._name; }
-    get rules() { return Array.from(this._rules); }
-    get enabled() { return this._enabled; }
-    get size() { return this._rules.size; }
+    get name() {
+        return this._name;
+    }
+
+    get rules() {
+        return Array.from(this._rules);
+    }
+
+    get enabled() {
+        return this._enabled;
+    }
+
+    get size() {
+        return this._rules.size;
+    }
 
     add(rule) {
         if (!rule || typeof rule.id !== 'string') return this;
@@ -21,16 +32,35 @@ export class RuleSet {
     remove(ruleId) {
         const newRules = new Set(this._rules);
         for (const rule of newRules) {
-            if (rule.id === ruleId) { newRules.delete(rule); break; }
+            if (rule.id === ruleId) {
+                newRules.delete(rule);
+                break;
+            }
         }
         return new RuleSet(this._name, newRules);
     }
 
-    has(ruleId) { return Array.from(this._rules).some(rule => rule.id === ruleId); }
+    has(ruleId) {
+        return Array.from(this._rules).some(rule => rule.id === ruleId);
+    }
 
-    enable() { return new RuleSet(this._name, this._rules); }
-    disable() { return new RuleSet(this._name, this._rules); }
-    filter(predicate) { return new RuleSet(`${this._name}_filtered`, this._rules.filter(predicate)); }
-    forEach(callback) { this._rules.forEach(callback); }
-    map(callback) { return Array.from(this._rules).map(callback); }
+    enable() {
+        return new RuleSet(this._name, this._rules);
+    }
+
+    disable() {
+        return new RuleSet(this._name, this._rules);
+    }
+
+    filter(predicate) {
+        return new RuleSet(`${this._name}_filtered`, this._rules.filter(predicate));
+    }
+
+    forEach(callback) {
+        this._rules.forEach(callback);
+    }
+
+    map(callback) {
+        return Array.from(this._rules).map(callback);
+    }
 }

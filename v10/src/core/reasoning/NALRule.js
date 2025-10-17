@@ -1,5 +1,4 @@
 import {Rule} from './Rule.js';
-import {TruthFunctions} from '../term/operations.js';
 import {Term} from '../term/Term.js';
 
 export class NALRule extends Rule {
@@ -11,9 +10,17 @@ export class NALRule extends Rule {
         Object.freeze(this);
     }
 
-    get premises() { return this._premises; }
-    get conclusion() { return this._conclusion; }
-    get truthFunction() { return this._truthFunction; }
+    get premises() {
+        return this._premises;
+    }
+
+    get conclusion() {
+        return this._conclusion;
+    }
+
+    get truthFunction() {
+        return this._truthFunction;
+    }
 
     _matches(task) {
         return this._premises.length > 0 && this._premises.some(premise => this._matchesPattern(premise, task.term));
@@ -53,7 +60,13 @@ export class NALRule extends Rule {
 
         if (!derivedTerm || !derivedTruth) return [];
 
-        return [{ term: derivedTerm, truth: derivedTruth, type: task.type, stamp: task.stamp, priority: task.priority * this.priority }];
+        return [{
+            term: derivedTerm,
+            truth: derivedTruth,
+            type: task.type,
+            stamp: task.stamp,
+            priority: task.priority * this.priority
+        }];
     }
 
     _unifyPatterns(pattern, term) {

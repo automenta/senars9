@@ -1,7 +1,7 @@
-import { Logger } from '../../util/Logger.js';
-import { Rule } from './Rule.js';
-import { RuleSet } from './RuleSet.js';
-import { Metrics } from '../util/Metrics.js';
+import {Logger} from '../../util/Logger.js';
+import {Rule} from './Rule.js';
+import {RuleSet} from './RuleSet.js';
+import {Metrics} from '../util/Metrics.js';
 
 export class RuleEngine {
     constructor(config = {}) {
@@ -14,9 +14,17 @@ export class RuleEngine {
         };
     }
 
-    get rules() { return Array.from(this._rules.values()); }
-    get ruleSets() { return Array.from(this._ruleSets.values()); }
-    get metrics() { return { ...this._metrics }; }
+    get rules() {
+        return Array.from(this._rules.values());
+    }
+
+    get ruleSets() {
+        return Array.from(this._ruleSets.values());
+    }
+
+    get metrics() {
+        return {...this._metrics};
+    }
 
     register(rule) {
         if (!(rule instanceof Rule)) throw new Error('Invalid rule type');
@@ -24,15 +32,23 @@ export class RuleEngine {
         return this;
     }
 
-    unregister(ruleId) { this._rules.delete(ruleId); return this; }
-    getRule(ruleId) { return this._rules.get(ruleId); }
+    unregister(ruleId) {
+        this._rules.delete(ruleId);
+        return this;
+    }
+
+    getRule(ruleId) {
+        return this._rules.get(ruleId);
+    }
 
     createSet(name, ruleIds = []) {
         const rules = ruleIds.map(id => this._rules.get(id)).filter(Boolean);
         return this._ruleSets.set(name, new RuleSet(name, rules)).get(name);
     }
 
-    getSet(name) { return this._ruleSets.get(name); }
+    getSet(name) {
+        return this._ruleSets.get(name);
+    }
 
     getApplicableRules(task) {
         return Array.from(this._rules.values())
@@ -41,16 +57,16 @@ export class RuleEngine {
     }
 
     applyRule(rule, task) {
-        if (!rule || !this._rules.has(rule.id)) return { results: [], rule };
+        if (!rule || !this._rules.has(rule.id)) return {results: [], rule};
 
         const startTime = Date.now();
         let success = false;
 
         try {
-            const { results, rule: updatedRule } = rule.apply(task);
+            const {results, rule: updatedRule} = rule.apply(task);
             this._rules.set(rule.id, updatedRule);
             success = true;
-            return { results, rule: updatedRule };
+            return {results, rule: updatedRule};
         } catch (error) {
             if (error.rule) this._rules.set(rule.id, error.rule);
             throw error.error || error;
@@ -60,20 +76,20 @@ export class RuleEngine {
     }
 
     applyRules(task, ruleIds = null) {
-        const rules = ruleIds ? 
-            ruleIds.map(id => this._rules.get(id)).filter(Boolean) : 
+        const rules = ruleIds ?
+            ruleIds.map(id => this._rules.get(id)).filter(Boolean) :
             this.getApplicableRules(task);
 
         const allResults = [];
         for (const rule of rules) {
             try {
-                const { results } = this.applyRule(rule, task);
+                const {results} = this.applyRule(rule, task);
                 allResults.push(...results);
             } catch (error) {
                 this.logger.warn(`Rule ${rule.id} failed:`, error);
             }
         }
-        
+
         return allResults;
     }
 
@@ -89,7 +105,11 @@ export class RuleEngine {
         return this;
     }
 
-    clear() { this._rules.clear(); this._ruleSets.clear(); return this; }
+    clear() {
+        this._rules.clear();
+        this._ruleSets.clear();
+        return this;
+    }
 
     _updateMetrics(success, time) {
         this._metrics = Metrics.update(this._metrics, success, time);

@@ -181,7 +181,7 @@ export class NarseseParser {
     }
 
     getTaskType(punct) {
-        return { '.': 'BELIEF', '!': 'GOAL', '?': 'QUESTION' }[punct] || 'BELIEF';
+        return {'.': 'BELIEF', '!': 'GOAL', '?': 'QUESTION'}[punct] || 'BELIEF';
     }
 
     getOperatorSymbol(op) {

@@ -1,10 +1,26 @@
 import {Concept} from './Concept.js';
+import {MemoryIndex} from './MemoryIndex.js';
+import {MemoryConsolidation} from './MemoryConsolidation.js';
+import {TaskPromotionManager} from './TaskPromotionManager.js';
 
 export class Memory {
     constructor(config) {
-        this._config = config;
+        if (!config) {
+            throw new Error('Memory requires a configuration object');
+        }
+        
+        this._config = {
+            priorityThreshold: 0.5,
+            priorityDecayRate: 0.01,
+            consolidationInterval: 10,
+            ...config
+        };
+        
         this._concepts = new Map();
         this._focusConcepts = new Set();
+        this._index = new MemoryIndex();
+        this._consolidation = new MemoryConsolidation();
+        this._promotionManager = new TaskPromotionManager();
         this._stats = {
             totalConcepts: 0,
             totalTasks: 0,
@@ -48,13 +64,20 @@ export class Memory {
     }
 
     addTask(task, currentTime = Date.now()) {
-        if (!task || !task.term) return false;
+        if (!task) {
+            throw new Error('Memory.addTask: task is required');
+        }
+        if (!task.term) {
+            throw new Error('Memory.addTask: task must have a term');
+        }
+        
         const term = task.term;
 
         let concept = this._concepts.get(term);
         if (!concept) {
             concept = new Concept(term, this._config);
             this._concepts.set(term, concept);
+            this._index.addConcept(concept);
             this._stats.totalConcepts++;
         }
 
@@ -70,7 +93,10 @@ export class Memory {
     }
 
     getConcept(term) {
-        if (!term) return null;
+        if (!term) {
+            throw new Error('Memory.getConcept: term is required');
+        }
+        
         let concept = this._concepts.get(term);
         if (concept) return concept;
 
@@ -101,13 +127,16 @@ export class Memory {
         const {useCount: useLimit, taskCount: taskLimit} = Memory.NORMALIZATION_LIMITS;
 
         return this.getAllConcepts()
-            .map(concept => this._calculateConceptScore(concept, activation, useCount, taskCount, useLimit, taskLimit))
+            .map(concept => this._calculateConceptScore(concept))
             .sort((a, b) => b.score - a.score)
             .slice(0, limit)
             .map(({concept}) => concept);
     }
 
-    _calculateConceptScore(concept, activationWeight, useCountWeight, taskCountWeight, useLimit, taskLimit) {
+    _calculateConceptScore(concept) {
+        const {activation: activationWeight, useCount: useCountWeight, taskCount: taskCountWeight} = Memory.SCORING_WEIGHTS;
+        const {useCount: useLimit, taskCount: taskLimit} = Memory.NORMALIZATION_LIMITS;
+        
         const normalizedUseCount = Math.min(concept.useCount / useLimit, 1);
         const normalizedTaskCount = Math.min(concept.totalTasks / taskLimit, 1);
         const score = concept.activation * activationWeight +
@@ -118,6 +147,10 @@ export class Memory {
     }
 
     removeConcept(term) {
+        if (!term) {
+            throw new Error('Memory.removeConcept: term is required');
+        }
+        
         const concept = this._concepts.get(term);
         if (!concept) return false;
 
@@ -127,6 +160,7 @@ export class Memory {
         }
 
         this._concepts.delete(term);
+        this._index.removeConcept(concept);
         this._stats.totalConcepts--;
         this._stats.totalTasks -= concept.totalTasks;
 
@@ -142,19 +176,19 @@ export class Memory {
         this._cyclesSinceConsolidation = 0;
         this._stats.lastConsolidation = currentTime;
 
+        // Use enhanced consolidation algorithm
+        const consolidationResults = this._consolidation.consolidate(this, currentTime);
+
+        // Legacy consolidation for focus concepts
         const {activationThreshold, minTasksThreshold} = Memory.CONSOLIDATION_THRESHOLDS;
-
         for (const concept of this._focusConcepts) {
-            concept.getAllTasks().filter(task => task.priority >= this._config.priorityThreshold).forEach(task => task.boostActivation?.());
-
             if (concept.activation < activationThreshold && concept.totalTasks < minTasksThreshold) {
                 this._focusConcepts.delete(concept);
             }
         }
 
-        this._applyGlobalDecay();
-        this._removeDecayedConcepts();
         this._updateFocusConceptsCount();
+        return consolidationResults;
     }
 
     _applyGlobalDecay() {
@@ -207,11 +241,19 @@ export class Memory {
                 focusConcepts: this._focusConcepts.size,
                 totalTasks: this._stats.totalTasks
             },
+            indexStats: this._index.getStats(),
             oldestConcept: hasConcepts ? Math.min(...conceptStats.map(s => s.createdAt)) : null,
             newestConcept: hasConcepts ? Math.max(...conceptStats.map(s => s.createdAt)) : null,
             averageActivation: hasConcepts ? conceptStats.reduce((sum, s) => sum + s.activation, 0) / conceptStats.length : 0,
             averageQuality: hasConcepts ? conceptStats.reduce((sum, s) => sum + s.quality, 0) / conceptStats.length : 0
         };
+    }
+
+    /**
+     * Get memory health metrics
+     */
+    getHealthMetrics() {
+        return this._consolidation.calculateHealthMetrics(this);
     }
 
     /**
@@ -225,6 +267,7 @@ export class Memory {
     clear() {
         this._concepts.clear();
         this._focusConcepts.clear();
+        this._index.clear();
         this._stats = {
             totalConcepts: 0,
             totalTasks: 0,

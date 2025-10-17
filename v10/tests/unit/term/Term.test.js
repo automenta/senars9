@@ -133,4 +133,30 @@ describe('Term', () => {
         const termNames = term.reduce((names, t) => [...names, t.name], []);
         expect(termNames).toEqual(['(-->, A, B)', 'A', 'B']);
     });
+
+    test('should handle associativity', () => {
+        const atomA = newAtom('A');
+        const atomB = newAtom('B');
+        const atomC = newAtom('C');
+
+        const term1 = createCompound('&', [
+            atomA,
+            createCompound('&', [atomB, atomC])
+        ]);
+
+        expect(term1.name).toBe('(&, A, B, C)');
+    });
+
+    test('should handle redundancy', () => {
+        const atomA = newAtom('A');
+
+        const term = createCompound('&', [atomA, atomA]);
+        expect(term.name).toBe('(&, A)');
+    });
+
+    test('should cache identical terms', () => {
+        const term1 = newAtom('A');
+        const term2 = newAtom('A');
+        expect(term1).toBe(term2);
+    });
 });

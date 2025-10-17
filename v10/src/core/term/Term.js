@@ -12,7 +12,8 @@ export class Term {
         this._operator = operator;
         this._components = Object.freeze(components);
         this._complexity = this._calculateComplexity();
-        this._hash = Term.computeHash(this._name);
+        this._id = this._calculateId();
+        this._hash = Term.computeHash(this._id);
         Object.freeze(this);
     }
 
@@ -40,6 +41,10 @@ export class Term {
         return this._hash;
     }
 
+    get id() {
+        return this._id;
+    }
+
     get isAtomic() {
         return this._type === TermType.ATOM;
     }
@@ -48,12 +53,16 @@ export class Term {
         return this._type === TermType.COMPOUND;
     }
 
+    _calculateId() {
+        return this._type === TermType.ATOM ? this._name : `${this._operator}_${this._name}`;
+    }
+
     static computeHash(str) {
         return crypto.createHash('sha256').update(str).digest('hex');
     }
 
     equals(other) {
-        return other instanceof Term && this.name === other.name;
+        return other instanceof Term && this.id === other.id;
     }
 
     toString() {
