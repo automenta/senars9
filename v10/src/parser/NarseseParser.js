@@ -1,5 +1,17 @@
 import {TermFactory} from '../core/term/TermFactory.js';
 
+const PUNCTUATION_TYPE_MAP = {'.': 'BELIEF', '!': 'GOAL', '?': 'QUESTION'};
+const OPERATOR_SYMBOL_MAP = {
+    ' --> ': '-->',
+    ' <-> ': '<->',
+    ' ==> ': '==>',
+    ' <=> ': '<=>',
+    ' ^ ': '^',
+    ' & ': '&',
+    ' {{-- ': '{{--',
+    ' --}} ': '--}}'
+};
+
 export class NarseseParser {
     constructor() {
         this.termFactory = new TermFactory();
@@ -15,13 +27,12 @@ export class NarseseParser {
             term: this.parseTerm(termPart),
             punctuation,
             truthValue,
-            taskType: this.getTaskType(punctuation)
+            taskType: PUNCTUATION_TYPE_MAP[punctuation] || 'BELIEF'
         };
     }
 
     parseTerm(input) {
-        const data = this.parseTermData(input);
-        return this.termFactory.create(data);
+        return this.termFactory.create(this.parseTermData(input));
     }
 
     parseTermData(input) {
@@ -32,11 +43,11 @@ export class NarseseParser {
         }
 
         if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-            return this.parseSet(trimmed, '{}');
+            return {operator: '{}', components: this.parseList(trimmed.slice(1, -1).trim())};
         }
 
         if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-            return this.parseSet(trimmed, '[]');
+            return {operator: '[]', components: this.parseList(trimmed.slice(1, -1).trim())};
         }
 
         return {components: [trimmed]};
@@ -67,11 +78,9 @@ export class NarseseParser {
             else if (inner[i] === ')') parenDepth--;
             else if (parenDepth === 0) {
                 for (const op of operators) {
-                    if (inner.startsWith(op, i)) {
-                        if (mainOpIndex === -1 || i < mainOpIndex) {
-                            mainOp = op;
-                            mainOpIndex = i;
-                        }
+                    if (inner.startsWith(op, i) && (mainOpIndex === -1 || i < mainOpIndex)) {
+                        mainOp = op;
+                        mainOpIndex = i;
                     }
                 }
             }
@@ -81,7 +90,7 @@ export class NarseseParser {
             const left = inner.substring(0, mainOpIndex).trim();
             const right = inner.substring(mainOpIndex + mainOp.length).trim();
             return {
-                operator: this.getOperatorSymbol(mainOp),
+                operator: OPERATOR_SYMBOL_MAP[mainOp] || mainOp,
                 components: [this.parseTermData(left), this.parseTermData(right)]
             };
         }
@@ -98,9 +107,7 @@ export class NarseseParser {
 
         for (const [prefix, op] of prefixOps) {
             if (inner.startsWith(prefix)) {
-                const content = inner.slice(prefix.length).trim();
-                const components = this.parseList(content);
-                return {operator: op, components};
+                return {operator: op, components: this.parseList(inner.slice(prefix.length).trim())};
             }
         }
         return null;
@@ -173,11 +180,9 @@ export class NarseseParser {
 
     parseTruth(truthStr) {
         const clean = truthStr.replace(/%/g, '');
-        const parts = clean.split(';');
-        if (parts.length !== 2) throw new Error('Invalid truth value format');
-        const [f, c] = parts.map(s => s.trim()).map(Number);
-        if (isNaN(f) || f < 0 || f > 1) throw new Error(`Invalid frequency: ${f}`);
-        if (isNaN(c) || c < 0 || c > 1) throw new Error(`Invalid confidence: ${c}`);
+        const [f, c] = clean.split(';').map(s => s.trim()).map(Number);
+        if (f < 0 || f > 1) throw new Error(`Invalid frequency: ${f}`);
+        if (c < 0 || c > 1) throw new Error(`Invalid confidence: ${c}`);
         return {frequency: f, confidence: c};
     }
 
