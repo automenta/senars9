@@ -1,15 +1,15 @@
 export default {
-  presets: [
-    [
-      '@babel/preset-env',
-      {
-        targets: {
-          node: 'current',
-        },
-      },
+    presets: [
+        [
+            '@babel/preset-env',
+            {
+                targets: {
+                    node: 'current',
+                },
+            },
+        ],
     ],
-  ],
-  plugins: [
-    '@babel/plugin-syntax-import-meta',
-  ],
+    plugins: [
+        '@babel/plugin-syntax-import-meta',
+    ],
 };

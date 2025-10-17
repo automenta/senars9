@@ -1,162 +1,188 @@
-import { Bag } from './Bag.js';
+import {Bag} from './Bag.js';
 
 export class Concept {
-  static get DEFAULT_CONFIG() {
-    return {
-      maxBeliefs: 100,
-      maxGoals: 50,
-      maxQuestions: 20,
-      defaultDecayRate: 0.01,
-      defaultActivationBoost: 0.1,
-      maxActivation: 1.0,
-      minQuality: 0,
-      maxQuality: 1
-    };
-  }
-
-  constructor(term, config = {}) {
-    this._term = term;
-    this._createdAt = Date.now();
-    this._lastAccessed = Date.now();
-    this._config = { ...Concept.DEFAULT_CONFIG, ...config };
-    this._beliefs = new Bag(this._config.maxBeliefs);
-    this._goals = new Bag(this._config.maxGoals);
-    this._questions = new Bag(this._config.maxQuestions);
-    this._activation = 0;
-    this._useCount = 0;
-    this._quality = 0;
-  }
-
- get term() { return this._term; }
- get createdAt() { return this._createdAt; }
- get lastAccessed() { return this._lastAccessed; }
- get activation() { return this._activation; }
- get useCount() { return this._useCount; }
- get quality() { return this._quality; }
- get beliefs() { return this._beliefs; }
- get goals() { return this._goals; }
- get questions() { return this._questions; }
-
-  get totalTasks() {
-    return this._beliefs.size + this._goals.size + this._questions.size;
-  }
-
-  get averagePriority() {
-    if (this.totalTasks === 0) return 0;
-    return this._calculateWeightedAveragePriority();
-  }
-
-  _calculateWeightedAveragePriority() {
-    const bags = [
-      { bag: this._beliefs, weight: this._beliefs.size },
-      { bag: this._goals, weight: this._goals.size },
-      { bag: this._questions, weight: this._questions.size }
-    ];
-
-    const totalPriority = bags.reduce((sum, { bag, weight }) =>
-      sum + (bag.getAveragePriority() * weight), 0
-    );
-
-    return totalPriority / this.totalTasks;
-  }
-
-  _getStorage(taskType) {
-    const storageMap = { BELIEF: this._beliefs, GOAL: this._goals, QUESTION: this._questions };
-    const storage = storageMap[taskType];
-    if (!storage) {
-      throw new Error(`Unknown task type: ${taskType}. Expected BELIEF, GOAL, or QUESTION.`);
+    constructor(term, config = {}) {
+        this._term = term;
+        this._createdAt = Date.now();
+        this._lastAccessed = Date.now();
+        this._config = {...Concept.DEFAULT_CONFIG, ...config};
+        this._beliefs = new Bag(this._config.maxBeliefs);
+        this._goals = new Bag(this._config.maxGoals);
+        this._questions = new Bag(this._config.maxQuestions);
+        this._activation = 0;
+        this._useCount = 0;
+        this._quality = 0;
     }
-    return storage;
-  }
 
-  _updateLastAccessed() {
-    this._lastAccessed = Date.now();
-  }
-
-  addTask(task) {
-    const storage = this._getStorage(task.type);
-    const added = storage.add(task, task.priority);
-    if (added) {
-      this._updateLastAccessed();
-      this._useCount++;
+    static get DEFAULT_CONFIG() {
+        return {
+            maxBeliefs: 100,
+            maxGoals: 50,
+            maxQuestions: 20,
+            defaultDecayRate: 0.01,
+            defaultActivationBoost: 0.1,
+            maxActivation: 1.0,
+            minQuality: 0,
+            maxQuality: 1
+        };
     }
-    return added;
-  }
 
-  getHighestPriorityTask(taskType) {
-    return this._getStorage(taskType).peek() || null;
-  }
-
-  getTasksByType(taskType) {
-    return this._getStorage(taskType).getItemsInPriorityOrder() || [];
-  }
-
-  removeTask(task) {
-    const removed = this._getStorage(task.type).remove(task);
-    if (removed) {
-      this._updateLastAccessed();
+    get term() {
+        return this._term;
     }
-    return removed || false;
-  }
 
-  updateTaskPriority(task, newPriority) {
-    const updated = this._getStorage(task.type).updatePriority(task, newPriority);
-    if (updated) {
-      this._updateLastAccessed();
+    get createdAt() {
+        return this._createdAt;
     }
-    return updated || false;
-  }
 
- applyDecay(decayRate = this._config.defaultDecayRate) {
-   this._beliefs.applyDecay(decayRate);
-   this._goals.applyDecay(decayRate);
-   this._questions.applyDecay(decayRate);
-   this._activation *= (1 - decayRate);
-   this._updateLastAccessed();
- }
+    get lastAccessed() {
+        return this._lastAccessed;
+    }
 
- boostActivation(activationBoost = this._config.defaultActivationBoost) {
-   this._activation = Math.min(this._config.maxActivation, this._activation + activationBoost);
-   this._updateLastAccessed();
-   this.incrementUseCount();
- }
+    get activation() {
+        return this._activation;
+    }
 
- incrementUseCount() {
-   this._useCount++;
- }
+    get useCount() {
+        return this._useCount;
+    }
 
- updateQuality(qualityChange) {
-   this._quality = Math.max(this._config.minQuality,
-                          Math.min(this._config.maxQuality, this._quality + qualityChange));
- }
+    get quality() {
+        return this._quality;
+    }
 
- containsTask(task) {
-   return this._beliefs.contains(task) || this._goals.contains(task) || this._questions.contains(task);
- }
+    get beliefs() {
+        return this._beliefs;
+    }
 
- getAllTasks() {
-   const allTasks = [
-     ...this._beliefs.getItemsInPriorityOrder(),
-     ...this._goals.getItemsInPriorityOrder(),
-     ...this._questions.getItemsInPriorityOrder()
-   ];
-   return allTasks.sort((a, b) => b.priority - a.priority);
- }
+    get goals() {
+        return this._goals;
+    }
 
- getStats() {
-   return {
-     term: this._term.toString(),
-     totalTasks: this.totalTasks,
-     beliefsCount: this._beliefs.size,
-     goalsCount: this._goals.size,
-     questionsCount: this._questions.size,
-     activation: this._activation,
-     useCount: this._useCount,
-     quality: this._quality,
-     averagePriority: this.averagePriority,
-     createdAt: this._createdAt,
-     lastAccessed: this._lastAccessed
-   };
- }
+    get questions() {
+        return this._questions;
+    }
+
+    get totalTasks() {
+        return this._beliefs.size + this._goals.size + this._questions.size;
+    }
+
+    get averagePriority() {
+        if (this.totalTasks === 0) return 0;
+        return this._calculateWeightedAveragePriority();
+    }
+
+    _calculateWeightedAveragePriority() {
+        const bags = [
+            {bag: this._beliefs, weight: this._beliefs.size},
+            {bag: this._goals, weight: this._goals.size},
+            {bag: this._questions, weight: this._questions.size}
+        ];
+
+        const totalPriority = bags.reduce((sum, {bag, weight}) =>
+            sum + (bag.getAveragePriority() * weight), 0
+        );
+
+        return totalPriority / this.totalTasks;
+    }
+
+    _getStorage(taskType) {
+        const storageMap = {BELIEF: this._beliefs, GOAL: this._goals, QUESTION: this._questions};
+        const storage = storageMap[taskType];
+        if (!storage) {
+            throw new Error(`Unknown task type: ${taskType}. Expected BELIEF, GOAL, or QUESTION.`);
+        }
+        return storage;
+    }
+
+    _updateLastAccessed() {
+        this._lastAccessed = Date.now();
+    }
+
+    addTask(task) {
+        const storage = this._getStorage(task.type);
+        const added = storage.add(task, task.priority);
+        if (added) {
+            this._updateLastAccessed();
+            this._useCount++;
+        }
+        return added;
+    }
+
+    getHighestPriorityTask(taskType) {
+        return this._getStorage(taskType).peek() || null;
+    }
+
+    getTasksByType(taskType) {
+        return this._getStorage(taskType).getItemsInPriorityOrder() || [];
+    }
+
+    removeTask(task) {
+        const removed = this._getStorage(task.type).remove(task);
+        if (removed) {
+            this._updateLastAccessed();
+        }
+        return removed || false;
+    }
+
+    updateTaskPriority(task, newPriority) {
+        const updated = this._getStorage(task.type).updatePriority(task, newPriority);
+        if (updated) {
+            this._updateLastAccessed();
+        }
+        return updated || false;
+    }
+
+    applyDecay(decayRate = this._config.defaultDecayRate) {
+        this._beliefs.applyDecay(decayRate);
+        this._goals.applyDecay(decayRate);
+        this._questions.applyDecay(decayRate);
+        this._activation *= (1 - decayRate);
+        this._updateLastAccessed();
+    }
+
+    boostActivation(activationBoost = this._config.defaultActivationBoost) {
+        this._activation = Math.min(this._config.maxActivation, this._activation + activationBoost);
+        this._updateLastAccessed();
+        this.incrementUseCount();
+    }
+
+    incrementUseCount() {
+        this._useCount++;
+    }
+
+    updateQuality(qualityChange) {
+        this._quality = Math.max(this._config.minQuality,
+            Math.min(this._config.maxQuality, this._quality + qualityChange));
+    }
+
+    containsTask(task) {
+        return this._beliefs.contains(task) || this._goals.contains(task) || this._questions.contains(task);
+    }
+
+    getAllTasks() {
+        const allTasks = [
+            ...this._beliefs.getItemsInPriorityOrder(),
+            ...this._goals.getItemsInPriorityOrder(),
+            ...this._questions.getItemsInPriorityOrder()
+        ];
+        return allTasks.sort((a, b) => b.priority - a.priority);
+    }
+
+    getStats() {
+        return {
+            term: this._term.toString(),
+            totalTasks: this.totalTasks,
+            beliefsCount: this._beliefs.size,
+            goalsCount: this._goals.size,
+            questionsCount: this._questions.size,
+            activation: this._activation,
+            useCount: this._useCount,
+            quality: this._quality,
+            averagePriority: this.averagePriority,
+            createdAt: this._createdAt,
+            lastAccessed: this._lastAccessed
+        };
+    }
 
 }

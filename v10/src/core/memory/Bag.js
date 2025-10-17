@@ -1,63 +1,68 @@
 export class Bag {
- constructor(maxSize) {
-   this._items = new Map();
-   this._maxSize = maxSize;
- }
+    constructor(maxSize) {
+        this._items = new Map();
+        this._maxSize = maxSize;
+    }
 
- get size() { return this._items.size; }
- get maxSize() { return this._maxSize; }
+    get size() {
+        return this._items.size;
+    }
 
- add(item, priority) {
-   if (this._items.has(item)) return false;
+    get maxSize() {
+        return this._maxSize;
+    }
 
-   if (this.size >= this.maxSize) {
-     this._removeLowestPriorityItem();
-   }
+    add(item, priority) {
+        if (this._items.has(item)) return false;
 
-   this._items.set(item, priority);
-   return true;
- }
+        if (this.size >= this.maxSize) {
+            this._removeLowestPriorityItem();
+        }
 
- remove(item) {
-   return this._items.delete(item);
- }
+        this._items.set(item, priority);
+        return true;
+    }
 
- contains(item) {
-   return this._items.has(item);
- }
+    remove(item) {
+        return this._items.delete(item);
+    }
 
- peek() {
-   if (this.size === 0) return null;
-   return this.getItemsInPriorityOrder()[0];
- }
+    contains(item) {
+        return this._items.has(item);
+    }
 
- getItemsInPriorityOrder() {
-   return [...this._items.entries()]
-     .sort((a, b) => b[1] - a[1])
-     .map(([item]) => item);
- }
+    peek() {
+        if (this.size === 0) return null;
+        return this.getItemsInPriorityOrder()[0];
+    }
 
- getAveragePriority() {
-   if (this.size === 0) return 0;
+    getItemsInPriorityOrder() {
+        return [...this._items.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([item]) => item);
+    }
 
-   const priorities = [...this._items.values()];
-   const sum = priorities.reduce((acc, priority) => acc + priority, 0);
-   return sum / this.size;
- }
+    getAveragePriority() {
+        if (this.size === 0) return 0;
 
- applyDecay(decayRate) {
-   const newItems = new Map();
-   for (const [item, priority] of this._items.entries()) {
-     const newPriority = priority * (1 - decayRate);
-     newItems.set(item.withPriority(newPriority), newPriority);
-   }
-   this._items = newItems;
- }
+        const priorities = [...this._items.values()];
+        const sum = priorities.reduce((acc, priority) => acc + priority, 0);
+        return sum / this.size;
+    }
 
- _removeLowestPriorityItem() {
-   if (this.size > 0) {
-     const items = this.getItemsInPriorityOrder();
-     this.remove(items[items.length - 1]);
-   }
- }
+    applyDecay(decayRate) {
+        const newItems = new Map();
+        for (const [item, priority] of this._items.entries()) {
+            const newPriority = priority * (1 - decayRate);
+            newItems.set(item.withPriority(newPriority), newPriority);
+        }
+        this._items = newItems;
+    }
+
+    _removeLowestPriorityItem() {
+        if (this.size > 0) {
+            const items = this.getItemsInPriorityOrder();
+            this.remove(items[items.length - 1]);
+        }
+    }
 }

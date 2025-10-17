@@ -1,17 +1,17 @@
-import { Stamp, ArrayStamp } from '../../../src/core/Stamp.js';
+import {Stamp} from '../../../src/core/Stamp.js';
 
 describe('Stamp', () => {
-  test('should create a new Stamp instance with correct properties', () => {
-    const stamp = Stamp.createInput();
-    expect(stamp.creationTime).toBeDefined();
-    expect(stamp.occurrenceTime).toBeDefined();
-    expect(stamp.fromConcept).toBeNull();
-  });
+    test('should create a new Stamp instance with correct properties', () => {
+        const stamp = Stamp.createInput();
+        expect(stamp.creationTime).toBeDefined();
+        expect(stamp.occurrenceTime).toBeDefined();
+        expect(stamp.fromConcept).toBeNull();
+    });
 
-  test('should enforce immutability', () => {
-    const stamp = Stamp.createInput();
-    expect(() => {
-      stamp.creationTime = 123;
-    }).toThrow();
-  });
+    test('should enforce immutability', () => {
+        const stamp = Stamp.createInput();
+        expect(() => {
+            stamp.creationTime = 123;
+        }).toThrow();
+    });
 });

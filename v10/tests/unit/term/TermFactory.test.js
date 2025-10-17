@@ -1,5 +1,5 @@
 describe('TermFactory', () => {
-  it('should have a placeholder test', () => {
-    expect(true).toBe(true);
-  });
+    it('should have a placeholder test', () => {
+        expect(true).toBe(true);
+    });
 });
