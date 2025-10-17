@@ -11,17 +11,15 @@ export class Truth {
     get f() { return this._f; }
     get c() { return this._c; }
     
-    // Truth value operations using a centralized helper that applies validation and clamping
     static _applyOperation(t1, t2, operation) {
-        if (!t1 || !t2) return null;
-        return operation(t1, t2);
+        return t1 && t2 ? operation(t1, t2) : null;
     }
     
     static _applyUnaryOperation(truth, operation) {
         return truth ? operation(truth) : null;
     }
 
-    // Static methods for truth value operations
+    // Truth value operations
     static deduction(t1, t2) {
         return this._applyOperation(t1, t2, (t1, t2) => new Truth(t1.f * t2.f, t1.c * t2.c));
     }

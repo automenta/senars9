@@ -2,23 +2,19 @@ export const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 export const normalize = (value, max) => Math.min(value / max, 1);
 
-export const calculateAverage = (values) =>
-    values.length === 0 ? 0 : values.reduce((sum, val) => sum + val, 0) / values.length;
+export const calculateAverage = (values) => values.length ? values.reduce((sum, val) => sum + val, 0) / values.length : 0;
 
-export const sortByPriority = (items) =>
-    [...items].sort((a, b) => b.priority - a.priority);
+export const sortByPriority = (items) => [...items].sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
-export const filterByMinValue = (items, minValue, valueFn) =>
-    items.filter(item => valueFn(item) >= minValue);
+export const filterByMinValue = (items, minValue, valueFn) => items.filter(item => valueFn(item) >= minValue);
 
-export const findByTerm = (items, term) =>
-    items.find(item => item.term?.equals(term));
+export const findByTerm = (items, term) => items.find(item => item.term?.equals(term));
 
-export const groupByType = (items) =>
-    items.reduce((groups, item) => {
-        const type = item.type || 'unknown';
-        return {...groups, [type]: [...(groups[type] || []), item]};
-    }, {});
+export const groupByType = (items) => items.reduce((groups, item) => {
+    const type = item.type || 'unknown';
+    const group = groups[type] || [];
+    return {...groups, [type]: [...group, item]};
+}, {});
 
 export const applyToAll = (items, fn) => items.forEach(fn);
 
@@ -30,11 +26,10 @@ export const safeExecute = (fn, ...args) => {
     }
 };
 
-export const createMap = (items, keyFn, valueFn = x => x) =>
-    items.reduce((map, item) => (map.set(keyFn(item), valueFn(item)), map), new Map());
+export const createMap = (items, keyFn, valueFn = x => x) => 
+    items.reduce((map, item) => map.set(keyFn(item), valueFn(item)) || map, new Map());
 
-export const createSet = (items, keyFn = x => x) =>
-    new Set(items.map(keyFn));
+export const createSet = (items, keyFn = x => x) => new Set(items.map(keyFn));
 
 export const debounce = (func, wait) => {
     let timeoutId = null;
@@ -44,7 +39,6 @@ export const debounce = (func, wait) => {
         timeoutId = setTimeout(() => func.apply(this, args), wait);
     };
 
-    // Add cleanup method
     debouncedFunc.cancel = () => {
         if (timeoutId) {
             clearTimeout(timeoutId);
@@ -69,26 +63,20 @@ export const throttle = (fn, delay) => {
 export const collectTasksFromAllConcepts = (memory, filterFn = null) => {
     const allTasks = [];
     for (const concept of memory.getAllConcepts()) {
-        const conceptTasks = filterFn ?
-            concept.getAllTasks().filter(filterFn) :
-            concept.getAllTasks();
-        allTasks.push(...conceptTasks);
+        const tasks = filterFn ? concept.getAllTasks().filter(filterFn) : concept.getAllTasks();
+        allTasks.push(...tasks);
     }
     return allTasks;
 };
 
-export const freezeObject = (obj) => Object.freeze(obj);
+export const freezeObject = Object.freeze;
 
 export const clampAndFreeze = (obj, min = 0, max = 1) => {
-    if (typeof obj === 'number') {
-        return clamp(obj, min, max);
-    }
-    // Assuming obj has numeric properties that need clamping
+    if (typeof obj === 'number') return clamp(obj, min, max);
+    
     const clamped = {...obj};
-    for (const key of Object.keys(clamped)) {
-        if (typeof clamped[key] === 'number') {
-            clamped[key] = clamp(clamped[key], min, max);
-        }
+    for (const [key, value] of Object.entries(clamped)) {
+        if (typeof value === 'number') clamped[key] = clamp(value, min, max);
     }
     return freezeObject(clamped);
 };

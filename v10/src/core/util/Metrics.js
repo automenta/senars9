@@ -16,29 +16,29 @@ export class Metrics {
     }
 
     static update(metrics, success, time, error = null) {
-        const updated = {
-            executions: metrics.executions + 1,
-            successes: metrics.successes + (success ? 1 : 0),
-            failures: metrics.failures + (success ? 0 : 1),
+        const totalExecutions = metrics.executions + 1;
+        const totalSuccesses = metrics.successes + (success ? 1 : 0);
+        const totalFailures = metrics.failures + (success ? 0 : 1);
+        
+        return {
+            executions: totalExecutions,
+            successes: totalSuccesses,
+            failures: totalFailures,
             totalTime: metrics.totalTime + time,
-            avgTime: 0, // Will be calculated below
+            avgTime: totalExecutions > 0 ? (metrics.totalTime + time) / totalExecutions : 0,
             lastRun: Date.now(),
             lastError: error,
             createdAt: metrics.createdAt
         };
-
-        // Calculate average time
-        updated.avgTime = updated.executions > 0 ? updated.totalTime / updated.executions : 0;
-
-        return updated;
     }
 
     static getStats(metrics) {
+        const successRate = metrics.executions > 0 ? (metrics.successes / metrics.executions) * 100 : 0;
         return {
             executions: metrics.executions,
             successes: metrics.successes,
             failures: metrics.failures,
-            successRate: metrics.executions > 0 ? (metrics.successes / metrics.executions) * 100 : 0,
+            successRate: Math.round(successRate * 100) / 100,
             avgTime: Math.round(metrics.avgTime * 100) / 100,
             totalTime: Math.round(metrics.totalTime * 100) / 100,
             lastRun: metrics.lastRun,

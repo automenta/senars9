@@ -2,7 +2,7 @@ import {Logger} from '../../util/Logger.js';
 import {Rule} from './Rule.js';
 import {LMRule} from './LMRule.js';
 import {RuleSet} from './RuleSet.js';
-import {Metrics} from '../util/Metrics.js';
+import {Metrics as MetricsUtil} from '../util/Metrics.js';
 import {sortByPriority} from '../../util/common.js';
 
 export class RuleEngine {
@@ -12,20 +12,21 @@ export class RuleEngine {
         this._ruleSets = new Map();
         this._lm = lm; // Language Model integration
         this.logger = Logger;
-        this._metrics = {
-            totalApplications: 0, 
-            totalSuccesses: 0, 
-            totalFailures: 0, 
-            totalTime: 0, 
+        this._metrics = MetricsUtil.create();
+        this._typeMetrics = {
             lmRuleApplications: 0,
-            nalRuleApplications: 0,
-            createdAt: Date.now()
+            nalRuleApplications: 0
         };
     }
 
     get rules() { return Array.from(this._rules.values()); }
     get ruleSets() { return Array.from(this._ruleSets.values()); }
-    get metrics() { return {...this._metrics}; }
+    get metrics() { 
+        return {
+            ...this._metrics,
+            ...this._typeMetrics
+        };
+    }
     get lm() { return this._lm; }
 
     setLM(lm) {
@@ -74,11 +75,9 @@ export class RuleEngine {
             .filter(rule => rule.canApply(task));
             
         if (ruleType) {
-            if (ruleType === 'lm') {
-                applicableRules = applicableRules.filter(rule => rule instanceof LMRule);
-            } else if (ruleType === 'nal') {
-                applicableRules = applicableRules.filter(rule => !(rule instanceof LMRule));
-            }
+            applicableRules = applicableRules.filter(rule => 
+                ruleType === 'lm' ? rule instanceof LMRule : !(rule instanceof LMRule)
+            );
         }
         
         return sortByPriority(applicableRules);
@@ -96,7 +95,7 @@ export class RuleEngine {
             success = true;
             
             // Update type-specific metrics
-            this._metrics[rule instanceof LMRule ? 'lmRuleApplications' : 'nalRuleApplications']++;
+            this._typeMetrics[rule instanceof LMRule ? 'lmRuleApplications' : 'nalRuleApplications']++;
             
             return {results, rule: updatedRule};
         } catch (error) {
@@ -108,9 +107,9 @@ export class RuleEngine {
     }
 
     applyRules(task, ruleIds = null, ruleType = null) {
-        const rules = ruleIds ?
-            ruleIds.map(id => this._rules.get(id)).filter(Boolean) :
-            this.getApplicableRules(task, ruleType);
+        const rules = ruleIds 
+            ? ruleIds.map(id => this._rules.get(id)).filter(Boolean)
+            : this.getApplicableRules(task, ruleType);
 
         const allResults = [];
         for (const rule of rules) {
@@ -147,6 +146,6 @@ export class RuleEngine {
     }
 
     _updateMetrics(success, time) {
-        this._metrics = Metrics.update(this._metrics, success, time);
+        this._metrics = MetricsUtil.update(this._metrics, success, time);
     }
 }
