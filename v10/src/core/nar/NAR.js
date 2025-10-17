@@ -60,15 +60,23 @@ export class NAR {
     async input(narseseString) {
         try {
             const parsed = this._parser.parse(narseseString);
+            if (!parsed || !parsed.term) {
+                throw new Error('Invalid parse result');
+            }
 
-            const task = {
-                BELIEF: () => this._taskManager.createBelief(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
-                GOAL: () => this._taskManager.createGoal(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
-                QUESTION: () => this._taskManager.createQuestion(parsed.term, this._calculateInputPriority(parsed))
-            }[parsed.taskType]?.() ?? (() => {
+            const priority = this._calculateInputPriority(parsed);
+
+            const taskCreator = {
+                BELIEF: () => this._taskManager.createBelief(parsed.term, parsed.truthValue, priority),
+                GOAL: () => this._taskManager.createGoal(parsed.term, parsed.truthValue, priority),
+                QUESTION: () => this._taskManager.createQuestion(parsed.term, priority)
+            }[parsed.taskType];
+
+            if (!taskCreator) {
                 throw new Error(`Unknown task type: ${parsed.taskType}`);
-            })();
+            }
 
+            const task = taskCreator();
             const added = this._taskManager.addTask(task);
 
             if (added) {
@@ -78,17 +86,13 @@ export class NAR {
                     originalInput: narseseString,
                     parsed
                 });
-
                 await this._processPendingTasks();
             }
-
             return added;
-
         } catch (error) {
             this._eventBus.emit('input.error', {
                 error: error.message,
-                input: narseseString,
-                type: 'SYNTAX_ERROR'
+                input: narseseString
             });
             throw error;
         }

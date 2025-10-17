@@ -23,7 +23,10 @@ export class NarseseParser {
     parseTermData(input) {
         const trimmed = input.trim();
 
-        if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+        if (trimmed.startsWith('(')) {
+            if (!trimmed.endsWith(')')) {
+                throw new Error('Unclosed parenthesis');
+            }
             return this.parseCompound(trimmed.slice(1, -1).trim());
         }
 
@@ -39,117 +42,63 @@ export class NarseseParser {
     }
 
     parseCompound(inner) {
-        // Handle nested compound terms first
-        if (inner.includes('(') && inner.includes(')')) {
-            return this.parseNestedCompound(inner);
-        }
-
-        const parsers = [
-            {
-                match: s => s.startsWith('--, '),
-                parse: s => ({operator: '--', components: [this.parseTermData(s.slice(4).trim())]})
-            },
-            {
-                match: s => s.startsWith('&, '),
-                parse: s => ({operator: '&', components: this.parseList(s.slice(3).trim())})
-            },
-            {
-                match: s => s.startsWith('|, '),
-                parse: s => ({operator: '|', components: this.parseList(s.slice(3).trim())})
-            },
-            {
-                match: s => s.startsWith('&/, '),
-                parse: s => ({operator: '&/', components: this.parseList(s.slice(4).trim())})
-            },
-            {match: s => s.includes(' --> '), parse: s => this.parseBinary(s, ' --> ', '-->')},
-            {match: s => s.includes(' <-> '), parse: s => this.parseBinary(s, ' <-> ', '<->')},
-            {match: s => s.includes(' ==> '), parse: s => this.parseBinary(s, ' ==> ', '==>')},
-            {match: s => s.includes(' <=> '), parse: s => this.parseBinary(s, ' <=> ', '<=>')},
-            {match: s => s.includes(' ^ '), parse: s => this.parseBinary(s, ' ^ ', '^')},
-            {match: s => s.includes(' {{-- '), parse: s => this.parseBinary(s, ' {{-- ', '{{--')},
-            {match: s => s.includes(' --}} '), parse: s => this.parseBinary(s, ' --}} ', '--}}')}
-        ];
-
-        for (const parser of parsers) {
-            if (parser.match(inner)) {
-                return parser.parse(inner);
-            }
-        }
-
-        // Product: comma-separated terms
-        const components = this.parseList(inner);
-        return components.length > 1 ? {operator: ',', components} : {components: [inner]};
-    }
-
-    parseNestedCompound(inner) {
         // Find the main operator that's not nested
         const operators = [' --> ', ' <-> ', ' ==> ', ' <=> ', ' ^ ', ' {{-- ', ' --}} '];
         let mainOp = null;
         let mainOpIndex = -1;
 
-        for (const op of operators) {
-            const index = inner.indexOf(op);
-            if (index !== -1) {
-                // Check if this operator is at the top level (not nested)
-                const before = inner.substring(0, index);
-                const parenDepth = (before.match(/\(/g) || []).length - (before.match(/\)/g) || []).length;
-                if (parenDepth === 0) {
-                    if (mainOpIndex === -1 || index < mainOpIndex) {
-                        mainOp = op;
-                        mainOpIndex = index;
+        let parenDepth = 0;
+        for (let i = 0; i < inner.length; i++) {
+            if (inner[i] === '(') parenDepth++;
+            else if (inner[i] === ')') parenDepth--;
+            else if (parenDepth === 0) {
+                for (const op of operators) {
+                    if (inner.substring(i, i + op.length) === op) {
+                        if (mainOpIndex === -1 || i < mainOpIndex) {
+                            mainOp = op;
+                            mainOpIndex = i;
+                        }
                     }
                 }
             }
         }
 
         if (mainOp) {
-            const [left, right] = inner.split(mainOp).map(s => s.trim());
+            const left = inner.substring(0, mainOpIndex).trim();
+            const right = inner.substring(mainOpIndex + mainOp.length).trim();
             return {
                 operator: this.getOperatorSymbol(mainOp),
                 components: [this.parseTermData(left), this.parseTermData(right)]
             };
         }
 
-        // Fallback to regular parsing
-        return this.parseCompoundSimple(inner);
-    }
-
-    parseCompoundSimple(inner) {
-        const parsers = [
-            {
-                match: s => s.startsWith('--, '),
-                parse: s => ({operator: '--', components: [this.parseTermData(s.slice(4).trim())]})
-            },
-            {
-                match: s => s.startsWith('&, '),
-                parse: s => ({operator: '&', components: this.parseList(s.slice(3).trim())})
-            },
-            {
-                match: s => s.startsWith('|, '),
-                parse: s => ({operator: '|', components: this.parseList(s.slice(3).trim())})
-            },
-            {
-                match: s => s.startsWith('&/, '),
-                parse: s => ({operator: '&/', components: this.parseList(s.slice(4).trim())})
-            },
-            {match: s => s.includes(' --> '), parse: s => this.parseBinary(s, ' --> ', '-->')},
-            {match: s => s.includes(' <-> '), parse: s => this.parseBinary(s, ' <-> ', '<->')},
-            {match: s => s.includes(' ==> '), parse: s => this.parseBinary(s, ' ==> ', '==>')},
-            {match: s => s.includes(' <=> '), parse: s => this.parseBinary(s, ' <=> ', '<=>')},
-            {match: s => s.includes(' ^ '), parse: s => this.parseBinary(s, ' ^ ', '^')},
-            {match: s => s.includes(' {{-- '), parse: s => this.parseBinary(s, ' {{-- ', '{{--')},
-            {match: s => s.includes(' --}} '), parse: s => this.parseBinary(s, ' --}} ', '--}}')}
+        const prefixParsers = [
+            {prefix: '--, ', operator: '--', arity: 1},
+            {prefix: '&, ', operator: '&', arity: -1},
+            {prefix: '|, ', operator: '|', arity: -1},
+            {prefix: '&/, ', operator: '&/', arity: -1}
         ];
 
-        for (const parser of parsers) {
-            if (parser.match(inner)) {
-                return parser.parse(inner);
+        for (const parser of prefixParsers) {
+            if (inner.startsWith(parser.prefix)) {
+                const content = inner.slice(parser.prefix.length).trim();
+                const components = this.parseList(content);
+                if (parser.arity === 1 && components.length === 1) {
+                    return {operator: parser.operator, components};
+                }
+                return {operator: parser.operator, components};
             }
         }
 
         // Product: comma-separated terms
         const components = this.parseList(inner);
-        return components.length > 1 ? {operator: ',', components} : {components: [inner]};
+        if (components.length > 1) {
+            return {operator: ',', components};
+        } else if (components.length === 1) {
+            return {components: [inner]};
+        } else {
+            throw new Error('Invalid compound term');
+        }
     }
 
     parseBinary(str, op, operator) {
@@ -186,28 +135,42 @@ export class NarseseParser {
     }
 
     splitStatement(input) {
-        // Look for truth value at the end - more specific pattern for valid truth values
-        const truthMatch = input.match(/(.+?)\s*(%[0-9]*\.?[0-9]+%;[0-9]*\.?[0-9]+%)\s*([.?!]?)\s*$/);
+        let termPart = input;
+        let punctuation = null;
+        let truthValue = null;
+
+        const truthRegex = /%([0-9]*\.?[0-9]+);([0-9]*\.?[0-9]+)%/;
+        const truthMatch = termPart.match(truthRegex);
+
         if (truthMatch) {
-            const [, termPart, truthStr, punct] = truthMatch;
-            const punctuation = punct || '.';
-            const truthValue = this.parseTruth(truthStr);
-            return {termPart: termPart.trim(), punctuation, truthValue};
+            truthValue = this.parseTruth(truthMatch[0]);
+            termPart = (termPart.slice(0, truthMatch.index) + termPart.slice(truthMatch.index + truthMatch[0].length)).trim();
+        } else if (termPart.includes('%')) {
+            throw new Error('Invalid truth value format');
         }
 
-        // No truth value, just extract punctuation
-        const punctMatch = input.match(/(.+?)\s*([.?!])\s*$/);
-        if (punctMatch) {
-            const [, termPart, punctuation] = punctMatch;
-            return {termPart: termPart.trim(), punctuation, truthValue: null};
+        const lastChar = termPart.slice(-1);
+        if (['.', '!', '?'].includes(lastChar)) {
+            punctuation = lastChar;
+            termPart = termPart.slice(0, -1).trim();
         }
 
-        throw new Error('Missing punctuation');
+        if (!punctuation) {
+            throw new Error('Missing punctuation');
+        }
+
+        if (!termPart) {
+            throw new Error('Missing term');
+        }
+
+        return {termPart, punctuation, truthValue};
     }
 
     parseTruth(truthStr) {
         const clean = truthStr.replace(/%/g, '');
-        const [f, c] = clean.split(';').map(Number);
+        const parts = clean.split(';');
+        if (parts.length !== 2) throw new Error('Invalid truth value format');
+        const [f, c] = parts.map(s => s.trim()).map(Number);
         if (isNaN(f) || f < 0 || f > 1) throw new Error(`Invalid frequency: ${f}`);
         if (isNaN(c) || c < 0 || c > 1) throw new Error(`Invalid confidence: ${c}`);
         return {frequency: f, confidence: c};

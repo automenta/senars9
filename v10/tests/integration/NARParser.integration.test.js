@@ -122,7 +122,6 @@ describe('NAR Parser Integration', () => {
 
             await expect(nar.input('')).rejects.toThrow();
             expect(events.length).toBe(1);
-            expect(events[0].type).toBe('SYNTAX_ERROR');
         });
 
         test('maintains task properties correctly', async () => {

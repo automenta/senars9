@@ -29,14 +29,14 @@ export class TermFactory {
         );
 
         if (operator) {
-            // Only sort commutative operators
-            if (COMMUTATIVE_OPERATORS.has(operator)) {
-                normalizedComponents.sort((a, b) => a.name.localeCompare(b.name));
-            }
-
             // Flatten associative operators
             if (operator === '&' || operator === '|') {
                 normalizedComponents = this.flatten(operator, normalizedComponents);
+            }
+
+            // Only sort commutative operators
+            if (COMMUTATIVE_OPERATORS.has(operator)) {
+                normalizedComponents.sort((a, b) => a.name.localeCompare(b.name));
             }
 
             // Remove redundancy for commutative operators
