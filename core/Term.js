@@ -184,4 +184,49 @@ export class Term {
   equals(other) {
     return other instanceof Term && this.hash === other.hash;
   }
+
+  static fromString(str) {
+    // This is a simplified parser. A more robust implementation would use a proper grammar.
+    str = str.trim();
+    if (!str.startsWith('(') || !str.endsWith(')')) {
+      return Term.newAtom(str);
+    }
+
+    const content = str.substring(1, str.length - 1).trim();
+    const parts = content.split(/\s+/);
+    const operator = parts[1];
+    const subject = parts[0];
+    const predicate = parts[2];
+
+    const termTypeMap = {
+      '-->': TermType.INHERITANCE,
+      '==>': TermType.IMPLICATION,
+      '<->': TermType.SIMILARITY,
+      '<=>': TermType.EQUIVALENCE,
+      '&/': TermType.SEQUENTIAL_CONJUNCTION,
+      '^': TermType.OPERATION,
+      '--}}': TermType.PROPERTY,
+      '{{--': TermType.INSTANCE,
+    };
+
+    const termType = termTypeMap[operator];
+    if (termType) {
+      return Term.createCompound(termType, [Term.fromString(subject), Term.fromString(predicate)]);
+    }
+
+    // Handle conjunctions, disjunctions, etc.
+    const multiTermOperator = parts[0];
+    const terms = parts.slice(1).join(' ').split(',').map(t => Term.fromString(t.trim()));
+    const multiTermTypeMap = {
+      '&,': TermType.CONJUNCTION,
+      '|,': TermType.DISJUNCTION,
+    };
+
+    const multiTermType = multiTermTypeMap[multiTermOperator];
+    if (multiTermType) {
+      return Term.createCompound(multiTermType, terms);
+    }
+
+    return Term.newAtom(str);
+  }
 }

@@ -142,11 +142,11 @@ export class NAR {
             termStr = termStr.slice(0, -1);
         }
 
-        term = Term.newAtom(termStr);
+        term = Term.fromString(termStr);
         truth = new TruthValue(0.9, 0.9);
         priority = 0.5;
     } else {
-        term = typeof taskData.term === 'string' ? Term.newAtom(taskData.term) : taskData.term;
+        term = typeof taskData.term === 'string' ? Term.fromString(taskData.term) : taskData.term;
         punctuation = taskData.punctuation || Punctuation.BELIEF;
         truth = taskData.truth ? new TruthValue(taskData.truth.frequency, taskData.truth.confidence) : new TruthValue(0.9, 0.9);
         priority = taskData.priority || 0.5;
@@ -296,15 +296,13 @@ export class NAR {
 
   // Method to run reasoning with specific rule filtering
   async runCycleWithRules(ruleIds) {
-    const originalEnabledIds = new Set(this.reasoner.enabledRuleIds);
+    const originalEnabledIds = new Set(this.reasoner.ruleManager.enabledRuleIds);
     
     try {
       // Temporarily enable only the specified rules
-      this.reasoner.enabledRuleIds.clear();
+      this.reasoner.disableAllRules();
       ruleIds.forEach(id => {
-        if (this.reasoner.rules.has(id)) {
-          this.reasoner.enabledRuleIds.add(id);
-        }
+        this.reasoner.enable(id);
       });
       
       const result = await this.runCycle();
@@ -312,7 +310,7 @@ export class NAR {
       return result;
     } finally {
       // Restore original enabled rule set
-      this.reasoner.enabledRuleIds = originalEnabledIds;
+      this.reasoner.ruleManager.enabledRuleIds = originalEnabledIds;
     }
   }
 

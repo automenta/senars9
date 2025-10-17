@@ -116,12 +116,19 @@ export class TestNAR {
 
     if (this.rules.size > 0) {
       this.nar.reasoner.disableAllRules();
-      for (const rule of this.nar.reasoner.rules.values()) {
-        for (const testRule of this.rules) {
-          if (rule instanceof testRule) {
-            this.nar.reasoner.enable(rule.id);
+      const ruleIds = Array.from(this.nar.reasoner.ruleManager.rules.values())
+        .filter(rule => {
+          for (const testRule of this.rules) {
+            if (rule instanceof testRule) {
+              return true;
+            }
           }
-        }
+          return false;
+        })
+        .map(rule => rule.id);
+
+      for (const ruleId of ruleIds) {
+        this.nar.reasoner.enable(ruleId);
       }
     }
 
@@ -195,24 +202,8 @@ ${derivedTasksFormatted || '  (None)'}
   }
 
   _createTaskFromString(taskStr, punctuation = Punctuation.BELIEF, freq = 0.9, conf = 0.9, priority = 0.9) {
-    let term;
-    let cleanStr = taskStr.trim();
-    if (cleanStr.startsWith('(') && cleanStr.endsWith(')')) {
-      cleanStr = cleanStr.substring(1, cleanStr.length - 1);
-    }
-
-    const relationRegex = /^(?:(\".*?\"|\S+))\s*(-->|==>)\s*(?:(\".*?\"|\S+))$/;
-    const match = cleanStr.match(relationRegex);
-
-    if (match) {
-      const [_, subject, operator, predicate] = match;
-      const relationType = operator === '-->' ? TermType.INHERITANCE : TermType.IMPLICATION;
-      term = Term.createCompound(relationType, [Term.newAtom(subject.replace(/"/g, '')), Term.newAtom(predicate.replace(/"/g, ''))]);
-    } else {
-      term = Term.newAtom(cleanStr.replace(/"/g, ''));
-    }
-
+    const term = Term.fromString(taskStr);
     const truth = new TruthValue(freq, conf);
-    return new Task(term, punctuation, truth, Date.now(), Date.now(), priority);
+    return Task.createInput(term, punctuation, truth, Date.now(), Date.now(), priority);
   }
 }
