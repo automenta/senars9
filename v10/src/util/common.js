@@ -65,3 +65,14 @@ export const throttle = (fn, delay) => {
         }
     };
 };
+
+export const collectTasksFromAllConcepts = (memory, filterFn = null) => {
+    const allTasks = [];
+    for (const concept of memory.getAllConcepts()) {
+        const conceptTasks = filterFn ?
+            concept.getAllTasks().filter(filterFn) :
+            concept.getAllTasks();
+        allTasks.push(...conceptTasks);
+    }
+    return allTasks;
+};

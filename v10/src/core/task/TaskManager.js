@@ -1,4 +1,5 @@
 import {Task} from './Task.js';
+import {sortByPriority, collectTasksFromAllConcepts} from '../../util/common.js';
 
 export class TaskManager {
     constructor(memory, focus, config) {
@@ -77,16 +78,7 @@ export class TaskManager {
     }
 
     _collectTasksFromAllConcepts(filterFn = null) {
-        const allTasks = [];
-
-        for (const concept of this._memory.getAllConcepts()) {
-            const conceptTasks = filterFn ?
-                concept.getAllTasks().filter(filterFn) :
-                concept.getAllTasks();
-            allTasks.push(...conceptTasks);
-        }
-
-        return allTasks;
+        return collectTasksFromAllConcepts(this._memory, filterFn);
     }
 
     findTasksByType(taskType) {
@@ -111,8 +103,7 @@ export class TaskManager {
 
     getHighestPriorityTasks(limit = 10) {
         const allTasks = this._collectTasksFromAllConcepts();
-        allTasks.sort((a, b) => b.priority - a.priority);
-        return allTasks.slice(0, limit);
+        return sortByPriority(allTasks).slice(0, limit);
     }
 
     updateTaskPriority(task, newPriority) {

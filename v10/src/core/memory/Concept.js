@@ -1,4 +1,5 @@
 import {Bag} from './Bag.js';
+import {sortByPriority} from '../../util/common.js';
 
 export class Concept {
     constructor(term, config = {}) {
@@ -129,7 +130,7 @@ export class Concept {
             ...this._goals.getItemsInPriorityOrder(),
             ...this._questions.getItemsInPriorityOrder()
         ];
-        return allTasks.sort((a, b) => b.priority - a.priority);
+        return sortByPriority(allTasks);
     }
 
     getStats() {

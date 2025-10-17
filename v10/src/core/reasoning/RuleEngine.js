@@ -3,6 +3,7 @@ import {Rule} from './Rule.js';
 import {LMRule} from './LMRule.js';
 import {RuleSet} from './RuleSet.js';
 import {Metrics} from '../util/Metrics.js';
+import {sortByPriority} from '../../util/common.js';
 
 export class RuleEngine {
     constructor(config = {}, lm = null) {
@@ -96,7 +97,7 @@ export class RuleEngine {
             }
         }
         
-        return applicableRules.sort((a, b) => b.priority - a.priority);
+        return sortByPriority(applicableRules);
     }
 
     applyRule(rule, task) {

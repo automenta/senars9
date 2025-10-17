@@ -1,5 +1,6 @@
 import {Stamp} from '../Stamp.js';
 import {Term} from '../term/Term.js';
+import {clamp} from '../../util/common.js';
 
 export class Task {
     constructor(arg1, punctuation, truth, priority) {
@@ -16,7 +17,7 @@ export class Task {
             this._type = type;
             this._truth = truthVal ?? null;
             this._stamp = stamp || Stamp.createInput();
-            this._priority = Math.max(Task.DEFAULTS.minPriority, Math.min(Task.DEFAULTS.maxPriority, prio ?? Task.DEFAULTS.priority));
+            this._priority = clamp(prio ?? Task.DEFAULTS.priority, Task.DEFAULTS.minPriority, Task.DEFAULTS.maxPriority);
             this._budget = budget ?? Task.DEFAULTS.budget;
             this._createdAt = this._stamp.occurrenceTime;
             this._accessedAt = accessedAt || this._createdAt;
@@ -35,7 +36,7 @@ export class Task {
             this._type = type;
             this._truth = truth ?? null;
             this._stamp = Stamp.createInput();
-            this._priority = Math.max(Task.DEFAULTS.minPriority, Math.min(Task.DEFAULTS.maxPriority, priority ?? Task.DEFAULTS.priority));
+            this._priority = clamp(priority ?? Task.DEFAULTS.priority, Task.DEFAULTS.minPriority, Task.DEFAULTS.maxPriority);
             this._budget = Task.DEFAULTS.budget;
             this._createdAt = this._stamp.occurrenceTime;
             this._accessedAt = this._createdAt;

@@ -1,4 +1,5 @@
 import { Metrics } from '../../util/Metrics.js';
+import {sortByPriority} from '../../util/common.js';
 
 /**
  * Advanced Rule Manager with comprehensive rule management and validation
@@ -343,7 +344,7 @@ export class RuleManager {
         const enabledRules = this.getEnabled();
         
         // Sort rules by priority
-        const sortedRules = enabledRules.sort((a, b) => b.priority - a.priority);
+        const sortedRules = sortByPriority(enabledRules);
         
         for (const rule of sortedRules) {
             if (rule.canApply && rule.canApply(task, context)) {
