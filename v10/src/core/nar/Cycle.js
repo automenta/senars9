@@ -3,6 +3,8 @@
  * Orchestrates task selection, rule application, and memory updates
  */
 
+import { Logger } from '../../util/Logger.js';
+
 export class Cycle {
     constructor({memory, focus, ruleEngine, taskManager, config}) {
         this._memory = memory;
@@ -10,6 +12,7 @@ export class Cycle {
         this._ruleEngine = ruleEngine;
         this._taskManager = taskManager;
         this._config = config;
+        this.logger = Logger;
 
         // Cycle state
         this._cycleCount = 0;
@@ -76,7 +79,7 @@ export class Cycle {
             };
 
         } catch (error) {
-            console.error('Error in reasoning cycle:', error);
+            this.logger.error('Error in reasoning cycle:', error);
             throw error;
         } finally {
             this._isRunning = false;
@@ -129,7 +132,7 @@ export class Cycle {
                     }
                 }
             } catch (error) {
-                console.warn(`Error applying rules to task ${task.stamp.id}:`, error);
+                this.logger.warn(`Error applying rules to task ${task.stamp.id}:`, error);
             }
         }
 
@@ -192,7 +195,7 @@ export class Cycle {
                     await this._delay(this._config.delay);
                 }
             } catch (error) {
-                console.error(`Error in cycle ${i + 1}:`, error);
+                this.logger.error(`Error in cycle ${i + 1}:`, error);
                 results.push({
                     cycleNumber: this._cycleCount,
                     error: error.message

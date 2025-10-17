@@ -1,11 +1,13 @@
-import {Rule} from './Rule.js';
-import {LM} from '../config/constants.js';
+import { Logger } from '../../util/Logger.js';
+import { Rule } from './Rule.js';
+import { LM } from '../config/constants.js';
 
 export class LMRule extends Rule {
     constructor(id, promptTemplate, responseProcessor, priority = 1.0, config = {}) {
         super(id, 'lm', priority, config);
         this._promptTemplate = promptTemplate;
         this._responseProcessor = responseProcessor;
+        this.logger = Logger;
         this._lmConfig = {
             temperature: LM.DEFAULT_TEMPERATURE,
             maxTokens: LM.DEFAULT_MAX_TOKENS,
@@ -29,7 +31,7 @@ export class LMRule extends Rule {
             const processedResponse = await this._responseProcessor(response, task);
             return Array.isArray(processedResponse) ? processedResponse : [processedResponse];
         } catch (error) {
-            console.warn(`LM rule ${this.id} failed:`, error);
+            this.logger.warn(`LM rule ${this.id} failed:`, error);
             return [];
         }
     }

@@ -1,6 +1,9 @@
+import { Logger } from './Logger.js';
+
 export class EventBus {
     constructor() {
         this._events = new Map();
+        this.logger = Logger;
     }
 
     on(eventName, listener) {
@@ -22,7 +25,7 @@ export class EventBus {
             try {
                 listener(data);
             } catch (error) {
-                console.error(`Error in event listener for '${eventName}':`, error);
+                this.logger.error(`Error in event listener for '${eventName}':`, error);
             }
         });
     }

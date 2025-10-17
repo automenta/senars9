@@ -1,12 +1,14 @@
-import {Rule} from './Rule.js';
-import {RuleSet} from './RuleSet.js';
-import {Metrics} from '../util/Metrics.js';
+import { Logger } from '../../util/Logger.js';
+import { Rule } from './Rule.js';
+import { RuleSet } from './RuleSet.js';
+import { Metrics } from '../util/Metrics.js';
 
 export class RuleEngine {
     constructor(config = {}) {
         this._config = config;
         this._rules = new Map();
         this._ruleSets = new Map();
+        this.logger = Logger;
         this._metrics = {
             totalApplications: 0, totalSuccesses: 0, totalFailures: 0, totalTime: 0, createdAt: Date.now()
         };
@@ -68,7 +70,7 @@ export class RuleEngine {
                 const { results } = this.applyRule(rule, task);
                 allResults.push(...results);
             } catch (error) {
-                console.warn(`Rule ${rule.id} failed:`, error);
+                this.logger.warn(`Rule ${rule.id} failed:`, error);
             }
         }
         

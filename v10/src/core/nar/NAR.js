@@ -1,16 +1,18 @@
-import {SystemConfig} from './SystemConfig.js';
-import {Memory} from '../memory/Memory.js';
-import {TaskManager} from '../task/TaskManager.js';
-import {Cycle} from './Cycle.js';
-import {NarseseParser} from '../../parser/NarseseParser.js';
-import {EventBus} from '../../util/EventBus.js';
-import {RuleEngine} from '../reasoning/RuleEngine.js';
-import {DeductionRule} from '../reasoning/rules/deduction.js';
-import {PRIORITY, TRUTH} from '../config/constants.js';
+import { SystemConfig } from './SystemConfig.js';
+import { Memory } from '../memory/Memory.js';
+import { TaskManager } from '../task/TaskManager.js';
+import { Cycle } from './Cycle.js';
+import { NarseseParser } from '../../parser/NarseseParser.js';
+import { EventBus } from '../../util/EventBus.js';
+import { RuleEngine } from '../reasoning/RuleEngine.js';
+import { DeductionRule } from '../reasoning/rules/deduction.js';
+import { PRIORITY, TRUTH } from '../config/constants.js';
+import { Logger } from '../../util/Logger.js';
 
 export class NAR {
     constructor(config = {}) {
         this._config = SystemConfig.from(config);
+        this.logger = Logger;
 
         this._memory = new Memory(this._config.memory);
         this._parser = new NarseseParser();
@@ -44,7 +46,7 @@ export class NAR {
         try {
             this._ruleEngine.register(new DeductionRule());
         } catch (error) {
-            console.warn('Error setting up default rules:', error);
+            this.logger.warn('Error setting up default rules:', error);
         }
     }
 
@@ -110,7 +112,7 @@ export class NAR {
             try {
                 await this._executeCycle();
             } catch (error) {
-                console.error('Error in reasoning cycle:', error);
+                this.logger.error('Error in reasoning cycle:', error);
                 this._eventBus.emit('cycle.error', { error: error.message });
             }
         }, this._config.cycle.delay);
@@ -212,10 +214,10 @@ export class NAR {
 
     _setupDefaultEventHandlers() {
         this._eventBus.on('task.input', (data) => {
-            if (this._config.debug.enabled) console.log(`Input: ${data.originalInput} -> ${data.task.type}`);
+            if (this._config.debug.enabled) this.logger.log('debug', `Input: ${data.originalInput} -> ${data.task.type}`);
         });
 
-        this._eventBus.on('cycle.error', (data) => console.error('Cycle error:', data.error));
-        this._eventBus.on('input.error', (data) => console.error('Input error:', data.error));
+        this._eventBus.on('cycle.error', (data) => this.logger.error('Cycle error:', data.error));
+        this._eventBus.on('input.error', (data) => this.logger.error('Input error:', data.error));
     }
 }
