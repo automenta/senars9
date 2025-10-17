@@ -4,6 +4,8 @@ import {TaskManager} from '../task/TaskManager.js';
 import {Cycle} from './Cycle.js';
 import {NarseseParser} from '../../parser/NarseseParser.js';
 import {EventBus} from '../../util/EventBus.js';
+import {RuleEngine} from '../reasoning/RuleEngine.js';
+import {DeductionRule} from '../reasoning/rules/deduction.js';
 
 export class NAR {
     constructor(config = {}) {
@@ -22,10 +24,8 @@ export class NAR {
 
         this._taskManager = new TaskManager(this._memory, this._focus, this._config.taskManager);
 
-        this._ruleEngine = {
-            getApplicableRules: () => [],
-            applyRule: () => []
-        };
+        this._ruleEngine = new RuleEngine(this._config.ruleEngine);
+        this._setupDefaultRules();
 
         this._cycle = new Cycle({
             memory: this._memory,
@@ -39,6 +39,15 @@ export class NAR {
         this._cycleInterval = null;
 
         this._setupDefaultEventHandlers();
+    }
+
+    _setupDefaultRules() {
+        try {
+            const deductionRule = new DeductionRule();
+            this._ruleEngine.register(deductionRule);
+        } catch (error) {
+            console.warn('Error setting up default rules:', error);
+        }
     }
 
     get config() {
