@@ -18,7 +18,7 @@ describe('NAR Integration Tests', () => {
     termFactory = new TermFactory();
   });
 
-  afterEach(() =) {
+  afterEach(() => {
     if (nar && nar.isRunning) {
       nar.stop();
     }
