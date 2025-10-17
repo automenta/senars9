@@ -18,22 +18,14 @@ export class LMRule extends Rule {
     get responseProcessor() { return this._responseProcessor; }
     get lmConfig() { return { ...this._lmConfig }; }
 
-    _matches(task) {
-        return this._enabled && this._isRelevant(task);
-    }
-
-    _isRelevant(task) {
-        // LM rules can be applied to any task, but specific relevance
-        // can be implemented based on task content or type
-        return true;
-    }
+    _matches(task) { return this._enabled && this._isRelevant(task); }
+    _isRelevant(task) { return true; }
 
     async _apply(task) {
         try {
             const prompt = this._buildPrompt(task);
             const response = await this._callLanguageModel(prompt);
             const processedResponse = await this._responseProcessor(response, task);
-
             return Array.isArray(processedResponse) ? processedResponse : [processedResponse];
         } catch (error) {
             console.warn(`LM rule ${this.id} failed:`, error);
@@ -49,29 +41,19 @@ export class LMRule extends Rule {
             context: this._getContext(task)
         };
 
-        return this._promptTemplate.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-            return templateVars[key] !== undefined ? templateVars[key] : match;
-        });
+        return this._promptTemplate.replace(/\{\{(\w+)\}\}/g, (match, key) =>
+            templateVars[key] !== undefined ? templateVars[key] : match
+        );
     }
 
-    _getContext(task) {
-        // This would typically gather relevant context from memory
-        // For now, return basic task information
-        return `Task: ${task.term.toString()}, Type: ${task.type}`;
-    }
+    _getContext(task) { return `Task: ${task.term.toString()}, Type: ${task.type}`; }
 
     async _callLanguageModel(prompt) {
-        // This would integrate with actual LM providers
-        // For now, return a mock response
-        if (this._config.mock) {
-            return this._mockLMResponse(prompt);
-        }
-
+        if (this._config.mock) return this._mockLMResponse(prompt);
         throw new Error('No language model provider configured');
     }
 
     _mockLMResponse(prompt) {
-        // Mock response for testing - in real implementation this would call actual LM
         return Promise.resolve({
             content: `Based on the task "${prompt.substring(0, 100)}...", I think...`,
             usage: { tokens: 150 },
@@ -80,24 +62,11 @@ export class LMRule extends Rule {
     }
 
     withConfig(newConfig) {
-        return new LMRule(
-            this.id,
-            this._promptTemplate,
-            this._responseProcessor,
-            this.priority,
-            { ...this._config, ...newConfig }
-        );
+        return new LMRule(this.id, this._promptTemplate, this._responseProcessor, this.priority,
+            { ...this._config, ...newConfig });
     }
 
-    withTemperature(temperature) {
-        return this.withConfig({ lm: { ...this._lmConfig, temperature } });
-    }
-
-    withMaxTokens(maxTokens) {
-        return this.withConfig({ lm: { ...this._lmConfig, maxTokens } });
-    }
-
-    withModel(model) {
-        return this.withConfig({ lm: { ...this._lmConfig, model } });
-    }
+    withTemperature(temperature) { return this.withConfig({ lm: { ...this._lmConfig, temperature } }); }
+    withMaxTokens(maxTokens) { return this.withConfig({ lm: { ...this._lmConfig, maxTokens } }); }
+    withModel(model) { return this.withConfig({ lm: { ...this._lmConfig, model } }); }
 }

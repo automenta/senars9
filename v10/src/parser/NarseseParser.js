@@ -11,8 +11,12 @@ export class NarseseParser {
         if (!trimmed) throw new Error('Empty input');
 
         const {termPart, punctuation, truthValue} = this.splitStatement(trimmed);
-        const term = this.parseTerm(termPart);
-        return {term, punctuation, truthValue, taskType: this.getTaskType(punctuation)};
+        return {
+            term: this.parseTerm(termPart),
+            punctuation,
+            truthValue,
+            taskType: this.getTaskType(punctuation)
+        };
     }
 
     parseTerm(input) {

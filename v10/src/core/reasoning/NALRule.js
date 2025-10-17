@@ -16,14 +16,7 @@ export class NALRule extends Rule {
     get truthFunction() { return this._truthFunction; }
 
     _matches(task) {
-        return this._premises.length > 0 && this._matchesPremises(task);
-    }
-
-    _matchesPremises(task) {
-        for (const premise of this._premises) {
-            if (this._matchesPattern(premise, task.term)) return true;
-        }
-        return false;
+        return this._premises.length > 0 && this._premises.some(premise => this._matchesPattern(premise, task.term));
     }
 
     _matchesPattern(pattern, term) {
@@ -34,12 +27,8 @@ export class NALRule extends Rule {
         }
 
         if (pattern.isCompound && term.isCompound) {
-            if (pattern.operator !== term.operator) return false;
-            if (pattern.components.length !== term.components.length) return false;
-
-            return pattern.components.every((comp, i) =>
-                this._matchesPattern(comp, term.components[i])
-            );
+            if (pattern.operator !== term.operator || pattern.components.length !== term.components.length) return false;
+            return pattern.components.every((comp, i) => this._matchesPattern(comp, term.components[i]));
         }
 
         return false;
@@ -47,14 +36,11 @@ export class NALRule extends Rule {
 
     async _apply(task) {
         const results = [];
-
         for (const premise of this._premises) {
             if (this._matchesPattern(premise, task.term)) {
-                const derivedTasks = await this._deriveFromPremise(premise, task);
-                results.push(...derivedTasks);
+                results.push(...await this._deriveFromPremise(premise, task));
             }
         }
-
         return results;
     }
 
@@ -67,13 +53,7 @@ export class NALRule extends Rule {
 
         if (!derivedTerm || !derivedTruth) return [];
 
-        return [{
-            term: derivedTerm,
-            truth: derivedTruth,
-            type: task.type,
-            stamp: task.stamp,
-            priority: task.priority * this.priority
-        }];
+        return [{ term: derivedTerm, truth: derivedTruth, type: task.type, stamp: task.stamp, priority: task.priority * this.priority }];
     }
 
     _unifyPatterns(pattern, term) {
@@ -94,10 +74,7 @@ export class NALRule extends Rule {
             for (let i = 0; i < pattern.components.length; i++) {
                 const patternBindings = this._unifyPatterns(pattern.components[i], term.components[i]);
                 if (!patternBindings) return null;
-
-                for (const [key, value] of patternBindings) {
-                    bindings.set(key, value);
-                }
+                for (const [key, value] of patternBindings) bindings.set(key, value);
             }
             return bindings;
         }
@@ -106,14 +83,10 @@ export class NALRule extends Rule {
     }
 
     _substituteVariables(term, bindings) {
-        if (term.isAtomic) {
-            return bindings.has(term.name) ? bindings.get(term.name) : term;
-        }
+        if (term.isAtomic) return bindings.has(term.name) ? bindings.get(term.name) : term;
 
         if (term.isCompound) {
-            const substitutedComponents = term.components.map(comp =>
-                this._substituteVariables(comp, bindings)
-            );
+            const substitutedComponents = term.components.map(comp => this._substituteVariables(comp, bindings));
             return new Term(term.type, term.name, substitutedComponents, term.operator);
         }
 
@@ -121,10 +94,6 @@ export class NALRule extends Rule {
     }
 
     _computeDerivedTruth(taskTruth, bindings) {
-        if (!this._truthFunction) return taskTruth;
-
-        // For now, return the original truth - more complex truth computation
-        // would require analyzing the specific inference pattern
-        return this._truthFunction(taskTruth, taskTruth);
+        return this._truthFunction ? this._truthFunction(taskTruth, taskTruth) : taskTruth;
     }
 }

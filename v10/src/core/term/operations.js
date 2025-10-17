@@ -1,110 +1,90 @@
 import {Truth} from '../Truth.js';
 
-export const TruthFunctions = {
-    // Basic NAL truth value operations
+export const TruthFunctions = (() => {
+    // Common utilities
+    const validateInputs = (t1, t2) => t1 && t2;
+    const validateInput = (t) => t;
+    const combineConfidence = (c1, c2) => Math.min(c1, c2);
+    const averageFrequency = (f1, f2) => (f1 + f2) / 2;
 
-    revision(t1, t2) {
-        if (!t1 || !t2) return null;
+    // Higher-order function to eliminate repetitive validation
+    const withValidation = (fn) => (...args) => {
+        if (args.length === 2 && !validateInputs(args[0], args[1])) return null;
+        if (args.length === 1 && !validateInput(args[0])) return null;
+        return fn(...args);
+    };
 
-        const f = (t1.f * t1.c + t2.f * t2.c) / (t1.c + t2.c);
-        const c = t1.c + t2.c;
+    return {
+        // Basic NAL truth value operations - optimized and consolidated
 
-        return new Truth(f, Math.min(1.0, c));
-    },
+        revision: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            const f = (f1 * c1 + f2 * c2) / (c1 + c2);
+            return new Truth(f, Math.min(1.0, c1 + c2));
+        }),
 
-    deduction(t1, t2) {
-        if (!t1 || !t2) return null;
+        deduction: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            return new Truth(f1 * f2, c1 * c2);
+        }),
 
-        const f = t1.f * t2.f;
-        const c = t1.c * t2.c;
+        induction: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            const denominator = 1 - f1 * f2;
+            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
 
-        return new Truth(f, c);
-    },
+            const f = (f1 * (1 - f2) + f2 * (1 - f1)) / denominator;
+            return new Truth(f, combineConfidence(c1, c2));
+        }),
 
-    induction(t1, t2) {
-        if (!t1 || !t2) return null;
+        abduction: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            const denominator = f1 * f2 + (1 - f1) * (1 - f2);
+            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
 
-        const f = (t1.f * (1 - t2.f) + t2.f * (1 - t1.f)) / (1 - t1.f * t2.f);
-        const c = Math.min(t1.c, t2.c);
+            return new Truth((f1 * f2) / denominator, combineConfidence(c1, c2));
+        }),
 
-        return new Truth(f, c);
-    },
+        exemplification: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            return new Truth(averageFrequency(f1, f2), combineConfidence(c1, c2));
+        }),
 
-    abduction(t1, t2) {
-        if (!t1 || !t2) return null;
+        comparison: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            const denominator = f1 * f2 + (1 - f1) * (1 - f2);
+            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
 
-        const f = (t1.f * t2.f) / (t1.f * t2.f + (1 - t1.f) * (1 - t2.f));
-        const c = Math.min(t1.c, t2.c);
+            return new Truth((f1 * f2) / denominator, combineConfidence(c1, c2));
+        }),
 
-        return new Truth(f, c);
-    },
+        negation: withValidation((truth) => new Truth(1 - truth.f, truth.c)),
 
-    exemplification(t1, t2) {
-        if (!t1 || !t2) return null;
+        contraposition: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            const denominator = f2 * (1 - f1) + (1 - f2) * f1;
+            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
 
-        const f = (t1.f + t2.f) / 2;
-        const c = Math.min(t1.c, t2.c);
+            const f = f2 * (1 - f1) / denominator;
+            return new Truth(f, combineConfidence(c1, c2));
+        }),
 
-        return new Truth(f, c);
-    },
+        analogy: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            const denominator = f1 * f2 + (1 - f1) * (1 - f2);
+            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
 
-    comparison(t1, t2) {
-        if (!t1 || !t2) return null;
+            return new Truth((f1 * f2) / denominator, combineConfidence(c1, c2));
+        }),
 
-        const f = (t1.f * t2.f) / (t1.f * t2.f + (1 - t1.f) * (1 - t2.f));
-        const c = Math.min(t1.c, t2.c);
+        resemblance: withValidation((t1, t2) => {
+            const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
+            return new Truth(averageFrequency(f1, f2), combineConfidence(c1, c2));
+        }),
 
-        return new Truth(f, c);
-    },
-
-    negation(truth) {
-        if (!truth) return null;
-
-        return new Truth(1 - truth.f, truth.c);
-    },
-
-    contraposition(t1, t2) {
-        if (!t1 || !t2) return null;
-
-        const f = t2.f * (1 - t1.f) / (t2.f * (1 - t1.f) + (1 - t2.f) * t1.f);
-        const c = Math.min(t1.c, t2.c);
-
-        return new Truth(f, c);
-    },
-
-    analogy(t1, t2) {
-        if (!t1 || !t2) return null;
-
-        const f = (t1.f * t2.f) / (t1.f * t2.f + (1 - t1.f) * (1 - t2.f));
-        const c = Math.min(t1.c, t2.c);
-
-        return new Truth(f, c);
-    },
-
-    resemblance(t1, t2) {
-        if (!t1 || !t2) return null;
-
-        const f = (t1.f + t2.f) / 2;
-        const c = Math.min(t1.c, t2.c);
-
-        return new Truth(f, c);
-    },
-
-    expectation(truth) {
-        if (!truth) return 0;
-
-        return truth.f * truth.c;
-    },
-
-    isEqual(t1, t2) {
-        return t1 && t2 && t1.f === t2.f && t1.c === t2.c;
-    },
-
-    isMoreConfident(t1, t2) {
-        return t1 && t2 && t1.c > t2.c;
-    },
-
-    isStronger(t1, t2) {
-        return this.expectation(t1) > this.expectation(t2);
-    }
-};
+        expectation(truth) { return truth ? truth.f * truth.c : 0; },
+        isEqual(t1, t2) { return t1 && t2 && t1.f === t2.f && t1.c === t2.c; },
+        isMoreConfident(t1, t2) { return t1 && t2 && t1.c > t2.c; },
+        isStronger(t1, t2) { return this.expectation(t1) > this.expectation(t2); }
+    };
+})();

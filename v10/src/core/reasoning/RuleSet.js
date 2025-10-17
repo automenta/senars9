@@ -21,39 +21,16 @@ export class RuleSet {
     remove(ruleId) {
         const newRules = new Set(this._rules);
         for (const rule of newRules) {
-            if (rule.id === ruleId) {
-                newRules.delete(rule);
-                break;
-            }
+            if (rule.id === ruleId) { newRules.delete(rule); break; }
         }
         return new RuleSet(this._name, newRules);
     }
 
-    has(ruleId) {
-        for (const rule of this._rules) {
-            if (rule.id === ruleId) return true;
-        }
-        return false;
-    }
+    has(ruleId) { return Array.from(this._rules).some(rule => rule.id === ruleId); }
 
-    enable() {
-        return new RuleSet(this._name, this._rules);
-    }
-
-    disable() {
-        return new RuleSet(this._name, this._rules);
-    }
-
-    filter(predicate) {
-        const filteredRules = this._rules.filter(predicate);
-        return new RuleSet(`${this._name}_filtered`, filteredRules);
-    }
-
-    forEach(callback) {
-        this._rules.forEach(callback);
-    }
-
-    map(callback) {
-        return Array.from(this._rules).map(callback);
-    }
+    enable() { return new RuleSet(this._name, this._rules); }
+    disable() { return new RuleSet(this._name, this._rules); }
+    filter(predicate) { return new RuleSet(`${this._name}_filtered`, this._rules.filter(predicate)); }
+    forEach(callback) { this._rules.forEach(callback); }
+    map(callback) { return Array.from(this._rules).map(callback); }
 }

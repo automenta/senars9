@@ -17,8 +17,7 @@ export class NAR {
         this._eventBus = new EventBus();
 
         this._focus = {
-            addTaskToFocus: (task, priority) => {
-            },
+            addTaskToFocus: (task, priority) => {},
             getStats: () => ({focusSets: 0, totalTasks: 0})
         };
 
@@ -43,8 +42,7 @@ export class NAR {
 
     _setupDefaultRules() {
         try {
-            const deductionRule = new DeductionRule();
-            this._ruleEngine.register(deductionRule);
+            this._ruleEngine.register(new DeductionRule());
         } catch (error) {
             console.warn('Error setting up default rules:', error);
         }
@@ -69,40 +67,27 @@ export class NAR {
     async input(narseseString) {
         try {
             const parsed = this._parser.parse(narseseString);
-            if (!parsed || !parsed.term) {
-                throw new Error('Invalid parse result');
-            }
+            if (!parsed?.term) throw new Error('Invalid parse result');
 
-            const priority = this._calculateInputPriority(parsed);
+            const taskCreators = {
+                BELIEF: () => this._taskManager.createBelief(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
+                GOAL: () => this._taskManager.createGoal(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
+                QUESTION: () => this._taskManager.createQuestion(parsed.term, this._calculateInputPriority(parsed))
+            };
 
-            const taskCreator = {
-                BELIEF: () => this._taskManager.createBelief(parsed.term, parsed.truthValue, priority),
-                GOAL: () => this._taskManager.createGoal(parsed.term, parsed.truthValue, priority),
-                QUESTION: () => this._taskManager.createQuestion(parsed.term, priority)
-            }[parsed.taskType];
-
-            if (!taskCreator) {
-                throw new Error(`Unknown task type: ${parsed.taskType}`);
-            }
+            const taskCreator = taskCreators[parsed.taskType];
+            if (!taskCreator) throw new Error(`Unknown task type: ${parsed.taskType}`);
 
             const task = taskCreator();
             const added = this._taskManager.addTask(task);
 
             if (added) {
-                this._eventBus.emit('task.input', {
-                    task,
-                    source: 'user',
-                    originalInput: narseseString,
-                    parsed
-                });
+                this._eventBus.emit('task.input', { task, source: 'user', originalInput: narseseString, parsed });
                 await this._processPendingTasks();
             }
             return added;
         } catch (error) {
-            this._eventBus.emit('input.error', {
-                error: error.message,
-                input: narseseString
-            });
+            this._eventBus.emit('input.error', { error: error.message, input: narseseString });
             throw error;
         }
     }
@@ -118,11 +103,11 @@ export class NAR {
                 await this._executeCycle();
             } catch (error) {
                 console.error('Error in reasoning cycle:', error);
-                this._eventBus.emit('cycle.error', {error: error.message});
+                this._eventBus.emit('cycle.error', { error: error.message });
             }
         }, this._config.cycle.delay);
 
-        this._eventBus.emit('system.started', {timestamp: Date.now()});
+        this._eventBus.emit('system.started', { timestamp: Date.now() });
         return true;
     }
 
@@ -130,13 +115,12 @@ export class NAR {
         if (!this._isRunning) return false;
 
         this._isRunning = false;
-
         if (this._cycleInterval) {
             clearInterval(this._cycleInterval);
             this._cycleInterval = null;
         }
 
-        this._eventBus.emit('system.stopped', {timestamp: Date.now()});
+        this._eventBus.emit('system.stopped', { timestamp: Date.now() });
         return true;
     }
 
@@ -147,7 +131,7 @@ export class NAR {
             this._eventBus.emit('cycle.completed', result);
             return result;
         } catch (error) {
-            this._eventBus.emit('cycle.error', {error: error.message});
+            this._eventBus.emit('cycle.error', { error: error.message });
             throw error;
         }
     }
@@ -156,60 +140,40 @@ export class NAR {
         const results = [];
         for (let i = 0; i < count; i++) {
             try {
-                const result = await this.step();
-                results.push(result);
+                results.push(await this.step());
             } catch (error) {
-                results.push({error: error.message, cycleNumber: i + 1});
+                results.push({ error: error.message, cycleNumber: i + 1 });
             }
         }
         return results;
     }
 
-    query(queryTerm) {
-        const concept = this._memory.getConcept(queryTerm);
-        return concept ? concept.getTasksByType('BELIEF') : [];
-    }
+    query(queryTerm) { return this._memory.getConcept(queryTerm)?.getTasksByType('BELIEF') || []; }
 
     getBeliefs(queryTerm = null) {
-        if (queryTerm) return this.query(queryTerm);
-
-        const allBeliefs = [];
-        for (const concept of this._memory.getAllConcepts()) {
-            allBeliefs.push(...concept.getTasksByType('BELIEF'));
-        }
-        return allBeliefs;
+        return queryTerm ? this.query(queryTerm) : Array.from(this._memory.getAllConcepts()).flatMap(concept => concept.getTasksByType('BELIEF'));
     }
 
-    getGoals() {
-        return this._taskManager.findTasksByType('GOAL');
-    }
-
-    getQuestions() {
-        return this._taskManager.findTasksByType('QUESTION');
-    }
+    getGoals() { return this._taskManager.findTasksByType('GOAL'); }
+    getQuestions() { return this._taskManager.findTasksByType('QUESTION'); }
 
     reset() {
         this.stop();
         this._memory.clear();
         this._taskManager.clearPendingTasks();
         this._cycle.reset();
-        this._eventBus.emit('system.reset', {timestamp: Date.now()});
+        this._eventBus.emit('system.reset', { timestamp: Date.now() });
     }
 
-    on(eventName, callback) {
-        this._eventBus.on(eventName, callback);
-    }
-
-    off(eventName, callback) {
-        this._eventBus.off(eventName, callback);
-    }
+    on(eventName, callback) { this._eventBus.on(eventName, callback); }
+    off(eventName, callback) { this._eventBus.off(eventName, callback); }
 
     getStats() {
         return {
             isRunning: this._isRunning,
             cycleCount: this._cycle.cycleCount,
             memoryStats: this._memory.getDetailedStats(),
-            taskManagerStats: this._taskManager.getTaskStats ? this._taskManager.getTaskStats() : this._taskManager.stats,
+            taskManagerStats: this._taskManager.getTaskStats?.() || this._taskManager.stats,
             cycleStats: this._cycle.stats,
             config: this._config.toJSON()
         };
@@ -217,38 +181,24 @@ export class NAR {
 
     _calculateInputPriority(parsed) {
         let priority = this._config.taskManager.defaultPriority;
-        if (parsed.truthValue?.confidence) {
-            priority = Math.min(1.0, priority + parsed.truthValue.confidence * 0.3);
-        }
-        priority = Math.min(1.0, priority + {GOAL: 0.2, QUESTION: 0.1}[parsed.taskType] || 0);
-        return priority;
+        if (parsed.truthValue?.confidence) priority = Math.min(1.0, priority + parsed.truthValue.confidence * 0.3);
+        return Math.min(1.0, priority + { GOAL: 0.2, QUESTION: 0.1 }[parsed.taskType] || 0);
     }
 
     async _processPendingTasks() {
-        const processedTasks = this._taskManager.processPendingTasks(Date.now());
-        for (const task of processedTasks) {
-            this._eventBus.emit('task.added', {task});
+        for (const task of this._taskManager.processPendingTasks(Date.now())) {
+            this._eventBus.emit('task.added', { task });
         }
     }
 
-    async _executeCycle() {
-        const result = await this._cycle.execute();
-        this._eventBus.emit('cycle.completed', result);
-    }
+    async _executeCycle() { this._eventBus.emit('cycle.completed', await this._cycle.execute()); }
 
     _setupDefaultEventHandlers() {
         this._eventBus.on('task.input', (data) => {
-            if (this._config.debug.enabled) {
-                console.log(`Input: ${data.originalInput} -> ${data.task.type}`);
-            }
+            if (this._config.debug.enabled) console.log(`Input: ${data.originalInput} -> ${data.task.type}`);
         });
 
-        this._eventBus.on('cycle.error', (data) => {
-            console.error('Cycle error:', data.error);
-        });
-
-        this._eventBus.on('input.error', (data) => {
-            console.error('Input error:', data.error);
-        });
+        this._eventBus.on('cycle.error', (data) => console.error('Cycle error:', data.error));
+        this._eventBus.on('input.error', (data) => console.error('Input error:', data.error));
     }
 }

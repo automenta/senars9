@@ -7,11 +7,7 @@ export class RuleEngine {
         this._rules = new Map();
         this._ruleSets = new Map();
         this._metrics = {
-            totalApplications: 0,
-            totalSuccesses: 0,
-            totalFailures: 0,
-            totalTime: 0,
-            createdAt: Date.now()
+            totalApplications: 0, totalSuccesses: 0, totalFailures: 0, totalTime: 0, createdAt: Date.now()
         };
     }
 
@@ -25,57 +21,42 @@ export class RuleEngine {
         return this;
     }
 
-    unregister(ruleId) {
-        this._rules.delete(ruleId);
-        return this;
-    }
-
-    getRule(ruleId) {
-        return this._rules.get(ruleId);
-    }
+    unregister(ruleId) { this._rules.delete(ruleId); return this; }
+    getRule(ruleId) { return this._rules.get(ruleId); }
 
     createSet(name, ruleIds = []) {
         const rules = ruleIds.map(id => this._rules.get(id)).filter(Boolean);
-        const ruleSet = new RuleSet(name, rules);
-        this._ruleSets.set(name, ruleSet);
-        return ruleSet;
+        return this._ruleSets.set(name, new RuleSet(name, rules)).get(name);
     }
 
-    getSet(name) {
-        return this._ruleSets.get(name);
-    }
+    getSet(name) { return this._ruleSets.get(name); }
 
     getApplicableRules(task) {
-        const applicable = [];
-        for (const rule of this._rules.values()) {
-            if (rule.canApply(task)) applicable.push(rule);
-        }
-        return applicable.sort((a, b) => b.priority - a.priority);
+        return Array.from(this._rules.values())
+            .filter(rule => rule.canApply(task))
+            .sort((a, b) => b.priority - a.priority);
     }
 
-    async applyRule(rule, task) {
-        if (!rule || !this._rules.has(rule.id)) return [];
+    applyRule(rule, task) {
+        if (!rule || !this._rules.has(rule.id)) return { results: [], rule };
 
-        const startTime = Date.now();
         try {
-            const results = await rule.apply(task);
-            this._updateMetrics(true, Date.now() - startTime);
-            return results;
+            const { results, rule: updatedRule } = rule.apply(task);
+            this._rules.set(rule.id, updatedRule);
+            return { results, rule: updatedRule };
         } catch (error) {
-            this._updateMetrics(false, Date.now() - startTime);
-            throw error;
+            if (error.rule) this._rules.set(rule.id, error.rule);
+            throw error.error || error;
         }
     }
 
-    async applyRules(task, ruleIds = null) {
-        const rules = ruleIds
-            ? ruleIds.map(id => this._rules.get(id)).filter(Boolean)
-            : this.getApplicableRules(task);
-
+    applyRules(task, ruleIds = null) {
+        const rules = ruleIds ? ruleIds.map(id => this._rules.get(id)).filter(Boolean) : this.getApplicableRules(task);
         const results = [];
+
         for (const rule of rules) {
             try {
-                const ruleResults = await this.applyRule(rule, task);
+                const { results: ruleResults } = this.applyRule(rule, task);
                 if (ruleResults.length > 0) results.push(...ruleResults);
             } catch (error) {
                 console.warn(`Rule ${rule.id} failed:`, error);
@@ -86,31 +67,21 @@ export class RuleEngine {
 
     enableRule(ruleId) {
         const rule = this._rules.get(ruleId);
-        if (rule) {
-            const enabledRule = rule.enable();
-            this._rules.set(ruleId, enabledRule);
-        }
+        if (rule) this._rules.set(ruleId, rule.enable());
         return this;
     }
 
     disableRule(ruleId) {
         const rule = this._rules.get(ruleId);
-        if (rule) {
-            const disabledRule = rule.disable();
-            this._rules.set(ruleId, disabledRule);
-        }
+        if (rule) this._rules.set(ruleId, rule.disable());
         return this;
     }
 
-    clear() {
-        this._rules.clear();
-        this._ruleSets.clear();
-        return this;
-    }
+    clear() { this._rules.clear(); this._ruleSets.clear(); return this; }
 
     _updateMetrics(success, time) {
         this._metrics.totalApplications++;
-        success ? this._metrics.totalSuccesses++ : this._metrics.totalFailures++;
+        if (success) this._metrics.totalSuccesses++; else this._metrics.totalFailures++;
         this._metrics.totalTime += time;
     }
 }
