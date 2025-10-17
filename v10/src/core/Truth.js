@@ -10,83 +10,83 @@ export class Truth {
 
     get f() { return this._f; }
     get c() { return this._c; }
+    
+    // Truth value operations using a centralized helper that applies validation and clamping
+    static _applyOperation(t1, t2, operation) {
+        if (!t1 || !t2) return null;
+        return operation(t1, t2);
+    }
+    
+    static _applyUnaryOperation(truth, operation) {
+        return truth ? operation(truth) : null;
+    }
 
     // Static methods for truth value operations
     static deduction(t1, t2) {
-        if (!t1 || !t2) return null;
-        const f = t1.f * t2.f;
-        const c = t1.c * t2.c;
-        return new Truth(f, c);
+        return this._applyOperation(t1, t2, (t1, t2) => new Truth(t1.f * t2.f, t1.c * t2.c));
     }
 
     static induction(t1, t2) {
-        if (!t1 || !t2) return null;
-        const f = t1.f;
-        const c = this._weak(t1.c * t2.c) * t2.f;
-        return new Truth(f, c);
+        return this._applyOperation(t1, t2, (t1, t2) => new Truth(t1.f, this._weak(t1.c * t2.c) * t2.f));
     }
 
     static abduction(t1, t2) {
-        if (!t1 || !t2) return null;
-        const f = t2.f;
-        const c = this._weak(t1.c * t2.c) * t1.f;
-        return new Truth(f, c);
+        return this._applyOperation(t1, t2, (t1, t2) => new Truth(t2.f, this._weak(t1.c * t2.c) * t1.f));
     }
 
     static detachment(t1, t2) {
-        if (!t1 || !t2) return null;
-        const f = t2.f;
-        const c = (t1.c * t2.c) * t1.f;
-        return new Truth(f, c);
+        return this._applyOperation(t1, t2, (t1, t2) => new Truth(t2.f, (t1.c * t2.c) * t1.f));
     }
 
     static revision(t1, t2) {
         if (!t1 || !t2) return t1 || t2;
         const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
         const f = (f1 * c1 + f2 * c2) / (c1 + c2);
-        return new Truth(f, Math.min(1.0, c1 + c2));  // This can also be clamped
+        return new Truth(f, Math.min(1.0, c1 + c2));
     }
 
     static negation(truth) {
-        if (!truth) return null;
-        return new Truth(1 - truth.f, truth.c);
+        return this._applyUnaryOperation(truth, t => new Truth(1 - t.f, t.c));
     }
 
     static expectation(truth) {
         return truth ? truth.f * truth.c : 0;
     }
 
-    // Additional truth functions from operations.js
+    // Additional truth functions
     static exemplification(t1, t2) {
-        if (!t1 || !t2) return null;
-        return new Truth(Truth._averageFrequency(t1.f, t2.f), Truth._combineConfidence(t1.c, t2.c));
+        return this._applyOperation(t1, t2, (t1, t2) => 
+            new Truth(this._averageFrequency(t1.f, t2.f), this._combineConfidence(t1.c, t2.c)));
     }
 
     static comparison(t1, t2) {
-        if (!t1 || !t2) return null;
-        const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
-        const denominator = f1 * f2 + (1 - f1) * (1 - f2);
-        return new Truth(Truth._safeDivide(f1 * f2, denominator), Truth._combineConfidence(c1, c2));
+        return this._applyOperation(t1, t2, (t1, t2) => {
+            const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
+            const denominator = f1 * f2 + (1 - f1) * (1 - f2);
+            return new Truth(this._safeDivide(f1 * f2, denominator), this._combineConfidence(c1, c2));
+        });
     }
 
     static contraposition(t1, t2) {
-        if (!t1 || !t2) return null;
-        const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
-        const denominator = f2 * (1 - f1) + (1 - f2) * f1;
-        const f = Truth._safeDivide(f2 * (1 - f1), denominator);
-        return new Truth(f, Truth._combineConfidence(c1, c2));
+        return this._applyOperation(t1, t2, (t1, t2) => {
+            const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
+            const denominator = f2 * (1 - f1) + (1 - f2) * f1;
+            const f = this._safeDivide(f2 * (1 - f1), denominator);
+            return new Truth(f, this._combineConfidence(c1, c2));
+        });
     }
 
     static analogy(t1, t2) {
-        if (!t1 || !t2) return null;
-        const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
-        const denominator = f1 * f2 + (1 - f1) * (1 - f2);
-        return new Truth(Truth._safeDivide(f1 * f2, denominator), Truth._combineConfidence(c1, c2));
+        return this._applyOperation(t1, t2, (t1, t2) => {
+            const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
+            const denominator = f1 * f2 + (1 - f1) * (1 - f2);
+            return new Truth(this._safeDivide(f1 * f2, denominator), this._combineConfidence(c1, c2));
+        });
     }
 
     static resemblance(t1, t2) {
-        if (!t1 || !t2) return null;
-        return new Truth(Truth._averageFrequency(t1.f, t2.f), Truth._combineConfidence(t1.c, t2.c));
+        return this._applyOperation(t1, t2, (t1, t2) => 
+            new Truth(this._averageFrequency(t1.f, t2.f), this._combineConfidence(t1.c, t2.c)));
     }
 
     static isMoreConfident(t1, t2) {
@@ -97,15 +97,13 @@ export class Truth {
         return Truth.expectation(t1) > Truth.expectation(t2);
     }
 
-    // Helper functions moved from TruthFunctions
-    static _validateInputs(t1, t2) { return t1 && t2; }
-    static _validateInput(t) { return t; }
+    // Helper functions
     static _combineConfidence(c1, c2) { return Math.min(c1, c2); }
-    static _averageFrequency(f1, f2) { return clamp((f1 + f2) / 2, 0, 1); }  // Now using clamp
+    static _averageFrequency(f1, f2) { return clamp((f1 + f2) / 2, 0, 1); }
     static _safeDivide(numerator, denominator) { 
-        return denominator === 0 ? TRUTH.DEFAULT_FREQUENCY : clamp(numerator / denominator, 0, 1);  // Now using clamp
+        return denominator === 0 ? TRUTH.DEFAULT_FREQUENCY : clamp(numerator / denominator, 0, 1);
     }
-    static _weak(c) { return clamp(c / (c + 1.0), 0, 1); }  // Now using clamp
+    static _weak(c) { return clamp(c / (c + 1.0), 0, 1); }
 
     equals(other) {
         return other instanceof Truth && 

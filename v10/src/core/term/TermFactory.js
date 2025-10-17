@@ -15,30 +15,28 @@ export class TermFactory {
         
         // Handle string input
         if (typeof termData === 'string') {
-            return this._createAtomic(termData);
+            return this._getOrCreateAtomic(termData);
         }
         
         // Handle simple object with name
         if (!termData.components && termData.operator === undefined && termData.name) {
-            return this._createAtomic(termData.name);
+            return this._getOrCreateAtomic(termData.name);
         }
         
         // Handle compound terms
-        const {operator, components} = this.normalize(termData);
-        const name = this.buildCanonicalName(operator, components);
+        const {operator, components} = this._normalizeTermData(termData);
+        const name = this._buildCanonicalName(operator, components);
         return this._cache.get(name) || this._createAndCache(operator, components, name);
     }
 
-    _createAtomic(name) {
-        const cached = this._cache.get(name);
-        if (cached) return cached;
-        
-        const term = new Term(TermType.ATOM, name, [], null);
-        this._cache.set(term.id, term);
-        return term;
+    _getOrCreateAtomic(name) {
+        return this._cache.get(name) || this._createAndCache(null, [], name);
     }
 
     _createAndCache(operator, components, name) {
+        const existing = this._cache.get(name);
+        if (existing) return existing;
+        
         const term = new Term(
             operator ? TermType.COMPOUND : TermType.ATOM,
             name,
@@ -49,7 +47,7 @@ export class TermFactory {
         return term;
     }
 
-    normalize({operator, components}) {
+    _normalizeTermData({operator, components}) {
         if (!Array.isArray(components)) {
             throw new Error('TermFactory.normalize: components must be an array');
         }
@@ -81,13 +79,13 @@ export class TermFactory {
 
     _validateOperator(operator) {
         if (typeof operator !== 'string') {
-            throw new Error('TermFactory.normalize: operator must be a string');
+            throw new Error('TermFactory._validateOperator: operator must be a string');
         }
     }
 
     _flatten(operator, components) {
         if (!Array.isArray(components)) {
-            throw new Error('TermFactory.flatten: components must be an array');
+            throw new Error('TermFactory._flatten: components must be an array');
         }
         
         return components.flatMap(comp =>
@@ -96,22 +94,21 @@ export class TermFactory {
     }
 
     _normalizeCommutative(components) {
-        // Sort components by name for commutative operators
-        const sorted = components.sort((a, b) => a.name.localeCompare(b.name));
-        
-        // Remove duplicates
-        return this._removeRedundancy(sorted);
+        // Sort components by name for commutative operators and remove duplicates
+        return this._removeRedundancy(
+            components.sort((a, b) => a.name.localeCompare(b.name))
+        );
     }
 
     _removeRedundancy(components) {
         if (!Array.isArray(components)) {
-            throw new Error('TermFactory.removeRedundancy: components must be an array');
+            throw new Error('TermFactory._removeRedundancy: components must be an array');
         }
         
         const seen = new Set();
         return components.filter(comp => {
             if (!comp || typeof comp.name !== 'string') {
-                throw new Error('TermFactory.removeRedundancy: component must have a name property');
+                throw new Error('TermFactory._removeRedundancy: component must have a name property');
             }
             
             if (seen.has(comp.name)) return false;
@@ -120,7 +117,7 @@ export class TermFactory {
         });
     }
 
-    buildCanonicalName(operator, components) {
+    _buildCanonicalName(operator, components) {
         if (!operator) {
             return components[0].toString();
         }

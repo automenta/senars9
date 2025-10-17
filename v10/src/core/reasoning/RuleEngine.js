@@ -23,21 +23,10 @@ export class RuleEngine {
         };
     }
 
-    get rules() {
-        return Array.from(this._rules.values());
-    }
-
-    get ruleSets() {
-        return Array.from(this._ruleSets.values());
-    }
-
-    get metrics() {
-        return {...this._metrics};
-    }
-
-    get lm() {
-        return this._lm;
-    }
+    get rules() { return Array.from(this._rules.values()); }
+    get ruleSets() { return Array.from(this._ruleSets.values()); }
+    get metrics() { return {...this._metrics}; }
+    get lm() { return this._lm; }
 
     setLM(lm) {
         this._lm = lm;
@@ -72,17 +61,12 @@ export class RuleEngine {
         return this;
     }
 
-    getRule(ruleId) {
-        return this._rules.get(ruleId);
-    }
+    getRule(ruleId) { return this._rules.get(ruleId); }
+    getSet(name) { return this._ruleSets.get(name); }
 
     createSet(name, ruleIds = []) {
         const rules = ruleIds.map(id => this._rules.get(id)).filter(Boolean);
         return this._ruleSets.set(name, new RuleSet(name, rules)).get(name);
-    }
-
-    getSet(name) {
-        return this._ruleSets.get(name);
     }
 
     getApplicableRules(task, ruleType = null) {
@@ -112,9 +96,7 @@ export class RuleEngine {
             success = true;
             
             // Update type-specific metrics
-            rule instanceof LMRule ? 
-                this._metrics.lmRuleApplications++ : 
-                this._metrics.nalRuleApplications++;
+            this._metrics[rule instanceof LMRule ? 'lmRuleApplications' : 'nalRuleApplications']++;
             
             return {results, rule: updatedRule};
         } catch (error) {
@@ -143,13 +125,8 @@ export class RuleEngine {
         return allResults;
     }
 
-    applyLMRules(task, ruleIds = null) {
-        return this.applyRules(task, ruleIds, 'lm');
-    }
-
-    applyNALRules(task, ruleIds = null) {
-        return this.applyRules(task, ruleIds, 'nal');
-    }
+    applyLMRules(task, ruleIds = null) { return this.applyRules(task, ruleIds, 'lm'); }
+    applyNALRules(task, ruleIds = null) { return this.applyRules(task, ruleIds, 'nal'); }
 
     enableRule(ruleId) {
         const rule = this._rules.get(ruleId);

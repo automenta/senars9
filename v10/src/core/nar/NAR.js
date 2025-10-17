@@ -84,13 +84,13 @@ export class NAR {
         const {taskType, term, truthValue} = parsed;
         const priority = this._calculateInputPriority(parsed);
 
-        const taskCreators = {
+        const creators = {
             'BELIEF': () => this._taskManager.createBelief(term, truthValue, priority),
             'GOAL': () => this._taskManager.createGoal(term, truthValue, priority),
             'QUESTION': () => this._taskManager.createQuestion(term, priority)
         };
 
-        const creator = taskCreators[taskType];
+        const creator = creators[taskType];
         if (!creator) throw new Error(`Unknown task type: ${taskType}`);
         return creator();
     }
@@ -195,9 +195,7 @@ export class NAR {
             config: this._config.toJSON()
         };
 
-        if (this._lm) {
-            stats.lmStats = this._lm.getMetrics();
-        }
+        if (this._lm) stats.lmStats = this._lm.getMetrics();
 
         return stats;
     }

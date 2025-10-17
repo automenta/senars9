@@ -142,10 +142,9 @@ export class LMRule extends Rule {
     }
 
     // Override _clone to handle LMRule-specific constructor signature
-    _clone(overrides = {}) {
-        return new LMRule(this._id, this.lm, this._promptTemplate, this._responseProcessor, this._priority, {
-            ...this._config, ...overrides
-        });
+    _clone(overrides = {}, newConfig = null) {
+        const configArg = newConfig || {...this._config, ...overrides};
+        return new LMRule(this._id, this.lm, this._promptTemplate, this._responseProcessor, this._priority, configArg);
     }
 
     withConfig(newConfig) {

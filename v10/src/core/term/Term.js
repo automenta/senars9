@@ -70,8 +70,6 @@ export class Term {
     }
 
     _calculateComplexity() {
-        return this.type === TermType.ATOM
-            ? 1
-            : 1 + this._components.reduce((sum, comp) => sum + comp.complexity, 0);
+        return this.type === TermType.ATOM ? 1 : 1 + this._components.reduce((sum, comp) => sum + (comp?.complexity || 0), 0);
     }
 }

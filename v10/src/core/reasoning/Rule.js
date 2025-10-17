@@ -26,30 +26,18 @@ export class Rule {
     get metrics() { return this._metrics; }
 
     // Immutable state modifiers
-    enable() {
-        return this._toggleEnabled(true);
-    }
-
-    disable() {
-        return this._toggleEnabled(false);
-    }
-
-    withPriority(priority) {
-        const clamped = clamp(priority, TRUTH.MIN_PRIORITY, TRUTH.MAX_PRIORITY);
-        return this._updateIfChanged('_priority', clamped);
-    }
-
-    withConfig(config) {
-        const merged = {...this._config, ...config};
-        return this._updateIfChanged('_config', merged);
-    }
+    enable() { return this._updateIfChanged('_enabled', true); }
+    disable() { return this._updateIfChanged('_enabled', false); }
+    withPriority(priority) { return this._updateIfChanged('_priority', clamp(priority, TRUTH.MIN_PRIORITY, TRUTH.MAX_PRIORITY)); }
+    withConfig(config) { return this._updateIfChanged('_config', {...this._config, ...config}); }
 
     // Helper methods for common operations
-    _toggleEnabled(newState) {
-        return this._enabled === newState ? this : this._clone({enabled: newState});
-    }
-
     _updateIfChanged(propName, newValue) {
+        if (propName === '_enabled') {
+            // Special handling: _enabled maps to 'enabled' in config
+            const newConfig = {...this._config, enabled: newValue};
+            return this._enabled === newValue ? this : this._clone({}, newConfig);
+        }
         return this[propName] === newValue ? this : this._clone({[propName]: newValue});
     }
 
@@ -70,18 +58,13 @@ export class Rule {
     }
 
     // Template methods - to be overridden by subclasses
-    _matches(task) {
-        return true;
-    }
-
-    _apply(task) {
-        return [];
-    }
+    _matches(task) { return this._enabled; }
+    _apply(task) { return []; }
 
     // Internal utilities
-    _clone(overrides = {}) {
+    _clone(overrides = {}, newConfig = null) {
         const Constructor = this.constructor;
-        const configArg = {...this._config, ...overrides};
+        const configArg = newConfig || {...this._config, ...overrides};
 
         // Handle different constructor signatures for subclasses  
         const newRule = new Constructor(this._id, this._type, this._priority, configArg);

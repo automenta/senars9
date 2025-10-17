@@ -3,7 +3,7 @@ import {Term} from '../term/Term.js';
 import {clamp} from '../../util/common.js';
 
 export class Task {
-    constructor(arg1, punctuation, truth, priority) {
+    constructor(arg1, punctuationOrType, truth, priority) {
         // Support both old object-based constructor and new convenience constructor
         if (this._isTaskDataObject(arg1)) {
             // Old constructor: ({term, type, truth, stamp, priority, budget, accessedAt})
@@ -12,7 +12,15 @@ export class Task {
         } else {
             // New convenience constructor: (term, punctuation, truth, priority)
             const term = arg1;
-            const type = Task._getTaskTypeFromPunctuation(punctuation);
+            
+            // Second parameter should be punctuation - validate it as such
+            if (typeof punctuationOrType !== 'string') {
+                throw new Error(`Punctuation must be a string. Received: ${typeof punctuationOrType}.`);
+            }
+            
+            // Treat second parameter as punctuation and convert to type
+            const type = Task._getTaskTypeFromPunctuation(punctuationOrType);
+            
             this._initializeFromParameters(term, type, truth, priority);
         }
         
