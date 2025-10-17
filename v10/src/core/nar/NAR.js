@@ -25,7 +25,7 @@ export class NAR {
     this._focus = {
       addTaskToFocus: (task, priority) => {
         // Placeholder - will be enhanced when Focus class is implemented
-        console.log(`Adding task to focus: ${task.term.toString()} (priority: ${priority})`);
+        //console.log(`Adding task to focus: ${task.term.toString()} (priority: ${priority})`);
       },
       getStats: () => ({ focusSets: 0, totalTasks: 0 })
     };
