@@ -65,7 +65,7 @@ export class RuleManager {
     const ruleIds = this.rules.has(idOrGroup)
       ? [idOrGroup]
       : this.ruleGroups.get(idOrGroup) || [];
-    ruleIds.forEach(id => enable ? this.enabledRuleIds.add(id) : this.enabledRuleIds.delete(id));
+    ruleIds.forEach(id => (enable ? this.enabledRuleIds.add(id) : this.enabledRuleIds.delete(id)));
   }
 
   disableAllRules() {
@@ -236,77 +236,66 @@ export class RuleManager {
   }
 
   async reason(focusSet, memory, context) {
+    if (!focusSet?.length || !memory || !context) {
+      const reason = !focusSet?.length ? 'No focus set provided' : 'Missing memory or context';
+      Logger.debug(`${reason}, returning empty derived tasks`);
+      return [];
+    }
+
     const derivedTasks = [];
     const enabledRules = this.getEnabledRules();
 
-    if (!focusSet || focusSet.length === 0) {
-      Logger.debug('No focus set provided, returning empty derived tasks');
-      return derivedTasks;
-    }
-
-    if (!memory || !context) {
-      Logger.warn('Missing memory or context in reasoning cycle');
-      return derivedTasks;
-    }
-
     for (const rule of enabledRules) {
-      if (!rule || !rule.id) {
+      if (!rule?.id) {
         Logger.warn('Skipping invalid rule without ID');
         continue;
       }
 
-      try {
-        for (const premise of focusSet) {
-          if (!premise) {
-            continue; // Skip invalid premises
-          }
-
-          const startTime = Date.now();
-
-          try {
-            // Check if rule can be applied before applying (if method exists)
-            if (rule.canApply && typeof rule.canApply === 'function') {
-              if (!rule.canApply({ premise, memory, context })) {
-                this.updateMetrics(rule.id, false, Date.now() - startTime, 'Rule condition not met');
-                continue;
-              }
-            }
-
-            const result = await rule.apply({ premise, memory, context });
-            const endTime = Date.now();
-
-            if (result && Array.isArray(result) && result.length > 0) {
-              // Validate each derived task before adding
-              const validResults = result.filter(task => {
-                if (!task || !task.term) {
-                  Logger.warn(`Rule ${rule.id} produced invalid task without term`);
-                  return false;
-                }
-                return true;
-              });
-              
-              if (validResults.length > 0) {
-                derivedTasks.push(...validResults);
-                this.updateMetrics(rule.id, true, endTime - startTime);
-              } else {
-                this.updateMetrics(rule.id, false, endTime - startTime, 'No valid results produced');
-              }
-            } else {
-              this.updateMetrics(rule.id, false, endTime - startTime, 'No results produced');
-            }
-          } catch (applyError) {
-            const endTime = Date.now();
-            Logger.error(`Rule ${rule.id} apply failed on premise:`, applyError);
-            this.updateMetrics(rule.id, false, endTime - startTime, applyError.message);
-          }
-        }
-      } catch (ruleError) {
-        Logger.error(`Rule ${rule.id} encountered critical error:`, ruleError);
-        this.updateMetrics(rule.id, false, 0, ruleError.message);
-      }
+      await this._applyRule(rule, focusSet, memory, context, derivedTasks);
     }
 
     Logger.debug(`Reasoning cycle completed with ${derivedTasks.length} derived tasks from ${focusSet.length} premises using ${enabledRules.length} enabled rules`);
     return derivedTasks;
+  }
+
+  async _applyRule(rule, focusSet, memory, context, derivedTasks) {
+    const startTime = Date.now();
+
+    try {
+      for (const premise of focusSet) {
+        if (!premise) continue;
+
+        const canApply = !rule.canApply || rule.canApply({ premise, memory, context });
+        if (!canApply) {
+          this.updateMetrics(rule.id, false, Date.now() - startTime, 'Rule condition not met');
+          continue;
+        }
+
+        const result = await rule.apply({ premise, memory, context });
+        const endTime = Date.now();
+
+        this._processRuleResult(rule, result, endTime - startTime, derivedTasks);
+      }
+    } catch (error) {
+      Logger.error(`Rule ${rule.id} encountered critical error:`, error);
+      this.updateMetrics(rule.id, false, 0, error.message);
+    }
+  }
+
+  _processRuleResult(rule, result, executionTime, derivedTasks) {
+    if (!result?.length) {
+      this.updateMetrics(rule.id, false, executionTime, 'No results produced');
+      return;
+    }
+
+    const validResults = result.filter(task => task?.term);
+    if (!validResults.length) {
+      Logger.warn(`Rule ${rule.id} produced invalid task without term`);
+      this.updateMetrics(rule.id, false, executionTime, 'No valid results produced');
+      return;
+    }
+
+    derivedTasks.push(...validResults);
+    this.updateMetrics(rule.id, true, executionTime);
   }
 }

@@ -1,7 +1,3 @@
-/**
- * Modus Ponens reasoning tests using the new TestNAR framework.
- */
-
 import { TestNAR, TaskMatch } from './TestNAR.js';
 
 describe('Modus Ponens Tests (with new TestNAR)', () => {
@@ -9,7 +5,7 @@ describe('Modus Ponens Tests (with new TestNAR)', () => {
     const result = await new TestNAR()
       .input('(a ==> b)', 0.9, 0.9)
       .input('a', 0.8, 0.8)
-      .run(2) // Run for 2 cycles to ensure rule has a chance to fire
+      .run(2)
       .expect(new TaskMatch('b').withTruth(0.71, 0.64)) // freq=0.9*0.8=0.72, conf=0.9*0.8*0.9=0.648. Rounded down for the test.
       .execute();
 

@@ -1,8 +1,3 @@
-/**
- * @file tests/reasoning/TestNAR.test.js
- * @description Test that the TestNAR class works as expected.
- */
-
 import { test, expect } from '@jest/globals';
 import { TestNAR, TaskMatch } from './TestNAR.js';
 import { ModusPonensRule } from '../../core/reasoning/nal/ModusPonensRule.js';

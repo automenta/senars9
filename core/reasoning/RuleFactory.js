@@ -1,7 +1,3 @@
-/**
- * Rule factory for consistent rule instantiation
- */
-
 import { NALRule } from './NALRule.js';
 import { DeductionRule, InductionRule, AbductionRule } from './nal/NALRules.js';
 import { ModusPonensRule } from './nal/ModusPonensRule.js';
@@ -68,12 +64,10 @@ export class RuleFactory {
   static createRule(type, config = {}) {
     const { ruleType = 'nal', dependencies = {}, options = {} } = config;
 
-    if (ruleType === 'nal') {
-      return this.createNALRule(type, options);
-    } else if (ruleType === 'lm') {
-      return this.createLMRule(type, dependencies, options);
-    }
-
-    throw new Error(`Unknown rule type: ${ruleType}`);
+    return ruleType === 'nal'
+      ? this.createNALRule(type, options)
+      : ruleType === 'lm'
+        ? this.createLMRule(type, dependencies, options)
+        : (() => { throw new Error(`Unknown rule type: ${ruleType}`); })();
   }
 }

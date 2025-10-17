@@ -110,27 +110,37 @@ export class TestNAR {
     this.nar = new NAR();
     await this.nar.initialize();
 
-    if (this.configureCallback) {
-      this.configureCallback(this.nar);
-    }
+    this.configureCallback?.(this.nar);
+    this._configureRules();
+    await this._processOperations();
 
-    if (this.rules.size > 0) {
-      this.nar.reasoner.disableAllRules();
-      for (const rule of this.nar.reasoner.rules.values()) {
-        for (const testRule of this.rules) {
-          if (rule instanceof testRule) {
-            this.nar.reasoner.enable(rule.id);
-          }
+    const derivedTasks = this._getDerivedTasks();
+    this._validateExpectations(derivedTasks);
+
+    return true;
+  }
+
+  _configureRules() {
+    if (this.rules.size === 0) return;
+
+    this.nar.reasoner.disableAllRules();
+    for (const rule of this.nar.reasoner.rules.values()) {
+      for (const testRule of this.rules) {
+        if (rule instanceof testRule) {
+          this.nar.reasoner.enable(rule.id);
         }
       }
     }
+  }
 
+  async _processOperations() {
     const expectations = [];
+
     for (const op of this.operations) {
       switch (op.type) {
         case 'input': {
           const task = this._createTaskFromString(op.termStr, Punctuation.BELIEF, op.freq, op.conf);
-          this.inputTaskHashes.add(task.term.hash); // Record input hash
+          this.inputTaskHashes.add(task.term.hash);
           this.nar.input(task);
           break;
         }
@@ -145,11 +155,16 @@ export class TestNAR {
       }
     }
 
-    const allTasks = this.nar.getTasks();
-    // A derived task is any task whose hash is NOT in the input set.
-    const derivedTasks = allTasks.filter(t => !this.inputTaskHashes.has(t.term.hash));
+    this.expectations = expectations;
+  }
 
-    for (const exp of expectations) {
+  _getDerivedTasks() {
+    const allTasks = this.nar.getTasks();
+    return allTasks.filter(t => !this.inputTaskHashes.has(t.term.hash));
+  }
+
+  _validateExpectations(derivedTasks) {
+    for (const exp of this.expectations) {
       const { matcher, criteria, shouldExist } = exp;
       const matchFound = derivedTasks.some(matcher);
       const expectationMet = shouldExist ? matchFound : !matchFound;
@@ -158,39 +173,37 @@ export class TestNAR {
         this._reportFailure(exp, derivedTasks);
       }
     }
-
-    return true;
   }
 
   _reportFailure(exp, derivedTasks) {
     const { criteria, shouldExist } = exp;
-    const derivedTasksFormatted = derivedTasks.map(t => `  - ${t.toString()}`).join('\n');
-    const failureMessage = `
+    const taskList = derivedTasks.length
+      ? derivedTasks.map(t => `  - ${t.toString()}`).join('\n')
+      : '  (None)';
+
+    throw new Error(`
       ==================== TEST FAILED ====================
       Expectation: ${shouldExist ? 'FIND' : 'NOT FIND'} a task matching criteria.
       Criteria: ${JSON.stringify(criteria)}
 
       ----- Derived Tasks (${derivedTasks.length}) -----
-${derivedTasksFormatted || '  (None)'}
+${taskList}
       ---------------------------------------------------
-    `;
-    throw new Error(failureMessage);
+    `);
   }
 
   _createMatcher(criteria) {
-    if (typeof criteria === 'string') {
-      return task => task.term.toString() === criteria;
-    }
-
-    return task => {
-      if (criteria.term && task.term.toString() !== criteria.term) return false;
-      if (criteria.punctuation && task.punctuation !== criteria.punctuation) return false;
-      if (criteria.truth) {
-        if (criteria.truth.minFrequency && task.truth.frequency < criteria.truth.minFrequency) return false;
-        if (criteria.truth.minConfidence && task.truth.confidence < criteria.truth.minConfidence) return false;
-      }
-      return true;
-    };
+    return typeof criteria === 'string'
+      ? task => task.term.toString() === criteria
+      : task => {
+          if (criteria.term && task.term.toString() !== criteria.term) return false;
+          if (criteria.punctuation && task.punctuation !== criteria.punctuation) return false;
+          if (criteria.truth) {
+            if (criteria.truth.minFrequency && task.truth.frequency < criteria.truth.minFrequency) return false;
+            if (criteria.truth.minConfidence && task.truth.confidence < criteria.truth.minConfidence) return false;
+          }
+          return true;
+        };
   }
 
   _createTaskFromString(taskStr, punctuation = Punctuation.BELIEF, freq = 0.9, conf = 0.9, priority = 0.9) {

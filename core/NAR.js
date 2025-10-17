@@ -60,17 +60,12 @@ export class NAR {
   }
 
   input(taskData) {
-    try {
-      const task = this._createTask(taskData);
-      this.memory.addTask(task, this.clock.getTime());
-      this.focus.addTaskToFocus(task, task.getPriority());
-      this.stats.inputTasks++;
-      Logger.debug(`Task input: ${task.toString()}`);
-      return task;
-    } catch (error) {
-      Logger.error('Error inputting task:', error);
-      throw error;
-    }
+    const task = this._createTask(taskData);
+    this.memory.addTask(task, this.clock.getTime());
+    this.focus.addTaskToFocus(task, task.getPriority());
+    this.stats.inputTasks++;
+    Logger.debug(`Task input: ${task.toString()}`);
+    return task;
   }
 
   // Convenience methods for different task types
@@ -115,10 +110,12 @@ export class NAR {
 
   _createTask(taskData) {
     const currentTime = this.clock.getTime();
-    if (typeof taskData === 'string') {
-      return this._createTaskFromString(taskData, currentTime);
-    }
+    return typeof taskData === 'string'
+      ? this._createTaskFromString(taskData, currentTime)
+      : this._createTaskFromObject(taskData, currentTime);
+  }
 
+  _createTaskFromObject(taskData, currentTime) {
     return Task.createInput(
       typeof taskData.term === 'string' ? Term.newAtom(taskData.term) : taskData.term,
       taskData.punctuation || Punctuation.BELIEF,
@@ -253,9 +250,8 @@ export class NAR {
         await this.runCycle();
       } catch (error) {
         Logger.error('Error in reasoning cycle:', error);
-        // Continue running even if a cycle fails
       }
-      if (this._isRunning) { // Check again before scheduling next cycle
+      if (this._isRunning) {
         this.cycleTimer = setTimeout(cycleFn, this.config.cycleInterval);
       }
     };
@@ -456,55 +452,67 @@ export class NAR {
   }
 
   async _loadReasoningRules() {
-    // Load LM rules using the existing loader
-    const lmRuleDir = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
-    const lmRules = await loadRules(lmRuleDir, { lm: this.lm });
+    const [lmRules, nalRules] = await Promise.all([
+      this._loadLMRules(),
+      this._loadNALRules()
+    ]);
 
-    // Validate loaded LM rules
-    const lmValidation = validateLoadedRules(lmRules);
-    if (lmValidation.invalidCount > 0) {
-      Logger.warn(`LM rule validation issues: ${lmValidation.invalidCount} invalid rules found`);
+    const allRules = [...lmRules.valid, ...nalRules.valid];
+    const successfullyAdded = this._registerRules(allRules);
+
+    Logger.info(`Loaded ${lmRules.all.length} LM rules and ${nalRules.all.length} NAL rules, with ${successfullyAdded} successfully registered`);
+
+    if (nalRules.errors.length > 0) {
+      Logger.error(`Failed to create ${nalRules.errors.length} NAL rules:`, nalRules.errors);
+    }
+  }
+
+  async _loadLMRules() {
+    const lmRuleDir = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
+    const rules = await loadRules(lmRuleDir, { lm: this.lm });
+    const validation = validateLoadedRules(rules);
+
+    if (validation.invalidCount > 0) {
+      Logger.warn(`LM rule validation issues: ${validation.invalidCount} invalid rules found`);
     }
 
-    // Load NAL rules using the factory
+    return { all: rules, valid: validation.valid };
+  }
+
+  async _loadNALRules() {
     const nalRuleTypes = RuleFactory.getAvailableNALRules();
-    const nalRules = [];
-    const nalErrors = [];
+    const rules = [];
+    const errors = [];
 
     for (const type of nalRuleTypes) {
       try {
-        const rule = RuleFactory.createNALRule(type);
-        nalRules.push(rule);
+        rules.push(RuleFactory.createNALRule(type));
       } catch (error) {
+        const errorInfo = { type, error: error.message };
         Logger.error(`Failed to create NAL rule of type ${type}:`, error.message);
-        nalErrors.push({ type, error: error.message });
+        errors.push(errorInfo);
       }
     }
 
-    // Validate loaded NAL rules
-    const nalValidation = validateLoadedRules(nalRules);
-    if (nalValidation.invalidCount > 0) {
-      Logger.warn(`NAL rule validation issues: ${nalValidation.invalidCount} invalid rules found`);
+    const validation = validateLoadedRules(rules);
+    if (validation.invalidCount > 0) {
+      Logger.warn(`NAL rule validation issues: ${validation.invalidCount} invalid rules found`);
     }
 
-    // Combine and register all rules
-    const allRules = [...lmValidation.valid, ...nalValidation.valid];
-    let successfullyAdded = 0;
-    
-    for (const rule of allRules) {
+    return { all: rules, valid: validation.valid, errors };
+  }
+
+  _registerRules(rules) {
+    let count = 0;
+    for (const rule of rules) {
       try {
         this.reasoner.addRule(rule);
-        successfullyAdded++;
+        count++;
       } catch (error) {
         Logger.error(`Failed to add rule ${rule.id}:`, error.message);
       }
     }
-
-    Logger.info(`Loaded ${lmRules.length} LM rules and ${nalRules.length} NAL rules, with ${successfullyAdded} successfully registered`);
-    
-    if (nalErrors.length > 0) {
-      Logger.error(`Failed to create ${nalErrors.length} NAL rules:`, nalErrors);
-    }
+    return count;
   }
 
   isRunning() {
@@ -512,24 +520,28 @@ export class NAR {
   }
 
   // Rule management methods
+  _logRuleAction(action, target) {
+    Logger.debug(`${action} ${target}`);
+  }
+
   enableRule(ruleId) {
     this.reasoner.enable(ruleId);
-    Logger.debug(`Enabled rule: ${ruleId}`);
+    this._logRuleAction('Enabled rule:', ruleId);
   }
 
   disableRule(ruleId) {
     this.reasoner.disable(ruleId);
-    Logger.debug(`Disabled rule: ${ruleId}`);
+    this._logRuleAction('Disabled rule:', ruleId);
   }
 
   enableRuleType(type) {
     this.reasoner.enable(`type:${type}`);
-    Logger.debug(`Enabled rule type: ${type}`);
+    this._logRuleAction('Enabled rule type:', type);
   }
 
   disableRuleType(type) {
     this.reasoner.disable(`type:${type}`);
-    Logger.debug(`Disabled rule type: ${type}`);
+    this._logRuleAction('Disabled rule type:', type);
   }
 
   getRulesByType(type) {
