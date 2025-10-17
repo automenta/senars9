@@ -27,7 +27,7 @@ export class LMRule extends Rule {
             avgTime: 0 
         };
         
-        Object.freeze(this);
+        this._freeze();
     }
 
     get promptTemplate() {

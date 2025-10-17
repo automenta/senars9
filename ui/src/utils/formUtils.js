@@ -113,25 +113,3 @@ export const inputHandlers = {
     setter(e.target.checked);
   }
 };
-
-/**
- * Optimized debounce utility with proper cleanup
- */
-export const debounce = (func, wait) => {
-  let timeoutId = null;
-
-  const debouncedFunc = (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(this, args), wait);
-  };
-
-  // Add cleanup method
-  debouncedFunc.cancel = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
-    }
-  };
-
-  return debouncedFunc;
-};

@@ -1,6 +1,7 @@
 import {Term, TermType} from './Term.js';
 
 const COMMUTATIVE_OPERATORS = new Set(['&', '|', '+', '*']);
+const ASSOCIATIVE_OPERATORS = new Set(['&', '|']);
 
 export class TermFactory {
     constructor() {
@@ -12,46 +13,39 @@ export class TermFactory {
             throw new Error('TermFactory.create: termData is required');
         }
         
+        // Handle string input
         if (typeof termData === 'string') {
-            // If a string is passed, create an atomic term
-            const name = termData;
-            const id = name;  // For atomic terms, id is the name itself
-            const cached = this._cache.get(id);
-            if (cached) return cached;
-            
-            const term = new Term(TermType.ATOM, name, [], null);
-            this._cache.set(term.id, term);
-            return term;
+            return this._createAtomic(termData);
         }
         
-        if (!termData.components && termData.operator === undefined) {
-            // Handle case where termData is a simple object with just a name
-            if (termData.name) {
-                const name = termData.name;
-                const id = name;
-                const cached = this._cache.get(id);
-                if (cached) return cached;
-                
-                const term = new Term(TermType.ATOM, name, [], null);
-                this._cache.set(term.id, term);
-                return term;
-            } else {
-                throw new Error('TermFactory.create: termData must have components or be a string');
-            }
+        // Handle simple object with name
+        if (!termData.components && termData.operator === undefined && termData.name) {
+            return this._createAtomic(termData.name);
         }
         
+        // Handle compound terms
         const {operator, components} = this.normalize(termData);
         const name = this.buildCanonicalName(operator, components);
+        return this._cache.get(name) || this._createAndCache(operator, components, name);
+    }
+
+    _createAtomic(name) {
         const cached = this._cache.get(name);
         if (cached) return cached;
+        
+        const term = new Term(TermType.ATOM, name, [], null);
+        this._cache.set(term.id, term);
+        return term;
+    }
 
+    _createAndCache(operator, components, name) {
         const term = new Term(
             operator ? TermType.COMPOUND : TermType.ATOM,
             name,
             components,
             operator
         );
-        this._cache.set(name, term);  // Use name for caching as it represents canonical form
+        this._cache.set(name, term);
         return term;
     }
 
@@ -60,49 +54,38 @@ export class TermFactory {
             throw new Error('TermFactory.normalize: components must be an array');
         }
         
-        // For terms without operator (atomic-like terms), convert components to Term objects and preserve
-        if (!operator) {
-            const normalizedComponents = components.map(comp =>
-                (typeof comp === 'string' || comp instanceof Term) ? 
-                (typeof comp === 'string' ? this.create(comp) : comp) : 
-                this.create(comp)
-            );
-            return {operator, components: normalizedComponents};
-        }
-        
-        // For compound terms with operators, convert components to Term objects and normalize
+        // Normalize components: convert strings to Terms recursively
         let normalizedComponents = components.map(comp =>
             (typeof comp === 'string' || comp instanceof Term) ? 
             (typeof comp === 'string' ? this.create(comp) : comp) : 
             this.create(comp)
         );
 
+        // Process operators if present
         if (operator) {
-            // Validate operator type
-            if (typeof operator !== 'string') {
-                throw new Error('TermFactory.normalize: operator must be a string');
-            }
+            this._validateOperator(operator);
             
             // Flatten associative operators
-            if (operator === '&' || operator === '|') {
-                normalizedComponents = this.flatten(operator, normalizedComponents);
+            if (ASSOCIATIVE_OPERATORS.has(operator)) {
+                normalizedComponents = this._flatten(operator, normalizedComponents);
             }
 
-            // Only sort commutative operators
+            // Sort and remove redundancy for commutative operators
             if (COMMUTATIVE_OPERATORS.has(operator)) {
-                normalizedComponents.sort((a, b) => a.name.localeCompare(b.name));
-            }
-
-            // Remove redundancy for commutative operators
-            if (COMMUTATIVE_OPERATORS.has(operator)) {
-                normalizedComponents = this.removeRedundancy(normalizedComponents);
+                normalizedComponents = this._normalizeCommutative(normalizedComponents);
             }
         }
 
         return {operator, components: normalizedComponents};
     }
 
-    flatten(operator, components) {
+    _validateOperator(operator) {
+        if (typeof operator !== 'string') {
+            throw new Error('TermFactory.normalize: operator must be a string');
+        }
+    }
+
+    _flatten(operator, components) {
         if (!Array.isArray(components)) {
             throw new Error('TermFactory.flatten: components must be an array');
         }
@@ -112,7 +95,15 @@ export class TermFactory {
         );
     }
 
-    removeRedundancy(components) {
+    _normalizeCommutative(components) {
+        // Sort components by name for commutative operators
+        const sorted = components.sort((a, b) => a.name.localeCompare(b.name));
+        
+        // Remove duplicates
+        return this._removeRedundancy(sorted);
+    }
+
+    _removeRedundancy(components) {
         if (!Array.isArray(components)) {
             throw new Error('TermFactory.removeRedundancy: components must be an array');
         }

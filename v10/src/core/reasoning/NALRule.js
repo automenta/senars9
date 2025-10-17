@@ -4,29 +4,22 @@ import {Term} from '../term/Term.js';
 export class NALRule extends Rule {
     constructor(id, premises, conclusion, truthFunction, priority = 1.0, config = {}) {
         super(id, 'nal', priority, config);
-        this._premises = Object.freeze(premises);
+        this._premises = Object.freeze(premises || []);
         this._conclusion = conclusion;
         this._truthFunction = truthFunction;
         Object.freeze(this);
     }
 
-    get premises() {
-        return this._premises;
-    }
-
-    get conclusion() {
-        return this._conclusion;
-    }
-
-    get truthFunction() {
-        return this._truthFunction;
-    }
+    get premises() { return this._premises; }
+    get conclusion() { return this._conclusion; }
+    get truthFunction() { return this._truthFunction; }
 
     _matches(task) {
         return this._premises.length > 0 && this._premises.some(premise => this._matchesPattern(premise, task.term));
     }
 
     _matchesPattern(pattern, term) {
+        if (!pattern || !term) return false;
         if (pattern.type !== term.type) return false;
 
         if (pattern.isAtomic && term.isAtomic) {
@@ -56,7 +49,7 @@ export class NALRule extends Rule {
         if (!bindings) return [];
 
         const derivedTerm = this._substituteVariables(this._conclusion, bindings);
-        const derivedTruth = this._computeDerivedTruth(task.truth, bindings);
+        const derivedTruth = this._computeDerivedTruth(task.truth);
 
         if (!derivedTerm || !derivedTruth) return [];
 
@@ -106,7 +99,7 @@ export class NALRule extends Rule {
         return term;
     }
 
-    _computeDerivedTruth(taskTruth, bindings) {
+    _computeDerivedTruth(taskTruth) {
         return this._truthFunction ? this._truthFunction(taskTruth, taskTruth) : taskTruth;
     }
 

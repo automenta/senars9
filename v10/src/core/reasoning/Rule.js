@@ -17,47 +17,30 @@ export class Rule {
         });
     }
 
-    get id() {
-        return this._id;
-    }
-
-    get type() {
-        return this._type;
-    }
-
-    get priority() {
-        return this._priority;
-    }
-
-    get enabled() {
-        return this._enabled;
-    }
-
-    get config() {
-        return this._config;
-    }
-
-    get metrics() {
-        return this._metrics;
-    }
+    get id() { return this._id; }
+    get type() { return this._type; }
+    get priority() { return this._priority; }
+    get enabled() { return this._enabled; }
+    get config() { return this._config; }
+    get metrics() { return this._metrics; }
 
     // Immutable state modifiers
     enable() {
-        return this._enabled ? Object.freeze({...this}) : this._clone({enabled: true});
+        return this._enabled ? this : this._clone({enabled: true});
     }
 
     disable() {
-        return this._enabled ? this._clone({enabled: false}) : Object.freeze({...this});
+        return this._enabled ? this._clone({enabled: false}) : this;
     }
 
     withPriority(priority) {
         const clamped = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
-        return clamped === this._priority ? Object.freeze({...this}) : this._clone({priority: clamped});
+        return clamped === this._priority ? this : this._clone({priority: clamped});
     }
 
     withConfig(config) {
         const merged = {...this._config, ...config};
-        return this._config === merged ? Object.freeze({...this}) : this._clone({config: merged});
+        return this._config === merged ? this : this._clone({config: merged});
     }
 
     canApply(task) {
@@ -65,7 +48,7 @@ export class Rule {
     }
 
     apply(task) {
-        if (!this.canApply(task)) return [];
+        if (!this.canApply(task)) return {results: [], rule: this};
 
         const start = performance.now();
         try {
@@ -76,7 +59,7 @@ export class Rule {
         }
     }
 
-    // Template methods
+    // Template methods - to be overridden by subclasses
     _matches(task) {
         return true;
     }
@@ -88,14 +71,10 @@ export class Rule {
     // Internal utilities
     _clone(overrides = {}) {
         const Constructor = this.constructor;
-        const baseArgs = [this._id, this._type, this._priority];
         const configArg = {...this._config, ...overrides};
 
-        // Handle different constructor signatures for subclasses
-        const newRule = Constructor.length === 4
-            ? new Constructor(...baseArgs, configArg)
-            : new Constructor(...baseArgs, this._priority, configArg);
-        
+        // Handle different constructor signatures for subclasses  
+        const newRule = new Constructor(this._id, this._type, this._priority, configArg);
         Object.freeze(newRule);
         return newRule;
     }
@@ -103,7 +82,12 @@ export class Rule {
     _updateMetrics(success, time) {
         const metrics = Metrics.update(this._metrics, success, time);
         const newRule = this._clone({metrics});
-        Object.freeze(newRule);
         return newRule;
+    }
+    
+    // Freeze the rule instance - should be called at the end of subclass constructors
+    _freeze() {
+        Object.freeze(this);
+        return this;
     }
 }

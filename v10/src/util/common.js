@@ -36,21 +36,32 @@ export const createMap = (items, keyFn, valueFn = x => x) =>
 export const createSet = (items, keyFn = x => x) =>
     new Set(items.map(keyFn));
 
-export const debounce = (fn, delay) => {
-    let timeoutId;
-    return (...args) => {
+export const debounce = (func, wait) => {
+    let timeoutId = null;
+
+    const debouncedFunc = (...args) => {
         clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => fn(...args), delay);
+        timeoutId = setTimeout(() => func.apply(this, args), wait);
     };
+
+    // Add cleanup method
+    debouncedFunc.cancel = () => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+    };
+
+    return debouncedFunc;
 };
 
 export const throttle = (fn, delay) => {
     let lastCall = 0;
     return (...args) => {
         const now = Date.now();
-        (now - lastCall >= delay)
-        now - lastCall >= delay && (lastCall = now, fn(...args));
-        now - lastCall >= delay && (lastCall = now, fn(...args));
-        (lastCall = now, fn(...args));
+        if (now - lastCall >= delay) {
+            lastCall = now;
+            fn(...args);
+        }
     };
 };

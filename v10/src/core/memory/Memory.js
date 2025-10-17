@@ -1,7 +1,6 @@
 import {Concept} from './Concept.js';
 import {MemoryIndex} from './MemoryIndex.js';
 import {MemoryConsolidation} from './MemoryConsolidation.js';
-import {TaskPromotionManager} from './TaskPromotionManager.js';
 
 export class Memory {
     static get SCORING_WEIGHTS() {
@@ -16,17 +15,13 @@ export class Memory {
         return {activationThreshold: 0.1, minTasksThreshold: 5, decayThreshold: 0.01, minTasksForDecay: 2};
     }
 
-    static get ACTIVATION_MULTIPLIERS() {
-        return {globalDecay: 0.9, averagePriority: 0.5};
-    }
-
     constructor(config = {}) {
-        // Store the original config object to maintain reference equality for tests
+        // Store the original config to maintain reference equality for tests
         this._originalConfig = config;
         
         this._config = {
             priorityThreshold: 0.5,
-            priorityDecayRate: 0.01,  // Default, but will be overridden by config if provided
+            priorityDecayRate: 0.01,
             consolidationInterval: 10,
             ...config
         };
@@ -35,7 +30,6 @@ export class Memory {
         this._focusConcepts = new Set();
         this._index = new MemoryIndex();
         this._consolidation = new MemoryConsolidation();
-        this._promotionManager = new TaskPromotionManager();
         this._stats = {
             totalConcepts: 0,
             totalTasks: 0,
@@ -46,39 +40,16 @@ export class Memory {
         this._cyclesSinceConsolidation = 0;
     }
 
-    get config() {
-        return this._originalConfig;
-    }
-
-    get concepts() {
-        return new Map(this._concepts);
-    }
-
-    get focusConcepts() {
-        return new Set(this._focusConcepts);
-    }
-
-    get stats() {
-        return {...this._stats};
-    }
+    get config() { return this._originalConfig; }
+    get concepts() { return new Map(this._concepts); }
+    get focusConcepts() { return new Set(this._focusConcepts); }
+    get stats() { return {...this._stats}; }
 
     addTask(task, currentTime = Date.now()) {
-        if (!task) {
-            return false;
-        }
-        if (!task.term) {
-            return false;
-        }
+        if (!task?.term) return false;
         
         const term = task.term;
-
-        let concept = this._concepts.get(term);
-        if (!concept) {
-            concept = new Concept(term, this._config);
-            this._concepts.set(term, concept);
-            this._index.addConcept(concept);
-            this._stats.totalConcepts++;
-        }
+        let concept = this._concepts.get(term) || this._createConcept(term);
 
         const added = concept.addTask(task);
         if (added) {
@@ -91,15 +62,22 @@ export class Memory {
         return added;
     }
 
+    _createConcept(term) {
+        const concept = new Concept(term, this._config);
+        this._concepts.set(term, concept);
+        this._index.addConcept(concept);
+        this._stats.totalConcepts++;
+        return concept;
+    }
+
     getConcept(term) {
-        if (!term) {
-            return null;
-        }
+        if (!term) return null;
         
-        let concept = this._concepts.get(term);
+        const concept = this._concepts.get(term);
         if (concept) return concept;
 
-        for (let [key, value] of this._concepts) {
+        // Fallback to equality check if term not found by reference
+        for (const [key, value] of this._concepts) {
             if (key.equals(term)) return value;
         }
         return null;
@@ -110,9 +88,7 @@ export class Memory {
     }
 
     getConceptsByCriteria(criteria = {}) {
-        let concepts = this.getAllConcepts();
-
-        return concepts.filter(c => {
+        return this.getAllConcepts().filter(c => {
             if (criteria.minActivation !== undefined && c.activation < criteria.minActivation) return false;
             if (criteria.minTasks !== undefined && c.totalTasks < criteria.minTasks) return false;
             if (criteria.taskType && c.getTasksByType(criteria.taskType).length === 0) return false;
@@ -146,9 +122,7 @@ export class Memory {
     }
 
     removeConcept(term) {
-        if (!term) {
-            throw new Error('Memory.removeConcept: term is required');
-        }
+        if (!term) return false;
         
         const concept = this._concepts.get(term);
         if (!concept) return false;
@@ -167,50 +141,14 @@ export class Memory {
     }
 
     consolidate(currentTime = Date.now()) {
-        if (this._cyclesSinceConsolidation < this._config.consolidationInterval) {
-            this._cyclesSinceConsolidation++;
-            return;
-        }
+        if (this._cyclesSinceConsolidation++ < this._config.consolidationInterval) return;
 
         this._cyclesSinceConsolidation = 0;
         this._stats.lastConsolidation = currentTime;
 
-        // Use enhanced consolidation algorithm
-        const consolidationResults = this._consolidation.consolidate(this, currentTime);
-
-        // Legacy consolidation for focus concepts
-        const {activationThreshold, minTasksThreshold} = Memory.CONSOLIDATION_THRESHOLDS;
-        for (const concept of this._focusConcepts) {
-            if (concept.activation < activationThreshold && concept.totalTasks < minTasksThreshold) {
-                this._focusConcepts.delete(concept);
-            }
-        }
-
+        const results = this._consolidation.consolidate(this, currentTime);
         this._updateFocusConceptsCount();
-        return consolidationResults;
-    }
-
-    _applyGlobalDecay() {
-        const decayRate = this._config.priorityDecayRate;
-        const {globalDecay, averagePriority} = Memory.ACTIVATION_MULTIPLIERS;
-
-        for (const concept of this._concepts.values()) {
-            concept.applyDecay(decayRate);
-            const avgPriority = concept.averagePriority;
-            concept._activation = Math.max(concept._activation * globalDecay, avgPriority * averagePriority);
-        }
-    }
-
-    _removeDecayedConcepts() {
-        const {decayThreshold, minTasksForDecay} = Memory.CONSOLIDATION_THRESHOLDS;
-        const conceptsToRemove = [];
-
-        for (const [term, concept] of this._concepts) {
-            if (concept.activation < decayThreshold && concept.totalTasks < minTasksForDecay) {
-                conceptsToRemove.push(term);
-            }
-        }
-        conceptsToRemove.forEach(term => this.removeConcept(term));
+        return results;
     }
 
     boostConceptActivation(term, boostAmount = 0.1) {
@@ -248,17 +186,10 @@ export class Memory {
         };
     }
 
-    /**
-     * Get memory health metrics
-     */
     getHealthMetrics() {
         return this._consolidation.calculateHealthMetrics(this);
     }
 
-    /** 
-     * Helper method to update focus concepts count in stats
-     * @private
-     */
     _updateFocusConceptsCount() {
         this._stats.focusConceptsCount = this._focusConcepts.size;
     }

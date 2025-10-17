@@ -45,29 +45,13 @@ export class NAR {
 
         this._isRunning = false;
         this._cycleInterval = null;
-
-        this._setupDefaultEventHandlers();
     }
 
-    get config() {
-        return this._config;
-    }
-
-    get memory() {
-        return this._memory;
-    }
-
-    get isRunning() {
-        return this._isRunning;
-    }
-
-    get cycleCount() {
-        return this._cycle.cycleCount;
-    }
-
-    get lm() {
-        return this._lm;
-    }
+    get config() { return this._config; }
+    get memory() { return this._memory; }
+    get isRunning() { return this._isRunning; }
+    get cycleCount() { return this._cycle.cycleCount; }
+    get lm() { return this._lm; }
 
     _setupDefaultRules() {
         try {
@@ -91,7 +75,8 @@ export class NAR {
             }
             return added;
         } catch (error) {
-            return this._handleInputError(error, narseseString);
+            this._eventBus.emit('input.error', {error: error.message, input: narseseString});
+            throw error;
         }
     }
 
@@ -108,11 +93,6 @@ export class NAR {
         return taskCreator();
     }
 
-    _handleInputError(error, input) {
-        this._eventBus.emit('input.error', {error: error.message, input});
-        throw error;
-    }
-
     start() {
         if (this._isRunning) return false;
 
@@ -121,14 +101,16 @@ export class NAR {
 
         this._cycleInterval = setInterval(async () => {
             try {
-                await this._executeCycle();
+                const result = await this._cycle.execute();
+                this._eventBus.emit('cycle.completed', result);
             } catch (error) {
                 this.logger.error('Error in reasoning cycle:', error);
                 this._eventBus.emit('cycle.error', {error: error.message});
             }
         }, this._config.cycle.delay);
 
-        return this._eventBus.emit('system.started', {timestamp: Date.now()}), true;
+        this._eventBus.emit('system.started', {timestamp: Date.now()});
+        return true;
     }
 
     stop() {
@@ -205,8 +187,7 @@ export class NAR {
             isRunning: this._isRunning,
             cycleCount: this._cycle.cycleCount,
             memoryStats: this._memory.getDetailedStats(),
-            taskManagerStats: this._taskManager.getTaskStats ?
-                this._taskManager.getTaskStats() : this._taskManager.stats,
+            taskManagerStats: this._taskManager.getTaskStats || this._taskManager.stats,
             cycleStats: this._cycle.stats,
             config: this._config.toJSON()
         };
@@ -267,18 +248,5 @@ export class NAR {
         for (const task of this._taskManager.processPendingTasks(Date.now())) {
             this._eventBus.emit('task.added', {task});
         }
-    }
-
-    async _executeCycle() {
-        this._eventBus.emit('cycle.completed', await this._cycle.execute());
-    }
-
-    _setupDefaultEventHandlers() {
-        this._eventBus.on('task.input', (data) => {
-            if (this._config.debug.enabled) this.logger.log('debug', `Input: ${data.originalInput} -> ${data.task.type}`);
-        });
-
-        this._eventBus.on('cycle.error', (data) => this.logger.error('Cycle error:', data.error));
-        this._eventBus.on('input.error', (data) => this.logger.error('Input error:', data.error));
     }
 }

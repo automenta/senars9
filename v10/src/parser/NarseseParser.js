@@ -27,19 +27,16 @@ export class NarseseParser {
     parseTermData(input) {
         const trimmed = input.trim();
 
-        if (trimmed.startsWith('(')) {
-            if (!trimmed.endsWith(')')) {
-                throw new Error('Unclosed parenthesis');
-            }
+        if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
             return this.parseCompound(trimmed.slice(1, -1).trim());
         }
 
         if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-            return this.parseSet(trimmed, 'EXTENSIONAL_SET');
+            return this.parseSet(trimmed, '{}');
         }
 
         if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-            return this.parseSet(trimmed, 'INTENSIONAL_SET');
+            return this.parseSet(trimmed, '[]');
         }
 
         return {components: [trimmed]};
@@ -57,7 +54,7 @@ export class NarseseParser {
             else if (inner[i] === ')') parenDepth--;
             else if (parenDepth === 0) {
                 for (const op of operators) {
-                    if (inner.substring(i, i + op.length) === op) {
+                    if (inner.startsWith(op, i)) {
                         if (mainOpIndex === -1 || i < mainOpIndex) {
                             mainOp = op;
                             mainOpIndex = i;
@@ -67,7 +64,7 @@ export class NarseseParser {
             }
         }
 
-        if (mainOp) {
+        if (mainOp !== null) {
             const left = inner.substring(0, mainOpIndex).trim();
             const right = inner.substring(mainOpIndex + mainOp.length).trim();
             return {
@@ -76,33 +73,25 @@ export class NarseseParser {
             };
         }
 
-        const prefixParsers = [
-            {prefix: '--, ', operator: '--', arity: 1},
-            {prefix: '&, ', operator: '&', arity: -1},
-            {prefix: '|, ', operator: '|', arity: -1},
-            {prefix: '&/, ', operator: '&/', arity: -1}
+        // Check for prefix operators like negation, conjunction, etc.
+        const prefixOps = [
+            ['--, ', '--'],
+            ['&, ', '&'],
+            ['|, ', '|'],
+            ['&/, ', '&/']
         ];
 
-        for (const parser of prefixParsers) {
-            if (inner.startsWith(parser.prefix)) {
-                const content = inner.slice(parser.prefix.length).trim();
+        for (const [prefix, op] of prefixOps) {
+            if (inner.startsWith(prefix)) {
+                const content = inner.slice(prefix.length).trim();
                 const components = this.parseList(content);
-                if (parser.arity === 1 && components.length === 1) {
-                    return {operator: parser.operator, components};
-                }
-                return {operator: parser.operator, components};
+                return {operator: op, components};
             }
         }
 
         // Product: comma-separated terms
         const components = this.parseList(inner);
-        if (components.length > 1) {
-            return {operator: ',', components};
-        } else if (components.length === 1) {
-            return {components: [inner]};
-        } else {
-            throw new Error('Invalid compound term');
-        }
+        return components.length > 1 ? {operator: ',', components} : {components: [inner]};
     }
 
     parseBinary(str, op, operator) {
@@ -110,9 +99,9 @@ export class NarseseParser {
         return {operator, components: [this.parseTermData(left), this.parseTermData(right)]};
     }
 
-    parseSet(str, type) {
+    parseSet(str, operator) {
         const inner = str.slice(1, -1).trim();
-        return {operator: type === 'EXTENSIONAL_SET' ? '{}' : '[]', components: this.parseList(inner)};
+        return {operator, components: this.parseList(inner)};
     }
 
     parseList(str) {
@@ -191,6 +180,7 @@ export class NarseseParser {
             ' ==> ': '==>',
             ' <=> ': '<=>',
             ' ^ ': '^',
+            ' & ': '&',
             ' {{-- ': '{{--',
             ' --}} ': '--}}'
         };
