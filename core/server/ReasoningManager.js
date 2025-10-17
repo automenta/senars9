@@ -109,22 +109,22 @@ class ReasoningManager {
 
   createAndAddTask(taskData) {
     try {
-      // If we have access to core memory, use its task creation methods
-      if (this.core?.memory?.createTask) {
-        const task = this.core.memory.createTask(taskData);
-        this.core.memory.addTask(task, Date.now());
-      } else if (this.memory?.createTask) {
-        const task = this.memory.createTask(taskData);
-        this.memory.addTask(task, Date.now());
-      } else {
-        // Fallback: add task data directly to memory if it supports that
-        this.memory.addTask(taskData, Date.now());
-      }
-      
+      const task = this._createTask(taskData);
+      this._addTaskToMemory(task, Date.now());
       WebSocketUtils.debug(`Loaded task: ${taskData.content}`);
     } catch (taskError) {
       WebSocketUtils.error('Error creating task:', taskError, taskData);
     }
+  }
+
+  _createTask(taskData) {
+    const memory = this.core?.memory || this.memory;
+    return memory?.createTask ? memory.createTask(taskData) : taskData;
+  }
+
+  _addTaskToMemory(task, timestamp) {
+    const memory = this.core?.memory || this.memory;
+    memory.addTask(task, timestamp);
   }
 
   parseTaskContent(content, truthValue = null) {
@@ -138,100 +138,70 @@ class ReasoningManager {
     return this.createAtomicTerm(cleanContent, truthValue);
   }
 
-  createInheritanceTerm(subject, predicate, truthValue) {
-    // If we have access to core memory, delegate to it
-    if (this.core?.memory?.createInheritanceTerm) {
-      return this.core.memory.createInheritanceTerm(subject, predicate, truthValue);
-    } else if (this.memory?.createInheritanceTerm) {
-      return this.memory.createInheritanceTerm(subject, predicate, truthValue);
+  _getMemory() {
+    return this.core?.memory || this.memory;
+  }
+
+  _createTermWithFallback(createTermFn, fallbackTerm, truthValue, defaultFreq, defaultConf) {
+    const memory = this._getMemory();
+
+    if (memory?.[createTermFn.name]) {
+      return memory[createTermFn.name](...createTermFn.arguments);
     }
-    
-    // Fallback handling for undefined Term objects
+
     try {
-      // Check if Term and TermType are defined before using them
       if (typeof Term !== 'undefined' && typeof TermType !== 'undefined') {
-        const subjTerm = Term.newAtom(subject);
-        const predTerm = Term.newAtom(predicate);
-        const term = Term.createCompound(TermType.INHERITANCE, [subjTerm, predTerm]);
-
-        const truth = this.normalizeTruthValue(truthValue, 0.8, 0.8);
-
+        const term = createTermFn(Term, TermType);
+        const truth = this._normalizeTruthValue(truthValue, defaultFreq, defaultConf);
         return { term, truth };
-      } else {
-        // Safe fallback if Term is not available
-        return { 
-          term: `(${subject}-->${predicate})`, 
-          truth: truthValue 
-        };
       }
     } catch (error) {
-      // Safe fallback if Term is not available or error occurs
-      return { 
-        term: `(${subject}-->${predicate})`, 
-        truth: truthValue 
-      };
+      // Safe fallback
     }
+
+    return { term: fallbackTerm, truth: truthValue };
+  }
+
+  createInheritanceTerm(subject, predicate, truthValue) {
+    return this._createTermWithFallback(
+      () => [subject, predicate],
+      `(${subject}-->${predicate})`,
+      truthValue,
+      0.8,
+      0.8
+    );
   }
 
   createAtomicTerm(content, truthValue) {
-    // If we have access to core memory, delegate to it
-    if (this.core?.memory?.createAtomicTerm) {
-      return this.core.memory.createAtomicTerm(content, truthValue);
-    } else if (this.memory?.createAtomicTerm) {
-      return this.memory.createAtomicTerm(content, truthValue);
-    }
-    
-    // Fallback handling for undefined Term objects
-    try {
-      if (typeof Term !== 'undefined') {
-        const term = Term.newAtom(content);
-        const truth = this.normalizeTruthValue(truthValue, 0.5, 0.5);
-
-        return { term, truth };
-      } else {
-        // Safe fallback if Term is not available
-        return { 
-          term: content, 
-          truth: truthValue 
-        };
-      }
-    } catch (error) {
-      // Safe fallback if Term is not available or error occurs
-      return { 
-        term: content, 
-        truth: truthValue 
-      };
-    }
+    return this._createTermWithFallback(
+      () => [content],
+      content,
+      truthValue,
+      0.5,
+      0.5
+    );
   }
 
-  normalizeTruthValue(truthValue, defaultFreq, defaultConf) {
-    // If we have access to core memory, delegate to it
-    if (this.core?.memory?.normalizeTruthValue) {
-      return this.core.memory.normalizeTruthValue(truthValue, defaultFreq, defaultConf);
-    } else if (this.memory?.normalizeTruthValue) {
-      return this.memory.normalizeTruthValue(truthValue, defaultFreq, defaultConf);
+  _normalizeTruthValue(truthValue, defaultFreq, defaultConf) {
+    const memory = this._getMemory();
+
+    if (memory?.normalizeTruthValue) {
+      return memory.normalizeTruthValue(truthValue, defaultFreq, defaultConf);
     }
-    
+
     if (!truthValue) {
-      // Check if TruthValue constructor is available
-      if (typeof TruthValue !== 'undefined') {
-        return new TruthValue(defaultFreq, defaultConf);
-      } else {
-        // Return a plain object as fallback
-        return { frequency: defaultFreq, confidence: defaultConf };
-      }
+      return typeof TruthValue !== 'undefined'
+        ? new TruthValue(defaultFreq, defaultConf)
+        : { frequency: defaultFreq, confidence: defaultConf };
     }
 
     if (typeof truthValue === 'object' && !truthValue.hasOwnProperty('frequency')) {
-      if (typeof TruthValue !== 'undefined') {
-        return new TruthValue(truthValue.frequency || defaultFreq, truthValue.confidence || defaultConf);
-      } else {
-        // Return a plain object as fallback
-        return { 
-          frequency: truthValue.frequency || defaultFreq, 
-          confidence: truthValue.confidence || defaultConf 
-        };
-      }
+      return typeof TruthValue !== 'undefined'
+        ? new TruthValue(truthValue.frequency || defaultFreq, truthValue.confidence || defaultConf)
+        : {
+            frequency: truthValue.frequency || defaultFreq,
+            confidence: truthValue.confidence || defaultConf
+          };
     }
 
     return truthValue;

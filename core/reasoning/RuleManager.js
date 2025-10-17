@@ -166,7 +166,9 @@ export class RuleManager {
   }
 
   getRulesByType(type) {
-    return Array.from(this.rules.values()).filter(rule => rule.type === type);
+    const typeGroup = this.ruleGroups.get(`type:${type}`);
+    if (!typeGroup) return [];
+    return Array.from(typeGroup).map(id => this.rules.get(id)).filter(Boolean);
   }
 
   getStats() {
@@ -188,12 +190,6 @@ export class RuleManager {
       validatedRules: this.ruleValidation.size,
       performance: this._aggregateMetrics()
     };
-  }
-
-  getRulesByType(type) {
-    const typeGroup = this.ruleGroups.get(`type:${type}`);
-    if (!typeGroup) return [];
-    return Array.from(typeGroup).map(id => this.rules.get(id)).filter(Boolean);
   }
 
   getRuleValidationStatus(ruleId) {

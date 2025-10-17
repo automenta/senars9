@@ -179,10 +179,9 @@ ${derivedTasksFormatted || '  (None)'}
 
   _createMatcher(criteria) {
     if (typeof criteria === 'string') {
-      // Use exact match for simple strings to avoid ambiguity.
       return task => task.term.toString() === criteria;
     }
-    // Fallback for more complex object-based criteria (not currently used but good for future)
+
     return task => {
       if (criteria.term && task.term.toString() !== criteria.term) return false;
       if (criteria.punctuation && task.punctuation !== criteria.punctuation) return false;

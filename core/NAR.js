@@ -90,12 +90,6 @@ export class NAR {
     });
   }
 
-  ask(content) {
-    return this.input(typeof content === 'string'
-      ? { term: content, punctuation: Punctuation.QUESTION }
-      : { ...content, punctuation: Punctuation.QUESTION });
-  }
-
   // Convenience method to quickly run reasoning on a task
   async think(taskContent) {
     const task = this.input(taskContent);
@@ -107,7 +101,7 @@ export class NAR {
   async thinkAndRespond(taskContent, options = {}) {
     const task = this.input(taskContent);
     const derivedTasks = await this.runCycle();
-    
+
     if (options.returnDerived !== false) {
       return {
         input: task,
@@ -115,35 +109,14 @@ export class NAR {
         tasks: this.getTasksByPriority()
       };
     }
-    
+
     return { input: task, derived: derivedTasks };
   }
 
   _createTask(taskData) {
     const currentTime = this.clock.getTime();
     if (typeof taskData === 'string') {
-      const isGoal = taskData.endsWith('!');
-      const isQuestion = taskData.endsWith('?');
-      let termStr = taskData;
-      let punctuation = Punctuation.BELIEF;
-
-      if (isGoal) {
-        termStr = taskData.slice(0, -1);
-        punctuation = Punctuation.GOAL;
-      } else if (isQuestion) {
-        termStr = taskData.slice(0, -1);
-        punctuation = Punctuation.QUESTION;
-      } else if (taskData.endsWith('.')) {
-        termStr = taskData.slice(0, -1);
-      }
-
-      return Task.createInput(
-        Term.newAtom(termStr.trim()),
-        punctuation,
-        new TruthValue(0.9, 0.9),
-        currentTime,
-        currentTime
-      );
+      return this._createTaskFromString(taskData, currentTime);
     }
 
     return Task.createInput(
@@ -154,6 +127,37 @@ export class NAR {
       currentTime,
       taskData.priority || 0.5
     );
+  }
+
+  _createTaskFromString(taskStr, currentTime) {
+    const { termStr, punctuation } = this._parseTaskString(taskStr);
+
+    return Task.createInput(
+      Term.newAtom(termStr.trim()),
+      punctuation,
+      new TruthValue(0.9, 0.9),
+      currentTime,
+      currentTime
+    );
+  }
+
+  _parseTaskString(taskStr) {
+    const isGoal = taskStr.endsWith('!');
+    const isQuestion = taskStr.endsWith('?');
+    let termStr = taskStr;
+    let punctuation = Punctuation.BELIEF;
+
+    if (isGoal) {
+      termStr = taskStr.slice(0, -1);
+      punctuation = Punctuation.GOAL;
+    } else if (isQuestion) {
+      termStr = taskStr.slice(0, -1);
+      punctuation = Punctuation.QUESTION;
+    } else if (taskStr.endsWith('.')) {
+      termStr = taskStr.slice(0, -1);
+    }
+
+    return { termStr, punctuation };
   }
 
   ask(questionData) {
