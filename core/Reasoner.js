@@ -3,12 +3,10 @@ import { DEFAULTS } from './base/constants.js';
 import { Component } from './components/Component.js';
 import { RuleManager } from './reasoning/RuleManager.js';
 import { RuleApplicationEngine } from './reasoning/RuleApplicationEngine.js';
+import { NALRule } from './reasoning/NALRule.js';
 
-export class NALRule {
-  getTriggerTermType() { throw new Error('getTriggerTermType must be implemented by subclasses'); }
-  apply(context) { throw new Error('apply must be implemented by subclasses'); }
-  canApply(context) { return true; }
-}
+// Export NALRule for backward compatibility with other modules
+export { NALRule };
 
 export class Reasoner extends Component {
   constructor(lm = null, strategyRegistry = null, systemContext = null) {

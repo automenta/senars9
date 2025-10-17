@@ -3,7 +3,7 @@
  * @description LM-specific reasoning components
  */
 
-export { LMRule } from '../Rule.js';
+export { LMRule } from '../LMRule.js';
 export { 
   Premise, 
   TaskPremise, 

@@ -6,17 +6,7 @@
 import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation } from '../../../Task.js';
-import { extractTaskFromContext } from '../../RuleHelpers.js';
-
-// Helper functions
-
-function parseSubGoals(lmResponse) {
-  return lmResponse
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .map(line => line.replace(/^\s*\d+[\.\)]\s*|^\s*[-*]\s*/, '').trim());
-}
+import { extractTaskFromContext, parseSubGoals } from '../../RuleHelpers.js';
 
 const hasVariable = (text) => {
   return /[\$\?]\w+/.test(text);

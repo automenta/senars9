@@ -1,4 +1,5 @@
 import { NALRule } from '../NALRule.js';
+import { TruthValue } from '../../Task.js';
 
 export class DeductionRule extends NALRule {
   constructor(options = {}) {
@@ -43,7 +44,7 @@ export class DeductionRule extends NALRule {
             results.push({
               term: `(${consequent}).`,
               punctuation: '.',
-              truth: this.applyTruthFunction(task.truth, { type: 'deduction' }),
+              truth: TruthValue.deduction(task.truth, { frequency: 0.9, confidence: 0.9 }),
               derivationPath: ['nal:deduction', this.id],
               parent: [task]
             });
@@ -98,7 +99,7 @@ export class InductionRule extends NALRule {
         results.push({
           term: `(${pattern} <-> ${pattern}).`,
           punctuation: '.',
-          truth: this.applyTruthFunction({ frequency: avgFreq, confidence: avgConf }, { type: 'induction' }),
+          truth: new TruthValue(avgFreq, avgConf),
           derivationPath: ['nal:induction', this.id],
           parent: similarTasks
         });
@@ -134,7 +135,7 @@ export class AbductionRule extends NALRule {
       results.push({
         term: `(${questionTask.term.replace('?', '')} ? hypothesis).`,
         punctuation: '.',
-        truth: this.applyTruthFunction(null, { type: 'abduction' }),
+        truth: TruthValue.abduction({ frequency: 0.9, confidence: 0.9 }, questionTask.truth),
         derivationPath: ['nal:abduction', this.id],
         parent: [questionTask]
       });

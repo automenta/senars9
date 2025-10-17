@@ -6,35 +6,7 @@
 import { LMRule } from '../../LMRule.js';
 import { Term } from '../../../Term.js';
 import { Task, Punctuation, TruthValue } from '../../../Task.js';
-import { extractTaskFromContext } from '../../RuleHelpers.js';
-
-// Helper functions (previously in RuleHelpers.js)
-
-function parseSubGoals(lmResponse) {
-  return lmResponse
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .map(line => line.replace(/^\s*\d+[\.\)]\s*|^\s*[-*]\s*/, '').trim());
-}
-
-function cleanSubGoal(goal) {
-  if (!goal) return '';
-  goal = goal.replace(/^["']|["']$/g, '');
-  goal = goal.replace(/[.,;!?]+$/, '');
-  return goal.trim();
-}
-
-function isValidSubGoal(goal, minLength, maxLength) {
-  if (!goal || goal.length < minLength || goal.length > maxLength) {
-    return false;
-  }
-  const lowerGoal = goal.toLowerCase();
-  if (lowerGoal.includes('sorry') || lowerGoal.includes('cannot') || lowerGoal.includes('unable')) {
-    return false;
-  }
-  return true;
-}
+import { extractTaskFromContext, parseSubGoals, cleanSubGoal, isValidSubGoal } from '../../RuleHelpers.js';
 
 function createSubGoalTask(subGoal, originalTask) {
   const originalTruth = originalTask.truth || new TruthValue(1.0, 0.9);

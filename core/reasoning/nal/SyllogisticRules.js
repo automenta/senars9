@@ -117,11 +117,7 @@ export class DeductiveSyllogismRule extends SyllogisticRule {
         }
       },
       (s1, _p1, _s2, p2) => [s1, p2],
-      (t1, t2) => {
-        const f = t1.frequency * t2.frequency;
-        const c = t1.confidence * t2.confidence * t2.frequency;
-        return new TruthValue(f, c);
-      },
+      (t1, t2) => TruthValue.deduction(t1, t2),
       false,
       options
     );
@@ -147,11 +143,7 @@ export class InductionRule extends SyllogisticRule {
         }
       },
       (_s1, p1, _s2, p2) => [p1, p2],
-      (t1, t2) => {
-        const f = t1.frequency * t2.frequency;
-        const c = t1.confidence * t2.confidence * t2.frequency;
-        return new TruthValue(f, c);
-      },
+      (t1, t2) => TruthValue.deduction(t1, t2),
       true,
       options
     );
@@ -177,11 +169,7 @@ export class AbductionRule extends SyllogisticRule {
         }
       },
       (s1, _p1, s2, _p2) => [s1, s2],
-      (t1, t2) => {
-        const f = t1.frequency * t2.frequency;
-        const c = t1.confidence * t2.confidence * t2.frequency;
-        return new TruthValue(f, c);
-      },
+      (t1, t2) => TruthValue.deduction(t1, t2),
       true,
       options
     );

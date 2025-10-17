@@ -106,9 +106,9 @@ export class Analogy extends NALRule {
   }
 
   _calculateAnalogyTruth(truth1, truth2, truth3) {
-    return {
-      frequency: Math.min(truth1.frequency, truth2.frequency, truth3.frequency),
-      confidence: truth1.confidence * truth2.confidence * truth3.confidence
-    };
+    return new TruthValue(
+      Math.min(truth1.frequency, truth2.frequency, truth3.frequency),
+      truth1.confidence * truth2.confidence * truth3.confidence
+    );
   }
 }

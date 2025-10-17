@@ -47,9 +47,7 @@ export class ModusPonensRule extends NALRule {
       const antecedentTask = memory.getTask(antecedentTerm.hash);
 
       if (antecedentTask && antecedentTask.punctuation === Punctuation.BELIEF) {
-        const newFreq = implicationTruth.frequency * antecedentTask.truth.frequency;
-        const newConf = implicationTruth.confidence * antecedentTask.truth.confidence * implicationTruth.frequency;
-        const newTruth = new TruthValue(newFreq, newConf);
+        const newTruth = TruthValue.detachment(implicationTruth, antecedentTask.truth);
 
         const newTask = new Task(
           consequentTerm,
