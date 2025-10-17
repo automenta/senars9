@@ -78,7 +78,21 @@ export class Memory {
     if (!term) {
       return null;
     }
-    return this._concepts.get(term) || null;
+    // Try direct lookup first (using object identity)
+    let concept = this._concepts.get(term);
+    if (concept) {
+      return concept;
+    }
+    
+    // If direct lookup fails, try to find by logical equality
+    // This handles cases where different Term instances represent the same logical term
+    for (let [key, value] of this._concepts) {
+      if (key.equals(term)) {
+        return value;
+      }
+    }
+    
+    return null;
   }
 
   /**

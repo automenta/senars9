@@ -25,8 +25,21 @@ export class TermFactory {
     // Determine if this is an atomic or compound term
     const isAtomic = !canonicalForm.operator && canonicalForm.components.length === 1;
     const type = isAtomic ? TermType.ATOM : TermType.COMPOUND;
+    
+    // For compound terms, we need to convert string components to Term objects
+    let components = canonicalForm.components;
+    if (!isAtomic) {
+      components = components.map(comp => {
+        if (typeof comp === 'string') {
+          // Recursively create Term object for string components
+          return this.create(comp);
+        } else {
+          return comp; // Already a Term object (from recursive call)
+        }
+      });
+    }
 
-    const newTerm = new Term(type, name, canonicalForm.components, canonicalForm.operator);
+    const newTerm = new Term(type, name, components, canonicalForm.operator);
     this._cache.set(cacheKey, newTerm);
     return newTerm;
   }
@@ -49,50 +62,55 @@ export class TermFactory {
   
   parseString(narseseString) {
     const trimmed = narseseString.trim();
+    
+    // Skip whitespace and empty string validation here since parser handles it
+    if (trimmed.length === 0) {
+      throw new Error('Empty input string');
+    }
 
     // Handle compound terms in parentheses
     if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
       const inner = trimmed.slice(1, -1).trim();
 
       // Check for infix operators: A --> B, A <-> B, etc.
-      if (inner.includes(' --> ')) {
-        const parts = inner.split(' --> ');
-        if (parts.length === 2 && this._validateComponents(parts)) {
+      if (this._hasInfixOperator(inner, ' --> ')) {
+        const parts = this._splitInfix(inner, ' --> ');
+        if (parts && parts.length === 2 && this._validateComponents(parts)) {
           return {
             operator: '-->',
-            components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
+            components: [this._createSubTerm(parts[0].trim()), this._createSubTerm(parts[1].trim())]
           };
         }
-      } else if (inner.includes(' <-> ')) {
-        const parts = inner.split(' <-> ');
-        if (parts.length === 2 && this._validateComponents(parts)) {
+      } else if (this._hasInfixOperator(inner, ' <-> ')) {
+        const parts = this._splitInfix(inner, ' <-> ');
+        if (parts && parts.length === 2 && this._validateComponents(parts)) {
           return {
             operator: '<->',
-            components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
+            components: [this._createSubTerm(parts[0].trim()), this._createSubTerm(parts[1].trim())]
           };
         }
-      } else if (inner.includes(' ==> ')) {
-        const parts = inner.split(' ==> ');
-        if (parts.length === 2 && this._validateComponents(parts)) {
+      } else if (this._hasInfixOperator(inner, ' ==> ')) {
+        const parts = this._splitInfix(inner, ' ==> ');
+        if (parts && parts.length === 2 && this._validateComponents(parts)) {
           return {
             operator: '==>',
-            components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
+            components: [this._createSubTerm(parts[0].trim()), this._createSubTerm(parts[1].trim())]
           };
         }
-      } else if (inner.includes(' <=> ')) {
-        const parts = inner.split(' <=> ');
-        if (parts.length === 2 && this._validateComponents(parts)) {
+      } else if (this._hasInfixOperator(inner, ' <=> ')) {
+        const parts = this._splitInfix(inner, ' <=> ');
+        if (parts && parts.length === 2 && this._validateComponents(parts)) {
           return {
             operator: '<=>',
-            components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
+            components: [this._createSubTerm(parts[0].trim()), this._createSubTerm(parts[1].trim())]
           };
         }
       }
 
       // Handle prefix operators: (&, A, B, C)
-      const parts = this._parsePrefixOperator(inner);
-      if (parts) {
-        return parts;
+      const prefixParts = this._parsePrefixOperator(inner);
+      if (prefixParts) {
+        return prefixParts;
       }
 
       throw new Error(`Invalid compound term syntax: ${trimmed}`);
@@ -106,16 +124,110 @@ export class TermFactory {
     throw new Error(`Invalid atomic term: ${trimmed}`);
   }
 
-   _parsePrefixOperator(str) {
-     // Handle prefix operators like (&, A, B, C)
-     const parts = this._simpleTokenize(str);
-     if (parts.length >= 2) {
-       const operator = parts[0];
-       const components = parts.slice(1).map(comp => this._parseComponent(comp));
-       return { operator, components };
-     }
-     return null;
-   }
+  _hasInfixOperator(str, operator) {
+    // Check if the operator exists and is not inside nested parentheses
+    let parenDepth = 0;
+    for (let i = 0; i < str.length; i++) {
+      if (str[i] === '(') {
+        parenDepth++;
+      } else if (str[i] === ')') {
+        parenDepth--;
+      } else if (parenDepth === 0 && str.startsWith(operator, i)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  _splitInfix(str, operator) {
+    // Split on the operator while respecting parentheses
+    const parts = [];
+    let current = '';
+    let parenDepth = 0;
+
+    for (let i = 0; i < str.length; i++) {
+      if (str[i] === '(') {
+        parenDepth++;
+        current += str[i];
+      } else if (str[i] === ')') {
+        parenDepth--;
+        current += str[i];
+      } else if (parenDepth === 0 && str.startsWith(operator, i)) {
+        parts.push(current);
+        current = '';
+        i += operator.length - 1; // Skip operator characters
+      } else {
+        current += str[i];
+      }
+    }
+    
+    if (current.length > 0) {
+      parts.push(current);
+    }
+    
+    return parts.length === 2 ? parts : null;
+  }
+
+  _parsePrefixOperator(str) {
+    // Handle prefix operators like (&, A, B, C), (|, A, B, C), etc.
+    const tokens = this._tokenizePrefix(str);
+    if (tokens.length >= 1) {
+      const operator = tokens[0];
+      const components = tokens.slice(1).map(comp => this._createSubTerm(comp.trim()));
+      return { operator, components };
+    }
+    return null;
+  }
+
+  _tokenizePrefix(str) {
+    // Tokenize prefix operators with proper parentheses handling
+    const tokens = [];
+    let current = '';
+    let parenDepth = 0;
+    
+    // First, find the operator (first part before comma or space)
+    let i = 0;
+    while (i < str.length && str[i] !== ' ' && str[i] !== ',') {
+      current += str[i];
+      i++;
+    }
+    
+    if (current.trim()) {
+      tokens.push(current.trim());
+      current = '';
+    }
+    
+    // Now parse the remaining components, handling nested parentheses
+    for (; i < str.length; i++) {
+      const char = str[i];
+      
+      if (char === '(') {
+        parenDepth++;
+        current += char;
+      } else if (char === ')') {
+        parenDepth--;
+        current += char;
+      } else if (char === ',') {
+        if (parenDepth === 0) {
+          // End of current component
+          if (current.trim()) {
+            tokens.push(current.trim());
+          }
+          current = '';
+        } else {
+          current += char;
+        }
+      } else {
+        current += char;
+      }
+    }
+    
+    if (current.trim()) {
+      tokens.push(current.trim());
+    }
+    
+    return tokens;
+  }
 
    _buildCanonicalName(canonicalForm) {
      if (!canonicalForm.operator) {
@@ -160,9 +272,10 @@ export class TermFactory {
      return /^[a-zA-Z0-9_-]+$/.test(trimmed);
    }
 
-  _simpleTokenize(str) {
-    // Simple tokenization by comma and space
-    return str.split(',').map(part => part.trim()).filter(part => part.length > 0);
+  _createSubTerm(subTermStr) {
+    // Recursively parse sub-terms and return Term objects
+    // This should create and return actual Term objects, not just the parsed form
+    return this.create(subTermStr);
   }
 
   _parseComponent(compStr) {
