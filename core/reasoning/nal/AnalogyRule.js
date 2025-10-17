@@ -2,93 +2,113 @@ import { NALRule } from '../NALRule.js';
 import { Term, TermType } from '../../Term.js';
 import { Task, Punctuation } from '../../Task.js';
 
-/**
- * Implements the analogy rule.
- * This rule derives ((S --> M) ==> (P --> M)) from (S <-> P)
- */
 export class Analogy extends NALRule {
   constructor(options = {}) {
     super('analogy', options);
   }
 
   canApply(context) {
-    // New context format from reasoner
-    const task = context.premise && context.premise.task ? context.premise.task : null;
-    return task && task.term && task.term.termType === TermType.SIMILARITY;
+    const task = context.premise?.task;
+    return task?.term?.termType === TermType.SIMILARITY;
   }
 
   apply(context) {
     const derived = [];
+    const { premise, memory } = context;
 
-    // New context format from reasoner
-    const premiseTask = context.premise && context.premise.task ? context.premise.task : null;
-    const memory = context.memory;
-    
-    if (!premiseTask || !memory || !premiseTask.term.subject || !premiseTask.term.predicate || !premiseTask.truth) {
-      return derived;
+    if (!this._validateContext(premise, memory)) return derived;
+
+    const premiseTask = premise.task;
+    const { s, p } = this._extractSubjects(premiseTask);
+    const predicates = this._findCommonPredicates(s, p, memory);
+
+    for (const { sp, pp } of predicates) {
+      const analogyTask = this._createAnalogyTask(premiseTask, sp, pp, context);
+      if (analogyTask) derived.push(analogyTask);
     }
 
-    const s = premiseTask.term.subject;
-    const p = premiseTask.term.predicate;
-    const truth1 = premiseTask.truth;
+    return derived;
+  }
 
-    // Find common predicates for s and p
-    let s_predicates, p_predicates;
-    
+  _validateContext(premise, memory) {
+    return premise?.task?.term?.subject && premise.task.term.predicate && premise.task.truth && memory;
+  }
+
+  _extractSubjects(premiseTask) {
+    return {
+      s: premiseTask.term.subject,
+      p: premiseTask.term.predicate
+    };
+  }
+
+  _findCommonPredicates(s, p, memory) {
+    const predicates = [];
+
     if (memory.getInheritanceBySubject) {
-      s_predicates = memory.getInheritanceBySubject(s) || [];
-      p_predicates = memory.getInheritanceBySubject(p) || [];
-    } else {
-      // Fallback: find tasks with s and p as subjects
-      const allTasks = Array.from(memory.getAllTasks ? (memory.getAllTasks().values() || []) : []);
-      s_predicates = allTasks.filter(t => t.term && 
-                                      t.term.termType === TermType.INHERITANCE && 
-                                      t.term.subject && 
-                                      t.term.subject.hash === s.hash);
-      p_predicates = allTasks.filter(t => t.term && 
-                                      t.term.termType === TermType.INHERITANCE && 
-                                      t.term.subject && 
-                                      t.term.subject.hash === p.hash);
-    }
+      const sPredicates = memory.getInheritanceBySubject(s) || [];
+      const pPredicates = memory.getInheritanceBySubject(p) || [];
 
-    if (!s_predicates || !p_predicates) return derived;
-
-    for (const sp of s_predicates) {
-      for (const pp of p_predicates) {
-        if (sp.term.predicate.hash === pp.term.predicate.hash) {
-          const m = sp.term.predicate;
-
-          // Create new term ((S --> M) ==> (P --> M))
-          const sm = Term.createCompound(TermType.INHERITANCE, [s, m]);
-          const pm = Term.createCompound(TermType.IMPLICATION, [p, m]);
-          const newTerm = Term.createCompound(TermType.IMPLICATION, [sm, pm]);
-
-          const truth2 = sp.truth;
-          const truth3 = pp.truth;
-
-          // Calculate new truth value for analogy
-          const newFreq = Math.min(truth1.frequency, truth2.frequency, truth3.frequency);
-          const newConf = truth1.confidence * truth2.confidence * truth3.confidence;
-          const newTruth = { frequency: newFreq, confidence: newConf };
-
-          // Get current time from context
-          const currentTime = context.context?.currentTime;
-          if (currentTime === undefined) {
-            throw new Error('Context must provide currentTime for proper time tracking');
+      for (const sp of sPredicates) {
+        for (const pp of pPredicates) {
+          if (sp.term.predicate.hash === pp.term.predicate.hash) {
+            predicates.push({ sp, pp });
           }
+        }
+      }
+    } else {
+      const allTasks = Array.from(memory.getAllTasks?.().values() || []);
+      const sPredicates = this._filterInheritanceTasks(allTasks, s);
+      const pPredicates = this._filterInheritanceTasks(allTasks, p);
 
-          const newTask = Task.createDerived(
-            [premiseTask, sp, pp],
-            newTerm,
-            Punctuation.BELIEF,
-            newTruth,
-            currentTime,
-            currentTime
-          );
-          derived.push(newTask);
+      for (const sp of sPredicates) {
+        for (const pp of pPredicates) {
+          if (sp.term.predicate.hash === pp.term.predicate.hash) {
+            predicates.push({ sp, pp });
+          }
         }
       }
     }
-    return derived;
+
+    return predicates;
+  }
+
+  _filterInheritanceTasks(tasks, subject) {
+    return tasks.filter(t =>
+      t.term?.termType === TermType.INHERITANCE &&
+      t.term.subject?.hash === subject.hash
+    );
+  }
+
+  _createAnalogyTask(premiseTask, sp, pp, context) {
+    const { s, p } = this._extractSubjects(premiseTask);
+    const m = sp.term.predicate;
+
+    const newTerm = Term.createCompound(TermType.IMPLICATION, [
+      Term.createCompound(TermType.INHERITANCE, [s, m]),
+      Term.createCompound(TermType.IMPLICATION, [p, m])
+    ]);
+
+    const newTruth = this._calculateAnalogyTruth(premiseTask.truth, sp.truth, pp.truth);
+    const currentTime = context.context?.currentTime;
+
+    if (currentTime === undefined) {
+      throw new Error('Context must provide currentTime for proper time tracking');
+    }
+
+    return Task.createDerived(
+      [premiseTask, sp, pp],
+      newTerm,
+      Punctuation.BELIEF,
+      newTruth,
+      currentTime,
+      currentTime
+    );
+  }
+
+  _calculateAnalogyTruth(truth1, truth2, truth3) {
+    return {
+      frequency: Math.min(truth1.frequency, truth2.frequency, truth3.frequency),
+      confidence: truth1.confidence * truth2.confidence * truth3.confidence
+    };
   }
 }

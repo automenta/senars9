@@ -101,71 +101,60 @@ export class Reasoner extends Component {
   _hasOverlap(taskA, taskB) { return taskA?.stamp?.overlaps(taskB?.stamp) || false; }
 
   async performTemporalReasoning(scenario, timepoints = [], context = {}) {
-    // Create a task that will trigger temporal reasoning rules
-    const temporalTask = {
-      term: `temporal_analysis_of_${scenario.replace(/ /g, '_')}`,
-      punctuation: '.',
-      truth: { frequency: 0.8, confidence: 0.7 },
-      priority: 0.6,
-      metadata: { scenario, timepoints, reasoningType: 'temporal' }
-    };
-
-    if (this.memory) {
-      await this.memory.input(temporalTask);
-    }
-
-    return {
-      original: `Temporal analysis initiated: ${scenario}`,
-      type: 'temporal',
-      scenario,
-      timepoints,
-      timestamp: Date.now()
-    };
+    return await this._performAdvancedReasoning('temporal', scenario, { timepoints }, context);
   }
 
   async performCounterfactualReasoning(scenario, context = {}) {
-    // Create a task that will trigger counterfactual reasoning rules
-    const counterfactualTask = {
-      term: `counterfactual_analysis_of_${scenario.replace(/ /g, '_')}`,
-      punctuation: '.',
-      truth: { frequency: 0.7, confidence: 0.6 },
-      priority: 0.5,
-      metadata: { scenario, reasoningType: 'counterfactual' }
-    };
-
-    if (this.memory) {
-      await this.memory.input(counterfactualTask);
-    }
-
-    return {
-      original: `Counterfactual analysis initiated: ${scenario}`,
-      type: 'counterfactual',
-      scenario,
-      timestamp: Date.now()
-    };
+    return await this._performAdvancedReasoning('counterfactual', scenario, {}, context);
   }
 
   async performCausalReasoning(cause, effect, context = {}) {
-    // Create a task that will trigger causal reasoning rules
-    const causalTask = {
-      term: `causal_analysis_${cause.replace(/ /g, '_')}_leads_to_${effect.replace(/ /g, '_')}`,
-      punctuation: '.',
-      truth: { frequency: 0.8, confidence: 0.7 },
-      priority: 0.6,
-      metadata: { cause, effect, reasoningType: 'causal' }
-    };
+    return await this._performAdvancedReasoning('causal', `${cause}_leads_to_${effect}`, { cause, effect }, context);
+  }
+
+  async _performAdvancedReasoning(type, scenario, metadata = {}, context = {}) {
+    const config = this._getReasoningConfig(type);
+    const task = this._createReasoningTask(type, scenario, config, metadata);
 
     if (this.memory) {
-      await this.memory.input(causalTask);
+      await this.memory.input(task);
     }
 
     return {
-      original: `Causal analysis initiated: ${cause} → ${effect}`,
-      type: 'causal',
-      cause,
-      effect,
-      timestamp: Date.now()
+      original: `${this._getReasoningDescription(type)}: ${scenario}`,
+      type,
+      scenario,
+      timestamp: Date.now(),
+      ...metadata
     };
+  }
+
+  _getReasoningConfig(type) {
+    const configs = {
+      temporal: { frequency: 0.8, confidence: 0.7, priority: 0.6 },
+      counterfactual: { frequency: 0.7, confidence: 0.6, priority: 0.5 },
+      causal: { frequency: 0.8, confidence: 0.7, priority: 0.6 }
+    };
+    return configs[type] || configs.temporal;
+  }
+
+  _createReasoningTask(type, scenario, config, metadata) {
+    return {
+      term: `${type}_analysis_of_${scenario.replace(/ /g, '_')}`,
+      punctuation: '.',
+      truth: { frequency: config.frequency, confidence: config.confidence },
+      priority: config.priority,
+      metadata: { ...metadata, reasoningType: type }
+    };
+  }
+
+  _getReasoningDescription(type) {
+    const descriptions = {
+      temporal: 'Temporal analysis initiated',
+      counterfactual: 'Counterfactual analysis initiated',
+      causal: 'Causal analysis initiated'
+    };
+    return descriptions[type] || 'Analysis initiated';
   }
 
   addStrategy(strategy) {

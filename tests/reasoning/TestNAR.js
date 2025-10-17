@@ -1,6 +1,5 @@
 /**
- * @file tests/reasoning/TestNAR.js
- * @description NAR extension for declarative, isolated testing functionality.
+ * NAR extension for declarative, isolated testing functionality.
  */
 
 import { NAR } from '../../core/NAR.js';
@@ -29,10 +28,7 @@ export class TaskMatch {
   }
 
   withTruth(minFrequency, minConfidence) {
-    this.conditions.push(task =>
-      task.truth.frequency >= minFrequency &&
-      task.truth.confidence >= minConfidence
-    );
+    this.conditions.push(task => TestNAR._matchesTruth(task.truth, { minFrequency, minConfidence }));
     return this;
   }
 
@@ -196,21 +192,28 @@ ${taskList}
     return typeof criteria === 'string'
       ? task => task.term.toString() === criteria
       : task => {
-          if (criteria.term && task.term.toString() !== criteria.term) return false;
-          if (criteria.punctuation && task.punctuation !== criteria.punctuation) return false;
-          if (criteria.truth) {
-            if (criteria.truth.minFrequency && task.truth.frequency < criteria.truth.minFrequency) return false;
-            if (criteria.truth.minConfidence && task.truth.confidence < criteria.truth.minConfidence) return false;
-          }
-          return true;
+          const { term, punctuation, truth } = criteria;
+          return (!term || task.term.toString() === term) &&
+                 (!punctuation || task.punctuation === punctuation) &&
+                 (!truth || this._matchesTruth(task.truth, truth));
         };
   }
 
+  static _matchesTruth(taskTruth, criteriaTruth) {
+    return (!criteriaTruth.minFrequency || taskTruth.frequency >= criteriaTruth.minFrequency) &&
+           (!criteriaTruth.minConfidence || taskTruth.confidence >= criteriaTruth.minConfidence);
+  }
+
   _createTaskFromString(taskStr, punctuation = Punctuation.BELIEF, freq = 0.9, conf = 0.9, priority = 0.9) {
-    let term;
+    const { term, punctuation: parsedPunct } = this._parseTaskString(taskStr);
+    const truth = new TruthValue(freq, conf);
+    return new Task(term, parsedPunct || punctuation, truth, Date.now(), Date.now(), priority);
+  }
+
+  _parseTaskString(taskStr) {
     let cleanStr = taskStr.trim();
     if (cleanStr.startsWith('(') && cleanStr.endsWith(')')) {
-      cleanStr = cleanStr.substring(1, cleanStr.length - 1);
+      cleanStr = cleanStr.slice(1, -1);
     }
 
     const relationRegex = /^(?:(\".*?\"|\S+))\s*(-->|==>)\s*(?:(\".*?\"|\S+))$/;
@@ -219,12 +222,14 @@ ${taskList}
     if (match) {
       const [_, subject, operator, predicate] = match;
       const relationType = operator === '-->' ? TermType.INHERITANCE : TermType.IMPLICATION;
-      term = Term.createCompound(relationType, [Term.newAtom(subject.replace(/"/g, '')), Term.newAtom(predicate.replace(/"/g, ''))]);
-    } else {
-      term = Term.newAtom(cleanStr.replace(/"/g, ''));
+      return {
+        term: Term.createCompound(relationType, [
+          Term.newAtom(subject.replace(/"/g, '')),
+          Term.newAtom(predicate.replace(/"/g, ''))
+        ])
+      };
     }
 
-    const truth = new TruthValue(freq, conf);
-    return new Task(term, punctuation, truth, Date.now(), Date.now(), priority);
+    return { term: Term.newAtom(cleanStr.replace(/"/g, '')) };
   }
 }

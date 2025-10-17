@@ -91,8 +91,27 @@ export class RuleManager {
   }
 
   _validateRule(rule) {
+    const errors = this._collectValidationErrors(rule);
+
+    if (errors.length > 0) {
+      const error = new Error(`Rule validation failed: ${errors.join(', ')}`);
+      Logger.error('Rule validation failed:', error.message);
+      throw error;
+    }
+
+    this.ruleValidation.set(rule.id, { validated: true, timestamp: Date.now(), errors: [] });
+  }
+
+  _collectValidationErrors(rule) {
     const errors = [];
 
+    this._validateBasicRuleProperties(rule, errors);
+    this._validateRuleTypeSpecific(rule, errors);
+
+    return errors;
+  }
+
+  _validateBasicRuleProperties(rule, errors) {
     if (!rule.id || typeof rule.id !== 'string') {
       errors.push('Rule must have a valid string ID');
     }
@@ -105,33 +124,23 @@ export class RuleManager {
       errors.push('Rule must have an apply method');
     }
 
-    if (rule.type && !['nal', 'lm', 'general'].includes(rule.type)) {
+    if (rule.type && !this._isValidRuleType(rule.type)) {
       errors.push(`Rule type must be 'nal', 'lm', or 'general', got '${rule.type}'`);
     }
+  }
 
-    // Additional validation for NAL rules (only if they don't have a basic apply method)
-    if (rule.type === 'nal' && typeof rule.apply !== 'function') {
-      // NAL rules can use performInference as an alternative to apply
-      if (typeof rule.performInference !== 'function') {
-        errors.push('NAL rule must have either performInference or apply method');
-      }
+  _validateRuleTypeSpecific(rule, errors) {
+    if (rule.type === 'nal' && typeof rule.apply !== 'function' && typeof rule.performInference !== 'function') {
+      errors.push('NAL rule must have either performInference or apply method');
     }
 
-    // Additional validation for LM rules (only if they don't have a basic apply method)
-    if (rule.type === 'lm' && typeof rule.apply !== 'function') {
-      // LM rules can use executeLM as an alternative to apply
-      if (typeof rule.executeLM !== 'function') {
-        errors.push('LM rule must have either executeLM or apply method');
-      }
+    if (rule.type === 'lm' && typeof rule.apply !== 'function' && typeof rule.executeLM !== 'function') {
+      errors.push('LM rule must have either executeLM or apply method');
     }
+  }
 
-    if (errors.length > 0) {
-      const error = new Error(`Rule validation failed: ${errors.join(', ')}`);
-      Logger.error('Rule validation failed:', error.message);
-      throw error;
-    }
-
-    this.ruleValidation.set(rule.id, { validated: true, timestamp: Date.now(), errors: [] });
+  _isValidRuleType(type) {
+    return ['nal', 'lm', 'general'].includes(type);
   }
 
   _trackRuleType(rule) {
