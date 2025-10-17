@@ -9,6 +9,7 @@ import {DeductionRule} from '../reasoning/rules/deduction.js';
 import {PRIORITY, TRUTH} from '../config/constants.js';
 import {Logger} from '../../util/Logger.js';
 import {Focus} from '../memory/Focus.js';
+import {LM} from '../lm/LM.js';
 
 export class NAR {
     constructor(config = {}) {
@@ -23,7 +24,15 @@ export class NAR {
 
         this._taskManager = new TaskManager(this._memory, this._focus, this._config.taskManager);
 
-        this._ruleEngine = new RuleEngine(this._config.ruleEngine);
+        // Initialize LM if enabled in config
+        this._lm = null;
+        if (this._config.lm.enabled) {
+            this._lm = new LM();
+            this._ruleEngine = new RuleEngine(this._config.ruleEngine, this._lm);
+        } else {
+            this._ruleEngine = new RuleEngine(this._config.ruleEngine);
+        }
+        
         this._setupDefaultRules();
 
         this._cycle = new Cycle({
@@ -54,6 +63,10 @@ export class NAR {
 
     get cycleCount() {
         return this._cycle.cycleCount;
+    }
+
+    get lm() {
+        return this._lm;
     }
 
     _setupDefaultRules() {
@@ -188,7 +201,7 @@ export class NAR {
     }
 
     getStats() {
-        return {
+        const stats = {
             isRunning: this._isRunning,
             cycleCount: this._cycle.cycleCount,
             memoryStats: this._memory.getDetailedStats(),
@@ -197,6 +210,42 @@ export class NAR {
             cycleStats: this._cycle.stats,
             config: this._config.toJSON()
         };
+
+        if (this._lm) {
+            stats.lmStats = this._lm.getMetrics();
+        }
+
+        return stats;
+    }
+
+    // LM-related methods
+    registerLMProvider(id, provider) {
+        if (!this._lm) {
+            throw new Error('Language Model is not enabled in this NAR instance');
+        }
+        this._lm.registerProvider(id, provider);
+        return this;
+    }
+
+    async generateWithLM(prompt, options = {}) {
+        if (!this._lm) {
+            throw new Error('Language Model is not enabled in this NAR instance');
+        }
+        return await this._lm.generateText(prompt, options);
+    }
+
+    translateToNarsese(text) {
+        if (!this._lm) {
+            throw new Error('Language Model is not enabled in this NAR instance');
+        }
+        return this._lm.translateToNarsese(text);
+    }
+
+    translateFromNarsese(narsese) {
+        if (!this._lm) {
+            throw new Error('Language Model is not enabled in this NAR instance');
+        }
+        return this._lm.translateFromNarsese(narsese);
     }
 
     _calculateInputPriority(parsed) {

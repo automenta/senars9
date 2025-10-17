@@ -52,6 +52,14 @@ export class SystemConfig {
                 logLevel: 'info', // error, warn, info, debug
                 traceCycles: false,
                 ...config.debug
+            },
+
+            // Language Model settings
+            lm: {
+                enabled: false,
+                defaultProvider: null,
+                autoRegister: true, // Auto-register basic providers if available
+                ...config.lm
             }
         };
 
@@ -83,6 +91,10 @@ export class SystemConfig {
 
     get debug() {
         return this._config.debug;
+    }
+
+    get lm() {
+        return this._config.lm;
     }
 
     // Static factory method with validation
@@ -132,6 +144,14 @@ export class SystemConfig {
         }
         if (this._config.focus.defaultFocusSetSize < 1) {
             errors.push('defaultFocusSetSize must be at least 1');
+        }
+
+        // LM validation
+        if (typeof this._config.lm.enabled !== 'boolean') {
+            errors.push('lm.enabled must be a boolean');
+        }
+        if (this._config.lm.enabled && this._config.lm.autoRegister !== undefined && typeof this._config.lm.autoRegister !== 'boolean') {
+            errors.push('lm.autoRegister must be a boolean');
         }
 
         if (errors.length > 0) {

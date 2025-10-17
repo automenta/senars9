@@ -1,19 +1,32 @@
 import {Logger} from '../../util/Logger.js';
 import {Rule} from './Rule.js';
-import {LM} from '../config/constants.js';
 
+/**
+ * An LM-based reasoning rule that interacts with a Language Model.
+ * This class is designed to be highly configurable and declarative,
+ * allowing for the easy creation of new rules with minimal boilerplate.
+ */
 export class LMRule extends Rule {
-    constructor(id, promptTemplate, responseProcessor, priority = 1.0, config = {}) {
+    constructor(id, lm, promptTemplate, responseProcessor, priority = 1.0, config = {}) {
         super(id, 'lm', priority, config);
+        this.lm = lm; // Reference to the LM instance
         this._promptTemplate = promptTemplate;
         this._responseProcessor = responseProcessor;
         this.logger = Logger;
         this._lmConfig = {
-            temperature: LM.DEFAULT_TEMPERATURE,
-            maxTokens: LM.DEFAULT_MAX_TOKENS,
-            model: 'default',
+            temperature: 0.7,  // Default temperature
+            maxTokens: 1000,   // Default max tokens
+            model: 'default',  // Default model
             ...config.lm
         };
+        
+        // Initialize metrics for LM operations
+        this.lmStats = { 
+            tokens: 0, 
+            calls: 0, 
+            avgTime: 0 
+        };
+        
         Object.freeze(this);
     }
 
@@ -29,31 +42,57 @@ export class LMRule extends Rule {
         return {...this._lmConfig};
     }
 
+    /**
+     * Checks if this rule can be applied to the given task
+     */
     _matches(task) {
-        return this._enabled && this._isRelevant(task);
+        // Check if LM is available and task is relevant
+        return this._enabled && this.lm && this._isRelevant(task);
     }
 
+    /**
+     * Determines if the task is relevant for this rule
+     */
     _isRelevant(task) {
+        // Basic relevance check - can be overridden by subclasses
         return true;
     }
 
+    /**
+     * Applies the rule to the given task
+     */
     async _apply(task) {
+        const startTime = Date.now();
         try {
+            if (!this.lm) {
+                throw new Error(`LM unavailable for rule ${this.id}`);
+            }
+
             const prompt = this._buildPrompt(task);
             const response = await this._callLanguageModel(prompt);
             const processedResponse = await this._responseProcessor(response, task);
+            
+            // Update LM stats
+            this._updateLMStats(prompt.length + (response?.length || 0), Date.now() - startTime);
+            
             return Array.isArray(processedResponse) ? processedResponse : [processedResponse];
         } catch (error) {
             this.logger.warn(`LM rule ${this.id} failed:`, error);
+            this._updateLMStats(0, Date.now() - startTime);
             return [];
         }
     }
 
+    /**
+     * Builds the prompt for the language model based on the task
+     */
     _buildPrompt(task) {
         const templateVars = {
-            taskTerm: task.term.toString(),
-            taskType: task.type,
-            taskTruth: task.truth ? `(${task.truth.f.toFixed(2)}, ${task.truth.c.toFixed(2)})` : 'no truth',
+            taskTerm: task.term?.toString() || 'unknown',
+            taskType: task.type || 'unknown',
+            taskTruth: task.truth ? 
+                `(${task.truth.frequency?.toFixed(2) || task.truth.f?.toFixed(2) || 0.5}, ${task.truth.confidence?.toFixed(2) || task.truth.c?.toFixed(2) || 0.5})` : 
+                'no truth',
             context: this._getContext(task)
         };
 
@@ -62,26 +101,49 @@ export class LMRule extends Rule {
         );
     }
 
+    /**
+     * Gets context for prompt building
+     */
     _getContext(task) {
-        return `Task: ${task.term.toString()}, Type: ${task.type}`;
+        return `Task: ${task.term?.toString() || 'unknown'}, Type: ${task.type || 'unknown'}`;
     }
 
+    /**
+     * Calls the language model with the constructed prompt
+     */
     async _callLanguageModel(prompt) {
-        if (this._config.mock) return this._mockLMResponse(prompt);
-        throw new Error('No language model provider configured');
+        if (!this.lm) {
+            throw new Error(`LM unavailable for rule ${this.id}`);
+        }
+
+        const startTime = Date.now();
+        const response = await this.lm.process(prompt, this._lmConfig);
+        const time = Date.now() - startTime;
+
+        this._updateLMStats(prompt.length + (response?.length || 0), time);
+        return response;
     }
 
-    _mockLMResponse(prompt) {
-        return Promise.resolve({
-            content: `Based on the task "${prompt.substring(0, LM.MOCK_CONTENT_TRUNCATION)}...", I think...`,
-            usage: {tokens: LM.MOCK_RESPONSE_TOKENS},
-            model: this._lmConfig.model
-        });
+    /**
+     * Updates language model statistics
+     */
+    _updateLMStats(tokens, time) {
+        const s = this.lmStats;
+        s.calls++;
+        s.tokens += tokens;
+        s.avgTime = (s.avgTime * (s.calls - 1) + time) / s.calls;
+    }
+
+    /**
+     * Gets the current LM statistics for this rule
+     */
+    getLMStats() {
+        return { ...this.lmStats };
     }
 
     // Override _clone to handle LMRule-specific constructor signature
     _clone(overrides = {}) {
-        return new LMRule(this._id, this._promptTemplate, this._responseProcessor, this._priority, {
+        return new LMRule(this._id, this.lm, this._promptTemplate, this._responseProcessor, this._priority, {
             ...this._config, ...overrides
         });
     }

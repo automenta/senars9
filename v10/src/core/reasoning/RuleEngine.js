@@ -1,16 +1,24 @@
 import {Logger} from '../../util/Logger.js';
 import {Rule} from './Rule.js';
+import {LMRule} from './LMRule.js';
 import {RuleSet} from './RuleSet.js';
 import {Metrics} from '../util/Metrics.js';
 
 export class RuleEngine {
-    constructor(config = {}) {
+    constructor(config = {}, lm = null) {
         this._config = config;
         this._rules = new Map();
         this._ruleSets = new Map();
+        this._lm = lm; // Language Model integration
         this.logger = Logger;
         this._metrics = {
-            totalApplications: 0, totalSuccesses: 0, totalFailures: 0, totalTime: 0, createdAt: Date.now()
+            totalApplications: 0, 
+            totalSuccesses: 0, 
+            totalFailures: 0, 
+            totalTime: 0, 
+            lmRuleApplications: 0,
+            nalRuleApplications: 0,
+            createdAt: Date.now()
         };
     }
 
@@ -26,9 +34,35 @@ export class RuleEngine {
         return {...this._metrics};
     }
 
+    get lm() {
+        return this._lm;
+    }
+
+    setLM(lm) {
+        this._lm = lm;
+        // Update any existing LM rules with the new LM instance
+        for (const [id, rule] of this._rules) {
+            if (rule instanceof LMRule && rule.lm !== lm) {
+                // For LM rules, we need to create a new instance with the updated LM
+                const newRule = new LMRule(rule.id, lm, rule._promptTemplate, rule._responseProcessor, 
+                                          rule._priority, rule._config);
+                this._rules.set(id, newRule);
+            }
+        }
+    }
+
     register(rule) {
         if (!(rule instanceof Rule)) throw new Error('Invalid rule type');
-        this._rules.set(rule.id, rule);
+        
+        // If this is an LM rule and we have an LM instance but the rule doesn't have one,
+        // assign our LM instance to it
+        if (rule instanceof LMRule && !rule.lm && this._lm) {
+            const newRule = new LMRule(rule.id, this._lm, rule._promptTemplate, rule._responseProcessor, 
+                                      rule._priority, rule._config);
+            this._rules.set(rule.id, newRule);
+        } else {
+            this._rules.set(rule.id, rule);
+        }
         return this;
     }
 
@@ -50,15 +84,24 @@ export class RuleEngine {
         return this._ruleSets.get(name);
     }
 
-    getApplicableRules(task) {
-        return Array.from(this._rules.values())
-            .filter(rule => rule.canApply(task))
-            .sort((a, b) => b.priority - a.priority);
+    getApplicableRules(task, ruleType = null) {
+        let applicableRules = Array.from(this._rules.values())
+            .filter(rule => rule.canApply(task));
+            
+        if (ruleType) {
+            if (ruleType === 'lm') {
+                applicableRules = applicableRules.filter(rule => rule instanceof LMRule);
+            } else if (ruleType === 'nal') {
+                applicableRules = applicableRules.filter(rule => !(rule instanceof LMRule));
+            }
+        }
+        
+        return applicableRules.sort((a, b) => b.priority - a.priority);
     }
 
     applyRule(rule, task) {
         if (!rule || !this._rules.has(rule.id)) return {results: [], rule};
-
+        
         const startTime = Date.now();
         let success = false;
 
@@ -66,6 +109,14 @@ export class RuleEngine {
             const {results, rule: updatedRule} = rule.apply(task);
             this._rules.set(rule.id, updatedRule);
             success = true;
+            
+            // Update type-specific metrics
+            if (rule instanceof LMRule) {
+                this._metrics.lmRuleApplications++;
+            } else {
+                this._metrics.nalRuleApplications++;
+            }
+            
             return {results, rule: updatedRule};
         } catch (error) {
             if (error.rule) this._rules.set(rule.id, error.rule);
@@ -75,10 +126,10 @@ export class RuleEngine {
         }
     }
 
-    applyRules(task, ruleIds = null) {
+    applyRules(task, ruleIds = null, ruleType = null) {
         const rules = ruleIds ?
             ruleIds.map(id => this._rules.get(id)).filter(Boolean) :
-            this.getApplicableRules(task);
+            this.getApplicableRules(task, ruleType);
 
         const allResults = [];
         for (const rule of rules) {
@@ -91,6 +142,14 @@ export class RuleEngine {
         }
 
         return allResults;
+    }
+
+    applyLMRules(task, ruleIds = null) {
+        return this.applyRules(task, ruleIds, 'lm');
+    }
+
+    applyNALRules(task, ruleIds = null) {
+        return this.applyRules(task, ruleIds, 'nal');
     }
 
     enableRule(ruleId) {
