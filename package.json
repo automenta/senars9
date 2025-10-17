@@ -32,10 +32,10 @@
     "express": "^5.1.0",
     "fs-extra": "^11.2.0",
     "glob": "^10.4.5",
+    "js-sha256": "^0.11.0",
     "langchain": "^0.3.0",
     "ws": "^8.18.3",
-    "y-websocket": "^3.0.0",
-    "js-sha256": "^0.11.0"
+    "y-websocket": "^3.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",

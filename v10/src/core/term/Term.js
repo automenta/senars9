@@ -5,23 +5,9 @@ export const TermType = {
   COMPOUND: 'compound',
 };
 
-// As per DESIGN.md, different term types have different string representations
-const TermRepresentation = {
-  INHERITANCE: '-->',
-  SIMILARITY: '<->',
-  IMPLICATION: '==>',
-  EQUIVALENCE: '<=>',
-  CONJUNCTION: '&,',
-  DISJUNCTION: '|,',
-  NEGATION: '--,',
-  PRODUCT: ',',
-  // Add other types as needed
-};
-
 /**
- * Term class - represents knowledge elements in the system.
- * Implements strict immutability as specified in DESIGN.md.
- * Use static factory methods `Term.newAtom()` and `Term.createCompound()` to create instances.
+ * Represents a knowledge element in the system.
+ * This class is strictly immutable. Instances should be created via TermFactory.
  */
 export class Term {
   /**
@@ -31,37 +17,13 @@ export class Term {
     this._type = type;
     this._name = name; // The canonical string representation
     this._operator = operator;
-
-    // For atomic terms, components should be empty
-    if (type === TermType.ATOM) {
-      this._components = Object.freeze([]);
-    } else {
-      // For compound terms, convert string components to Term objects if needed
-      this._components = Object.freeze(
-        components.map(comp => typeof comp === 'string' ? new Term(TermType.ATOM, comp) : comp)
-      );
-    }
+    this._components = Object.freeze(components);
 
     // Pre-calculate and cache complexity and hash
     this._complexity = this._calculateComplexity();
     this._hash = Term.computeHash(this._name);
 
     Object.freeze(this);
-  }
-
-  // --- Factory Methods ---
-
-  static newAtom(name) {
-    return new Term(TermType.ATOM, name);
-  }
-
-  static createCompound(operator, components) {
-    // Per DESIGN.md, handle normalization for commutative operators
-    if (Term.isCommutative(operator)) {
-      components.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    const name = Term.buildCompoundName(operator, components);
-    return new Term(TermType.COMPOUND, name, components, operator);
   }
 
   // --- Getters ---
@@ -88,6 +50,14 @@ export class Term {
 
   get hash() {
     return this._hash;
+  }
+
+  get isAtomic() {
+    return this._type === TermType.ATOM;
+  }
+
+  get isCompound() {
+    return this._type === TermType.COMPOUND;
   }
 
   // --- Public Methods ---
@@ -125,22 +95,6 @@ export class Term {
       return 1;
     }
     return 1 + this._components.reduce((sum, comp) => sum + comp.complexity, 0);
-  }
-
-  static isCommutative(operator) {
-    return [TermRepresentation.CONJUNCTION, TermRepresentation.SIMILARITY, TermRepresentation.EQUIVALENCE, TermRepresentation.DISJUNCTION].includes(operator);
-  }
-
-  static buildCompoundName(operator, components) {
-    // Infix operators (A --> B)
-    if (['-->', '<->', '==>', '<=>'].includes(operator)) {
-      if (components.length !== 2) throw new Error(`Operator ${operator} requires 2 components.`);
-      return `(${components[0].name} ${operator} ${components[1].name})`;
-    }
-
-    // Prefix operators (&, A, B)
-    const componentNames = components.map(c => c.name).join(' ');
-    return `(${operator}${componentNames ? ' ' + componentNames : ''})`;
   }
 
   static computeHash(str) {
