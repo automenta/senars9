@@ -66,8 +66,8 @@ describe('Memory and Focus Management Integration', () => {
             const term1 = termFactory.create({components: ['urgent']});
             const term2 = termFactory.create({components: ['normal']});
 
-            const urgentTask = new Task({term: term1, type: 'BELIEF', priority: 0.9});
-            const normalTask = new Task({term: term2, type: 'BELIEF', priority: 0.5});
+            const urgentTask = new Task(term1, '.', null, 0.9);
+            const normalTask = new Task(term2, '.', null, 0.5);
 
             focus.setFocus('primary');
             focus.addTaskToFocus(urgentTask, 0.9);
@@ -92,7 +92,7 @@ describe('Memory and Focus Management Integration', () => {
             focus.setFocus('test-set');
 
             const term = termFactory.create({components: ['test']});
-            const task = new Task({term, type: 'BELIEF', priority: 0.8});
+            const task = new Task(term, '.', null, 0.8);
 
             focus.addTaskToFocus(task, 0.8);
 
@@ -121,6 +121,7 @@ describe('Memory and Focus Management Integration', () => {
                 operator: '-->'
             });
 
+            // Note: The convenience constructor doesn't support custom stamps, so keep original for these
             const recentTask = new Task({
                 term: simpleTerm, 
                 type: 'BELIEF', 
@@ -152,16 +153,8 @@ describe('Memory and Focus Management Integration', () => {
         });
 
         test('should respect priority threshold in selection', () => {
-            const highPriorityTask = new Task({
-                term: termFactory.create({components: ['high']}),
-                type: 'BELIEF',
-                priority: 0.8
-            });
-            const lowPriorityTask = new Task({
-                term: termFactory.create({components: ['low']}),
-                type: 'BELIEF',
-                priority: 0.1
-            });
+            const highPriorityTask = new Task(termFactory.create({components: ['high']}), '.', null, 0.8);
+            const lowPriorityTask = new Task(termFactory.create({components: ['low']}), '.', null, 0.1);
 
             const selected = selector.select([highPriorityTask, lowPriorityTask], currentTime);
 
@@ -257,10 +250,10 @@ describe('Memory and Focus Management Integration', () => {
 
             // Create tasks
             const tasks = [
-                new Task({term: catAnimalTerm, type: 'BELIEF', priority: 0.9}),
-                new Task({term: dogAnimalTerm, type: 'BELIEF', priority: 0.8}),
-                new Task({term: catPetTerm, type: 'BELIEF', priority: 0.7}),
-                new Task({term: animalMammalTerm, type: 'BELIEF', priority: 0.6})
+                new Task(catAnimalTerm, '.', null, 0.9),
+                new Task(dogAnimalTerm, '.', null, 0.8),
+                new Task(catPetTerm, '.', null, 0.7),
+                new Task(animalMammalTerm, '.', null, 0.6)
             ];
 
             // Add some tasks to focus
@@ -290,7 +283,7 @@ describe('Memory and Focus Management Integration', () => {
             // Create many concepts
             for (let i = 0; i < 100; i++) {
                 const term = termFactory.create({components: [`concept${i}`]});
-                const task = new Task({term, type: 'BELIEF', priority: 0.5});
+                const task = new Task(term, '.', null, 0.5);
                 memory.addTask(task, currentTime);
             }
 
@@ -313,7 +306,7 @@ describe('Memory and Focus Management Integration', () => {
             // Add many tasks to focus
             for (let i = 0; i < 50; i++) {
                 const term = termFactory.create({components: [`focus_item${i}`]});
-                const task = new Task({term, type: 'BELIEF', priority: 0.5});
+                const task = new Task(term, '.', null, 0.5);
                 focus.addTaskToFocus(task, 0.5);
             }
 
@@ -341,9 +334,9 @@ describe('Memory and Focus Management Integration', () => {
             const term2 = termFactory.create({components: ['B']});
             const term3 = termFactory.create({components: ['C']});
 
-            const task1 = new Task({term: term1, type: 'BELIEF', priority: 0.8});
-            const task2 = new Task({term: term2, type: 'BELIEF', priority: 0.6});
-            const task3 = new Task({term: term3, type: 'BELIEF', priority: 0.9});
+            const task1 = new Task(term1, '.', null, 0.8);
+            const task2 = new Task(term2, '.', null, 0.6);
+            const task3 = new Task(term3, '.', null, 0.9);
 
             focus.addTaskToFocus(task1, 0.8);
             focus.addTaskToFocus(task2, 0.6);

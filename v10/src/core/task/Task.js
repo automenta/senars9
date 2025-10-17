@@ -2,28 +2,58 @@ import {Stamp} from '../Stamp.js';
 import {Term} from '../term/Term.js';
 
 export class Task {
-    constructor({
-                    term,
-                    type,
-                    truth = null,
-                    stamp = null,
-                    priority = Task.DEFAULTS.priority,
-                    budget = Task.DEFAULTS.budget,
-                    accessedAt = null
-                }) {
-        if (!(term instanceof Term)) {
-            throw new Error(`Task must be initialized with a valid Term object. Received: ${typeof term}.`);
-        }
+    constructor(arg1, punctuation, truth, priority) {
+        // Support both old object-based constructor and new convenience constructor
+        if (typeof arg1 === 'object' && arg1 !== null && arg1.hasOwnProperty('term')) {
+            // Old constructor: ({term, type, truth, stamp, priority, budget, accessedAt})
+            const {term, type, truth: truthVal, stamp, priority: prio, budget, accessedAt} = arg1;
+            
+            if (!(term instanceof Term)) {
+                throw new Error(`Task must be initialized with a valid Term object. Received: ${typeof term}.`);
+            }
 
-        this._term = term;
-        this._type = type;
-        this._truth = truth;
-        this._stamp = stamp || Stamp.createInput();
-        this._priority = Math.max(Task.DEFAULTS.minPriority, Math.min(Task.DEFAULTS.maxPriority, priority));
-        this._budget = budget;
-        this._createdAt = this._stamp.occurrenceTime;
-        this._accessedAt = accessedAt || this._createdAt;
+            this._term = term;
+            this._type = type;
+            this._truth = truthVal ?? null;
+            this._stamp = stamp || Stamp.createInput();
+            this._priority = Math.max(Task.DEFAULTS.minPriority, Math.min(Task.DEFAULTS.maxPriority, prio ?? Task.DEFAULTS.priority));
+            this._budget = budget ?? Task.DEFAULTS.budget;
+            this._createdAt = this._stamp.occurrenceTime;
+            this._accessedAt = accessedAt || this._createdAt;
+        } else {
+            // New convenience constructor: (term, punctuation, truth, priority)
+            const term = arg1;
+            
+            if (!(term instanceof Term)) {
+                throw new Error(`Task must be initialized with a valid Term object. Received: ${typeof term}.`);
+            }
+
+            // Convert punctuation to task type: '.' -> 'BELIEF', '!' -> 'GOAL', '?' -> 'QUESTION'
+            const type = Task._getTaskTypeFromPunctuation(punctuation);
+            
+            this._term = term;
+            this._type = type;
+            this._truth = truth ?? null;
+            this._stamp = Stamp.createInput();
+            this._priority = Math.max(Task.DEFAULTS.minPriority, Math.min(Task.DEFAULTS.maxPriority, priority ?? Task.DEFAULTS.priority));
+            this._budget = Task.DEFAULTS.budget;
+            this._createdAt = this._stamp.occurrenceTime;
+            this._accessedAt = this._createdAt;
+        }
+        
         Object.freeze(this);
+    }
+
+    static _getTaskTypeFromPunctuation(punctuation) {
+        if (typeof punctuation !== 'string') {
+            throw new Error(`Punctuation must be a string. Received: ${typeof punctuation}.`);
+        }
+        const typeMap = {'.': 'BELIEF', '!': 'GOAL', '?': 'QUESTION'};
+        const type = typeMap[punctuation];
+        if (!type) {
+            throw new Error(`Invalid punctuation: ${punctuation}. Must be one of '.', '!', '?'`);
+        }
+        return type;
     }
 
     static get DEFAULTS() {

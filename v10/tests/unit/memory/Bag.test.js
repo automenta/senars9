@@ -21,14 +21,14 @@ describe('Bag', () => {
     });
 
     test('should add an item', () => {
-        const task = new Task({term, type: 'BELIEF'});
+        const task = new Task(term, '.', null);
         const added = bag.add(task, 0.5);
         expect(added).toBe(true);
         expect(bag.size).toBe(1);
     });
 
     test('should not add a duplicate item', () => {
-        const task = new Task({term, type: 'BELIEF'});
+        const task = new Task(term, '.', null);
         bag.add(task, 0.5);
         const added = bag.add(task, 0.5);
         expect(added).toBe(false);
@@ -36,7 +36,7 @@ describe('Bag', () => {
     });
 
     test('should remove an item', () => {
-        const task = new Task({term, type: 'BELIEF'});
+        const task = new Task(term, '.', null);
         bag.add(task, 0.5);
         const removed = bag.remove(task);
         expect(removed).toBe(true);
@@ -44,16 +44,16 @@ describe('Bag', () => {
     });
 
     test('should peek at the highest priority item', () => {
-        const task1 = new Task({term, type: 'BELIEF', priority: 0.5});
-        const task2 = new Task({term: newAtom('B'), type: 'BELIEF', priority: 0.8});
+        const task1 = new Task(term, '.', null, 0.5);
+        const task2 = new Task(newAtom('B'), '.', null, 0.8);
         bag.add(task1, 0.5);
         bag.add(task2, 0.8);
         expect(bag.peek()).toBe(task2);
     });
 
     test('should get items in priority order', () => {
-        const task1 = new Task({term, type: 'BELIEF', priority: 0.5});
-        const task2 = new Task({term: newAtom('B'), type: 'BELIEF', priority: 0.8});
+        const task1 = new Task(term, '.', null, 0.5);
+        const task2 = new Task(newAtom('B'), '.', null, 0.8);
         bag.add(task1, 0.5);
         bag.add(task2, 0.8);
         const items = bag.getItemsInPriorityOrder();
@@ -61,8 +61,8 @@ describe('Bag', () => {
     });
 
     test('should apply decay to priorities', () => {
-        const task1 = new Task({term, type: 'BELIEF', priority: 0.5});
-        const task2 = new Task({term: newAtom('B'), type: 'BELIEF', priority: 0.8});
+        const task1 = new Task(term, '.', null, 0.5);
+        const task2 = new Task(newAtom('B'), '.', null, 0.8);
         bag.add(task1, 0.5);
         bag.add(task2, 0.8);
         bag.applyDecay(0.5);

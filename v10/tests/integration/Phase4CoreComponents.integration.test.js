@@ -46,12 +46,7 @@ describe('Phase 4 Core Components Integration', () => {
     test('Task should be created with proper validation', () => {
         const testTerm = termFactory.create('dog');
         const testTruth = new Truth(0.9, 0.8);
-        const testTask = new Task({
-            term: testTerm,
-            type: 'BELIEF',
-            truth: testTruth,
-            priority: 0.8
-        });
+        const testTask = new Task(testTerm, '.', testTruth, 0.8);
 
         expect(testTask).toBeDefined();
         expect(testTask.term).toBe(testTerm);
@@ -64,12 +59,7 @@ describe('Phase 4 Core Components Integration', () => {
     test('Memory should handle proper configuration and task operations', () => {
         const testTerm = termFactory.create('dog');
         const testTruth = new Truth(0.9, 0.8);
-        const testTask = new Task({
-            term: testTerm,
-            type: 'BELIEF',
-            truth: testTruth,
-            priority: 0.8
-        });
+        const testTask = new Task(testTerm, '.', testTruth, 0.8);
 
         const memory = new Memory({priorityThreshold: 0.5});
 
@@ -127,12 +117,7 @@ describe('Phase 4 Core Components Integration', () => {
         const inheritanceTerm = termFactory.create({operator: '-->', components: [subjectTerm, predicateTerm]});
 
         // Create task
-        const task = new Task({
-            term: inheritanceTerm,
-            type: 'BELIEF',
-            truth: new Truth(0.9, 0.8),
-            priority: 0.7
-        });
+        const task = new Task(inheritanceTerm, '.', new Truth(0.9, 0.8), 0.7);
 
         // Create memory and add task
         const memory = new Memory({priorityThreshold: 0.5});

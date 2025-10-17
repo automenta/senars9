@@ -16,7 +16,7 @@ describe('Task', () => {
 
     test('should create tasks with correct properties', () => {
         const truth = new Truth(0.9, 0.8);
-        const task = new Task({term, type: 'BELIEF', truth});
+        const task = new Task(term, '.', truth);
 
         expect(task.term).toBe(term);
         expect(task.type).toBe('BELIEF');
@@ -36,14 +36,14 @@ describe('Task', () => {
     });
 
     test('should maintain strict immutability', () => {
-        const task = new Task({term, type: 'BELIEF'});
+        const task = new Task(term, '.', null);
         expect(() => {
             task.type = 'GOAL';
         }).toThrow();
     });
 
     test('should create immutable copies with modified properties', () => {
-        const task1 = new Task({term, type: 'BELIEF', priority: 0.5});
+        const task1 = new Task(term, '.', null, 0.5);
 
         const task2 = task1.withPriority(0.8);
         expect(task1.priority).toBe(0.5);
@@ -62,9 +62,9 @@ describe('Task', () => {
     });
 
     test('should identify task types correctly', () => {
-        const belief = new Task({term, type: 'BELIEF'});
-        const goal = new Task({term, type: 'GOAL'});
-        const question = new Task({term, type: 'QUESTION'});
+        const belief = new Task(term, '.');
+        const goal = new Task(term, '!');
+        const question = new Task(term, '?');
 
         expect(belief.isBelief()).toBe(true);
         expect(belief.isGoal()).toBe(false);
@@ -77,11 +77,11 @@ describe('Task', () => {
         const truth2 = new Truth(0.9, 0.9);
         const truth3 = new Truth(0.8, 0.8);
 
-        const task1 = new Task({term, type: 'BELIEF', truth: truth1});
-        const task2 = new Task({term, type: 'BELIEF', truth: truth2}); // Same content
-        const task3 = new Task({term, type: 'BELIEF', truth: truth3}); // Different truth
-        const task4 = new Task({term: atomB, type: 'BELIEF', truth: truth1}); // Different term
-        const task5 = new Task({term, type: 'GOAL', truth: truth1}); // Different type
+        const task1 = new Task(term, '.', truth1);
+        const task2 = new Task(term, '.', truth2); // Same content
+        const task3 = new Task(term, '.', truth3); // Different truth
+        const task4 = new Task(atomB, '.', truth1); // Different term
+        const task5 = new Task(term, '!', truth1); // Different type
 
         expect(task1.equals(task2)).toBe(true);
         expect(task1.equals(task3)).toBe(false);
