@@ -36,45 +36,16 @@ export class Task {
     }
 
     // Getters
-    get term() {
-        return this._term;
-    }
-
-    get type() {
-        return this._type;
-    }
-
-    get truth() {
-        return this._truth;
-    }
-
-    get stamp() {
-        return this._stamp;
-    }
-
-    get priority() {
-        return this._priority;
-    }
-
-    get budget() {
-        return this._budget;
-    }
-
-    get createdAt() {
-        return this._createdAt;
-    }
-
-    get accessedAt() {
-        return this._accessedAt;
-    }
-
-    get truthValue() {
-        return this._truth;
-    }
-
-    get creationTime() {
-        return this._createdAt;
-    }
+    get term() { return this._term; }
+    get type() { return this._type; }
+    get truth() { return this._truth; }
+    get stamp() { return this._stamp; }
+    get priority() { return this._priority; }
+    get budget() { return this._budget; }
+    get createdAt() { return this._createdAt; }
+    get accessedAt() { return this._accessedAt; }
+    get truthValue() { return this._truth; }
+    get creationTime() { return this._createdAt; }
 
     // Immutable operations
     withTruth(newTruth) {

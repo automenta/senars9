@@ -27,50 +27,17 @@ export class Concept {
         };
     }
 
-    get term() {
-        return this._term;
-    }
-
-    get createdAt() {
-        return this._createdAt;
-    }
-
-    get lastAccessed() {
-        return this._lastAccessed;
-    }
-
-    get activation() {
-        return this._activation;
-    }
-
-    get useCount() {
-        return this._useCount;
-    }
-
-    get quality() {
-        return this._quality;
-    }
-
-    get beliefs() {
-        return this._beliefs;
-    }
-
-    get goals() {
-        return this._goals;
-    }
-
-    get questions() {
-        return this._questions;
-    }
-
-    get totalTasks() {
-        return this._beliefs.size + this._goals.size + this._questions.size;
-    }
-
-    get averagePriority() {
-        if (this.totalTasks === 0) return 0;
-        return this._calculateWeightedAveragePriority();
-    }
+    get term() { return this._term; }
+    get createdAt() { return this._createdAt; }
+    get lastAccessed() { return this._lastAccessed; }
+    get activation() { return this._activation; }
+    get useCount() { return this._useCount; }
+    get quality() { return this._quality; }
+    get beliefs() { return this._beliefs; }
+    get goals() { return this._goals; }
+    get questions() { return this._questions; }
+    get totalTasks() { return this._beliefs.size + this._goals.size + this._questions.size; }
+    get averagePriority() { return this.totalTasks === 0 ? 0 : this._calculateWeightedAveragePriority(); }
 
     _calculateWeightedAveragePriority() {
         const bags = [
@@ -89,9 +56,7 @@ export class Concept {
     _getStorage(taskType) {
         const storageMap = {BELIEF: this._beliefs, GOAL: this._goals, QUESTION: this._questions};
         const storage = storageMap[taskType];
-        if (!storage) {
-            throw new Error(`Unknown task type: ${taskType}. Expected BELIEF, GOAL, or QUESTION.`);
-        }
+        if (!storage) throw new Error(`Unknown task type: ${taskType}. Expected BELIEF, GOAL, or QUESTION.`);
         return storage;
     }
 
@@ -134,9 +99,7 @@ export class Concept {
     }
 
     applyDecay(decayRate = this._config.defaultDecayRate) {
-        this._beliefs.applyDecay(decayRate);
-        this._goals.applyDecay(decayRate);
-        this._questions.applyDecay(decayRate);
+        [this._beliefs, this._goals, this._questions].forEach(bag => bag.applyDecay(decayRate));
         this._activation *= (1 - decayRate);
         this._updateLastAccessed();
     }

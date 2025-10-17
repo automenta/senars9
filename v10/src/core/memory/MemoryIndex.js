@@ -9,6 +9,7 @@ export class MemoryIndex {
         this._similarityIndex = new Map(); // Map<term1, Set<term2>>
         this._compoundIndex = new Map(); // Map<operator, Set<terms>>
         this._termIndex = new Map(); // Map<termHash, concept>
+        this._totalConcepts = 0; // Track total number of concept objects added
     }
 
     /**
@@ -18,8 +19,15 @@ export class MemoryIndex {
         const term = concept.term;
         const termId = term.id;
 
-        // Add to main term index
-        this._termIndex.set(termId, concept);
+        // Update total concept counter
+        this._totalConcepts++;
+
+        // Add to main term index - store as array to handle multiple concepts per term
+        if (!this._termIndex.has(termId)) {
+            this._termIndex.set(termId, []);
+        }
+        const conceptsArray = this._termIndex.get(termId);
+        conceptsArray.push(concept);
 
         // Index by term type
         if (term.isAtomic) {
@@ -36,14 +44,32 @@ export class MemoryIndex {
         const term = concept.term;
         const termId = term.id;
 
-        // Remove from main term index
-        this._termIndex.delete(termId);
+        // Remove from main term index - handle array of concepts
+        if (this._termIndex.has(termId)) {
+            const concepts = this._termIndex.get(termId);
+            if (Array.isArray(concepts)) {
+                const index = concepts.indexOf(concept);
+                if (index !== -1) {
+                    concepts.splice(index, 1);
+                    this._totalConcepts--;
+                    
+                    // If array is empty, remove the entry
+                    if (concepts.length === 0) {
+                        this._termIndex.delete(termId);
+                    }
+                }
+            } else {
+                // Backwards compatibility with old direct storage
+                this._termIndex.delete(termId);
+                this._totalConcepts--;
+            }
+        }
 
         // Remove from specialized indexes
         if (term.isAtomic) {
             this._removeAtomicTermIndex(term);
         } else {
-            this._removeCompoundTermIndex(term);
+            this._removeCompoundTermIndex(term, concept);
         }
     }
 
@@ -81,6 +107,15 @@ export class MemoryIndex {
                 this._indexSimilarity(term, concept);
                 break;
         }
+        
+        // Recursively index any compound components
+        if (term.components) {
+            for (const component of term.components) {
+                if (component.isCompound) {
+                    this._indexCompoundTerm(component, concept);
+                }
+            }
+        }
     }
 
     /**
@@ -89,13 +124,12 @@ export class MemoryIndex {
      */
     _indexInheritance(term, concept) {
         if (term.components.length >= 2) {
-            const subject = term.components[0];
             const predicate = term.components[1];
 
             if (!this._inheritanceIndex.has(predicate)) {
                 this._inheritanceIndex.set(predicate, new Set());
             }
-            this._inheritanceIndex.get(predicate).add(subject);
+            this._inheritanceIndex.get(predicate).add(concept);
         }
     }
 
@@ -106,12 +140,11 @@ export class MemoryIndex {
     _indexImplication(term, concept) {
         if (term.components.length >= 2) {
             const premise = term.components[0];
-            const conclusion = term.components[1];
 
             if (!this._implicationIndex.has(premise)) {
                 this._implicationIndex.set(premise, new Set());
             }
-            this._implicationIndex.get(premise).add(conclusion);
+            this._implicationIndex.get(premise).add(concept);
         }
     }
 
@@ -131,8 +164,8 @@ export class MemoryIndex {
                 this._similarityIndex.set(term2, new Set());
             }
 
-            this._similarityIndex.get(term1).add(term2);
-            this._similarityIndex.get(term2).add(term1);
+            this._similarityIndex.get(term1).add(concept);
+            this._similarityIndex.get(term2).add(concept);
         }
     }
 
@@ -148,7 +181,7 @@ export class MemoryIndex {
      * Remove compound term from indexes
      * @private
      */
-    _removeCompoundTermIndex(term) {
+    _removeCompoundTermIndex(term, concept) {
         const operator = term.operator;
 
         // Remove from operator index
@@ -162,13 +195,13 @@ export class MemoryIndex {
         // Remove from specific indexes
         switch (operator) {
             case '-->':
-                this._removeInheritanceIndex(term);
+                this._removeInheritanceIndex(term, concept);
                 break;
             case '==>':
-                this._removeImplicationIndex(term);
+                this._removeImplicationIndex(term, concept);
                 break;
             case '<->':
-                this._removeSimilarityIndex(term);
+                this._removeSimilarityIndex(term, concept);
                 break;
         }
     }
@@ -177,13 +210,12 @@ export class MemoryIndex {
      * Remove inheritance index entries
      * @private
      */
-    _removeInheritanceIndex(term) {
+    _removeInheritanceIndex(term, concept) {
         if (term.components.length >= 2) {
-            const subject = term.components[0];
             const predicate = term.components[1];
 
             if (this._inheritanceIndex.has(predicate)) {
-                this._inheritanceIndex.get(predicate).delete(subject);
+                this._inheritanceIndex.get(predicate).delete(concept);
                 if (this._inheritanceIndex.get(predicate).size === 0) {
                     this._inheritanceIndex.delete(predicate);
                 }
@@ -195,13 +227,12 @@ export class MemoryIndex {
      * Remove implication index entries
      * @private
      */
-    _removeImplicationIndex(term) {
+    _removeImplicationIndex(term, concept) {
         if (term.components.length >= 2) {
             const premise = term.components[0];
-            const conclusion = term.components[1];
 
             if (this._implicationIndex.has(premise)) {
-                this._implicationIndex.get(premise).delete(conclusion);
+                this._implicationIndex.get(premise).delete(concept);
                 if (this._implicationIndex.get(premise).size === 0) {
                     this._implicationIndex.delete(premise);
                 }
@@ -213,20 +244,20 @@ export class MemoryIndex {
      * Remove similarity index entries
      * @private
      */
-    _removeSimilarityIndex(term) {
+    _removeSimilarityIndex(term, concept) {
         if (term.components.length >= 2) {
             const term1 = term.components[0];
             const term2 = term.components[1];
 
             if (this._similarityIndex.has(term1)) {
-                this._similarityIndex.get(term1).delete(term2);
+                this._similarityIndex.get(term1).delete(concept);
                 if (this._similarityIndex.get(term1).size === 0) {
                     this._similarityIndex.delete(term1);
                 }
             }
 
             if (this._similarityIndex.has(term2)) {
-                this._similarityIndex.get(term2).delete(term1);
+                this._similarityIndex.get(term2).delete(concept);
                 if (this._similarityIndex.get(term2).size === 0) {
                     this._similarityIndex.delete(term2);
                 }
@@ -238,30 +269,24 @@ export class MemoryIndex {
      * Find concepts with inheritance relationships
      */
     findInheritanceConcepts(predicate) {
-        const subjects = this._inheritanceIndex.get(predicate) || new Set();
-        return Array.from(subjects)
-            .map(subject => this._termIndex.get(subject.id))
-            .filter(concept => concept !== undefined);
+        const concepts = this._inheritanceIndex.get(predicate) || new Set();
+        return Array.from(concepts);
     }
 
     /**
      * Find concepts with implication relationships
      */
     findImplicationConcepts(premise) {
-        const conclusions = this._implicationIndex.get(premise) || new Set();
-        return Array.from(conclusions)
-            .map(conclusion => this._termIndex.get(conclusion.id))
-            .filter(concept => concept !== undefined);
+        const concepts = this._implicationIndex.get(premise) || new Set();
+        return Array.from(concepts);
     }
 
     /**
      * Find concepts with similarity relationships
      */
     findSimilarityConcepts(term) {
-        const similarTerms = this._similarityIndex.get(term) || new Set();
-        return Array.from(similarTerms)
-            .map(similarTerm => this._termIndex.get(similarTerm.id))
-            .filter(concept => concept !== undefined);
+        const concepts = this._similarityIndex.get(term) || new Set();
+        return Array.from(concepts);
     }
 
     /**
@@ -278,7 +303,11 @@ export class MemoryIndex {
      * Get concept by term hash
      */
     getConcept(termHash) {
-        return this._termIndex.get(termHash);
+        const concepts = this._termIndex.get(termHash);
+        if (Array.isArray(concepts) && concepts.length > 0) {
+            return concepts[concepts.length - 1]; // Return last added
+        }
+        return concepts; // In case it's not an array (old entries)
     }
 
     /**
@@ -293,7 +322,7 @@ export class MemoryIndex {
      */
     getStats() {
         return {
-            totalConcepts: this._termIndex.size,
+            totalConcepts: this._totalConcepts,
             inheritanceEntries: this._inheritanceIndex.size,
             implicationEntries: this._implicationIndex.size,
             similarityEntries: this._similarityIndex.size,
@@ -313,5 +342,6 @@ export class MemoryIndex {
         this._similarityIndex.clear();
         this._compoundIndex.clear();
         this._termIndex.clear();
+        this._totalConcepts = 0;
     }
 }

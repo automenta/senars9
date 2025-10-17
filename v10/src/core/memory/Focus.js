@@ -196,6 +196,9 @@ class FocusSet {
             addedAt: Date.now()
         });
 
+        // Increase attention based on task priority
+        this._attentionScore = Math.max(this._attentionScore, priority * 0.5);
+
         this._lastAccessed = Date.now();
         this._accessCount++;
 

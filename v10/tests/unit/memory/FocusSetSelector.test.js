@@ -93,7 +93,7 @@ describe('FocusSetSelector', () => {
     test('should respect maximum size limit', () => {
         const tasks = [];
         for (let i = 0; i < 5; i++) {
-            const term = termFactory.create({components: [String.fromCharCode(65 + i)]);
+            const term = termFactory.create({components: [String.fromCharCode(65 + i)]});
             const task = new Task({
                 term,
                 type: 'BELIEF',

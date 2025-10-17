@@ -1,27 +1,24 @@
-/**
+import {ConfigurableComponent} from '../util/ConfigurableComponent.js';
+
+/** 
  * Advanced task selection with composite scoring for focus sets
  * Implements sophisticated selection based on priority, urgency, and cognitive diversity
  */
-export class FocusSetSelector {
+export class FocusSetSelector extends ConfigurableComponent {
     constructor(config = {}) {
-        this._config = {
+        const defaultConfig = {
             maxSize: 10,
             priorityThreshold: 0.1,
             priorityWeight: 0.5,
             urgencyWeight: 0.3,
-            diversityWeight: 0.2,
-            ...config
+            diversityWeight: 0.2
         };
+        
+        super(defaultConfig);
+        this.configure(config);
     }
 
-    /**
-     * Get current configuration
-     */
-    get config() {
-        return {...this._config};
-    }
-
-    /**
+    /** 
      * Select tasks using composite scoring algorithm
      * @param {Task[]} tasks - Candidate tasks to select from
      * @param {number} currentTime - Current system timestamp
@@ -31,7 +28,7 @@ export class FocusSetSelector {
         if (!tasks?.length) return [];
 
         // Filter by priority threshold
-        const candidates = tasks.filter(task => task.priority >= this._config.priorityThreshold);
+        const candidates = tasks.filter(task => task.priority >= this.getConfigValue('priorityThreshold'));
         if (!candidates.length) return [];
 
         // Calculate normalization factors
@@ -47,11 +44,11 @@ export class FocusSetSelector {
         // Sort by score and return top tasks
         return scoredTasks
             .sort((a, b) => b.score - a.score)
-            .slice(0, this._config.maxSize)
+            .slice(0, this.getConfigValue('maxSize'))
             .map(item => item.task);
     }
 
-    /**
+    /** 
      * Calculate composite score for task selection
      * @private
      */
@@ -59,15 +56,8 @@ export class FocusSetSelector {
         const urgency = maxUrgency > 0 ? (currentTime - task.stamp.occurrenceTime) / maxUrgency : 0;
         const diversity = maxComplexity > 0 ? task.term.complexity / maxComplexity : 0;
 
-        return task.priority * this._config.priorityWeight +
-            urgency * this._config.urgencyWeight +
-            diversity * this._config.diversityWeight;
-    }
-
-    /**
-     * Update selection configuration
-     */
-    configure(newConfig) {
-        this._config = {...this._config, ...newConfig};
+        return task.priority * this.getConfigValue('priorityWeight') +
+            urgency * this.getConfigValue('urgencyWeight') +
+            diversity * this.getConfigValue('diversityWeight');
     }
 }

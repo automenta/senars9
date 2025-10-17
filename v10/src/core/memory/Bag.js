@@ -4,13 +4,8 @@ export class Bag {
         this._maxSize = maxSize;
     }
 
-    get size() {
-        return this._items.size;
-    }
-
-    get maxSize() {
-        return this._maxSize;
-    }
+    get size() { return this._items.size; }
+    get maxSize() { return this._maxSize; }
 
     add(item, priority) {
         if (this._items.has(item)) return false;

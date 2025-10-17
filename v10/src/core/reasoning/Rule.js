@@ -15,9 +15,6 @@ export class Rule {
         this._metrics = Object.freeze({
             applications: 0, successes: 0, failures: 0, totalTime: 0, createdAt: Date.now()
         });
-
-        // Freeze after subclasses have added their properties
-        Object.freeze(this);
     }
 
     get id() {
@@ -46,21 +43,21 @@ export class Rule {
 
     // Immutable state modifiers
     enable() {
-        return this._enabled ? this : this._clone({enabled: true});
+        return this._enabled ? Object.freeze({...this}) : this._clone({enabled: true});
     }
 
     disable() {
-        return this._enabled ? this._clone({enabled: false}) : this;
+        return this._enabled ? this._clone({enabled: false}) : Object.freeze({...this});
     }
 
     withPriority(priority) {
         const clamped = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
-        return clamped === this._priority ? this : this._clone({priority: clamped});
+        return clamped === this._priority ? Object.freeze({...this}) : this._clone({priority: clamped});
     }
 
     withConfig(config) {
         const merged = {...this._config, ...config};
-        return this._config === merged ? this : this._clone({config: merged});
+        return this._config === merged ? Object.freeze({...this}) : this._clone({config: merged});
     }
 
     canApply(task) {
@@ -95,13 +92,18 @@ export class Rule {
         const configArg = {...this._config, ...overrides};
 
         // Handle different constructor signatures for subclasses
-        return Constructor.length === 4
+        const newRule = Constructor.length === 4
             ? new Constructor(...baseArgs, configArg)
             : new Constructor(...baseArgs, this._priority, configArg);
+        
+        Object.freeze(newRule);
+        return newRule;
     }
 
     _updateMetrics(success, time) {
         const metrics = Metrics.update(this._metrics, success, time);
-        return this._clone({metrics});
+        const newRule = this._clone({metrics});
+        Object.freeze(newRule);
+        return newRule;
     }
 }

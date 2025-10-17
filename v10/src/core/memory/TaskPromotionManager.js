@@ -1,12 +1,13 @@
 import {Task} from '../task/Task.js';
+import {ConfigurableComponent} from '../util/ConfigurableComponent.js';
 
 /**
  * Task Promotion Manager - handles intelligent task promotion between focus and long-term memory
  * Implements sophisticated algorithms for determining when and how tasks should be promoted
  */
-export class TaskPromotionManager {
+export class TaskPromotionManager extends ConfigurableComponent {
     constructor(config = {}) {
-        this._config = {
+        const defaultConfig = {
             promotionThreshold: 0.7,
             demotionThreshold: 0.2,
             stabilityThreshold: 0.5,
@@ -15,9 +16,11 @@ export class TaskPromotionManager {
             priorityBoostFactor: 1.2,
             recencyWeight: 0.3,
             frequencyWeight: 0.4,
-            priorityWeight: 0.3,
-            ...config
+            priorityWeight: 0.3
         };
+        
+        super(defaultConfig);
+        this.configure(config);
     }
 
     /**
@@ -293,17 +296,5 @@ export class TaskPromotionManager {
         return stats;
     }
 
-    /**
-     * Update promotion configuration
-     */
-    configure(newConfig) {
-        this._config = {...this._config, ...newConfig};
-    }
 
-    /**
-     * Get current configuration
-     */
-    get config() {
-        return {...this._config};
-    }
 }

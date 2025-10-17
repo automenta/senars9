@@ -60,9 +60,14 @@ export class TermFactory {
             throw new Error('TermFactory.normalize: components must be an array');
         }
         
-        // For terms without operator (atomic-like terms), preserve components as they were provided
+        // For terms without operator (atomic-like terms), convert components to Term objects and preserve
         if (!operator) {
-            return {operator, components: [...components]}; // Return a copy of original components
+            const normalizedComponents = components.map(comp =>
+                (typeof comp === 'string' || comp instanceof Term) ? 
+                (typeof comp === 'string' ? this.create(comp) : comp) : 
+                this.create(comp)
+            );
+            return {operator, components: normalizedComponents};
         }
         
         // For compound terms with operators, convert components to Term objects and normalize
