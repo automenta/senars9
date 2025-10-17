@@ -21,14 +21,14 @@ export class Truth {
     static induction(t1, t2) {
         if (!t1 || !t2) return null;
         const f = t1.f;
-        const c = Truth._weak(t1.c * t2.c) * t2.f;
+        const c = this._weak(t1.c * t2.c) * t2.f;
         return new Truth(f, c);
     }
 
     static abduction(t1, t2) {
         if (!t1 || !t2) return null;
         const f = t2.f;
-        const c = Truth._weak(t1.c * t2.c) * t1.f;
+        const c = this._weak(t1.c * t2.c) * t1.f;
         return new Truth(f, c);
     }
 
@@ -55,9 +55,56 @@ export class Truth {
         return truth ? truth.f * truth.c : 0;
     }
 
-    static _weak(c) {
-        return c / (c + 1.0);
+    // Additional truth functions from operations.js
+    static exemplification(t1, t2) {
+        if (!t1 || !t2) return null;
+        return new Truth(Truth._averageFrequency(t1.f, t2.f), Truth._combineConfidence(t1.c, t2.c));
     }
+
+    static comparison(t1, t2) {
+        if (!t1 || !t2) return null;
+        const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
+        const denominator = f1 * f2 + (1 - f1) * (1 - f2);
+        return new Truth(Truth._safeDivide(f1 * f2, denominator), Truth._combineConfidence(c1, c2));
+    }
+
+    static contraposition(t1, t2) {
+        if (!t1 || !t2) return null;
+        const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
+        const denominator = f2 * (1 - f1) + (1 - f2) * f1;
+        const f = Truth._safeDivide(f2 * (1 - f1), denominator);
+        return new Truth(f, Truth._combineConfidence(c1, c2));
+    }
+
+    static analogy(t1, t2) {
+        if (!t1 || !t2) return null;
+        const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
+        const denominator = f1 * f2 + (1 - f1) * (1 - f2);
+        return new Truth(Truth._safeDivide(f1 * f2, denominator), Truth._combineConfidence(c1, c2));
+    }
+
+    static resemblance(t1, t2) {
+        if (!t1 || !t2) return null;
+        return new Truth(Truth._averageFrequency(t1.f, t2.f), Truth._combineConfidence(t1.c, t2.c));
+    }
+
+    static isMoreConfident(t1, t2) {
+        return t1 && t2 && t1.c > t2.c;
+    }
+
+    static isStronger(t1, t2) {
+        return Truth.expectation(t1) > Truth.expectation(t2);
+    }
+
+    // Helper functions moved from TruthFunctions
+    static _validateInputs(t1, t2) { return t1 && t2; }
+    static _validateInput(t) { return t; }
+    static _combineConfidence(c1, c2) { return Math.min(c1, c2); }
+    static _averageFrequency(f1, f2) { return (f1 + f2) / 2; }
+    static _safeDivide(numerator, denominator) { 
+        return denominator === 0 ? TRUTH.DEFAULT_FREQUENCY : numerator / denominator;
+    }
+    static _weak(c) { return c / (c + 1.0); }
 
     equals(other) {
         return other instanceof Truth && 

@@ -112,11 +112,9 @@ export class RuleEngine {
             success = true;
             
             // Update type-specific metrics
-            if (rule instanceof LMRule) {
-                this._metrics.lmRuleApplications++;
-            } else {
+            rule instanceof LMRule ? 
+                this._metrics.lmRuleApplications++ : 
                 this._metrics.nalRuleApplications++;
-            }
             
             return {results, rule: updatedRule};
         } catch (error) {

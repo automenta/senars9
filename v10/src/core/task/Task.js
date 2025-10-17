@@ -5,44 +5,52 @@ import {clamp} from '../../util/common.js';
 export class Task {
     constructor(arg1, punctuation, truth, priority) {
         // Support both old object-based constructor and new convenience constructor
-        if (typeof arg1 === 'object' && arg1 !== null && arg1.hasOwnProperty('term')) {
+        if (this._isTaskDataObject(arg1)) {
             // Old constructor: ({term, type, truth, stamp, priority, budget, accessedAt})
             const {term, type, truth: truthVal, stamp, priority: prio, budget, accessedAt} = arg1;
-            
-            if (!(term instanceof Term)) {
-                throw new Error(`Task must be initialized with a valid Term object. Received: ${typeof term}.`);
-            }
-
-            this._term = term;
-            this._type = type;
-            this._truth = truthVal ?? null;
-            this._stamp = stamp || Stamp.createInput();
-            this._priority = clamp(prio ?? Task.DEFAULTS.priority, Task.DEFAULTS.minPriority, Task.DEFAULTS.maxPriority);
-            this._budget = budget ?? Task.DEFAULTS.budget;
-            this._createdAt = this._stamp.occurrenceTime;
-            this._accessedAt = accessedAt || this._createdAt;
+            this._initializeFromObject({term, type, truth: truthVal, stamp, priority: prio, budget, accessedAt});
         } else {
             // New convenience constructor: (term, punctuation, truth, priority)
             const term = arg1;
-            
-            if (!(term instanceof Term)) {
-                throw new Error(`Task must be initialized with a valid Term object. Received: ${typeof term}.`);
-            }
-
-            // Convert punctuation to task type: '.' -> 'BELIEF', '!' -> 'GOAL', '?' -> 'QUESTION'
             const type = Task._getTaskTypeFromPunctuation(punctuation);
-            
-            this._term = term;
-            this._type = type;
-            this._truth = truth ?? null;
-            this._stamp = Stamp.createInput();
-            this._priority = clamp(priority ?? Task.DEFAULTS.priority, Task.DEFAULTS.minPriority, Task.DEFAULTS.maxPriority);
-            this._budget = Task.DEFAULTS.budget;
-            this._createdAt = this._stamp.occurrenceTime;
-            this._accessedAt = this._createdAt;
+            this._initializeFromParameters(term, type, truth, priority);
         }
         
         Object.freeze(this);
+    }
+
+    _isTaskDataObject(obj) {
+        return typeof obj === 'object' && obj !== null && obj.hasOwnProperty('term');
+    }
+
+    _initializeFromObject({term, type, truth, stamp, priority, budget, accessedAt}) {
+        if (!(term instanceof Term)) {
+            throw new Error(`Task must be initialized with a valid Term object. Received: ${typeof term}.`);
+        }
+
+        this._term = term;
+        this._type = type;
+        this._truth = truth ?? null;
+        this._stamp = stamp || Stamp.createInput();
+        this._priority = clamp(priority ?? Task.DEFAULTS.priority, Task.DEFAULTS.minPriority, Task.DEFAULTS.maxPriority);
+        this._budget = budget ?? Task.DEFAULTS.budget;
+        this._createdAt = this._stamp.occurrenceTime;
+        this._accessedAt = accessedAt || this._createdAt;
+    }
+
+    _initializeFromParameters(term, type, truth, priority) {
+        if (!(term instanceof Term)) {
+            throw new Error(`Task must be initialized with a valid Term object. Received: ${typeof term}.`);
+        }
+        
+        this._term = term;
+        this._type = type;
+        this._truth = truth ?? null;
+        this._stamp = Stamp.createInput();
+        this._priority = clamp(priority ?? Task.DEFAULTS.priority, Task.DEFAULTS.minPriority, Task.DEFAULTS.maxPriority);
+        this._budget = Task.DEFAULTS.budget;
+        this._createdAt = this._stamp.occurrenceTime;
+        this._accessedAt = this._createdAt;
     }
 
     static _getTaskTypeFromPunctuation(punctuation) {

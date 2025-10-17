@@ -43,7 +43,20 @@ export class NarseseParser {
     }
 
     parseCompound(inner) {
-        // Find the main operator that's not nested
+        // Look for infix operators first
+        const infixResult = this._findInfixOperator(inner);
+        if (infixResult) return infixResult;
+
+        // Check for prefix operators like negation, conjunction, etc.
+        const prefixResult = this._findPrefixOperator(inner);
+        if (prefixResult) return prefixResult;
+
+        // Product: comma-separated terms
+        const components = this.parseList(inner);
+        return components.length > 1 ? {operator: ',', components} : {components: [inner]};
+    }
+
+    _findInfixOperator(inner) {
         const operators = [' --> ', ' <-> ', ' ==> ', ' <=> ', ' ^ ', ' {{-- ', ' --}} '];
         let mainOp = null;
         let mainOpIndex = -1;
@@ -72,8 +85,10 @@ export class NarseseParser {
                 components: [this.parseTermData(left), this.parseTermData(right)]
             };
         }
+        return null;
+    }
 
-        // Check for prefix operators like negation, conjunction, etc.
+    _findPrefixOperator(inner) {
         const prefixOps = [
             ['--, ', '--'],
             ['&, ', '&'],
@@ -88,10 +103,7 @@ export class NarseseParser {
                 return {operator: op, components};
             }
         }
-
-        // Product: comma-separated terms
-        const components = this.parseList(inner);
-        return components.length > 1 ? {operator: ',', components} : {components: [inner]};
+        return null;
     }
 
     parseBinary(str, op, operator) {
@@ -169,21 +181,16 @@ export class NarseseParser {
         return {frequency: f, confidence: c};
     }
 
-    getTaskType(punct) {
-        return {'.': 'BELIEF', '!': 'GOAL', '?': 'QUESTION'}[punct] || 'BELIEF';
-    }
+    getTaskType = (punct) => ({'.': 'BELIEF', '!': 'GOAL', '?': 'QUESTION'}[punct] || 'BELIEF');
 
-    getOperatorSymbol(op) {
-        const symbols = {
-            ' --> ': '-->',
-            ' <-> ': '<->',
-            ' ==> ': '==>',
-            ' <=> ': '<=>',
-            ' ^ ': '^',
-            ' & ': '&',
-            ' {{-- ': '{{--',
-            ' --}} ': '--}}'
-        };
-        return symbols[op] || op;
-    }
+    getOperatorSymbol = (op) => ({
+        ' --> ': '-->',
+        ' <-> ': '<->',
+        ' ==> ': '==>',
+        ' <=> ': '<=>',
+        ' ^ ': '^',
+        ' & ': '&',
+        ' {{-- ': '{{--',
+        ' --}} ': '--}}'
+    }[op] || op);
 }

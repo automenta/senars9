@@ -77,7 +77,7 @@ export class TaskManager {
         return concept ? concept.getAllTasks() : [];
     }
 
-    _collectTasksFromAllConcepts(filterFn = null) {
+    _collectTasks(filterFn = null) {
         return collectTasksFromAllConcepts(this._memory, filterFn);
     }
 
@@ -90,19 +90,19 @@ export class TaskManager {
     }
 
     findTasksByPriority(minPriority = 0, maxPriority = 1) {
-        return this._collectTasksFromAllConcepts(
+        return this._collectTasks(
             task => task.priority >= minPriority && task.priority <= maxPriority
         );
     }
 
     findRecentTasks(sinceTimestamp) {
-        return this._collectTasksFromAllConcepts(
+        return this._collectTasks(
             task => task.createdAt >= sinceTimestamp
         );
     }
 
     getHighestPriorityTasks(limit = 10) {
-        const allTasks = this._collectTasksFromAllConcepts();
+        const allTasks = this._collectTasks();
         return sortByPriority(allTasks).slice(0, limit);
     }
 
@@ -127,7 +127,7 @@ export class TaskManager {
         const { minPriority = 0.7, maxAge = 60000, limit = 20 } = criteria;
         const currentTime = Date.now();
 
-        let allTasks = this._collectTasksFromAllConcepts(task => {
+        let allTasks = this._collectTasks(task => {
             return task.priority >= minPriority &&
                 (currentTime - task.createdAt) <= maxAge;
         });
@@ -137,34 +137,40 @@ export class TaskManager {
     }
 
     getTaskStats() {
-        const tasksByType = { BELIEF: 0, GOAL: 0, QUESTION: 0 };
-        const priorityDistribution = { low: 0, medium: 0, high: 0 };
-        let totalPriority = 0;
-        let oldestTask = Date.now();
-        let newestTask = 0;
+        const stats = {
+            tasksByType: { BELIEF: 0, GOAL: 0, QUESTION: 0 },
+            priorityDistribution: { low: 0, medium: 0, high: 0 },
+            totalPriority: 0,
+            oldestTask: Date.now(),
+            newestTask: 0
+        };
 
         for (const concept of this._memory.getAllConcepts()) {
             for (const task of concept.getAllTasks()) {
-                tasksByType[task.type]++;
-                priorityDistribution[task.priority < 0.3 ? 'low' : task.priority < 0.7 ? 'medium' : 'high']++;
-                totalPriority += task.priority;
-                oldestTask = Math.min(oldestTask, task.createdAt);
-                newestTask = Math.max(newestTask, task.createdAt);
+                stats.tasksByType[task.type]++;
+                stats.priorityDistribution[this._getPriorityBucket(task.priority)]++;
+                stats.totalPriority += task.priority;
+                stats.oldestTask = Math.min(stats.oldestTask, task.createdAt);
+                stats.newestTask = Math.max(stats.newestTask, task.createdAt);
             }
         }
 
-        const totalTasks = Object.values(tasksByType).reduce((sum, count) => sum + count, 0);
-        const averagePriority = totalTasks > 0 ? totalPriority / totalTasks : 0;
+        const totalTasks = Object.values(stats.tasksByType).reduce((sum, count) => sum + count, 0);
+        const averagePriority = totalTasks > 0 ? stats.totalPriority / totalTasks : 0;
 
         return {
             ...this._stats,
-            tasksByType,
-            priorityDistribution,
+            tasksByType: stats.tasksByType,
+            priorityDistribution: stats.priorityDistribution,
             averagePriority,
-            oldestTask,
-            newestTask,
-            ageRange: newestTask - oldestTask
+            oldestTask: stats.oldestTask,
+            newestTask: stats.newestTask,
+            ageRange: stats.newestTask - stats.oldestTask
         };
+    }
+
+    _getPriorityBucket(priority) {
+        return priority < 0.3 ? 'low' : priority < 0.7 ? 'medium' : 'high';
     }
 
     clearPendingTasks() {

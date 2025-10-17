@@ -26,21 +26,30 @@ export class Rule {
 
     // Immutable state modifiers
     enable() {
-        return this._enabled ? this : this._clone({enabled: true});
+        return this._toggleEnabled(true);
     }
 
     disable() {
-        return this._enabled ? this._clone({enabled: false}) : this;
+        return this._toggleEnabled(false);
     }
 
     withPriority(priority) {
         const clamped = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
-        return clamped === this._priority ? this : this._clone({priority: clamped});
+        return this._updateIfChanged('_priority', clamped);
     }
 
     withConfig(config) {
         const merged = {...this._config, ...config};
-        return this._config === merged ? this : this._clone({config: merged});
+        return this._updateIfChanged('_config', merged);
+    }
+
+    // Helper methods for common operations
+    _toggleEnabled(newState) {
+        return this._enabled === newState ? this : this._clone({enabled: newState});
+    }
+
+    _updateIfChanged(propName, newValue) {
+        return this[propName] === newValue ? this : this._clone({[propName]: newValue});
     }
 
     canApply(task) {

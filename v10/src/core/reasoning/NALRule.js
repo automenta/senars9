@@ -19,18 +19,25 @@ export class NALRule extends Rule {
     }
 
     _matchesPattern(pattern, term) {
-        if (!pattern || !term) return false;
-        if (pattern.type !== term.type) return false;
-
+        if (!pattern || !term || pattern.type !== term.type) return false;
+        
+        return this._matchesAtomic(pattern, term) || 
+               this._matchesCompound(pattern, term) ||
+               false;
+    }
+    
+    _matchesAtomic(pattern, term) {
         if (pattern.isAtomic && term.isAtomic) {
             return pattern.name === term.name || pattern.name === '?';
         }
-
+        return false;
+    }
+    
+    _matchesCompound(pattern, term) {
         if (pattern.isCompound && term.isCompound) {
             if (pattern.operator !== term.operator || pattern.components.length !== term.components.length) return false;
             return pattern.components.every((comp, i) => this._matchesPattern(comp, term.components[i]));
         }
-
         return false;
     }
 

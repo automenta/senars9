@@ -28,7 +28,18 @@ export class Bag {
 
     peek() {
         if (this.size === 0) return null;
-        return this.getItemsInPriorityOrder()[0];
+        
+        let highestPriorityItem = null;
+        let highestPriority = -Infinity;
+        
+        for (const [item, priority] of this._items.entries()) {
+            if (priority > highestPriority) {
+                highestPriority = priority;
+                highestPriorityItem = item;
+            }
+        }
+        
+        return highestPriorityItem;
     }
 
     getItemsInPriorityOrder() {

@@ -81,16 +81,19 @@ export class NAR {
     }
 
     _createTask(parsed) {
-        const taskCreators = {
-            BELIEF: () => this._taskManager.createBelief(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
-            GOAL: () => this._taskManager.createGoal(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
-            QUESTION: () => this._taskManager.createQuestion(parsed.term, this._calculateInputPriority(parsed))
-        };
+        const {taskType, term, truthValue} = parsed;
+        const priority = this._calculateInputPriority(parsed);
 
-        const taskCreator = taskCreators[parsed.taskType];
-        if (!taskCreator) throw new Error(`Unknown task type: ${parsed.taskType}`);
-
-        return taskCreator();
+        switch (taskType) {
+            case 'BELIEF': 
+                return this._taskManager.createBelief(term, truthValue, priority);
+            case 'GOAL': 
+                return this._taskManager.createGoal(term, truthValue, priority);
+            case 'QUESTION': 
+                return this._taskManager.createQuestion(term, priority);
+            default: 
+                throw new Error(`Unknown task type: ${taskType}`);
+        }
     }
 
     start() {

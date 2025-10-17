@@ -24,9 +24,7 @@ class Logger {
 
     log(level, message, data = {}) {
         // If silent mode is enabled (especially for tests), don't log anything
-        if (this.silent) {
-            return;
-        }
+        if (this.silent) return;
 
         // In test environment, only log if there's a mock in place to keep output clean
         if (this.isTestEnv) {
@@ -34,11 +32,7 @@ class Logger {
             const hasMock = consoleMethod._isMockFunction ||
                 (consoleMethod.mock && Array.isArray(consoleMethod.mock.calls));
 
-            if (hasMock) {
-                // If console method is mocked, let the mock handle it (for testing)
-                consoleMethod(`[${level.toUpperCase()}]`, message, data);
-            }
-            // Otherwise, do nothing to keep test output clean
+            if (hasMock) consoleMethod(`[${level.toUpperCase()}]`, message, data);
             return;
         }
 

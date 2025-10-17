@@ -73,10 +73,10 @@ export class Memory {
     getConcept(term) {
         if (!term) return null;
         
-        const concept = this._concepts.get(term);
-        if (concept) return concept;
+        return this._concepts.get(term) || this._findConceptByEquality(term);
+    }
 
-        // Fallback to equality check if term not found by reference
+    _findConceptByEquality(term) {
         for (const [key, value] of this._concepts) {
             if (key.equals(term)) return value;
         }
