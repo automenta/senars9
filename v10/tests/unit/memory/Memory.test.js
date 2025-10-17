@@ -2,12 +2,17 @@ import { Memory } from '../../../src/core/memory/Memory.js';
 import { Task } from '../../../src/core/task/Task.js';
 import { Term } from '../../../src/core/term/Term.js';
 import { jest } from '@jest/globals';
+import { TermFactory } from '../../../src/core/term/TermFactory.js';
 
 describe('Memory', () => {
   let memory;
   let config;
+  let termFactory;
+  let newAtom;
 
   beforeEach(() => {
+    termFactory = new TermFactory();
+    newAtom = name => termFactory.create({ components: [name] });
     config = {
       priorityThreshold: 0.5,
       consolidationInterval: 10,
@@ -26,7 +31,7 @@ describe('Memory', () => {
   });
 
   test('should add tasks and create concepts correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       truth: { frequency: 0.9, confidence: 0.8 },
@@ -45,7 +50,7 @@ describe('Memory', () => {
   });
 
   test('should not add duplicate tasks to concepts', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task1 = new Task({
       term,
       truth: { frequency: 0.9, confidence: 0.8 },
@@ -67,7 +72,7 @@ describe('Memory', () => {
   });
 
   test('should retrieve concepts correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       truth: { frequency: 0.9, confidence: 0.8 },
@@ -83,16 +88,16 @@ describe('Memory', () => {
   });
 
   test('should return null for non-existent concepts', () => {
-    const term = Term.newAtom('A');
-    const nonExistentTerm = Term.newAtom('B');
+    const term = newAtom('A');
+    const nonExistentTerm = newAtom('B');
 
     const concept = memory.getConcept(nonExistentTerm);
     expect(concept).toBeNull();
   });
 
   test('should get all concepts correctly', () => {
-    const termA = Term.newAtom('A');
-    const termB = Term.newAtom('B');
+    const termA = newAtom('A');
+    const termB = newAtom('B');
 
     const taskA = new Task({ term: termA, type: 'BELIEF' });
     const taskB = new Task({ term: termB, type: 'BELIEF' });
@@ -105,8 +110,8 @@ describe('Memory', () => {
   });
 
   test('should filter concepts by criteria correctly', () => {
-    const termA = Term.newAtom('A');
-    const termB = Term.newAtom('B');
+    const termA = newAtom('A');
+    const termB = newAtom('B');
 
     const highPriorityTask = new Task({
       term: termA,
@@ -132,8 +137,8 @@ describe('Memory', () => {
   });
 
   test('should get most active concepts correctly', () => {
-    const termA = Term.newAtom('A');
-    const termB = Term.newAtom('B');
+    const termA = newAtom('A');
+    const termB = newAtom('B');
 
     const taskA = new Task({ term: termA, type: 'BELIEF', priority: 0.9 });
     const taskB = new Task({ term: termB, type: 'BELIEF', priority: 0.7 });
@@ -146,7 +151,7 @@ describe('Memory', () => {
   });
 
   test('should remove concepts correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       type: 'BELIEF',
@@ -165,13 +170,13 @@ describe('Memory', () => {
   });
 
   test('should return false when removing non-existent concept', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const removed = memory.removeConcept(term);
     expect(removed).toBe(false);
   });
 
   test('should consolidate memory correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       type: 'BELIEF',
@@ -188,7 +193,7 @@ describe('Memory', () => {
   });
 
   test('should boost concept activation correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       type: 'BELIEF',
@@ -206,7 +211,7 @@ describe('Memory', () => {
   });
 
   test('should update concept quality correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       type: 'BELIEF',
@@ -224,7 +229,7 @@ describe('Memory', () => {
   });
 
   test('should provide detailed statistics correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       type: 'BELIEF',
@@ -242,7 +247,7 @@ describe('Memory', () => {
   });
 
   test('should clear memory correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       type: 'BELIEF',
@@ -261,8 +266,8 @@ describe('Memory', () => {
   });
 
   test('should check concept existence correctly', () => {
-    const term = Term.newAtom('A');
-    const nonExistentTerm = Term.newAtom('B');
+    const term = newAtom('A');
+    const nonExistentTerm = newAtom('B');
 
     expect(memory.hasConcept(term)).toBe(false);
 
@@ -274,7 +279,7 @@ describe('Memory', () => {
   test('should get total task count correctly', () => {
     expect(memory.getTotalTaskCount()).toBe(0);
 
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({ term, type: 'BELIEF' });
 
     memory.addTask(task);
@@ -282,8 +287,8 @@ describe('Memory', () => {
   });
 
   test('should handle focus memory correctly based on priority threshold', () => {
-    const termA = Term.newAtom('A');
-    const termB = Term.newAtom('B');
+    const termA = newAtom('A');
+    const termB = newAtom('B');
 
     const highPriorityTask = new Task({
       term: termA,

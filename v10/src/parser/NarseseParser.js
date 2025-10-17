@@ -29,7 +29,9 @@ export class NarseseParser {
     const { termPart, punctuation, truthValue } = this._splitStatement(trimmed);
 
     // Parse the term
-    const term = this.termFactory.create(termPart);
+    const termData = this._parseTerm(termPart);
+    const term = this.termFactory.create(termData);
+
 
     // Determine task type from punctuation
     const taskType = this._getTaskType(punctuation);
@@ -76,6 +78,8 @@ export class NarseseParser {
     if (punctuationMatch) {
       punctuation = punctuationMatch[0].trim();
       termPart = remainingStatement.substring(0, punctuationMatch.index).trim();
+    } else if (!truthValue) {
+        throw new Error('Missing punctuation');
     }
 
     return {
@@ -131,6 +135,21 @@ export class NarseseParser {
       default: return 'BELIEF'; // Default to belief
     }
   }
+
+  _parseTerm(termString) {
+    termString = termString.trim();
+
+    if (termString.startsWith('(') && termString.endsWith(')')) {
+      const content = termString.slice(1, -1).trim();
+      const parts = content.split(/,(?![^()]*\))/); // Split by comma, but not inside parentheses
+      const operator = parts[0].trim();
+      const components = parts.slice(1).map(p => this._parseTerm(p.trim()));
+      return { operator, components };
+    } else {
+      return { components: [termString] };
+    }
+  }
+
 
   /**
    * Parse atomic term (word or quoted string)

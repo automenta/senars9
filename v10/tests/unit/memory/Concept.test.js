@@ -2,14 +2,19 @@ import { Concept } from '../../../src/core/memory/Concept.js';
 import { Task } from '../../../src/core/task/Task.js';
 import { Term } from '../../../src/core/term/Term.js';
 import { Truth } from '../../../src/core/Truth.js';
+import { TermFactory } from '../../../src/core/term/TermFactory.js';
 
 describe('Concept', () => {
   let concept;
   let term;
   let config;
+  let termFactory;
+  let newAtom;
 
   beforeEach(() => {
-    term = Term.newAtom('A');
+    termFactory = new TermFactory();
+    newAtom = name => termFactory.create({ components: [name] });
+    term = newAtom('A');
     config = { priorityDecayRate: 0.9 };
     concept = new Concept(term, config);
   });

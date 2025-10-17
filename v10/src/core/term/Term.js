@@ -76,14 +76,20 @@ export class Term {
 
   visit(visitorFn, order = 'pre-order') {
     if (order === 'pre-order') visitorFn(this);
-    this._components.forEach(comp => comp.visit(visitorFn, order));
+    this._components.forEach(comp => {
+      if (comp instanceof Term) {
+        comp.visit(visitorFn, order);
+      }
+    });
     if (order === 'post-order') visitorFn(this);
   }
 
   reduce(reducerFn, initialValue) {
     let result = reducerFn(initialValue, this);
     for (const comp of this._components) {
-      result = comp.reduce(reducerFn, result);
+      if (comp instanceof Term) {
+        result = comp.reduce(reducerFn, result);
+      }
     }
     return result;
   }

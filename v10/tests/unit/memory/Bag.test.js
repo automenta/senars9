@@ -1,14 +1,19 @@
 import { Bag } from '../../../src/core/memory/Bag.js';
 import { Task } from '../../../src/core/task/Task.js';
 import { Term } from '../../../src/core/term/Term.js';
+import { TermFactory } from '../../../src/core/term/TermFactory.js';
 
 describe('Bag', () => {
   let bag;
   let term;
+  let termFactory;
+  let newAtom;
 
   beforeEach(() => {
+    termFactory = new TermFactory();
+    newAtom = name => termFactory.create({ components: [name] });
     bag = new Bag(10);
-    term = Term.newAtom('A');
+    term = newAtom('A');
   });
 
   test('should initialize with correct default state', () => {
@@ -41,7 +46,7 @@ describe('Bag', () => {
 
   test('should peek at the highest priority item', () => {
     const task1 = new Task({ term, type: 'BELIEF', priority: 0.5 });
-    const task2 = new Task({ term: Term.newAtom('B'), type: 'BELIEF', priority: 0.8 });
+    const task2 = new Task({ term: newAtom('B'), type: 'BELIEF', priority: 0.8 });
     bag.add(task1, 0.5);
     bag.add(task2, 0.8);
     expect(bag.peek()).toBe(task2);
@@ -49,7 +54,7 @@ describe('Bag', () => {
 
   test('should get items in priority order', () => {
     const task1 = new Task({ term, type: 'BELIEF', priority: 0.5 });
-    const task2 = new Task({ term: Term.newAtom('B'), type: 'BELIEF', priority: 0.8 });
+    const task2 = new Task({ term: newAtom('B'), type: 'BELIEF', priority: 0.8 });
     bag.add(task1, 0.5);
     bag.add(task2, 0.8);
     const items = bag.getItemsInPriorityOrder();
@@ -58,7 +63,7 @@ describe('Bag', () => {
 
   test('should apply decay to priorities', () => {
     const task1 = new Task({ term, type: 'BELIEF', priority: 0.5 });
-    const task2 = new Task({ term: Term.newAtom('B'), type: 'BELIEF', priority: 0.8 });
+    const task2 = new Task({ term: newAtom('B'), type: 'BELIEF', priority: 0.8 });
     bag.add(task1, 0.5);
     bag.add(task2, 0.8);
     bag.applyDecay(0.5);

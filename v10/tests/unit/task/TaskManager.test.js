@@ -3,14 +3,20 @@ import { TaskManager } from '../../../src/core/task/TaskManager.js';
 import { Task } from '../../../src/core/task/Task.js';
 import { Term } from '../../../src/core/term/Term.js';
 import { Stamp } from '../../../src/core/task/Stamp.js';
+import { TermFactory } from '../../../src/core/term/TermFactory.js';
 
 describe('TaskManager', () => {
   let taskManager;
   let memory;
   let focus;
   let config;
+  let termFactory;
+  let newAtom;
 
   beforeEach(() => {
+    termFactory = new TermFactory();
+    newAtom = name => termFactory.create({ components: [name] });
+
     // Mock memory
     memory = {
       addTask: jest.fn(),
@@ -40,7 +46,7 @@ describe('TaskManager', () => {
   });
 
   test('should add tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       truth: { frequency: 0.9, confidence: 0.8 },
@@ -70,7 +76,7 @@ describe('TaskManager', () => {
   });
 
   test('should process pending tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       truth: { frequency: 0.9, confidence: 0.8 },
@@ -92,7 +98,7 @@ describe('TaskManager', () => {
   });
 
   test('should not add high priority tasks to focus if below threshold', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({
       term,
       truth: { frequency: 0.9, confidence: 0.8 },
@@ -109,7 +115,7 @@ describe('TaskManager', () => {
   });
 
   test('should create belief tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const truth = { frequency: 0.9, confidence: 0.8 };
 
     const belief = taskManager.createBelief(term, truth, 0.7);
@@ -122,7 +128,7 @@ describe('TaskManager', () => {
   });
 
   test('should create belief tasks with default priority', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const truth = { frequency: 0.9, confidence: 0.8 };
 
     const belief = taskManager.createBelief(term, truth);
@@ -131,7 +137,7 @@ describe('TaskManager', () => {
   });
 
   test('should create goal tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const truth = { frequency: 0.9, confidence: 0.8 };
 
     const goal = taskManager.createGoal(term, truth, 0.6);
@@ -144,7 +150,7 @@ describe('TaskManager', () => {
   });
 
   test('should create goal tasks without truth value', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
 
     const goal = taskManager.createGoal(term);
 
@@ -154,7 +160,7 @@ describe('TaskManager', () => {
   });
 
   test('should create question tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
 
     const question = taskManager.createQuestion(term, 0.6);
 
@@ -166,7 +172,7 @@ describe('TaskManager', () => {
   });
 
   test('should find tasks by term correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const mockConcept = {
       getAllTasks: jest.fn(() => [
         new Task({ term, type: 'BELIEF' }),
@@ -185,14 +191,14 @@ describe('TaskManager', () => {
   test('should return empty array for non-existent term', () => {
     memory.getConcept.mockReturnValue(null);
 
-    const tasks = taskManager.findTasksByTerm(Term.newAtom('A'));
+    const tasks = taskManager.findTasksByTerm(newAtom('A'));
 
     expect(tasks).toHaveLength(0);
   });
 
   test('should find tasks by type correctly', () => {
-    const termA = Term.newAtom('A');
-    const termB = Term.newAtom('B');
+    const termA = newAtom('A');
+    const termB = newAtom('B');
 
     const mockConceptA = {
       getTasksByType: jest.fn((type) => {
@@ -218,7 +224,7 @@ describe('TaskManager', () => {
   });
 
   test('should find tasks by priority range correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
 
     const mockConcept = {
       getAllTasks: jest.fn(() => [
@@ -237,7 +243,7 @@ describe('TaskManager', () => {
   });
 
   test('should find recent tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const now = Date.now();
     const tasks = [
         new Task({ term, type: 'BELIEF', stamp: Stamp.createInput(now - 1000) }),
@@ -260,7 +266,7 @@ describe('TaskManager', () => {
   });
 
   test('should get highest priority tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
 
     const mockConcept = {
       getAllTasks: jest.fn(() => [
@@ -280,7 +286,7 @@ describe('TaskManager', () => {
   });
 
   test('should update task priority correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({ term, type: 'BELIEF', priority: 0.5 });
 
     const mockConcept = {
@@ -300,7 +306,7 @@ describe('TaskManager', () => {
     memory.getConcept.mockReturnValue(null);
 
     const updated = taskManager.updateTaskPriority(
-      new Task({ term: Term.newAtom('A'), type: 'BELIEF' }),
+      new Task({ term: newAtom('A'), type: 'BELIEF' }),
       0.7
     );
 
@@ -308,7 +314,7 @@ describe('TaskManager', () => {
   });
 
   test('should remove tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({ term, type: 'BELIEF' });
 
     const mockConcept = {
@@ -327,14 +333,14 @@ describe('TaskManager', () => {
     memory.getConcept.mockReturnValue(null);
 
     const removed = taskManager.removeTask(
-      new Task({ term: Term.newAtom('A'), type: 'BELIEF' })
+      new Task({ term: newAtom('A'), type: 'BELIEF' })
     );
 
     expect(removed).toBe(false);
   });
 
   test('should get tasks needing attention correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const now = Date.now();
 
     const mockConcept = {
@@ -359,8 +365,8 @@ describe('TaskManager', () => {
   });
 
   test('should provide comprehensive task statistics', () => {
-    const termA = Term.newAtom('A');
-    const termB = Term.newAtom('B');
+    const termA = newAtom('A');
+    const termB = newAtom('B');
 
     const mockConceptA = {
       getAllTasks: jest.fn(() => [
@@ -389,7 +395,7 @@ describe('TaskManager', () => {
   });
 
   test('should clear pending tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({ term, type: 'BELIEF' });
 
     taskManager.addTask(task);
@@ -401,7 +407,7 @@ describe('TaskManager', () => {
   });
 
   test('should check task existence correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({ term, type: 'BELIEF' });
 
     const mockConcept = {
@@ -420,14 +426,14 @@ describe('TaskManager', () => {
     memory.getConcept.mockReturnValue(null);
 
     const exists = taskManager.hasTask(
-      new Task({ term: Term.newAtom('A'), type: 'BELIEF' })
+      new Task({ term: newAtom('A'), type: 'BELIEF' })
     );
 
     expect(exists).toBe(false);
   });
 
   test('should get pending tasks correctly', () => {
-    const term = Term.newAtom('A');
+    const term = newAtom('A');
     const task = new Task({ term, type: 'BELIEF' });
 
     taskManager.addTask(task);

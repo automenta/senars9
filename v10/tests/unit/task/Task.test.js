@@ -2,12 +2,17 @@ import { Task } from '../../../src/core/task/Task.js';
 import { Truth } from '../../../src/core/Truth.js';
 import { Stamp } from '../../../src/core/task/Stamp.js';
 import { Term } from '../../../src/core/term/Term.js';
+import { TermFactory } from '../../../src/core/term/TermFactory.js';
 
 describe('Task', () => {
+  let termFactory;
   let term;
+  let atomB;
 
   beforeEach(() => {
-    term = Term.newAtom('A');
+    termFactory = new TermFactory();
+    term = termFactory.create({ components: ['A'] });
+    atomB = termFactory.create({ components: ['B'] });
   });
 
   test('should create tasks with correct properties', () => {
@@ -73,7 +78,7 @@ describe('Task', () => {
     const task1 = new Task({ term, type: 'BELIEF', truth: truth1 });
     const task2 = new Task({ term, type: 'BELIEF', truth: truth2 }); // Same content
     const task3 = new Task({ term, type: 'BELIEF', truth: truth3 }); // Different truth
-    const task4 = new Task({ term: Term.newAtom('B'), type: 'BELIEF', truth: truth1 }); // Different term
+    const task4 = new Task({ term: atomB, type: 'BELIEF', truth: truth1 }); // Different term
     const task5 = new Task({ term, type: 'GOAL', truth: truth1 }); // Different type
 
     expect(task1.equals(task2)).toBe(true);
