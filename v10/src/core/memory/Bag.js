@@ -9,7 +9,11 @@ export class Bag {
 
  add(item, priority) {
    if (this._items.has(item)) return false;
-   this.size >= this.maxSize && this._removeLowestPriorityItem();
+
+   if (this.size >= this.maxSize) {
+     this._removeLowestPriorityItem();
+   }
+
    this._items.set(item, priority);
    return true;
  }
@@ -23,15 +27,22 @@ export class Bag {
  }
 
  peek() {
-   return this.size === 0 ? null : this.getItemsInPriorityOrder()[0];
+   if (this.size === 0) return null;
+   return this.getItemsInPriorityOrder()[0];
  }
 
  getItemsInPriorityOrder() {
-   return [...this._items.entries()].sort((a, b) => b[1] - a[1]).map(([item]) => item);
+   return [...this._items.entries()]
+     .sort((a, b) => b[1] - a[1])
+     .map(([item]) => item);
  }
 
  getAveragePriority() {
-   return this.size === 0 ? 0 : [...this._items.values()].reduce((sum, priority) => sum + priority, 0) / this.size;
+   if (this.size === 0) return 0;
+
+   const priorities = [...this._items.values()];
+   const sum = priorities.reduce((acc, priority) => acc + priority, 0);
+   return sum / this.size;
  }
 
  applyDecay(decayRate) {
@@ -44,6 +55,9 @@ export class Bag {
  }
 
  _removeLowestPriorityItem() {
-   this.size > 0 && this.remove(this.getItemsInPriorityOrder().pop());
+   if (this.size > 0) {
+     const items = this.getItemsInPriorityOrder();
+     this.remove(items[items.length - 1]);
+   }
  }
 }

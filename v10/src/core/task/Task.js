@@ -3,24 +3,30 @@ import { Term } from '../term/Term.js';
 import { Truth } from '../Truth.js';
 
 export class Task {
- constructor({ term, type, truth = null, stamp = null, priority = 0.5, budget = 1.0, accessedAt = null }) {
-   if (!(term instanceof Term)) {
-     throw new Error('Task must be initialized with a valid Term object.');
-   }
+  static get DEFAULTS() {
+    return {
+      priority: 0.5,
+      budget: 1.0,
+      minPriority: 0,
+      maxPriority: 1
+    };
+  }
 
-   this._term = term;
-   this._type = type;
-   this._truth = truth;
-   this._stamp = stamp || Stamp.createInput();
-   this._priority = Math.max(0, Math.min(1, priority));
-   this._budget = budget;
-   this._createdAt = this._stamp.occurrenceTime;
-   this._accessedAt = accessedAt || this._createdAt;
-   Object.freeze(this);
- }
+  constructor({ term, type, truth = null, stamp = null, priority = Task.DEFAULTS.priority, budget = Task.DEFAULTS.budget, accessedAt = null }) {
+    if (!(term instanceof Term)) {
+      throw new Error(`Task must be initialized with a valid Term object. Received: ${typeof term}.`);
+    }
 
- static get DEFAULT_PRIORITY() { return 0.5; }
- static get DEFAULT_BUDGET() { return 1.0; }
+    this._term = term;
+    this._type = type;
+    this._truth = truth;
+    this._stamp = stamp || Stamp.createInput();
+    this._priority = Math.max(Task.DEFAULTS.minPriority, Math.min(Task.DEFAULTS.maxPriority, priority));
+    this._budget = budget;
+    this._createdAt = this._stamp.occurrenceTime;
+    this._accessedAt = accessedAt || this._createdAt;
+    Object.freeze(this);
+  }
 
  get term() { return this._term; }
  get type() { return this._type; }
@@ -49,8 +55,8 @@ export class Task {
 
   equals(other) {
     if (!(other instanceof Task)) return false;
-    const truthEquals = (!this.truth && !other.truth) || (this.truth && this.truth.equals(other.truth));
-    return this.term.equals(other.term) && this.type === other.type && truthEquals;
+    const truthEqual = (!this.truth && !other.truth) || (this.truth?.equals(other.truth));
+    return this.term.equals(other.term) && this.type === other.type && truthEqual;
   }
 
   _getAllProperties() {

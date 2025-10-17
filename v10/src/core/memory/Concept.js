@@ -1,17 +1,31 @@
 import { Bag } from './Bag.js';
 
 export class Concept {
- constructor(term, config = {}) {
-   this._term = term;
-   this._createdAt = Date.now();
-   this._lastAccessed = Date.now();
-   this._beliefs = new Bag(config.maxBeliefs || 100);
-   this._goals = new Bag(config.maxGoals || 50);
-   this._questions = new Bag(config.maxQuestions || 20);
-   this._activation = 0;
-   this._useCount = 0;
-   this._quality = 0;
- }
+  static get DEFAULT_CONFIG() {
+    return {
+      maxBeliefs: 100,
+      maxGoals: 50,
+      maxQuestions: 20,
+      defaultDecayRate: 0.01,
+      defaultActivationBoost: 0.1,
+      maxActivation: 1.0,
+      minQuality: 0,
+      maxQuality: 1
+    };
+  }
+
+  constructor(term, config = {}) {
+    this._term = term;
+    this._createdAt = Date.now();
+    this._lastAccessed = Date.now();
+    this._config = { ...Concept.DEFAULT_CONFIG, ...config };
+    this._beliefs = new Bag(this._config.maxBeliefs);
+    this._goals = new Bag(this._config.maxGoals);
+    this._questions = new Bag(this._config.maxQuestions);
+    this._activation = 0;
+    this._useCount = 0;
+    this._quality = 0;
+  }
 
  get term() { return this._term; }
  get createdAt() { return this._createdAt; }
@@ -29,21 +43,43 @@ export class Concept {
 
   get averagePriority() {
     if (this.totalTasks === 0) return 0;
-    const totalPriority = this._beliefs.getAveragePriority() * this._beliefs.size +
-                        this._goals.getAveragePriority() * this._goals.size +
-                        this._questions.getAveragePriority() * this._questions.size;
+    return this._calculateWeightedAveragePriority();
+  }
+
+  _calculateWeightedAveragePriority() {
+    const bags = [
+      { bag: this._beliefs, weight: this._beliefs.size },
+      { bag: this._goals, weight: this._goals.size },
+      { bag: this._questions, weight: this._questions.size }
+    ];
+
+    const totalPriority = bags.reduce((sum, { bag, weight }) =>
+      sum + (bag.getAveragePriority() * weight), 0
+    );
+
     return totalPriority / this.totalTasks;
   }
 
   _getStorage(taskType) {
     const storageMap = { BELIEF: this._beliefs, GOAL: this._goals, QUESTION: this._questions };
-    return storageMap[taskType] || (() => { throw new Error(`Unknown task type: ${taskType}`); })();
+    const storage = storageMap[taskType];
+    if (!storage) {
+      throw new Error(`Unknown task type: ${taskType}. Expected BELIEF, GOAL, or QUESTION.`);
+    }
+    return storage;
+  }
+
+  _updateLastAccessed() {
+    this._lastAccessed = Date.now();
   }
 
   addTask(task) {
     const storage = this._getStorage(task.type);
     const added = storage.add(task, task.priority);
-    added && (this._lastAccessed = Date.now(), this._useCount++);
+    if (added) {
+      this._updateLastAccessed();
+      this._useCount++;
+    }
     return added;
   }
 
@@ -57,27 +93,31 @@ export class Concept {
 
   removeTask(task) {
     const removed = this._getStorage(task.type).remove(task);
-    removed && (this._lastAccessed = Date.now());
+    if (removed) {
+      this._updateLastAccessed();
+    }
     return removed || false;
   }
 
   updateTaskPriority(task, newPriority) {
     const updated = this._getStorage(task.type).updatePriority(task, newPriority);
-    updated && (this._lastAccessed = Date.now());
+    if (updated) {
+      this._updateLastAccessed();
+    }
     return updated || false;
   }
 
- applyDecay(decayRate = 0.01) {
+ applyDecay(decayRate = this._config.defaultDecayRate) {
    this._beliefs.applyDecay(decayRate);
    this._goals.applyDecay(decayRate);
    this._questions.applyDecay(decayRate);
    this._activation *= (1 - decayRate);
-   this._lastAccessed = Date.now();
+   this._updateLastAccessed();
  }
 
- boostActivation(activationBoost = 0.1) {
-   this._activation = Math.min(1.0, this._activation + activationBoost);
-   this._lastAccessed = Date.now();
+ boostActivation(activationBoost = this._config.defaultActivationBoost) {
+   this._activation = Math.min(this._config.maxActivation, this._activation + activationBoost);
+   this._updateLastAccessed();
    this.incrementUseCount();
  }
 
@@ -86,7 +126,8 @@ export class Concept {
  }
 
  updateQuality(qualityChange) {
-   this._quality = Math.max(0, Math.min(1, this._quality + qualityChange));
+   this._quality = Math.max(this._config.minQuality,
+                          Math.min(this._config.maxQuality, this._quality + qualityChange));
  }
 
  containsTask(task) {
@@ -94,11 +135,12 @@ export class Concept {
  }
 
  getAllTasks() {
-   return [
+   const allTasks = [
      ...this._beliefs.getItemsInPriorityOrder(),
      ...this._goals.getItemsInPriorityOrder(),
      ...this._questions.getItemsInPriorityOrder()
-   ].sort((a, b) => b.priority - a.priority);
+   ];
+   return allTasks.sort((a, b) => b.priority - a.priority);
  }
 
  getStats() {

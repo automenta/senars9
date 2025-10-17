@@ -23,6 +23,14 @@ export class Memory {
    return { useCount: 100, taskCount: 50 };
  }
 
+ static get CONSOLIDATION_THRESHOLDS() {
+   return { activationThreshold: 0.1, minTasksThreshold: 5, decayThreshold: 0.01, minTasksForDecay: 2 };
+ }
+
+ static get ACTIVATION_MULTIPLIERS() {
+   return { globalDecay: 0.9, averagePriority: 0.5 };
+ }
+
  get concepts() { return new Map(this._concepts); }
  get focusConcepts() { return new Set(this._focusConcepts); }
  get stats() { return { ...this._stats }; }
@@ -42,10 +50,10 @@ export class Memory {
     const added = concept.addTask(task);
     if (added) {
       this._stats.totalTasks++;
-      task.priority >= this._config.priorityThreshold && (
-        this._focusConcepts.add(concept),
-        this._stats.focusConceptsCount = this._focusConcepts.size
-      );
+      if (task.priority >= this._config.priorityThreshold) {
+        this._focusConcepts.add(concept);
+        this._stats.focusConceptsCount = this._focusConcepts.size;
+      }
     }
     return added;
   }
@@ -82,18 +90,30 @@ export class Memory {
     const { useCount: useLimit, taskCount: taskLimit } = Memory.NORMALIZATION_LIMITS;
 
     return this.getAllConcepts()
-      .map(concept => ({ concept, score: concept.activation * activation + Math.min(concept.useCount / useLimit, 1) * useCount + Math.min(concept.totalTasks / taskLimit, 1) * taskCount }))
+      .map(concept => this._calculateConceptScore(concept, activation, useCount, taskCount, useLimit, taskLimit))
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
       .map(({ concept }) => concept);
+  }
+
+  _calculateConceptScore(concept, activationWeight, useCountWeight, taskCountWeight, useLimit, taskLimit) {
+    const normalizedUseCount = Math.min(concept.useCount / useLimit, 1);
+    const normalizedTaskCount = Math.min(concept.totalTasks / taskLimit, 1);
+    const score = concept.activation * activationWeight +
+                  normalizedUseCount * useCountWeight +
+                  normalizedTaskCount * taskCountWeight;
+
+    return { concept, score };
   }
 
  removeConcept(term) {
    const concept = this._concepts.get(term);
    if (!concept) return false;
 
-   this._focusConcepts.has(concept) &&
-     (this._focusConcepts.delete(concept), this._stats.focusConceptsCount = this._focusConcepts.size);
+   if (this._focusConcepts.has(concept)) {
+     this._focusConcepts.delete(concept);
+     this._stats.focusConceptsCount = this._focusConcepts.size;
+   }
 
    this._concepts.delete(term);
    this._stats.totalConcepts--;
@@ -111,10 +131,14 @@ export class Memory {
    this._cyclesSinceConsolidation = 0;
    this._stats.lastConsolidation = currentTime;
 
+   const { activationThreshold, minTasksThreshold } = Memory.CONSOLIDATION_THRESHOLDS;
+
    for (const concept of this._focusConcepts) {
      concept.getAllTasks().filter(task => task.priority >= this._config.priorityThreshold);
 
-     concept.activation < 0.1 && concept.totalTasks < 5 && this._focusConcepts.delete(concept);
+     if (concept.activation < activationThreshold && concept.totalTasks < minTasksThreshold) {
+       this._focusConcepts.delete(concept);
+     }
    }
 
    this._applyGlobalDecay();
@@ -124,26 +148,36 @@ export class Memory {
 
  _applyGlobalDecay() {
    const decayRate = this._config.priorityDecayRate;
+   const { globalDecay, averagePriority } = Memory.ACTIVATION_MULTIPLIERS;
+
    for (const concept of this._concepts.values()) {
      concept.applyDecay(decayRate);
      const avgPriority = concept.averagePriority;
-     concept._activation = Math.max(concept._activation * 0.9, avgPriority * 0.5);
+     concept._activation = Math.max(concept._activation * globalDecay, avgPriority * averagePriority);
    }
  }
 
  _removeDecayedConcepts() {
+   const { decayThreshold, minTasksForDecay } = Memory.CONSOLIDATION_THRESHOLDS;
    const conceptsToRemove = [];
+
    for (const [term, concept] of this._concepts) {
-     concept.activation < 0.01 && concept.totalTasks < 2 && conceptsToRemove.push(term);
+     if (concept.activation < decayThreshold && concept.totalTasks < minTasksForDecay) {
+       conceptsToRemove.push(term);
+     }
    }
    conceptsToRemove.forEach(term => this.removeConcept(term));
  }
 
  boostConceptActivation(term, boostAmount = 0.1) {
    const concept = this._concepts.get(term);
-   concept && (concept.boostActivation(boostAmount),
-               !this._focusConcepts.has(concept) &&
-               (this._focusConcepts.add(concept), this._stats.focusConceptsCount = this._focusConcepts.size));
+   if (concept) {
+     concept.boostActivation(boostAmount);
+     if (!this._focusConcepts.has(concept)) {
+       this._focusConcepts.add(concept);
+       this._stats.focusConceptsCount = this._focusConcepts.size;
+     }
+   }
  }
 
  updateConceptQuality(term, qualityChange) {
@@ -192,11 +226,7 @@ export class Memory {
 
  getConceptsWithBeliefs(pattern) {
    return this.getAllConcepts().filter(concept =>
-     concept.getTasksByType('BELIEF').some(task => this._termsMatch(task.term, pattern))
+     concept.getTasksByType('BELIEF').some(task => task.term.equals(pattern))
    );
- }
-
- _termsMatch(term1, term2) {
-   return term1.equals(term2);
  }
 }
