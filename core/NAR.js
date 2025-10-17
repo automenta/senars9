@@ -20,7 +20,10 @@ export class NAR {
   }
 
   async initialize() {
-    await this._loadReasoningRules();
+    await this.reasoner.initialize({
+      lm: this.lm,
+      rulePath: path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning')
+    });
     return this;
   }
 
@@ -365,64 +368,6 @@ export class NAR {
   reset() {
     this._initialize(this.config);
     Logger.debug('NAR reset to initial state');
-  }
-
-  async _loadReasoningRules() {
-    const lmRules = await this._loadLMRules();
-    const nalRules = this._loadNALRules();
-
-    const allRules = [...lmRules, ...nalRules];
-    this._registerRules(allRules);
-  }
-
-  async _loadLMRules() {
-    const lmRuleDir = path.join(path.dirname(import.meta.url.replace('file://', '')), 'reasoning', 'lm', 'rules');
-    const lmRules = await loadRules(lmRuleDir, { lm: this.lm });
-    const { valid, invalidCount } = validateLoadedRules(lmRules);
-    if (invalidCount > 0) {
-      Logger.warn(`LM rule validation issues: ${invalidCount} invalid rules found`);
-    }
-    return valid;
-  }
-
-  _loadNALRules() {
-    const nalRuleTypes = RuleFactory.getAvailableNALRules();
-    const nalRules = [];
-    const nalErrors = [];
-
-    for (const type of nalRuleTypes) {
-      try {
-        const rule = RuleFactory.createNALRule(type);
-        nalRules.push(rule);
-      } catch (error) {
-        Logger.error(`Failed to create NAL rule of type ${type}:`, error.message);
-        nalErrors.push({ type, error: error.message });
-      }
-    }
-
-    const { valid, invalidCount } = validateLoadedRules(nalRules);
-    if (invalidCount > 0) {
-        Logger.warn(`NAL rule validation issues: ${invalidCount} invalid rules found`);
-    }
-
-    if (nalErrors.length > 0) {
-        Logger.error(`Failed to create ${nalErrors.length} NAL rules:`, nalErrors);
-    }
-
-    return valid;
-  }
-
-  _registerRules(rules) {
-    let successfullyAdded = 0;
-    for (const rule of rules) {
-      try {
-        this.reasoner.addRule(rule);
-        successfullyAdded++;
-      } catch (error) {
-        Logger.error(`Failed to add rule ${rule.id}:`, error.message);
-      }
-    }
-    Logger.info(`Registered ${successfullyAdded} rules`);
   }
 
   isRunning() {
