@@ -61,18 +61,18 @@ export class RuleManager {
     return { all: rules, valid: validation.valid, errors };
   }
 
-  _registerRules(rules) {
-    let count = 0;
-    for (const rule of rules) {
-      try {
-        this.reasoner.addRule(rule);
-        count++;
-      } catch (error) {
-        Logger.error(`Failed to add rule ${rule.id}:`, error.message);
-      }
-    }
-    return count;
-  }
+ _registerRules(rules) {
+   let count = 0;
+   for (const rule of rules) {
+     try {
+       this.reasoner.addRule(rule);
+       count++;
+     } catch (error) {
+       Logger.error(`Failed to add rule ${rule.id}:`, error.message);
+     }
+   }
+   return count;
+ }
 
   enableRule(ruleId) { this.reasoner.enable(ruleId); }
   disableRule(ruleId) { this.reasoner.disable(ruleId); }

@@ -114,9 +114,7 @@ export class Reasoner extends Component {
     const config = this._getReasoningConfig(type);
     const task = this._createReasoningTask(type, scenario, config, metadata);
 
-    if (this.memory) {
-      await this.memory.input(task);
-    }
+    this.memory && await this.memory.input(task);
 
     return {
       original: `${this._getReasoningDescription(type)}: ${scenario}`,
@@ -147,12 +145,11 @@ export class Reasoner extends Component {
   }
 
   _getReasoningDescription(type) {
-    const descriptions = {
+    return ({
       temporal: 'Temporal analysis initiated',
       counterfactual: 'Counterfactual analysis initiated',
       causal: 'Causal analysis initiated'
-    };
-    return descriptions[type] || 'Analysis initiated';
+    })[type] || 'Analysis initiated';
   }
 
   addStrategy(strategy) {

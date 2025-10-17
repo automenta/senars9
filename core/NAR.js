@@ -130,10 +130,8 @@ export class NAR {
   }
 
   async runCycleWithRules(ruleIds) {
-    return await this.cycleManager.runCycleWithRules(ruleIds);
+   return await this.cycleManager.runCycleWithRules(ruleIds);
   }
-
-
 
   getRuleCounts() { return this.ruleManager.getRuleCounts(); }
   getRulesSummary() { return this.ruleManager.getRulesSummary(); }

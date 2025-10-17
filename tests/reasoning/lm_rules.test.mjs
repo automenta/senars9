@@ -54,4 +54,4 @@
 //     expect(result).toBe(true);
 //   });
 // });
-test.skip('LM-based Reasoning Tests are skipped', () => {});
+test.skip('LM-based Reasoning Tests are disabled pending rule integration fixes', () => {});
