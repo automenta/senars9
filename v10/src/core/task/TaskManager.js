@@ -1,7 +1,3 @@
-/**
- * TaskManager - Manages task lifecycle, priority, and selection
- * Handles input processing, task creation, and task retrieval
- */
 
 import { Task } from './Task.js';
 
@@ -75,61 +71,19 @@ export class TaskManager {
     return processedTasks;
   }
 
-  /**
-   * Create a new belief task
-   * @param {Term} term - The term for the belief
-   * @param {Object} truth - Truth value object
-   * @param {number} priority - Priority (optional, uses default)
-   * @returns {Task} - New belief task
-   */
-  createBelief(term, truth, priority) {
-    const taskPriority = priority !== undefined ? priority : this._config.defaultPriority;
-
+  _createTask(type, term, truth = null, priority) {
     return new Task({
       term,
       truth,
-      type: 'BELIEF',
-      priority: taskPriority,
+      type,
+      priority: priority ?? this._config.defaultPriority,
       budget: this._config.defaultBudget
     });
   }
 
-  /**
-   * Create a new goal task
-   * @param {Term} term - The term for the goal
-   * @param {Object} truth - Truth value object (optional for goals)
-   * @param {number} priority - Priority (optional, uses default)
-   * @returns {Task} - New goal task
-   */
-  createGoal(term, truth = null, priority) {
-    const taskPriority = priority !== undefined ? priority : this._config.defaultPriority;
-
-    return new Task({
-      term,
-      truth,
-      type: 'GOAL',
-      priority: taskPriority,
-      budget: this._config.defaultBudget
-    });
-  }
-
-  /**
-   * Create a new question task
-   * @param {Term} term - The term for the question
-   * @param {number} priority - Priority (optional, uses default)
-   * @returns {Task} - New question task
-   */
-  createQuestion(term, priority) {
-    const taskPriority = priority !== undefined ? priority : this._config.defaultPriority;
-
-    return new Task({
-      term,
-      truth: null,
-      type: 'QUESTION',
-      priority: taskPriority,
-      budget: this._config.defaultBudget
-    });
-  }
+  createBelief(term, truth, priority) { return this._createTask('BELIEF', term, truth, priority); }
+  createGoal(term, truth = null, priority) { return this._createTask('GOAL', term, truth, priority); }
+  createQuestion(term, priority) { return this._createTask('QUESTION', term, null, priority); }
 
   /**
    * Find tasks by term across all concepts
@@ -311,13 +265,7 @@ export class TaskManager {
         }
 
         // Priority distribution
-        if (task.priority < 0.3) {
-            priorityDistribution.low++;
-        } else if (task.priority < 0.7) {
-            priorityDistribution.medium++;
-        } else {
-            priorityDistribution.high++;
-        }
+        priorityDistribution[task.priority < 0.3 ? 'low' : task.priority < 0.7 ? 'medium' : 'high']++;
 
         totalPriority += task.priority;
 

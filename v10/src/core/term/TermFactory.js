@@ -10,9 +10,14 @@ export class TermFactory {
  create(termData) {
    const { operator, components } = this.normalize(termData);
    const name = this.buildCanonicalName(operator, components);
-   return this._cache.get(name) || this._cache.set(name, new Term(
+   const cached = this._cache.get(name);
+   if (cached) return cached;
+
+   const term = new Term(
      operator ? TermType.COMPOUND : TermType.ATOM, name, components, operator
-   )).get(name);
+   );
+   this._cache.set(name, term);
+   return term;
  }
 
  normalize({ operator, components }) {

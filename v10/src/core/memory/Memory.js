@@ -68,34 +68,24 @@ export class Memory {
   getConceptsByCriteria(criteria = {}) {
     let concepts = this.getAllConcepts();
 
-    criteria.minActivation !== undefined &&
-      (concepts = concepts.filter(c => c.activation >= criteria.minActivation));
-
-    criteria.minTasks !== undefined &&
-      (concepts = concepts.filter(c => c.totalTasks >= criteria.minTasks));
-
-    criteria.taskType &&
-      (concepts = concepts.filter(c => c.getTasksByType(criteria.taskType).length > 0));
-
-    criteria.onlyFocus === true &&
-      (concepts = concepts.filter(c => this._focusConcepts.has(c)));
-
-    return concepts;
+    return concepts.filter(c => {
+      if (criteria.minActivation !== undefined && c.activation < criteria.minActivation) return false;
+      if (criteria.minTasks !== undefined && c.totalTasks < criteria.minTasks) return false;
+      if (criteria.taskType && c.getTasksByType(criteria.taskType).length === 0) return false;
+      if (criteria.onlyFocus === true && !this._focusConcepts.has(c)) return false;
+      return true;
+    });
   }
 
   getMostActiveConcepts(limit = 10) {
-    const allConcepts = this.getAllConcepts();
     const { activation, useCount, taskCount } = Memory.SCORING_WEIGHTS;
     const { useCount: useLimit, taskCount: taskLimit } = Memory.NORMALIZATION_LIMITS;
 
-    const scoredConcepts = allConcepts.map(concept => ({
-      concept,
-      score: concept.activation * activation +
-             Math.min(concept.useCount / useLimit, 1) * useCount +
-             Math.min(concept.totalTasks / taskLimit, 1) * taskCount
-    }));
-
-    return scoredConcepts.sort((a, b) => b.score - a.score).slice(0, limit).map(item => item.concept);
+    return this.getAllConcepts()
+      .map(concept => ({ concept, score: concept.activation * activation + Math.min(concept.useCount / useLimit, 1) * useCount + Math.min(concept.totalTasks / taskLimit, 1) * taskCount }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ concept }) => concept);
   }
 
  removeConcept(term) {

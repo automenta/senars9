@@ -12,12 +12,12 @@ export class EventBus {
  }
 
  off(eventName, listener) {
-   return this._events.has(eventName) && this._events.get(eventName).delete(listener);
+   return this._events.get(eventName)?.delete(listener) || false;
  }
 
  emit(eventName, data) {
-   if (!this._events.has(eventName)) return;
-   const listeners = Array.from(this._events.get(eventName));
+   const listeners = this._events.get(eventName);
+   if (!listeners) return;
    listeners.forEach(listener => {
      try {
        listener(data);

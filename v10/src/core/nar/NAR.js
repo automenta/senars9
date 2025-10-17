@@ -1,8 +1,3 @@
-/**
- * NAR class - Main entry point and orchestrator for the NARS reasoning system
- * Provides the primary API for system control, input, and output as specified in DESIGN.md
- */
-
 import { SystemConfig } from './SystemConfig.js';
 import { Memory } from '../memory/Memory.js';
 import { TaskManager } from '../task/TaskManager.js';
@@ -62,42 +57,17 @@ export class NAR {
   get isRunning() { return this._isRunning; }
   get cycleCount() { return this._cycle.cycleCount; }
 
-  /**
-   * Input a Narsese string into the system
-   * @param {string} narseseString - The Narsese string to input
-   * @returns {boolean} - True if input was processed successfully
-   */
   async input(narseseString) {
     try {
       // Parse the input
       const parsed = this._parser.parse(narseseString);
 
       // Create task based on parsed input
-      let task;
-      switch (parsed.taskType) {
-        case 'BELIEF':
-          task = this._taskManager.createBelief(
-            parsed.term,
-            parsed.truthValue,
-            this._calculateInputPriority(parsed)
-          );
-          break;
-        case 'GOAL':
-          task = this._taskManager.createGoal(
-            parsed.term,
-            parsed.truthValue,
-            this._calculateInputPriority(parsed)
-          );
-          break;
-        case 'QUESTION':
-          task = this._taskManager.createQuestion(
-            parsed.term,
-            this._calculateInputPriority(parsed)
-          );
-          break;
-        default:
-          throw new Error(`Unknown task type: ${parsed.taskType}`);
-      }
+      const task = {
+        BELIEF: () => this._taskManager.createBelief(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
+        GOAL: () => this._taskManager.createGoal(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
+        QUESTION: () => this._taskManager.createQuestion(parsed.term, this._calculateInputPriority(parsed))
+      }[parsed.taskType]?.() ?? (() => { throw new Error(`Unknown task type: ${parsed.taskType}`); })();
 
       // Add task to system
       const added = this._taskManager.addTask(task);
@@ -126,10 +96,6 @@ export class NAR {
     }
   }
 
-  /**
-   * Start continuous reasoning cycles
-   * @returns {boolean} - True if started successfully
-   */
   start() {
     if (this._isRunning) {
       return false;
@@ -174,10 +140,6 @@ export class NAR {
     return true;
   }
 
-  /**
-   * Execute a single reasoning cycle
-   * @returns {Object} - Cycle results
-   */
   async step() {
     try {
       // Process pending tasks first
@@ -310,28 +272,13 @@ export class NAR {
     };
   }
 
-  // Private helper methods
-
-  /**
-   * Calculate priority for input tasks
-   * @param {Object} parsed - Parsed input data
-   * @returns {number} - Calculated priority
-   */
   _calculateInputPriority(parsed) {
-    // Base priority from configuration
     let priority = this._config.taskManager.defaultPriority;
 
-    // Adjust based on truth value confidence if present
-    if (parsed.truthValue && parsed.truthValue.confidence) {
-      priority = Math.min(1.0, priority + parsed.truthValue.confidence * 0.3);
-    }
+    parsed.truthValue?.confidence &&
+      (priority = Math.min(1.0, priority + parsed.truthValue.confidence * 0.3));
 
-    // Boost priority for goals and questions
-    if (parsed.taskType === 'GOAL') {
-      priority = Math.min(1.0, priority + 0.2);
-    } else if (parsed.taskType === 'QUESTION') {
-      priority = Math.min(1.0, priority + 0.1);
-    }
+    priority = Math.min(1.0, priority + { GOAL: 0.2, QUESTION: 0.1 }[parsed.taskType] || 0);
 
     return priority;
   }
