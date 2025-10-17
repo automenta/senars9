@@ -2,7 +2,7 @@
  * TermFactory - Creates and normalizes Term instances with caching
  * Implements canonical representation as specified in DESIGN.md
  */
-import { Term } from './Term.js';
+ import { Term, TermType } from './Term.js';
 
 export class TermFactory {
   constructor() {
@@ -14,12 +14,19 @@ export class TermFactory {
     // Handle different input types: string, object, array
     const canonicalForm = this.normalize(termExpression);
     const cacheKey = this.generateCacheKey(canonicalForm);
-    
+
     if (this._cache.has(cacheKey)) {
       return this._cache.get(cacheKey);
     }
-    
-    const newTerm = new Term(canonicalForm.components, canonicalForm.operator);
+
+    // Build the canonical name for the term
+    const name = this._buildCanonicalName(canonicalForm);
+
+    // Determine if this is an atomic or compound term
+    const isAtomic = !canonicalForm.operator && canonicalForm.components.length === 1;
+    const type = isAtomic ? TermType.ATOM : TermType.COMPOUND;
+
+    const newTerm = new Term(type, name, canonicalForm.components, canonicalForm.operator);
     this._cache.set(cacheKey, newTerm);
     return newTerm;
   }
@@ -41,31 +48,85 @@ export class TermFactory {
   }
   
   parseString(narseseString) {
-    // Simple parsing logic for basic terms
-    // Handle parentheses for compound terms
     const trimmed = narseseString.trim();
 
+    // Handle compound terms in parentheses
     if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
-      // Compound term: (operator, term1, term2, ...)
-      const inner = trimmed.slice(1, -1);
-      const parts = this._simpleTokenize(inner);
+      const inner = trimmed.slice(1, -1).trim();
 
-      if (parts.length >= 3) {
-        const operator = parts[0];
-        const components = parts.slice(1).map(comp => this._parseComponent(comp));
-        return { components, operator };
+      // Check for infix operators: A --> B, A <-> B, etc.
+      if (inner.includes(' --> ')) {
+        const parts = inner.split(' --> ');
+        if (parts.length === 2) {
+          return {
+            operator: '-->',
+            components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
+          };
+        }
+      } else if (inner.includes(' <-> ')) {
+        const parts = inner.split(' <-> ');
+        if (parts.length === 2) {
+          return {
+            operator: '<->',
+            components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
+          };
+        }
+      } else if (inner.includes(' ==> ')) {
+        const parts = inner.split(' ==> ');
+        if (parts.length === 2) {
+          return {
+            operator: '==>',
+            components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
+          };
+        }
+      } else if (inner.includes(' <=> ')) {
+        const parts = inner.split(' <=> ');
+        if (parts.length === 2) {
+          return {
+            operator: '<=>',
+            components: [this._parseComponent(parts[0].trim()), this._parseComponent(parts[1].trim())]
+          };
+        }
+      }
+
+      // Handle prefix operators: (&, A, B, C)
+      const parts = this._parsePrefixOperator(inner);
+      if (parts) {
+        return parts;
       }
     }
 
-    // Atomic term or simple conjunction
-    const parts = this._simpleTokenize(trimmed);
-    if (parts.length === 1) {
-      return { components: [parts[0]], operator: null };
-    } else {
-      // Multiple terms - treat as conjunction
-      return { components: parts, operator: '&' };
-    }
+    // Atomic term
+    return { components: [trimmed], operator: null };
   }
+
+   _parsePrefixOperator(str) {
+     // Handle prefix operators like (&, A, B, C)
+     const parts = this._simpleTokenize(str);
+     if (parts.length >= 2) {
+       const operator = parts[0];
+       const components = parts.slice(1).map(comp => this._parseComponent(comp));
+       return { operator, components };
+     }
+     return null;
+   }
+
+   _buildCanonicalName(canonicalForm) {
+     if (!canonicalForm.operator) {
+       // Atomic term
+       return canonicalForm.components[0];
+     }
+
+     // Build compound term name based on operator type
+     if (['-->', '<->', '==>', '<=>'].includes(canonicalForm.operator)) {
+       // Infix operators
+       return `(${canonicalForm.components[0]} ${canonicalForm.operator} ${canonicalForm.components[1]})`;
+     } else {
+       // Prefix operators
+       const componentStr = canonicalForm.components.join(', ');
+       return `(${canonicalForm.operator}, ${componentStr})`;
+     }
+   }
 
   _simpleTokenize(str) {
     // Simple tokenization by comma and space

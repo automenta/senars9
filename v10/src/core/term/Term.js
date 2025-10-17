@@ -1,4 +1,4 @@
-import { sha256 } from 'js-sha256';
+import crypto from 'crypto';
 
 export const TermType = {
   ATOM: 'atom',
@@ -31,7 +31,16 @@ export class Term {
     this._type = type;
     this._name = name; // The canonical string representation
     this._operator = operator;
-    this._components = Object.freeze([...components]);
+
+    // For atomic terms, components should be empty
+    if (type === TermType.ATOM) {
+      this._components = Object.freeze([]);
+    } else {
+      // For compound terms, convert string components to Term objects if needed
+      this._components = Object.freeze(
+        components.map(comp => typeof comp === 'string' ? new Term(TermType.ATOM, comp) : comp)
+      );
+    }
 
     // Pre-calculate and cache complexity and hash
     this._complexity = this._calculateComplexity();
@@ -135,6 +144,6 @@ export class Term {
   }
 
   static computeHash(str) {
-    return sha256(str);
+    return crypto.createHash('sha256').update(str).digest('hex');
   }
 }
