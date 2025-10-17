@@ -1,21 +1,20 @@
 import {Truth} from '../Truth.js';
+import {TRUTH} from '../config/constants.js';
 
 export const TruthFunctions = (() => {
-    // Common utilities
-    const validateInputs = (t1, t2) => t1 && t2;
-    const validateInput = (t) => t;
-    const combineConfidence = (c1, c2) => Math.min(c1, c2);
-    const averageFrequency = (f1, f2) => (f1 + f2) / 2;
+     // Common utilities - consolidated and parameterized
+     const validateInputs = (t1, t2) => t1 && t2;
+     const validateInput = (t) => t;
+     const combineConfidence = (c1, c2) => Math.min(c1, c2);
+     const averageFrequency = (f1, f2) => (f1 + f2) / 2;
+     const safeDivide = (numerator, denominator) => denominator === 0 ? TRUTH.DEFAULT_FREQUENCY : numerator / denominator;
 
-    // Higher-order function to eliminate repetitive validation
-    const withValidation = (fn) => (...args) => {
-        if (args.length === 2 && !validateInputs(args[0], args[1])) return null;
-        if (args.length === 1 && !validateInput(args[0])) return null;
-        return fn(...args);
-    };
+     const withValidation = (fn) => (...args) => {
+         const isValid = args.length === 2 ? validateInputs(args[0], args[1]) : validateInput(args[0]);
+         return isValid ? fn(...args) : null;
+     };
 
     return {
-        // Basic NAL truth value operations - optimized and consolidated
 
         revision: withValidation((t1, t2) => {
             const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
@@ -31,18 +30,14 @@ export const TruthFunctions = (() => {
         induction: withValidation((t1, t2) => {
             const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
             const denominator = 1 - f1 * f2;
-            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
-
-            const f = (f1 * (1 - f2) + f2 * (1 - f1)) / denominator;
+            const f = safeDivide(f1 * (1 - f2) + f2 * (1 - f1), denominator);
             return new Truth(f, combineConfidence(c1, c2));
         }),
 
         abduction: withValidation((t1, t2) => {
             const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
             const denominator = f1 * f2 + (1 - f1) * (1 - f2);
-            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
-
-            return new Truth((f1 * f2) / denominator, combineConfidence(c1, c2));
+            return new Truth(safeDivide(f1 * f2, denominator), combineConfidence(c1, c2));
         }),
 
         exemplification: withValidation((t1, t2) => {
@@ -53,9 +48,7 @@ export const TruthFunctions = (() => {
         comparison: withValidation((t1, t2) => {
             const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
             const denominator = f1 * f2 + (1 - f1) * (1 - f2);
-            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
-
-            return new Truth((f1 * f2) / denominator, combineConfidence(c1, c2));
+            return new Truth(safeDivide(f1 * f2, denominator), combineConfidence(c1, c2));
         }),
 
         negation: withValidation((truth) => new Truth(1 - truth.f, truth.c)),
@@ -63,18 +56,14 @@ export const TruthFunctions = (() => {
         contraposition: withValidation((t1, t2) => {
             const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
             const denominator = f2 * (1 - f1) + (1 - f2) * f1;
-            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
-
-            const f = f2 * (1 - f1) / denominator;
+            const f = safeDivide(f2 * (1 - f1), denominator);
             return new Truth(f, combineConfidence(c1, c2));
         }),
 
         analogy: withValidation((t1, t2) => {
             const { f: f1, c: c1 } = t1, { f: f2, c: c2 } = t2;
             const denominator = f1 * f2 + (1 - f1) * (1 - f2);
-            if (denominator === 0) return new Truth(0.5, combineConfidence(c1, c2));
-
-            return new Truth((f1 * f2) / denominator, combineConfidence(c1, c2));
+            return new Truth(safeDivide(f1 * f2, denominator), combineConfidence(c1, c2));
         }),
 
         resemblance: withValidation((t1, t2) => {

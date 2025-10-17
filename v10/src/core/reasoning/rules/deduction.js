@@ -4,7 +4,6 @@ import {Term} from '../../term/Term.js';
 
 export class DeductionRule extends NALRule {
     constructor() {
-        // Pattern: S ==> P, S ==> M ⊢ P ==> M (if S, P, M are variables)
         const premises = [
             new Term('compound', 'IMPLICATION', [
                 new Term('atom', 'S'),
@@ -31,11 +30,9 @@ export class DeductionRule extends NALRule {
     }
 
     async _deriveFromPremise(premise, task) {
-        // For deduction: if we have S ==> P and S ==> M, derive P ==> M
         const bindings = this._unifyPatterns(premise, task.term);
         if (!bindings) return [];
 
-        // Find complementary premise in memory or current context
         const complementaryPremise = this._findComplementaryPremise(task, bindings);
         if (!complementaryPremise) return [];
 
@@ -54,8 +51,6 @@ export class DeductionRule extends NALRule {
     }
 
     _findComplementaryPremise(task, bindings) {
-        // This would typically search memory for the complementary premise
-        // For now, return null to indicate no complementary premise found
         return null;
     }
 

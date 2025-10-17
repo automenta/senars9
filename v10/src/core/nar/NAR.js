@@ -6,6 +6,7 @@ import {NarseseParser} from '../../parser/NarseseParser.js';
 import {EventBus} from '../../util/EventBus.js';
 import {RuleEngine} from '../reasoning/RuleEngine.js';
 import {DeductionRule} from '../reasoning/rules/deduction.js';
+import {PRIORITY, TRUTH} from '../config/constants.js';
 
 export class NAR {
     constructor(config = {}) {
@@ -65,32 +66,40 @@ export class NAR {
     }
 
     async input(narseseString) {
-        try {
-            const parsed = this._parser.parse(narseseString);
-            if (!parsed?.term) throw new Error('Invalid parse result');
+         try {
+             const parsed = this._parser.parse(narseseString);
+             if (!parsed?.term) throw new Error('Invalid parse result');
 
-            const taskCreators = {
-                BELIEF: () => this._taskManager.createBelief(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
-                GOAL: () => this._taskManager.createGoal(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
-                QUESTION: () => this._taskManager.createQuestion(parsed.term, this._calculateInputPriority(parsed))
-            };
+             const task = this._createTask(parsed);
+             const added = this._taskManager.addTask(task);
 
-            const taskCreator = taskCreators[parsed.taskType];
-            if (!taskCreator) throw new Error(`Unknown task type: ${parsed.taskType}`);
+             if (added) {
+                 this._eventBus.emit('task.input', { task, source: 'user', originalInput: narseseString, parsed });
+                 await this._processPendingTasks();
+             }
+             return added;
+         } catch (error) {
+             return this._handleInputError(error, narseseString);
+         }
+     }
 
-            const task = taskCreator();
-            const added = this._taskManager.addTask(task);
+     _createTask(parsed) {
+         const taskCreators = {
+             BELIEF: () => this._taskManager.createBelief(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
+             GOAL: () => this._taskManager.createGoal(parsed.term, parsed.truthValue, this._calculateInputPriority(parsed)),
+             QUESTION: () => this._taskManager.createQuestion(parsed.term, this._calculateInputPriority(parsed))
+         };
 
-            if (added) {
-                this._eventBus.emit('task.input', { task, source: 'user', originalInput: narseseString, parsed });
-                await this._processPendingTasks();
-            }
-            return added;
-        } catch (error) {
-            this._eventBus.emit('input.error', { error: error.message, input: narseseString });
-            throw error;
-        }
-    }
+         const taskCreator = taskCreators[parsed.taskType];
+         if (!taskCreator) throw new Error(`Unknown task type: ${parsed.taskType}`);
+
+         return taskCreator();
+     }
+
+     _handleInputError(error, input) {
+         this._eventBus.emit('input.error', { error: error.message, input });
+         throw error;
+     }
 
     start() {
         if (this._isRunning) return false;
@@ -107,8 +116,7 @@ export class NAR {
             }
         }, this._config.cycle.delay);
 
-        this._eventBus.emit('system.started', { timestamp: Date.now() });
-        return true;
+        return this._eventBus.emit('system.started', { timestamp: Date.now() }), true;
     }
 
     stop() {
@@ -181,8 +189,8 @@ export class NAR {
 
     _calculateInputPriority(parsed) {
         let priority = this._config.taskManager.defaultPriority;
-        if (parsed.truthValue?.confidence) priority = Math.min(1.0, priority + parsed.truthValue.confidence * 0.3);
-        return Math.min(1.0, priority + { GOAL: 0.2, QUESTION: 0.1 }[parsed.taskType] || 0);
+        priority = parsed.truthValue?.confidence ? Math.min(TRUTH.MAX_PRIORITY, priority + parsed.truthValue.confidence * PRIORITY.CONFIDENCE_MULTIPLIER) : priority;
+        return Math.min(TRUTH.MAX_PRIORITY, priority + { GOAL: PRIORITY.GOAL_BOOST, QUESTION: PRIORITY.QUESTION_BOOST }[parsed.taskType] || 0);
     }
 
     async _processPendingTasks() {

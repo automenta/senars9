@@ -1,5 +1,6 @@
 import {Rule} from './Rule.js';
 import {RuleSet} from './RuleSet.js';
+import {Metrics} from '../util/Metrics.js';
 
 export class RuleEngine {
     constructor(config = {}) {
@@ -52,17 +53,15 @@ export class RuleEngine {
 
     applyRules(task, ruleIds = null) {
         const rules = ruleIds ? ruleIds.map(id => this._rules.get(id)).filter(Boolean) : this.getApplicableRules(task);
-        const results = [];
 
-        for (const rule of rules) {
+        return rules.flatMap(rule => {
             try {
-                const { results: ruleResults } = this.applyRule(rule, task);
-                if (ruleResults.length > 0) results.push(...ruleResults);
+                const { results } = this.applyRule(rule, task);
+                return results;
             } catch (error) {
-                console.warn(`Rule ${rule.id} failed:`, error);
+                return console.warn(`Rule ${rule.id} failed:`, error), [];
             }
-        }
-        return results;
+        });
     }
 
     enableRule(ruleId) {
@@ -80,8 +79,6 @@ export class RuleEngine {
     clear() { this._rules.clear(); this._ruleSets.clear(); return this; }
 
     _updateMetrics(success, time) {
-        this._metrics.totalApplications++;
-        if (success) this._metrics.totalSuccesses++; else this._metrics.totalFailures++;
-        this._metrics.totalTime += time;
+        this._metrics = Metrics.update(this._metrics, success, time);
     }
 }

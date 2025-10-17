@@ -1,50 +1,26 @@
-export const MEMORY_CONFIG = {
-    SCORING_WEIGHTS: {activation: 0.5, useCount: 0.3, taskCount: 0.2},
-    NORMALIZATION_LIMITS: {useCount: 100, taskCount: 50},
-    CONSOLIDATION_THRESHOLDS: {
-        activationThreshold: 0.1,
-        minTasksThreshold: 5,
-        decayThreshold: 0.01,
-        minTasksForDecay: 2
-    },
-    ACTIVATION_MULTIPLIERS: {globalDecay: 0.9, averagePriority: 0.5}
+// Configuration constants for the NARS system
+export const PRIORITY = {
+    CONFIDENCE_MULTIPLIER: 0.3,
+    GOAL_BOOST: 0.2,
+    QUESTION_BOOST: 0.1
 };
 
-export const CONCEPT_CONFIG = {
-    DEFAULTS: {
-        maxBeliefs: 100,
-        maxGoals: 50,
-        maxQuestions: 20,
-        defaultDecayRate: 0.01,
-        defaultActivationBoost: 0.1,
-        maxActivation: 1.0,
-        minQuality: 0,
-        maxQuality: 1
-    }
+export const LM = {
+    DEFAULT_TEMPERATURE: 0.7,
+    DEFAULT_MAX_TOKENS: 1000,
+    MOCK_RESPONSE_TOKENS: 150,
+    MOCK_CONTENT_TRUNCATION: 100
 };
 
-export const TASK_CONFIG = {
-    DEFAULTS: {
-        priority: 0.5,
-        budget: 1.0,
-        minPriority: 0,
-        maxPriority: 1
-    }
+export const TRUTH = {
+    DEFAULT_FREQUENCY: 0.5,
+    MAX_CONFIDENCE: 1.0,
+    MIN_PRIORITY: 0.0,
+    MAX_PRIORITY: 1.0
 };
 
-export const TERM_TYPES = {
-    ATOM: 'atom',
-    COMPOUND: 'compound'
-};
-
-export const TASK_TYPES = {
-    BELIEF: 'BELIEF',
-    GOAL: 'GOAL',
-    QUESTION: 'QUESTION'
-};
-
-export const STAMP_SOURCES = {
-    INPUT: 'INPUT',
-    DERIVED: 'DERIVED',
-    INFERENCE: 'INFERENCE'
+export const SYSTEM = {
+    DEFAULT_CYCLE_DELAY: 100,
+    DEFAULT_PRIORITY: 0.5,
+    METRIC_HISTORY_LIMIT: 1000
 };

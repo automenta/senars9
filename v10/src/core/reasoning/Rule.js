@@ -1,3 +1,6 @@
+import {Metrics} from '../util/Metrics.js';
+import {TRUTH} from '../config/constants.js';
+
 export class Rule {
     constructor(id, type, priority = 1.0, config = {}) {
         if (!id || typeof id !== 'string') {
@@ -6,7 +9,7 @@ export class Rule {
 
         this._id = id;
         this._type = type;
-        this._priority = Math.max(0, Math.min(1, priority));
+        this._priority = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
         this._config = Object.freeze({ ...config });
         this._enabled = config.enabled !== false;
         this._metrics = Object.freeze({
@@ -26,9 +29,9 @@ export class Rule {
 
     // Immutable state modifiers
     enable() { return this._enabled ? this : this._clone({ enabled: true }); }
-    disable() { return !this._enabled ? this : this._clone({ enabled: false }); }
+    disable() { return this._enabled ? this._clone({ enabled: false }) : this; }
     withPriority(priority) {
-        const clamped = Math.max(0, Math.min(1, priority));
+        const clamped = Math.max(TRUTH.MIN_PRIORITY, Math.min(TRUTH.MAX_PRIORITY, priority));
         return clamped === this._priority ? this : this._clone({ priority: clamped });
     }
     withConfig(config) {
@@ -58,20 +61,18 @@ export class Rule {
 
     // Internal utilities
     _clone(overrides = {}) {
-        return new (this.constructor)(this._id, this._type, this._priority, {
-            ...this._config, ...overrides
-        });
+        const Constructor = this.constructor;
+        const baseArgs = [this._id, this._type, this._priority];
+        const configArg = { ...this._config, ...overrides };
+
+        // Handle different constructor signatures for subclasses
+        return Constructor.length === 4
+            ? new Constructor(...baseArgs, configArg)
+            : new Constructor(...baseArgs, this._priority, configArg);
     }
 
     _updateMetrics(success, time) {
-        return this._clone({
-            metrics: {
-                applications: this._metrics.applications + 1,
-                successes: this._metrics.successes + (success ? 1 : 0),
-                failures: this._metrics.failures + (success ? 0 : 1),
-                totalTime: this._metrics.totalTime + time,
-                createdAt: this._metrics.createdAt
-            }
-        });
+        const metrics = Metrics.update(this._metrics, success, time);
+        return this._clone({ metrics });
     }
 }

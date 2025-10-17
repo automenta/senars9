@@ -96,4 +96,11 @@ export class NALRule extends Rule {
     _computeDerivedTruth(taskTruth, bindings) {
         return this._truthFunction ? this._truthFunction(taskTruth, taskTruth) : taskTruth;
     }
+
+    // Override _clone to handle NALRule-specific constructor signature
+    _clone(overrides = {}) {
+        return new NALRule(this._id, this._premises, this._conclusion, this._truthFunction, this._priority, {
+            ...this._config, ...overrides
+        });
+    }
 }

@@ -1,4 +1,5 @@
 import {Rule} from './Rule.js';
+import {LM} from '../config/constants.js';
 
 export class LMRule extends Rule {
     constructor(id, promptTemplate, responseProcessor, priority = 1.0, config = {}) {
@@ -6,8 +7,8 @@ export class LMRule extends Rule {
         this._promptTemplate = promptTemplate;
         this._responseProcessor = responseProcessor;
         this._lmConfig = {
-            temperature: 0.7,
-            maxTokens: 1000,
+            temperature: LM.DEFAULT_TEMPERATURE,
+            maxTokens: LM.DEFAULT_MAX_TOKENS,
             model: 'default',
             ...config.lm
         };
@@ -55,15 +56,21 @@ export class LMRule extends Rule {
 
     _mockLMResponse(prompt) {
         return Promise.resolve({
-            content: `Based on the task "${prompt.substring(0, 100)}...", I think...`,
-            usage: { tokens: 150 },
+            content: `Based on the task "${prompt.substring(0, LM.MOCK_CONTENT_TRUNCATION)}...", I think...`,
+            usage: { tokens: LM.MOCK_RESPONSE_TOKENS },
             model: this._lmConfig.model
         });
     }
 
+    // Override _clone to handle LMRule-specific constructor signature
+    _clone(overrides = {}) {
+        return new LMRule(this._id, this._promptTemplate, this._responseProcessor, this._priority, {
+            ...this._config, ...overrides
+        });
+    }
+
     withConfig(newConfig) {
-        return new LMRule(this.id, this._promptTemplate, this._responseProcessor, this.priority,
-            { ...this._config, ...newConfig });
+        return this._clone({ ...newConfig });
     }
 
     withTemperature(temperature) { return this.withConfig({ lm: { ...this._lmConfig, temperature } }); }
