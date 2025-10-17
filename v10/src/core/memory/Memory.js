@@ -63,7 +63,7 @@ export class Memory {
             this._stats.totalTasks++;
             if (task.priority >= this._config.priorityThreshold) {
                 this._focusConcepts.add(concept);
-                this._stats.focusConceptsCount = this._focusConcepts.size;
+                this._updateFocusConceptsCount();
             }
         }
         return added;
@@ -123,7 +123,7 @@ export class Memory {
 
         if (this._focusConcepts.has(concept)) {
             this._focusConcepts.delete(concept);
-            this._stats.focusConceptsCount = this._focusConcepts.size;
+            this._updateFocusConceptsCount();
         }
 
         this._concepts.delete(term);
@@ -154,7 +154,7 @@ export class Memory {
 
         this._applyGlobalDecay();
         this._removeDecayedConcepts();
-        this._stats.focusConceptsCount = this._focusConcepts.size;
+        this._updateFocusConceptsCount();
     }
 
     _applyGlobalDecay() {
@@ -186,7 +186,7 @@ export class Memory {
             concept.boostActivation(boostAmount);
             if (!this._focusConcepts.has(concept)) {
                 this._focusConcepts.add(concept);
-                this._stats.focusConceptsCount = this._focusConcepts.size;
+                this._updateFocusConceptsCount();
             }
         }
     }
@@ -212,6 +212,14 @@ export class Memory {
             averageActivation: hasConcepts ? conceptStats.reduce((sum, s) => sum + s.activation, 0) / conceptStats.length : 0,
             averageQuality: hasConcepts ? conceptStats.reduce((sum, s) => sum + s.quality, 0) / conceptStats.length : 0
         };
+    }
+
+    /**
+     * Helper method to update focus concepts count in stats
+     * @private
+     */
+    _updateFocusConceptsCount() {
+        this._stats.focusConceptsCount = this._focusConcepts.size;
     }
 
     clear() {

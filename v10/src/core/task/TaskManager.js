@@ -108,6 +108,25 @@ export class TaskManager {
     }
 
     /**
+     * Helper method to collect all tasks from all concepts with an optional filter
+     * @param {Function} filterFn - Optional filter function to apply to each task
+     * @returns {Array<Task>} - Array of tasks
+     * @private
+     */
+    _collectTasksFromAllConcepts(filterFn = null) {
+        const allTasks = [];
+        
+        for (const concept of this._memory.getAllConcepts()) {
+            const conceptTasks = filterFn ? 
+                concept.getAllTasks().filter(filterFn) : 
+                concept.getAllTasks();
+            allTasks.push(...conceptTasks);
+        }
+        
+        return allTasks;
+    }
+
+    /**
      * Find tasks by type across all concepts
      * @param {string} taskType - Type of task (BELIEF, GOAL, QUESTION)
      * @returns {Array<Task>} - Array of matching tasks
@@ -129,17 +148,9 @@ export class TaskManager {
      * @returns {Array<Task>} - Array of tasks in priority range
      */
     findTasksByPriority(minPriority = 0, maxPriority = 1) {
-        const allTasks = [];
-
-        for (const concept of this._memory.getAllConcepts()) {
-            for (const task of concept.getAllTasks()) {
-                if (task.priority >= minPriority && task.priority <= maxPriority) {
-                    allTasks.push(task);
-                }
-            }
-        }
-
-        return allTasks;
+        return this._collectTasksFromAllConcepts(
+            task => task.priority >= minPriority && task.priority <= maxPriority
+        );
     }
 
     /**
@@ -148,17 +159,9 @@ export class TaskManager {
      * @returns {Array<Task>} - Array of recent tasks
      */
     findRecentTasks(sinceTimestamp) {
-        const allTasks = [];
-
-        for (const concept of this._memory.getAllConcepts()) {
-            for (const task of concept.getAllTasks()) {
-                if (task.createdAt >= sinceTimestamp) {
-                    allTasks.push(task);
-                }
-            }
-        }
-
-        return allTasks;
+        return this._collectTasksFromAllConcepts(
+            task => task.createdAt >= sinceTimestamp
+        );
     }
 
     /**
@@ -167,12 +170,9 @@ export class TaskManager {
      * @returns {Array<Task>} - Highest priority tasks
      */
     getHighestPriorityTasks(limit = 10) {
-        const allTasks = [];
-
-        for (const concept of this._memory.getAllConcepts()) {
-            allTasks.push(...concept.getAllTasks());
-        }
-
+        // Use the helper method to collect all tasks
+        const allTasks = this._collectTasksFromAllConcepts();
+        
         // Sort by priority (highest first)
         allTasks.sort((a, b) => b.priority - a.priority);
 
@@ -223,17 +223,12 @@ export class TaskManager {
         } = criteria;
 
         const currentTime = Date.now();
-        const allTasks = [];
-
-        for (const concept of this._memory.getAllConcepts()) {
-            for (const task of concept.getAllTasks()) {
-                // Filter by priority and age
-                if (task.priority >= minPriority &&
-                    (currentTime - task.createdAt) <= maxAge) {
-                    allTasks.push(task);
-                }
-            }
-        }
+        
+        // Use the helper method with combined filter
+        let allTasks = this._collectTasksFromAllConcepts(task => {
+            return task.priority >= minPriority &&
+                (currentTime - task.createdAt) <= maxAge;
+        });
 
         // Sort by priority and recency
         allTasks.sort((a, b) => {
