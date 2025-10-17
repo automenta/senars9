@@ -91,7 +91,7 @@ export class LMRule extends Rule {
             taskTerm: task.term?.toString() || 'unknown',
             taskType: task.type || 'unknown',
             taskTruth: task.truth ? 
-                `(${task.truth.frequency?.toFixed(2) || task.truth.f?.toFixed(2) || 0.5}, ${task.truth.confidence?.toFixed(2) || task.truth.c?.toFixed(2) || 0.5})` : 
+                `(${task.truth.f?.toFixed(2) || task.truth.f || 0.5}, ${task.truth.c?.toFixed(2) || task.truth.c || 0.5})` : 
                 'no truth',
             context: this._getContext(task)
         };

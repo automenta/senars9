@@ -1,3 +1,5 @@
+import { LMRule } from '../reasoning/LMRule.js';
+
 /**
  * Factory for creating LM rules with common configurations
  */

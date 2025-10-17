@@ -9,13 +9,13 @@ import { NarseseTranslator } from './NarseseTranslator.js';
  * Implements the comprehensive LM infrastructure specified in DESIGN.md
  */
 export class LM {
-  constructor() {
+  constructor(config = {}) {
+    this._config = { ...config };
     this.providers = new ProviderRegistry();
     this.modelSelector = new ModelSelector(this.providers);
     this.narseseTranslator = new NarseseTranslator();
     this.metrics = new Metrics();
     this.activeWorkflows = new Set();
-    this.config = {};
     
     // Track LM usage metrics
     this.lmStats = {
@@ -28,20 +28,25 @@ export class LM {
     Object.freeze(this);
   }
 
+  get config() {
+    return { ...this._config };
+  }
+
   async initialize(config = {}) {
-    this.config = { ...config };
+    // Create a new instance with updated config to maintain immutability
+    const newLM = new LM({ ...this._config, ...config });
     
     // Initialize metrics tracker with config
-    if (this.metrics.initialize) {
-      await this.metrics.initialize(config.metrics || {});
+    if (newLM.metrics.initialize) {
+      await newLM.metrics.initialize(config.metrics || {});
     }
 
     Logger.info('LM component initialized', { 
       config: Object.keys(config), 
-      providerCount: this.providers.size 
+      providerCount: newLM.providers.size 
     });
     
-    return this;
+    return newLM;
   }
 
   registerProvider(id, provider) {
@@ -116,7 +121,7 @@ export class LM {
     }
   }
   
-  async selectOptimalModel(task, constraints = {}) {
+  selectOptimalModel(task, constraints = {}) {
     return this.modelSelector.select(task, constraints);
   }
 
