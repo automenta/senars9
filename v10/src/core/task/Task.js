@@ -24,14 +24,12 @@ export class Task {
         Object.freeze(this);
     }
 
-    static get DEFAULTS() {
-        return {
-            priority: 0.5,
-            budget: 1.0,
-            minPriority: 0,
-            maxPriority: 1
-        };
-    }
+    static DEFAULTS = {
+        priority: 0.5,
+        budget: 1.0,
+        minPriority: 0,
+        maxPriority: 1
+    };
 
     // Getters
     get term() {
@@ -136,23 +134,16 @@ export class Task {
     }
 
     // Type checking
-    isBelief() {
-        return this.type === 'BELIEF';
-    }
-
-    isGoal() {
-        return this.type === 'GOAL';
-    }
-
-    isQuestion() {
-        return this.type === 'QUESTION';
-    }
+    isBelief() { return this.type === 'BELIEF'; }
+    isGoal() { return this.type === 'GOAL'; }
+    isQuestion() { return this.type === 'QUESTION'; }
 
     // Equality
     equals(other) {
-        if (!(other instanceof Task)) return false;
-        const truthEqual = (!this.truth && !other.truth) || (this.truth?.equals(other.truth));
-        return this.term.equals(other.term) && this.type === other.type && truthEqual;
+        return other instanceof Task && 
+               this.term.equals(other.term) && 
+               this.type === other.type && 
+               ((!this.truth && !other.truth) || this.truth?.equals(other.truth));
     }
 
     // String representation

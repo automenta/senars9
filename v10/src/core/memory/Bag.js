@@ -84,8 +84,19 @@ export class Bag {
 
     _removeLowestPriorityItem() {
         if (this.size > 0) {
-            const items = this.getItemsInPriorityOrder();
-            this.remove(items[items.length - 1]);
+            let lowestPriorityItem = null;
+            let lowestPriority = Infinity;
+    
+            for (const [item, priority] of this._items.entries()) {
+                if (priority < lowestPriority) {
+                    lowestPriority = priority;
+                    lowestPriorityItem = item;
+                }
+            }
+    
+            if (lowestPriorityItem !== null) {
+                this.remove(lowestPriorityItem);
+            }
         }
     }
 }

@@ -49,8 +49,7 @@ export class Truth {
     static revision(t1, t2) {
         if (!t1 || !t2) return t1 || t2;
         const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
-        const f = (f1 * c1 + f2 * c2) / (c1 + c2);
-        return new Truth(f, Math.min(1.0, c1 + c2));
+        return new Truth((f1 * c1 + f2 * c2) / (c1 + c2), Math.min(1.0, c1 + c2));
     }
 
     static negation(truth) {
@@ -71,17 +70,20 @@ export class Truth {
     static comparison(t1, t2) {
         return this._applyOperation(t1, t2, (t1, t2) => {
             const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
-            const denominator = f1 * f2 + (1 - f1) * (1 - f2);
-            return new Truth(this._safeDivide(f1 * f2, denominator), this._combineConfidence(c1, c2));
+            return new Truth(
+                this._safeDivide(f1 * f2, f1 * f2 + (1 - f1) * (1 - f2)), 
+                this._combineConfidence(c1, c2)
+            );
         });
     }
 
     static contraposition(t1, t2) {
         return this._applyOperation(t1, t2, (t1, t2) => {
             const {f: f1, c: c1} = t1, {f: f2, c: c2} = t2;
-            const denominator = f2 * (1 - f1) + (1 - f2) * f1;
-            const f = this._safeDivide(f2 * (1 - f1), denominator);
-            return new Truth(f, this._combineConfidence(c1, c2));
+            return new Truth(
+                this._safeDivide(f2 * (1 - f1), f2 * (1 - f1) + (1 - f2) * f1),
+                this._combineConfidence(c1, c2)
+            );
         });
     }
 

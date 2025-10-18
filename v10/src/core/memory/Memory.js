@@ -29,17 +29,11 @@ export class Memory extends ConfigurableComponent {
         this._cyclesSinceConsolidation = 0;
     }
 
-    static get SCORING_WEIGHTS() {
-        return {activation: 0.5, useCount: 0.3, taskCount: 0.2};
-    }
+    static SCORING_WEIGHTS = {activation: 0.5, useCount: 0.3, taskCount: 0.2};
 
-    static get NORMALIZATION_LIMITS() {
-        return {useCount: 100, taskCount: 50};
-    }
+    static NORMALIZATION_LIMITS = {useCount: 100, taskCount: 50};
 
-    static get CONSOLIDATION_THRESHOLDS() {
-        return {activationThreshold: 0.1, minTasksThreshold: 5, decayThreshold: 0.01, minTasksForDecay: 2};
-    }
+    static CONSOLIDATION_THRESHOLDS = {activationThreshold: 0.1, minTasksThreshold: 5, decayThreshold: 0.01, minTasksForDecay: 2};
 
     get config() {
         return {...this._config};
