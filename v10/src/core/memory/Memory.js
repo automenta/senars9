@@ -1,19 +1,19 @@
 import {Concept} from './Concept.js';
 import {MemoryIndex} from './MemoryIndex.js';
 import {MemoryConsolidation} from './MemoryConsolidation.js';
+import {ConfigurableComponent} from '../util/ConfigurableComponent.js';
 import {clamp} from '../../util/common.js';
 
-export class Memory {
+export class Memory extends ConfigurableComponent {
     constructor(config = {}) {
-        // Store the original config to maintain reference equality for tests
-        this._originalConfig = config;
-
-        this._config = {
+        const defaultConfig = {
             priorityThreshold: 0.5,
             priorityDecayRate: 0.01,
-            consolidationInterval: 10,
-            ...config
+            consolidationInterval: 10
         };
+        
+        super(defaultConfig);
+        this.configure(config);
 
         this._concepts = new Map();
         this._focusConcepts = new Set();
@@ -42,7 +42,7 @@ export class Memory {
     }
 
     get config() {
-        return this._originalConfig;
+        return {...this._config};
     }
 
     get concepts() {
@@ -66,7 +66,7 @@ export class Memory {
         const added = concept.addTask(task);
         if (added) {
             this._stats.totalTasks++;
-            if (task.priority >= this._config.priorityThreshold) {
+            if (task.priority >= this.getConfigValue('priorityThreshold')) {
                 this._focusConcepts.add(concept);
                 this._updateFocusConceptsCount();
             }
@@ -83,9 +83,7 @@ export class Memory {
     }
 
     getConcept(term) {
-        if (!term) return null;
-
-        return this._concepts.get(term) || this._findConceptByEquality(term);
+        return !term ? null : this._concepts.get(term) || this._findConceptByEquality(term);
     }
 
     _findConceptByEquality(term) {
@@ -157,7 +155,7 @@ export class Memory {
     }
 
     consolidate(currentTime = Date.now()) {
-        if (this._cyclesSinceConsolidation++ < this._config.consolidationInterval) return;
+        if (this._cyclesSinceConsolidation++ < this.getConfigValue('consolidationInterval')) return;
 
         this._cyclesSinceConsolidation = 0;
         this._stats.lastConsolidation = currentTime;

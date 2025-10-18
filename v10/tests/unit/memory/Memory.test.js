@@ -25,7 +25,7 @@ describe('Memory', () => {
         expect(memory.stats.totalConcepts).toBe(0);
         expect(memory.stats.totalTasks).toBe(0);
         expect(memory.stats.focusConceptsCount).toBe(0);
-        expect(memory.config).toBe(config);
+        expect(memory.config).toStrictEqual(config);
     });
 
     test('should add tasks and create concepts correctly', () => {

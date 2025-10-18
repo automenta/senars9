@@ -1,32 +1,33 @@
 import {Bag} from './Bag.js';
 import {clamp, sortByPriority} from '../../util/common.js';
+import {ConfigurableComponent} from '../util/ConfigurableComponent.js';
 
-export class Concept {
+export class Concept extends ConfigurableComponent {
     constructor(term, config = {}) {
+        super(Concept.DEFAULT_CONFIG);
+        this.configure(config);
+        
         this._term = term;
         this._createdAt = Date.now();
         this._lastAccessed = Date.now();
-        this._config = {...Concept.DEFAULT_CONFIG, ...config};
-        this._beliefs = new Bag(this._config.maxBeliefs);
-        this._goals = new Bag(this._config.maxGoals);
-        this._questions = new Bag(this._config.maxQuestions);
+        this._beliefs = new Bag(this.getConfigValue('maxBeliefs'));
+        this._goals = new Bag(this.getConfigValue('maxGoals'));
+        this._questions = new Bag(this.getConfigValue('maxQuestions'));
         this._activation = 0;
         this._useCount = 0;
         this._quality = 0;
     }
 
-    static get DEFAULT_CONFIG() {
-        return {
-            maxBeliefs: 100,
-            maxGoals: 50,
-            maxQuestions: 20,
-            defaultDecayRate: 0.01,
-            defaultActivationBoost: 0.1,
-            maxActivation: 1.0,
-            minQuality: 0,
-            maxQuality: 1
-        };
-    }
+    static DEFAULT_CONFIG = {
+        maxBeliefs: 100,
+        maxGoals: 50,
+        maxQuestions: 20,
+        defaultDecayRate: 0.01,
+        defaultActivationBoost: 0.1,
+        maxActivation: 1.0,
+        minQuality: 0,
+        maxQuality: 1
+    };
 
     get term() {
         return this._term;
@@ -69,7 +70,7 @@ export class Concept {
     }
 
     get averagePriority() {
-        return this.totalTasks === 0 ? 0 : this._calculateWeightedAveragePriority();
+        return this.totalTasks ? this._calculateWeightedAveragePriority() : 0;
     }
 
     _calculateWeightedAveragePriority() {
@@ -131,14 +132,14 @@ export class Concept {
         return updated || false;
     }
 
-    applyDecay(decayRate = this._config.defaultDecayRate) {
+    applyDecay(decayRate = this.getConfigValue('defaultDecayRate')) {
         [this._beliefs, this._goals, this._questions].forEach(bag => bag.applyDecay(decayRate));
         this._activation *= (1 - decayRate);
         this._updateLastAccessed();
     }
 
-    boostActivation(activationBoost = this._config.defaultActivationBoost) {
-        this._activation = clamp(this._activation + activationBoost, 0, this._config.maxActivation);
+    boostActivation(activationBoost = this.getConfigValue('defaultActivationBoost')) {
+        this._activation = clamp(this._activation + activationBoost, 0, this.getConfigValue('maxActivation'));
         this._updateLastAccessed();
         this.incrementUseCount();
     }
@@ -148,7 +149,7 @@ export class Concept {
     }
 
     updateQuality(qualityChange) {
-        this._quality = clamp(this._quality + qualityChange, this._config.minQuality, this._config.maxQuality);
+        this._quality = clamp(this._quality + qualityChange, this.getConfigValue('minQuality'), this.getConfigValue('maxQuality'));
     }
 
     containsTask(task) {

@@ -1,7 +1,3 @@
-/**
- * Specialized indexing system for efficient memory retrieval
- * Supports different term types: inheritance, implication, similarity, etc.
- */
 export class MemoryIndex {
     constructor() {
         this._inheritanceIndex = new Map(); // Map<predicate, Set<subject>>
@@ -12,9 +8,6 @@ export class MemoryIndex {
         this._totalConcepts = 0; // Track total number of concept objects added
     }
 
-    /**
-     * Add concept to appropriate indexes
-     */
     addConcept(concept) {
         const term = concept.term;
         const termId = term.id;
@@ -304,10 +297,7 @@ export class MemoryIndex {
      */
     getConcept(termHash) {
         const concepts = this._termIndex.get(termHash);
-        if (Array.isArray(concepts) && concepts.length > 0) {
-            return concepts[concepts.length - 1]; // Return last added
-        }
-        return concepts; // In case it's not an array (old entries)
+        return Array.isArray(concepts) && concepts.length > 0 ? concepts[concepts.length - 1] : concepts;
     }
 
     /**
