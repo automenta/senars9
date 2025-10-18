@@ -123,14 +123,14 @@ describe('Memory and Focus Management Integration', () => {
 
             // Note: The convenience constructor doesn't support custom stamps, so keep original for these
             const recentTask = new Task({
-                term: simpleTerm, 
-                type: 'BELIEF', 
+                term: simpleTerm,
+                type: 'BELIEF',
                 priority: 0.7,
                 stamp: new ArrayStamp('recent', currentTime - 1000, 'INPUT')
             });
             const oldTask = new Task({
-                term: complexTerm, 
-                type: 'BELIEF', 
+                term: complexTerm,
+                type: 'BELIEF',
                 priority: 0.5,
                 stamp: new ArrayStamp('old', currentTime - 10000, 'INPUT')
             });

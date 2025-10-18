@@ -26,9 +26,17 @@ export class Cycle {
         };
     }
 
-    get cycleCount() { return this._cycleCount; }
-    get isRunning() { return this._isRunning; }
-    get stats() { return {...this._stats}; }
+    get cycleCount() {
+        return this._cycleCount;
+    }
+
+    get isRunning() {
+        return this._isRunning;
+    }
+
+    get stats() {
+        return {...this._stats};
+    }
 
     async execute() {
         const cycleStartTime = Date.now();

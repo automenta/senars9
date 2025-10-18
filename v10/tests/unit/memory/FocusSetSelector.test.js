@@ -111,15 +111,15 @@ describe('FocusSetSelector', () => {
         const term = termFactory.create({components: ['A']});
 
         const recentTask = new Task({
-            term, 
-            type: 'BELIEF', 
+            term,
+            type: 'BELIEF',
             priority: 0.5,
             stamp: new ArrayStamp('recent', currentTime - 100, 'INPUT') // Very recent
         });
 
         const oldTask = new Task({
-            term, 
-            type: 'BELIEF', 
+            term,
+            type: 'BELIEF',
             priority: 0.5,
             stamp: new ArrayStamp('old', currentTime - 10000, 'INPUT') // Very old
         });

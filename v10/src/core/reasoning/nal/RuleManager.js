@@ -1,9 +1,5 @@
-import { Metrics } from '../../../core/util/Metrics.js';
-import { sortByPriority } from '../../../util/common.js';
+import {sortByPriority} from '../../../util/common.js';
 
-/**
- * Rule Manager for comprehensive rule management and validation
- */
 export class RuleManager {
     constructor() {
         this._rules = new Map(); // Map of rule ID to rule instance
@@ -19,19 +15,19 @@ export class RuleManager {
 
         // Store the rule
         this._rules.set(rule.id, rule);
-        
+
         // Add to category
         const categorySet = this._categories.get(category) || new Set();
         categorySet.add(rule.id);
         this._categories.set(category, categorySet);
-        
+
         // Add to groups
         for (const group of groups) {
             const groupSet = this._ruleGroups.get(group) || new Set();
             groupSet.add(rule.id);
             this._ruleGroups.set(group, groupSet);
         }
-        
+
         // Initialize performance metrics
         this._performanceMetrics.set(rule.id, {
             applications: 0,
@@ -40,36 +36,36 @@ export class RuleManager {
             avgTime: 0,
             lastApplied: null
         });
-        
+
         // Enable the rule by default
         this._enabledRules.add(rule.id);
-        
+
         return this;
     }
 
     unregister(ruleId) {
         if (!this._rules.has(ruleId)) return false;
-        
+
         const rule = this._rules.get(ruleId);
-        
+
         // Remove from all collections
         this._rules.delete(ruleId);
         this._enabledRules.delete(ruleId);
         this._performanceMetrics.delete(ruleId);
         this._validationRules.delete(ruleId);
-        
+
         // Remove from categories
         for (const [category, ruleIds] of this._categories.entries()) {
             ruleIds.delete(ruleId);
             if (ruleIds.size === 0) this._categories.delete(category);
         }
-        
+
         // Remove from groups
         for (const [group, ruleIds] of this._ruleGroups.entries()) {
             ruleIds.delete(ruleId);
             if (ruleIds.size === 0) this._ruleGroups.delete(group);
         }
-        
+
         return true;
     }
 
@@ -132,7 +128,7 @@ export class RuleManager {
     getByCategory(category) {
         const ruleIds = this._categories.get(category);
         if (!ruleIds) return [];
-        
+
         return Array.from(ruleIds)
             .map(id => this._rules.get(id))
             .filter(rule => rule !== undefined);
@@ -141,7 +137,7 @@ export class RuleManager {
     getByGroup(group) {
         const ruleIds = this._ruleGroups.get(group);
         if (!ruleIds) return [];
-        
+
         return Array.from(ruleIds)
             .map(id => this._rules.get(id))
             .filter(rule => rule !== undefined);
@@ -163,7 +159,7 @@ export class RuleManager {
             metrics.applications++;
             if (success) metrics.successes++;
             else metrics.failures++;
-            
+
             // Update average time
             metrics.avgTime = (metrics.avgTime * (metrics.applications - 1) + executionTime) / metrics.applications;
             metrics.lastApplied = Date.now();
@@ -179,27 +175,27 @@ export class RuleManager {
         const enabledCount = this._enabledRules.size;
         const categories = Array.from(this._categories.keys());
         const groups = Array.from(this._ruleGroups.keys());
-        
+
         // Calculate overall performance
         let totalApplications = 0;
         let totalSuccesses = 0;
         let totalFailures = 0;
         let avgTime = 0;
         let completedMetrics = 0;
-        
+
         for (const [ruleId, metrics] of this._performanceMetrics.entries()) {
             totalApplications += metrics.applications;
             totalSuccesses += metrics.successes;
             totalFailures += metrics.failures;
-            
+
             if (metrics.applications > 0) {
                 avgTime += metrics.avgTime;
                 completedMetrics++;
             }
         }
-        
+
         if (completedMetrics > 0) avgTime = avgTime / completedMetrics;
-        
+
         return {
             totalRules,
             enabledCount,
@@ -218,22 +214,22 @@ export class RuleManager {
     async applyAllRules(task, context = {}) {
         const results = [];
         const enabledRules = this.getEnabled();
-        
+
         // Sort rules by priority
         const sortedRules = sortByPriority(enabledRules);
-        
+
         for (const rule of sortedRules) {
             if (rule.canApply && rule.canApply(task, context)) {
                 try {
                     const start = performance.now();
-                    const { results: ruleResults, rule: updatedRule } = await rule.apply(task, context);
-                    
+                    const {results: ruleResults, rule: updatedRule} = await rule.apply(task, context);
+
                     // Update metrics
                     this.updateMetrics(rule.id, true, performance.now() - start);
-                    
+
                     // Update the rule in the registry if it changed
                     if (updatedRule && updatedRule !== rule) this._rules.set(rule.id, updatedRule);
-                    
+
                     results.push(...ruleResults);
                 } catch (error) {
                     // Update failure metrics
@@ -242,7 +238,7 @@ export class RuleManager {
                 }
             }
         }
-        
+
         return results;
     }
 }

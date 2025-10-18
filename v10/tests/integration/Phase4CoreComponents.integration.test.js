@@ -10,13 +10,12 @@
  * - TermFactory validation
  */
 
-import { TermFactory } from '../../src/core/term/TermFactory.js';
-import { Term } from '../../src/core/term/Term.js';
-import { Task } from '../../src/core/task/Task.js';
-import { Memory } from '../../src/core/memory/Memory.js';
-import { Focus } from '../../src/core/memory/Focus.js';
-import { NAR } from '../../src/core/nar/NAR.js';
-import { Truth } from '../../src/core/Truth.js';
+import {TermFactory} from '../../src/core/term/TermFactory.js';
+import {Task} from '../../src/core/task/Task.js';
+import {Memory} from '../../src/core/memory/Memory.js';
+import {Focus} from '../../src/core/memory/Focus.js';
+import {NAR} from '../../src/core/nar/NAR.js';
+import {Truth} from '../../src/core/Truth.js';
 
 describe('Phase 4 Core Components Integration', () => {
     let termFactory;
@@ -28,7 +27,7 @@ describe('Phase 4 Core Components Integration', () => {
     test('TermFactory should handle proper hash-based identity with commutativity', () => {
         const term1 = termFactory.create({operator: '&', components: ['A', 'B']});
         const term2 = termFactory.create({operator: '&', components: ['B', 'A']}); // Should be same due to commutativity
-        
+
         expect(term1.toString()).toBeDefined();
         expect(term2.toString()).toBeDefined();
         expect(term1.equals(term2)).toBe(true);
@@ -37,7 +36,7 @@ describe('Phase 4 Core Components Integration', () => {
 
     test('Term should have proper ID calculation for atomic terms', () => {
         const atomicTerm = termFactory.create('test');
-        
+
         expect(atomicTerm.toString()).toBe('test');
         expect(atomicTerm.id).toBe('test');
         expect(atomicTerm.isAtomic).toBe(true);

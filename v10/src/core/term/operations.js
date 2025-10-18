@@ -1,5 +1,4 @@
 import {Truth} from '../Truth.js';
-import {TRUTH} from '../config/constants.js';
 
 // TruthFunctions consolidated to use methods in Truth class to eliminate duplication
 export const TruthFunctions = {
@@ -22,11 +21,11 @@ export const TruthFunctions = {
     analogy: Truth.analogy,
     resemblance: Truth.resemblance,
     expectation: Truth.expectation,
-    
+
     // Functions that are unique to TruthFunctions
     isEqual: (t1, t2) => t1 && t2 && Math.abs(t1.f - t2.f) < 1e-10 && Math.abs(t1.c - t2.c) < 1e-10,
     isMoreConfident: Truth.isMoreConfident,
     isStronger: Truth.isStronger,
-    
+
     _weak: Truth._weak
 };

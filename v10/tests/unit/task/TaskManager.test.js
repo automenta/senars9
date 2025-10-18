@@ -160,10 +160,10 @@ describe('TaskManager', () => {
     test('should find tasks by term correctly', () => {
         const term = newAtom('A');
         const task = new Task({term, type: 'BELIEF'});
-        
+
         // Add the task to memory first
         memory.addTask(task);
-        
+
         const tasks = taskManager.findTasksByTerm(term);
 
         expect(tasks).toHaveLength(1);
@@ -237,7 +237,7 @@ describe('TaskManager', () => {
 
     test('should return false when updating priority of non-existent task', () => {
         const task = new Task({term: newAtom('A'), type: 'BELIEF'});
-        
+
         const updated = taskManager.updateTaskPriority(task, 0.7);
 
         expect(updated).toBe(false);
@@ -248,7 +248,7 @@ describe('TaskManager', () => {
         const task = new Task({term, type: 'BELIEF'});
 
         memory.addTask(task);
-        
+
         const removed = taskManager.removeTask(task);
 
         expect(removed).toBe(true);

@@ -18,7 +18,7 @@ export class TaskPromotionManager extends ConfigurableComponent {
             frequencyWeight: 0.4,
             priorityWeight: 0.3
         };
-        
+
         super(defaultConfig);
         this.configure(config);
     }

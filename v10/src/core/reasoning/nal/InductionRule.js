@@ -1,11 +1,7 @@
-import { NALRule } from './NALRule.js';
-import { Term } from '../../term/Term.js';
-import { RuleUtils } from './RuleUtils.js';
+import {NALRule} from './NALRule.js';
+import {Term} from '../../term/Term.js';
+import {RuleUtils} from './RuleUtils.js';
 
-/**
- * Induction Rule: If <a --> b> and <b --> a> then <a <-> b>
- * Implements inductive inference in NAL
- */
 export class InductionRule extends NALRule {
     constructor() {
         super('induction', {
@@ -17,14 +13,14 @@ export class InductionRule extends NALRule {
     }
 
     _matches(task, context) {
-        return task.term?.isCompound && 
-               task.term.operator === '-->' && 
-               task.term.components?.length === 2;
+        return task.term?.isCompound &&
+            task.term.operator === '-->' &&
+            task.term.components?.length === 2;
     }
 
     async _apply(task, context) {
         const results = [];
-        
+
         if (!task.term?.isCompound || task.term.operator !== '-->' || task.term.components?.length !== 2) {
             return results;
         }
@@ -36,12 +32,12 @@ export class InductionRule extends NALRule {
 
         for (const compTask of inheritanceTasks) {
             const [compSubject, compPredicate] = compTask.term.components;
-            
+
             // Check if it's the reverse: <b --> a> where task is <a --> b>
             if (this._termsMatch(compSubject, predicate) && this._termsMatch(compPredicate, subject)) {
                 const derivedTerm = new Term('compound', 'SIMILARITY', [subject, predicate], '<->');
                 const derivedTruth = this._calculateTruth(task.truth, compTask.truth);
-                
+
                 results.push(this._createDerivedTask(task, {
                     term: derivedTerm,
                     truth: derivedTruth,

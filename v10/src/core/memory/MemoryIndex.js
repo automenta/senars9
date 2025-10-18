@@ -52,7 +52,7 @@ export class MemoryIndex {
                 if (index !== -1) {
                     concepts.splice(index, 1);
                     this._totalConcepts--;
-                    
+
                     // If array is empty, remove the entry
                     if (concepts.length === 0) {
                         this._termIndex.delete(termId);
@@ -107,7 +107,7 @@ export class MemoryIndex {
                 this._indexSimilarity(term, concept);
                 break;
         }
-        
+
         // Recursively index any compound components
         if (term.components) {
             for (const component of term.components) {

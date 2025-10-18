@@ -1,5 +1,4 @@
-import { RuleManager } from './RuleManager.js';
-import { Metrics } from '../../util/Metrics.js';
+import {RuleManager} from './RuleManager.js';
 
 /**
  * Advanced Rule Engine with sophisticated hybrid NAL-LM reasoning capabilities
@@ -37,17 +36,17 @@ export class RuleEngine {
         for (const rule of nalRules) {
             this._nalRules.register(rule, 'nal');
         }
-        
+
         // Register LM rules
         for (const rule of lmRules) {
             this._lmRules.register(rule, 'lm');
         }
-        
+
         // Register hybrid rules
         for (const rule of hybridRules) {
             this._hybridRules.register(rule, 'hybrid');
         }
-        
+
         return this;
     }
 
@@ -95,12 +94,12 @@ export class RuleEngine {
      */
     async applyNalRules(task, context = {}) {
         if (!this._config.enableNal) return [];
-        
+
         const results = await this._nalRules.applyAllRules(task, context);
         this._metrics.nalApplications++;
         this._metrics.totalApplications++;
         this._metrics.totalDerivations += results.length;
-        
+
         return results;
     }
 
@@ -112,12 +111,12 @@ export class RuleEngine {
      */
     async applyLmRules(task, context = {}) {
         if (!this._config.enableLm) return [];
-        
+
         const results = await this._lmRules.applyAllRules(task, context);
         this._metrics.lmApplications++;
         this._metrics.totalApplications++;
         this._metrics.totalDerivations += results.length;
-        
+
         return results;
     }
 
@@ -129,12 +128,12 @@ export class RuleEngine {
      */
     async applyHybridRules(task, context = {}) {
         if (!this._config.enableHybrid) return [];
-        
+
         const results = await this._hybridRules.applyAllRules(task, context);
         this._metrics.hybridApplications++;
         this._metrics.totalApplications++;
         this._metrics.totalDerivations += results.length;
-        
+
         return results;
     }
 
@@ -147,22 +146,22 @@ export class RuleEngine {
     async applyAllRules(task, params = {}) {
         const context = await this.getContext(params);
         let results = [];
-        
+
         // Apply NAL rules
         if (this._config.enableNal) {
             results.push(...await this.applyNalRules(task, context));
         }
-        
+
         // Apply LM rules
         if (this._config.enableLm) {
             results.push(...await this.applyLmRules(task, context));
         }
-        
+
         // Apply hybrid rules
         if (this._config.enableHybrid) {
             results.push(...await this.applyHybridRules(task, context));
         }
-        
+
         return results;
     }
 
@@ -174,25 +173,25 @@ export class RuleEngine {
      */
     async applyReasoningPath(task, params = {}) {
         const context = await this.getContext(params);
-        
+
         // Analyze the task to determine the best reasoning path
         const reasoningPath = this._determineReasoningPath(task, context);
-        
+
         let results = [];
-        
+
         // Apply rules based on the determined path
         if (reasoningPath.includes('nal')) {
             results.push(...await this.applyNalRules(task, context));
         }
-        
+
         if (reasoningPath.includes('lm')) {
             results.push(...await this.applyLmRules(task, context));
         }
-        
+
         if (reasoningPath.includes('hybrid')) {
             results.push(...await this.applyHybridRules(task, context));
         }
-        
+
         return results;
     }
 
@@ -204,27 +203,27 @@ export class RuleEngine {
      */
     _determineReasoningPath(task, context) {
         const paths = [];
-        
+
         // Check if the task is suitable for NAL reasoning (structured, formal logic)
         if (this._isNalSuitable(task, context)) {
             paths.push('nal');
         }
-        
+
         // Check if the task might benefit from LM reasoning (complex, ambiguous, or natural language)
         if (this._isLmSuitable(task, context)) {
             paths.push('lm');
         }
-        
+
         // Check if the task is suitable for hybrid reasoning
         if (this._isHybridSuitable(task, context)) {
             paths.push('hybrid');
         }
-        
+
         // Default to NAL if no specific path is identified
         if (paths.length === 0) {
             paths.push('nal');
         }
-        
+
         return paths;
     }
 
@@ -236,9 +235,9 @@ export class RuleEngine {
      */
     _isNalSuitable(task, context) {
         // NAL is suitable for structured, symbolic tasks
-        return task.term && 
-               task.term.isCompound && 
-               !this._isAmbiguous(task.term);
+        return task.term &&
+            task.term.isCompound &&
+            !this._isAmbiguous(task.term);
     }
 
     /**
@@ -249,9 +248,9 @@ export class RuleEngine {
      */
     _isLmSuitable(task, context) {
         // LM is suitable for complex, ambiguous, or natural language tasks
-        return this._isAmbiguous(task.term) || 
-               this._isComplex(task) || 
-               this._requiresCreativity(task, context);
+        return this._isAmbiguous(task.term) ||
+            this._isComplex(task) ||
+            this._requiresCreativity(task, context);
     }
 
     /**
@@ -263,7 +262,7 @@ export class RuleEngine {
     _isHybridSuitable(task, context) {
         // Hybrid is suitable when both NAL and LM can contribute
         return this._hasPartialInformation(task, context) &&
-               (this._isNalSuitable(task, context) || this._isLmSuitable(task, context));
+            (this._isNalSuitable(task, context) || this._isLmSuitable(task, context));
     }
 
     /**
@@ -273,10 +272,10 @@ export class RuleEngine {
      */
     _isAmbiguous(term) {
         if (!term) return false;
-        
+
         // Check for variables or highly general terms
-        return term.isVariable || 
-               (term.name && (term.name === 'any' || term.name === '?'));
+        return term.isVariable ||
+            (term.name && (term.name === 'any' || term.name === '?'));
     }
 
     /**
@@ -308,9 +307,9 @@ export class RuleEngine {
      */
     _hasPartialInformation(task, context) {
         // Check if there's not enough information in memory for pure NAL reasoning
-        return context.memory && 
-               context.memory.getRelevantTasks && 
-               context.memory.getRelevantTasks(task.term).length < 2;
+        return context.memory &&
+            context.memory.getRelevantTasks &&
+            context.memory.getRelevantTasks(task.term).length < 2;
     }
 
     /**
@@ -320,12 +319,12 @@ export class RuleEngine {
      */
     _getTermDepth(term) {
         if (!term || !term.isCompound || !term.components) return 1;
-        
+
         let maxDepth = 1;
         for (const component of term.components) {
             maxDepth = Math.max(maxDepth, 1 + this._getTermDepth(component));
         }
-        
+
         return maxDepth;
     }
 

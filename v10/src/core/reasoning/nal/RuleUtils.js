@@ -1,5 +1,3 @@
-import { sortByPriority } from '../../../util/common.js';
-
 /**
  * Utility functions for NAL rules to centralize common operations
  */
@@ -10,12 +8,12 @@ export class RuleUtils {
      * @returns {Array} - Array of tasks from memory and focus
      */
     static collectTasks(context) {
-        const { memory, focus } = context || {};
+        const {memory, focus} = context || {};
         const tasks = [];
-        
+
         if (memory?.getAllTasks) tasks.push(...memory.getAllTasks());
         if (focus?.getCurrentTasks) tasks.push(...focus.getCurrentTasks());
-        
+
         return tasks;
     }
 
@@ -41,9 +39,9 @@ export class RuleUtils {
      * @returns {Array} - Filtered array of inheritance tasks
      */
     static filterByInheritance(tasks, operator = '-->') {
-        return tasks.filter(task => 
-            task?.term?.isCompound && 
-            task.term.operator === operator && 
+        return tasks.filter(task =>
+            task?.term?.isCompound &&
+            task.term.operator === operator &&
             task.term.components?.length === 2
         );
     }

@@ -1,6 +1,6 @@
-import { Rule } from '../Rule.js';
-import { Term } from '../../term/Term.js';
-import { TruthFunctions } from './TruthFunctions.js';
+import {Rule} from '../Rule.js';
+import {Term} from '../../term/Term.js';
+import {TruthFunctions} from './TruthFunctions.js';
 
 /**
  * Enhanced NALRule base class with sophisticated pattern matching and variable handling
@@ -31,14 +31,14 @@ export class NALRule extends Rule {
      * @returns {Array} - Array of derived tasks
      */
     async apply(task, context = {}) {
-        if (!this.canApply(task, context)) return { results: [], rule: this };
+        if (!this.canApply(task, context)) return {results: [], rule: this};
 
         const start = performance.now();
         try {
             const results = await this._apply(task, context);
-            return { results, rule: this._updateMetrics(true, performance.now() - start) };
+            return {results, rule: this._updateMetrics(true, performance.now() - start)};
         } catch (error) {
-            throw { error, rule: this._updateMetrics(false, performance.now() - start) };
+            throw {error, rule: this._updateMetrics(false, performance.now() - start)};
         }
     }
 
@@ -124,11 +124,11 @@ class PatternMatcher {
      */
     unify(pattern, term) {
         const bindings = new Map();
-        
+
         if (!this._unifyTerms(pattern, term, bindings)) {
             return null; // Unification failed
         }
-        
+
         return bindings;
     }
 
@@ -153,17 +153,17 @@ class PatternMatcher {
 
         // Both must be of same type
         if (pattern.type !== term.type) return false;
-        
+
         // Check atomic terms
         if (pattern.isAtomic) {
             return this._termsEqual(pattern, term);
         }
-        
+
         // Check compound terms
         if (pattern.isCompound) {
             if (pattern.operator !== term.operator) return false;
             if (pattern.components.length !== term.components.length) return false;
-            
+
             // Recursively unify components
             for (let i = 0; i < pattern.components.length; i++) {
                 if (!this._unifyTerms(pattern.components[i], term.components[i], bindings)) {
@@ -172,7 +172,7 @@ class PatternMatcher {
             }
             return true;
         }
-        
+
         return false;
     }
 

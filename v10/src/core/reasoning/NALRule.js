@@ -10,9 +10,17 @@ export class NALRule extends Rule {
         Object.freeze(this);
     }
 
-    get premises() { return this._premises; }
-    get conclusion() { return this._conclusion; }
-    get truthFunction() { return this._truthFunction; }
+    get premises() {
+        return this._premises;
+    }
+
+    get conclusion() {
+        return this._conclusion;
+    }
+
+    get truthFunction() {
+        return this._truthFunction;
+    }
 
     _matches(task) {
         return this._premises.length > 0 && this._premises.some(premise => this._matchesPattern(premise, task.term));
@@ -20,19 +28,19 @@ export class NALRule extends Rule {
 
     _matchesPattern(pattern, term) {
         if (!pattern || !term || pattern.type !== term.type) return false;
-        
-        return this._matchesAtomic(pattern, term) || 
-               this._matchesCompound(pattern, term) ||
-               false;
+
+        return this._matchesAtomic(pattern, term) ||
+            this._matchesCompound(pattern, term) ||
+            false;
     }
-    
+
     _matchesAtomic(pattern, term) {
         if (pattern.isAtomic && term.isAtomic) {
             return pattern.name === term.name || pattern.name === '?';
         }
         return false;
     }
-    
+
     _matchesCompound(pattern, term) {
         if (pattern.isCompound && term.isCompound) {
             if (pattern.operator !== term.operator || pattern.components.length !== term.components.length) return false;

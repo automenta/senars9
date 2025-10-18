@@ -1,6 +1,5 @@
 import {MemoryIndex} from '../../../src/core/memory/MemoryIndex.js';
 import {Concept} from '../../../src/core/memory/Concept.js';
-import {Task} from '../../../src/core/task/Task.js';
 import {TermFactory} from '../../../src/core/term/TermFactory.js';
 
 describe('MemoryIndex', () => {

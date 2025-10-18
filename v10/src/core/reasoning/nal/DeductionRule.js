@@ -1,6 +1,5 @@
-import { NALRule } from './NALRule.js';
-import { Term } from '../../term/Term.js';
-import { RuleUtils } from './RuleUtils.js';
+import {NALRule} from './NALRule.js';
+import {RuleUtils} from './RuleUtils.js';
 
 /**
  * Deduction Rule: If <a --> b> and <a> then <b>
@@ -17,14 +16,14 @@ export class DeductionRule extends NALRule {
     }
 
     _matches(task, context) {
-        return task.term?.isCompound && 
-               task.term.operator === '-->' && 
-               task.term.components?.length === 2;
+        return task.term?.isCompound &&
+            task.term.operator === '-->' &&
+            task.term.components?.length === 2;
     }
 
     async _apply(task, context) {
         const results = [];
-        
+
         if (!task.term?.isCompound || task.term.operator !== '-->' || task.term.components?.length !== 2) {
             return results;
         }
@@ -33,14 +32,14 @@ export class DeductionRule extends NALRule {
 
         // Look for a matching statement that has the subject as its term
         const complementaryTasks = RuleUtils.findTasksByTerm(subject, context, this._unify.bind(this));
-        
+
         for (const compTask of complementaryTasks) {
             const bindings = this._unify(subject, compTask.term);
-            
+
             if (bindings) {
                 const derivedTerm = predicate;
                 const derivedTruth = this._calculateTruth(task.truth, compTask.truth);
-                
+
                 results.push(this._createDerivedTask(task, {
                     term: derivedTerm,
                     truth: derivedTruth,

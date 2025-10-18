@@ -2,7 +2,7 @@
  * Focus class - manages attention focus sets (short-term memory)
  * Implements focus set management as specified in DESIGN.md
  */
-import {sortByPriority, clamp} from '../../util/common.js';
+import {clamp, sortByPriority} from '../../util/common.js';
 
 export class Focus {
     constructor(config = {}) {

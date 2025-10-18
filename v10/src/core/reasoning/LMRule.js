@@ -19,14 +19,14 @@ export class LMRule extends Rule {
             model: 'default',  // Default model
             ...config.lm
         };
-        
+
         // Initialize metrics for LM operations
-        this.lmStats = { 
-            tokens: 0, 
-            calls: 0, 
-            avgTime: 0 
+        this.lmStats = {
+            tokens: 0,
+            calls: 0,
+            avgTime: 0
         };
-        
+
         this._freeze();
     }
 
@@ -71,10 +71,10 @@ export class LMRule extends Rule {
             const prompt = this._buildPrompt(task);
             const response = await this._callLanguageModel(prompt);
             const processedResponse = await this._responseProcessor(response, task);
-            
+
             // Update LM stats
             this._updateLMStats(prompt.length + (response?.length || 0), Date.now() - startTime);
-            
+
             return Array.isArray(processedResponse) ? processedResponse : [processedResponse];
         } catch (error) {
             this.logger.warn(`LM rule ${this.id} failed:`, error);
@@ -90,8 +90,8 @@ export class LMRule extends Rule {
         const templateVars = {
             taskTerm: task.term?.toString() || 'unknown',
             taskType: task.type || 'unknown',
-            taskTruth: task.truth ? 
-                `(${task.truth.f?.toFixed(2) || task.truth.f || 0.5}, ${task.truth.c?.toFixed(2) || task.truth.c || 0.5})` : 
+            taskTruth: task.truth ?
+                `(${task.truth.f?.toFixed(2) || task.truth.f || 0.5}, ${task.truth.c?.toFixed(2) || task.truth.c || 0.5})` :
                 'no truth',
             context: this._getContext(task)
         };
@@ -138,7 +138,7 @@ export class LMRule extends Rule {
      * Gets the current LM statistics for this rule
      */
     getLMStats() {
-        return { ...this.lmStats };
+        return {...this.lmStats};
     }
 
     // Override _clone to handle LMRule-specific constructor signature

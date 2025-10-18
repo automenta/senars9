@@ -1,6 +1,6 @@
-import { DeductionRule } from './DeductionRule.js';
-import { InductionRule } from './InductionRule.js';
-import { AbductionRule } from './AbductionRule.js';
+import {DeductionRule} from './DeductionRule.js';
+import {InductionRule} from './InductionRule.js';
+import {AbductionRule} from './AbductionRule.js';
 
 /**
  * Collection of all NAL rules

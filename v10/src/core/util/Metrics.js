@@ -19,7 +19,7 @@ export class Metrics {
         const totalExecutions = metrics.executions + 1;
         const totalSuccesses = metrics.successes + (success ? 1 : 0);
         const totalFailures = metrics.failures + (success ? 0 : 1);
-        
+
         return {
             executions: totalExecutions,
             successes: totalSuccesses,

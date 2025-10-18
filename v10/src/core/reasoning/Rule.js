@@ -18,18 +18,46 @@ export class Rule {
         });
     }
 
-    get id() { return this._id; }
-    get type() { return this._type; }
-    get priority() { return this._priority; }
-    get enabled() { return this._enabled; }
-    get config() { return this._config; }
-    get metrics() { return this._metrics; }
+    get id() {
+        return this._id;
+    }
+
+    get type() {
+        return this._type;
+    }
+
+    get priority() {
+        return this._priority;
+    }
+
+    get enabled() {
+        return this._enabled;
+    }
+
+    get config() {
+        return this._config;
+    }
+
+    get metrics() {
+        return this._metrics;
+    }
 
     // Immutable state modifiers
-    enable() { return this._updateIfChanged('_enabled', true); }
-    disable() { return this._updateIfChanged('_enabled', false); }
-    withPriority(priority) { return this._updateIfChanged('_priority', clamp(priority, TRUTH.MIN_PRIORITY, TRUTH.MAX_PRIORITY)); }
-    withConfig(config) { return this._updateIfChanged('_config', {...this._config, ...config}); }
+    enable() {
+        return this._updateIfChanged('_enabled', true);
+    }
+
+    disable() {
+        return this._updateIfChanged('_enabled', false);
+    }
+
+    withPriority(priority) {
+        return this._updateIfChanged('_priority', clamp(priority, TRUTH.MIN_PRIORITY, TRUTH.MAX_PRIORITY));
+    }
+
+    withConfig(config) {
+        return this._updateIfChanged('_config', {...this._config, ...config});
+    }
 
     // Helper methods for common operations
     _updateIfChanged(propName, newValue) {
@@ -58,8 +86,13 @@ export class Rule {
     }
 
     // Template methods - to be overridden by subclasses
-    _matches(task) { return this._enabled; }
-    _apply(task) { return []; }
+    _matches(task) {
+        return this._enabled;
+    }
+
+    _apply(task) {
+        return [];
+    }
 
     // Internal utilities
     _clone(overrides = {}, newConfig = null) {
@@ -77,7 +110,7 @@ export class Rule {
         const newRule = this._clone({metrics});
         return newRule;
     }
-    
+
     // Freeze the rule instance - should be called at the end of subclass constructors
     _freeze() {
         Object.freeze(this);

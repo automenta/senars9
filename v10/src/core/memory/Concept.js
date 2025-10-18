@@ -1,5 +1,5 @@
 import {Bag} from './Bag.js';
-import {sortByPriority, clamp} from '../../util/common.js';
+import {clamp, sortByPriority} from '../../util/common.js';
 
 export class Concept {
     constructor(term, config = {}) {
@@ -28,17 +28,49 @@ export class Concept {
         };
     }
 
-    get term() { return this._term; }
-    get createdAt() { return this._createdAt; }
-    get lastAccessed() { return this._lastAccessed; }
-    get activation() { return this._activation; }
-    get useCount() { return this._useCount; }
-    get quality() { return this._quality; }
-    get beliefs() { return this._beliefs; }
-    get goals() { return this._goals; }
-    get questions() { return this._questions; }
-    get totalTasks() { return this._beliefs.size + this._goals.size + this._questions.size; }
-    get averagePriority() { return this.totalTasks === 0 ? 0 : this._calculateWeightedAveragePriority(); }
+    get term() {
+        return this._term;
+    }
+
+    get createdAt() {
+        return this._createdAt;
+    }
+
+    get lastAccessed() {
+        return this._lastAccessed;
+    }
+
+    get activation() {
+        return this._activation;
+    }
+
+    get useCount() {
+        return this._useCount;
+    }
+
+    get quality() {
+        return this._quality;
+    }
+
+    get beliefs() {
+        return this._beliefs;
+    }
+
+    get goals() {
+        return this._goals;
+    }
+
+    get questions() {
+        return this._questions;
+    }
+
+    get totalTasks() {
+        return this._beliefs.size + this._goals.size + this._questions.size;
+    }
+
+    get averagePriority() {
+        return this.totalTasks === 0 ? 0 : this._calculateWeightedAveragePriority();
+    }
 
     _calculateWeightedAveragePriority() {
         const bags = [

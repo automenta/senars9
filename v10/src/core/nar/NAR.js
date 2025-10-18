@@ -32,7 +32,7 @@ export class NAR {
         } else {
             this._ruleEngine = new RuleEngine(this._config.ruleEngine);
         }
-        
+
         this._setupDefaultRules();
 
         this._cycle = new Cycle({
@@ -47,11 +47,25 @@ export class NAR {
         this._cycleInterval = null;
     }
 
-    get config() { return this._config; }
-    get memory() { return this._memory; }
-    get isRunning() { return this._isRunning; }
-    get cycleCount() { return this._cycle.cycleCount; }
-    get lm() { return this._lm; }
+    get config() {
+        return this._config;
+    }
+
+    get memory() {
+        return this._memory;
+    }
+
+    get isRunning() {
+        return this._isRunning;
+    }
+
+    get cycleCount() {
+        return this._cycle.cycleCount;
+    }
+
+    get lm() {
+        return this._lm;
+    }
 
     _setupDefaultRules() {
         try {
@@ -157,7 +171,7 @@ export class NAR {
     }
 
     getBeliefs(queryTerm = null) {
-        return queryTerm ? this.query(queryTerm) : 
+        return queryTerm ? this.query(queryTerm) :
             Array.from(this._memory.getAllConcepts()).flatMap(concept => concept.getTasksByType('BELIEF'));
     }
 
@@ -190,7 +204,9 @@ export class NAR {
             isRunning: this._isRunning,
             cycleCount: this._cycle.cycleCount,
             memoryStats: this._memory.getDetailedStats(),
-            taskManagerStats: this._taskManager.getTaskStats || this._taskManager.stats,
+            taskManagerStats: typeof this._taskManager.getTaskStats === 'function'
+                ? this._taskManager.getTaskStats()
+                : this._taskManager.stats,
             cycleStats: this._cycle.stats,
             config: this._config.toJSON()
         };
@@ -200,46 +216,44 @@ export class NAR {
         return stats;
     }
 
-    // LM-related methods
-    registerLMProvider(id, provider) {
+    _ensureLMEnabled() {
         if (!this._lm) {
             throw new Error('Language Model is not enabled in this NAR instance');
         }
+    }
+
+    // LM-related methods
+    registerLMProvider(id, provider) {
+        this._ensureLMEnabled();
         this._lm.registerProvider(id, provider);
         return this;
     }
 
     async generateWithLM(prompt, options = {}) {
-        if (!this._lm) {
-            throw new Error('Language Model is not enabled in this NAR instance');
-        }
+        this._ensureLMEnabled();
         return await this._lm.generateText(prompt, options);
     }
 
     translateToNarsese(text) {
-        if (!this._lm) {
-            throw new Error('Language Model is not enabled in this NAR instance');
-        }
+        this._ensureLMEnabled();
         return this._lm.translateToNarsese(text);
     }
 
     translateFromNarsese(narsese) {
-        if (!this._lm) {
-            throw new Error('Language Model is not enabled in this NAR instance');
-        }
+        this._ensureLMEnabled();
         return this._lm.translateFromNarsese(narsese);
     }
 
-    _calculateInputPriority(parsed) {
+    _calculateInputPriority = (parsed) => {
         const {truthValue, taskType} = parsed;
         const basePriority = this._config.taskManager.defaultPriority;
-        
+
         // Calculate priority with boosts
         const confidenceBoost = (truthValue?.confidence || 0) * PRIORITY.CONFIDENCE_MULTIPLIER;
         const typeBoost = {GOAL: PRIORITY.GOAL_BOOST, QUESTION: PRIORITY.QUESTION_BOOST}[taskType] || 0;
-        
+
         return Math.min(TRUTH.MAX_PRIORITY, basePriority + confidenceBoost + typeBoost);
-    }
+    };
 
     async _processPendingTasks() {
         for (const task of this._taskManager.processPendingTasks(Date.now())) {

@@ -10,13 +10,13 @@ export class Term {
     constructor(type, name, components = [], operator = null) {
         this._type = type;
         this._name = name;
-        
+
         // For atomic terms, components should include the name itself
         // For compound terms, use provided components
-        const actualComponents = type === TermType.ATOM && components.length === 0 
-            ? freezeObject([name]) 
+        const actualComponents = type === TermType.ATOM && components.length === 0
+            ? freezeObject([name])
             : freezeObject(components);
-            
+
         this._operator = operator;
         this._components = actualComponents;
         this._complexity = this._calculateComplexity();
@@ -25,22 +25,48 @@ export class Term {
         return freezeObject(this);
     }
 
-    get type() { return this._type; }
-    get name() { return this._name; }
-    get operator() { return this._operator; }
-    get components() { return this._components; }
-    get complexity() { return this._complexity; }
-    get hash() { return this._hash; }
-    get id() { return this._id; }
-    get isAtomic() { return this._type === TermType.ATOM; }
-    get isCompound() { return this._type === TermType.COMPOUND; }
+    get type() {
+        return this._type;
+    }
 
-    _calculateId() {
-        return this._type === TermType.ATOM ? this._name : `${this._operator}_${this._name}`;
+    get name() {
+        return this._name;
+    }
+
+    get operator() {
+        return this._operator;
+    }
+
+    get components() {
+        return this._components;
+    }
+
+    get complexity() {
+        return this._complexity;
+    }
+
+    get hash() {
+        return this._hash;
+    }
+
+    get id() {
+        return this._id;
+    }
+
+    get isAtomic() {
+        return this._type === TermType.ATOM;
+    }
+
+    get isCompound() {
+        return this._type === TermType.COMPOUND;
     }
 
     static computeHash(str) {
         return crypto.createHash('sha256').update(str).digest('hex');
+    }
+
+    _calculateId() {
+        return this._type === TermType.ATOM ? this._name : `${this._operator}_${this._name}`;
     }
 
     equals(other) {

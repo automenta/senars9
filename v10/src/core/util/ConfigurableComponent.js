@@ -9,14 +9,6 @@ export class ConfigurableComponent {
     }
 
     /**
-     * Update configuration with new values
-     */
-    configure(newConfig) {
-        this._config = {...this._config, ...newConfig};
-        return this;  // Allow chaining
-    }
-
-    /**
      * Get current configuration
      */
     get config() {
@@ -28,6 +20,14 @@ export class ConfigurableComponent {
      */
     get defaultConfig() {
         return {...this._defaultConfig};
+    }
+
+    /**
+     * Update configuration with new values
+     */
+    configure(newConfig) {
+        this._config = {...this._config, ...newConfig};
+        return this;  // Allow chaining
     }
 
     /**

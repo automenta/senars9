@@ -4,29 +4,17 @@ import {MemoryConsolidation} from './MemoryConsolidation.js';
 import {clamp} from '../../util/common.js';
 
 export class Memory {
-    static get SCORING_WEIGHTS() {
-        return {activation: 0.5, useCount: 0.3, taskCount: 0.2};
-    }
-
-    static get NORMALIZATION_LIMITS() {
-        return {useCount: 100, taskCount: 50};
-    }
-
-    static get CONSOLIDATION_THRESHOLDS() {
-        return {activationThreshold: 0.1, minTasksThreshold: 5, decayThreshold: 0.01, minTasksForDecay: 2};
-    }
-
     constructor(config = {}) {
         // Store the original config to maintain reference equality for tests
         this._originalConfig = config;
-        
+
         this._config = {
             priorityThreshold: 0.5,
             priorityDecayRate: 0.01,
             consolidationInterval: 10,
             ...config
         };
-        
+
         this._concepts = new Map();
         this._focusConcepts = new Set();
         this._index = new MemoryIndex();
@@ -41,14 +29,37 @@ export class Memory {
         this._cyclesSinceConsolidation = 0;
     }
 
-    get config() { return this._originalConfig; }
-    get concepts() { return new Map(this._concepts); }
-    get focusConcepts() { return new Set(this._focusConcepts); }
-    get stats() { return {...this._stats}; }
+    static get SCORING_WEIGHTS() {
+        return {activation: 0.5, useCount: 0.3, taskCount: 0.2};
+    }
+
+    static get NORMALIZATION_LIMITS() {
+        return {useCount: 100, taskCount: 50};
+    }
+
+    static get CONSOLIDATION_THRESHOLDS() {
+        return {activationThreshold: 0.1, minTasksThreshold: 5, decayThreshold: 0.01, minTasksForDecay: 2};
+    }
+
+    get config() {
+        return this._originalConfig;
+    }
+
+    get concepts() {
+        return new Map(this._concepts);
+    }
+
+    get focusConcepts() {
+        return new Set(this._focusConcepts);
+    }
+
+    get stats() {
+        return {...this._stats};
+    }
 
     addTask(task, currentTime = Date.now()) {
         if (!task?.term) return false;
-        
+
         const term = task.term;
         let concept = this._concepts.get(term) || this._createConcept(term);
 
@@ -73,7 +84,7 @@ export class Memory {
 
     getConcept(term) {
         if (!term) return null;
-        
+
         return this._concepts.get(term) || this._findConceptByEquality(term);
     }
 
@@ -110,9 +121,13 @@ export class Memory {
     }
 
     _calculateConceptScore(concept) {
-        const {activation: activationWeight, useCount: useCountWeight, taskCount: taskCountWeight} = Memory.SCORING_WEIGHTS;
+        const {
+            activation: activationWeight,
+            useCount: useCountWeight,
+            taskCount: taskCountWeight
+        } = Memory.SCORING_WEIGHTS;
         const {useCount: useLimit, taskCount: taskLimit} = Memory.NORMALIZATION_LIMITS;
-        
+
         const normalizedUseCount = clamp(concept.useCount / useLimit, 0, 1);
         const normalizedTaskCount = clamp(concept.totalTasks / taskLimit, 0, 1);
         const score = concept.activation * activationWeight +
@@ -124,7 +139,7 @@ export class Memory {
 
     removeConcept(term) {
         if (!term) return false;
-        
+
         const concept = this._concepts.get(term);
         if (!concept) return false;
 

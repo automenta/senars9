@@ -2,54 +2,54 @@
  * Registry for managing LM providers
  */
 export class ProviderRegistry {
-  constructor() {
-    this.providers = new Map();
-    this.defaultProviderId = null;
-  }
-
-  register(id, provider) {
-    if (!id || !provider) {
-      throw new Error('Provider ID and provider object are required');
+    constructor() {
+        this.providers = new Map();
+        this.defaultProviderId = null;
     }
-    
-    this.providers.set(id, provider);
-    
-    // Set as default if none exists
-    if (!this.defaultProviderId) {
-      this.defaultProviderId = id;
+
+    get size() {
+        return this.providers.size;
     }
-    
-    return this;
-  }
 
-  get(id) {
-    return this.providers.get(id);
-  }
+    register(id, provider) {
+        if (!id || !provider) {
+            throw new Error('Provider ID and provider object are required');
+        }
 
-  has(id) {
-    return this.providers.has(id);
-  }
+        this.providers.set(id, provider);
 
-  remove(id) {
-    if (this.defaultProviderId === id) {
-      this.defaultProviderId = this.providers.size > 0 ? 
-        Array.from(this.providers.keys())[0] : null;
+        // Set as default if none exists
+        if (!this.defaultProviderId) {
+            this.defaultProviderId = id;
+        }
+
+        return this;
     }
-    return this.providers.delete(id);
-  }
 
-  get size() {
-    return this.providers.size;
-  }
-
-  getAll() {
-    return new Map(this.providers);
-  }
-
-  setDefault(id) {
-    if (this.providers.has(id)) {
-      this.defaultProviderId = id;
+    get(id) {
+        return this.providers.get(id);
     }
-    return this;
-  }
+
+    has(id) {
+        return this.providers.has(id);
+    }
+
+    remove(id) {
+        if (this.defaultProviderId === id) {
+            this.defaultProviderId = this.providers.size > 0 ?
+                Array.from(this.providers.keys())[0] : null;
+        }
+        return this.providers.delete(id);
+    }
+
+    getAll() {
+        return new Map(this.providers);
+    }
+
+    setDefault(id) {
+        if (this.providers.has(id)) {
+            this.defaultProviderId = id;
+        }
+        return this;
+    }
 }

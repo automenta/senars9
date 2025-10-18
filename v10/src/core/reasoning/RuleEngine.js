@@ -19,15 +19,24 @@ export class RuleEngine {
         };
     }
 
-    get rules() { return Array.from(this._rules.values()); }
-    get ruleSets() { return Array.from(this._ruleSets.values()); }
-    get metrics() { 
+    get rules() {
+        return Array.from(this._rules.values());
+    }
+
+    get ruleSets() {
+        return Array.from(this._ruleSets.values());
+    }
+
+    get metrics() {
         return {
             ...this._metrics,
             ...this._typeMetrics
         };
     }
-    get lm() { return this._lm; }
+
+    get lm() {
+        return this._lm;
+    }
 
     setLM(lm) {
         this._lm = lm;
@@ -35,8 +44,8 @@ export class RuleEngine {
         for (const [id, rule] of this._rules) {
             if (rule instanceof LMRule && rule.lm !== lm) {
                 // For LM rules, we need to create a new instance with the updated LM
-                const newRule = new LMRule(rule.id, lm, rule._promptTemplate, rule._responseProcessor, 
-                                          rule._priority, rule._config);
+                const newRule = new LMRule(rule.id, lm, rule._promptTemplate, rule._responseProcessor,
+                    rule._priority, rule._config);
                 this._rules.set(id, newRule);
             }
         }
@@ -44,12 +53,12 @@ export class RuleEngine {
 
     register(rule) {
         if (!(rule instanceof Rule)) throw new Error('Invalid rule type');
-        
+
         // If this is an LM rule and we have an LM instance but the rule doesn't have one,
         // assign our LM instance to it
         if (rule instanceof LMRule && !rule.lm && this._lm) {
-            const newRule = new LMRule(rule.id, this._lm, rule._promptTemplate, rule._responseProcessor, 
-                                      rule._priority, rule._config);
+            const newRule = new LMRule(rule.id, this._lm, rule._promptTemplate, rule._responseProcessor,
+                rule._priority, rule._config);
             this._rules.set(rule.id, newRule);
         } else {
             this._rules.set(rule.id, rule);
@@ -62,8 +71,13 @@ export class RuleEngine {
         return this;
     }
 
-    getRule(ruleId) { return this._rules.get(ruleId); }
-    getSet(name) { return this._ruleSets.get(name); }
+    getRule(ruleId) {
+        return this._rules.get(ruleId);
+    }
+
+    getSet(name) {
+        return this._ruleSets.get(name);
+    }
 
     createSet(name, ruleIds = []) {
         const rules = ruleIds.map(id => this._rules.get(id)).filter(Boolean);
@@ -73,19 +87,19 @@ export class RuleEngine {
     getApplicableRules(task, ruleType = null) {
         let applicableRules = Array.from(this._rules.values())
             .filter(rule => rule.canApply(task));
-            
+
         if (ruleType) {
-            applicableRules = applicableRules.filter(rule => 
+            applicableRules = applicableRules.filter(rule =>
                 ruleType === 'lm' ? rule instanceof LMRule : !(rule instanceof LMRule)
             );
         }
-        
+
         return sortByPriority(applicableRules);
     }
 
     applyRule(rule, task) {
         if (!rule || !this._rules.has(rule.id)) return {results: [], rule};
-        
+
         const startTime = Date.now();
         let success = false;
 
@@ -93,10 +107,10 @@ export class RuleEngine {
             const {results, rule: updatedRule} = rule.apply(task);
             this._rules.set(rule.id, updatedRule);
             success = true;
-            
+
             // Update type-specific metrics
             this._typeMetrics[rule instanceof LMRule ? 'lmRuleApplications' : 'nalRuleApplications']++;
-            
+
             return {results, rule: updatedRule};
         } catch (error) {
             if (error.rule) this._rules.set(rule.id, error.rule);
@@ -107,7 +121,7 @@ export class RuleEngine {
     }
 
     applyRules(task, ruleIds = null, ruleType = null) {
-        const rules = ruleIds 
+        const rules = ruleIds
             ? ruleIds.map(id => this._rules.get(id)).filter(Boolean)
             : this.getApplicableRules(task, ruleType);
 
@@ -124,8 +138,13 @@ export class RuleEngine {
         return allResults;
     }
 
-    applyLMRules(task, ruleIds = null) { return this.applyRules(task, ruleIds, 'lm'); }
-    applyNALRules(task, ruleIds = null) { return this.applyRules(task, ruleIds, 'nal'); }
+    applyLMRules(task, ruleIds = null) {
+        return this.applyRules(task, ruleIds, 'lm');
+    }
+
+    applyNALRules(task, ruleIds = null) {
+        return this.applyRules(task, ruleIds, 'nal');
+    }
 
     enableRule(ruleId) {
         const rule = this._rules.get(ruleId);

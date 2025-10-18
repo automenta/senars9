@@ -12,17 +12,17 @@ export class TermFactory {
         if (!termData) {
             throw new Error('TermFactory.create: termData is required');
         }
-        
+
         // Handle string input
         if (typeof termData === 'string') {
             return this._getOrCreateAtomic(termData);
         }
-        
+
         // Handle simple object with name
         if (!termData.components && termData.operator === undefined && termData.name) {
             return this._getOrCreateAtomic(termData.name);
         }
-        
+
         // Handle compound terms
         const {operator, components} = this._normalizeTermData(termData);
         const name = this._buildCanonicalName(operator, components);
@@ -36,7 +36,7 @@ export class TermFactory {
     _createAndCache(operator, components, name) {
         const existing = this._cache.get(name);
         if (existing) return existing;
-        
+
         const term = new Term(
             operator ? TermType.COMPOUND : TermType.ATOM,
             name,
@@ -51,18 +51,18 @@ export class TermFactory {
         if (!Array.isArray(components)) {
             throw new Error('TermFactory.normalize: components must be an array');
         }
-        
+
         // Normalize components: convert strings to Terms recursively
         let normalizedComponents = components.map(comp =>
-            (typeof comp === 'string' || comp instanceof Term) ? 
-            (typeof comp === 'string' ? this.create(comp) : comp) : 
-            this.create(comp)
+            (typeof comp === 'string' || comp instanceof Term) ?
+                (typeof comp === 'string' ? this.create(comp) : comp) :
+                this.create(comp)
         );
 
         // Process operators if present
         if (operator) {
             this._validateOperator(operator);
-            
+
             // Flatten associative operators
             if (ASSOCIATIVE_OPERATORS.has(operator)) {
                 normalizedComponents = this._flatten(operator, normalizedComponents);
@@ -87,7 +87,7 @@ export class TermFactory {
         if (!Array.isArray(components)) {
             throw new Error('TermFactory._flatten: components must be an array');
         }
-        
+
         return components.flatMap(comp =>
             comp?.operator === operator ? comp.components : [comp]
         );
@@ -104,13 +104,13 @@ export class TermFactory {
         if (!Array.isArray(components)) {
             throw new Error('TermFactory._removeRedundancy: components must be an array');
         }
-        
+
         const seen = new Set();
         return components.filter(comp => {
             if (!comp || typeof comp.name !== 'string') {
                 throw new Error('TermFactory._removeRedundancy: component must have a name property');
             }
-            
+
             if (seen.has(comp.name)) return false;
             seen.add(comp.name);
             return true;

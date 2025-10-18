@@ -1,6 +1,6 @@
 import {ConfigurableComponent} from '../util/ConfigurableComponent.js';
 
-/** 
+/**
  * Advanced memory consolidation algorithms with activation propagation
  * Implements sophisticated forgetting policies and concept activation management
  */
@@ -13,7 +13,7 @@ export class MemoryConsolidation extends ConfigurableComponent {
             minTasksForDecay: 2,
             consolidationInterval: 100
         };
-        
+
         super(defaultConfig);
         this.configure(config);
     }
@@ -87,7 +87,7 @@ export class MemoryConsolidation extends ConfigurableComponent {
             // Add concepts that share common subterms or have been recently accessed together
             for (const otherConcept of memory.getAllConcepts()) {
                 if (otherConcept === concept) continue;
-                
+
                 // Check if the terms share any common substructure (e.g., same components)
                 if (this._hasCommonSubstructure(term, otherConcept.term)) {
                     relatedConcepts.push(otherConcept);
@@ -97,7 +97,7 @@ export class MemoryConsolidation extends ConfigurableComponent {
 
         return relatedConcepts;
     }
-    
+
     /**
      * Check if two terms have common substructures
      * @private
@@ -107,22 +107,22 @@ export class MemoryConsolidation extends ConfigurableComponent {
         if (term1.operator !== undefined && term2.operator !== undefined && term1.operator === term2.operator) {
             return true;
         }
-        
+
         // Extract all terms from both term structures
         const terms1 = this._extractAllTerms(term1);
         const terms2 = this._extractAllTerms(term2);
-        
+
         // Check if there are any common terms
         return terms1.some(t1 => terms2.some(t2 => t1.toString() === t2.toString()));
     }
-    
+
     /**
      * Recursively extract all terms from a term structure
      * @private
      */
     _extractAllTerms(term) {
         const allTerms = [term];
-        
+
         if (term.components) {
             for (const comp of term.components) {
                 if (comp instanceof Term) {
@@ -130,7 +130,7 @@ export class MemoryConsolidation extends ConfigurableComponent {
                 }
             }
         }
-        
+
         return allTerms;
     }
 
@@ -148,7 +148,7 @@ export class MemoryConsolidation extends ConfigurableComponent {
         if (term1.operator !== term2.operator) {
             return 0.0;
         }
-        
+
         // Structural similarity for compound terms with same operator
         if (term1.operator === term2.operator && term1.components.length === term2.components.length) {
             let totalSimilarity = 0;
@@ -157,7 +157,7 @@ export class MemoryConsolidation extends ConfigurableComponent {
             }
             return totalSimilarity / term1.components.length;
         }
-        
+
         // Check for shared components in compound terms (substructural similarity)
         if (term1.isCompound && term2.isCompound) {
             return this._calculateSubstructuralSimilarity(term1, term2);
@@ -165,22 +165,22 @@ export class MemoryConsolidation extends ConfigurableComponent {
 
         return 0.0;
     }
-    
+
     /**
      * Calculate substructural similarity between two compound terms
      * @private
      */
     _calculateSubstructuralSimilarity(term1, term2) {
         // If both terms have common components, calculate similarity
-        const commonComponents = term1.components.filter(comp1 => 
+        const commonComponents = term1.components.filter(comp1 =>
             term2.components.some(comp2 => this._calculateTermSimilarity(comp1, comp2) > 0.5)
         );
-        
+
         if (commonComponents.length > 0) {
             // Return a similarity score based on shared components
             return commonComponents.length / Math.max(term1.components.length, term2.components.length);
         }
-        
+
         return 0.0;
     }
 

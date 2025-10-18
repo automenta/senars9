@@ -1,6 +1,6 @@
 import {ConfigurableComponent} from '../util/ConfigurableComponent.js';
 
-/** 
+/**
  * Advanced task selection with composite scoring for focus sets
  * Implements sophisticated selection based on priority, urgency, and cognitive diversity
  */
@@ -13,12 +13,12 @@ export class FocusSetSelector extends ConfigurableComponent {
             urgencyWeight: 0.3,
             diversityWeight: 0.2
         };
-        
+
         super(defaultConfig);
         this.configure(config);
     }
 
-    /** 
+    /**
      * Select tasks using composite scoring algorithm
      * @param {Task[]} tasks - Candidate tasks to select from
      * @param {number} currentTime - Current system timestamp
@@ -48,7 +48,7 @@ export class FocusSetSelector extends ConfigurableComponent {
             .map(item => item.task);
     }
 
-    /** 
+    /**
      * Calculate composite score for task selection
      * @private
      */

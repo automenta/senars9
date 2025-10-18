@@ -1,5 +1,5 @@
 import {Task} from './Task.js';
-import {sortByPriority, collectTasksFromAllConcepts} from '../../util/common.js';
+import {collectTasksFromAllConcepts, sortByPriority} from '../../util/common.js';
 
 export class TaskManager {
     constructor(memory, focus, config) {
@@ -15,8 +15,13 @@ export class TaskManager {
         };
     }
 
-    get stats() { return {...this._stats}; }
-    get pendingTasksCount() { return this._pendingTasks.size; }
+    get stats() {
+        return {...this._stats};
+    }
+
+    get pendingTasksCount() {
+        return this._pendingTasks.size;
+    }
 
     addTask(task) {
         if (!(task instanceof Task)) {
@@ -82,12 +87,12 @@ export class TaskManager {
     }
 
     findTasksByPriority(minPriority = 0, maxPriority = 1) {
-        return collectTasksFromAllConcepts(this._memory, 
+        return collectTasksFromAllConcepts(this._memory,
             t => t.priority >= minPriority && t.priority <= maxPriority);
     }
 
     findRecentTasks(sinceTimestamp) {
-        return collectTasksFromAllConcepts(this._memory, 
+        return collectTasksFromAllConcepts(this._memory,
             t => t.createdAt >= sinceTimestamp);
     }
 
@@ -110,7 +115,7 @@ export class TaskManager {
     }
 
     getTasksNeedingAttention(criteria = {}) {
-        const { minPriority = 0.7, maxAge = 60000, limit = 20 } = criteria;
+        const {minPriority = 0.7, maxAge = 60000, limit = 20} = criteria;
         const currentTime = Date.now();
 
         const allTasks = collectTasksFromAllConcepts(this._memory, task =>
@@ -124,8 +129,8 @@ export class TaskManager {
 
     getTaskStats() {
         const stats = {
-            tasksByType: { BELIEF: 0, GOAL: 0, QUESTION: 0 },
-            priorityDistribution: { low: 0, medium: 0, high: 0 },
+            tasksByType: {BELIEF: 0, GOAL: 0, QUESTION: 0},
+            priorityDistribution: {low: 0, medium: 0, high: 0},
             totalPriority: 0,
             oldestTask: Date.now(),
             newestTask: 0
@@ -154,9 +159,7 @@ export class TaskManager {
         };
     }
 
-    _getPriorityBucket(priority) {
-        return priority < 0.3 ? 'low' : priority < 0.7 ? 'medium' : 'high';
-    }
+    _getPriorityBucket = (priority) => priority < 0.3 ? 'low' : priority < 0.7 ? 'medium' : 'high';
 
     clearPendingTasks() {
         this._pendingTasks.clear();
